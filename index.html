@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Web Messenger</title>
+
+    <!-- PWA: installable app metadata -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0A84FF">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Messenger">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/Bv3sQWxd/1783111354171.png">
+    <link rel="icon" href="https://i.postimg.cc/Bv3sQWxd/1783111354171.png">
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -225,6 +236,32 @@
         .glass-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: opacity; opacity: 0.8; transition: 0.2s; }
         .glass-icon:hover { opacity: 1; }
 
+        /* ── CHAT CONVERSATION VIEW ── */
+        .chat-view-overlay {
+            position: fixed; top: 0; right: 0; bottom: 0; left: 80px; background: #FFF;
+            z-index: 500; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+            display: flex; flex-direction: column;
+        }
+        .chat-view-overlay.active { transform: translateX(0); }
+        .chat-view-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+        .chat-view-back { width: 22px; height: 22px; cursor: pointer; color: var(--text-main); flex-shrink: 0; }
+        .chat-view-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; flex-shrink: 0; }
+        .chat-view-info h4 { font-size: 15px; font-weight: 600; }
+        .chat-view-info p { font-size: 12px; color: var(--success-green); }
+        .chat-view-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+        .msg-bubble { max-width: 68%; padding: 10px 16px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-bubble.in { align-self: flex-start; background: #F3F4F6; color: var(--text-main); border-bottom-left-radius: 4px; }
+        .msg-bubble.out { align-self: flex-end; background: var(--gradient-brand); color: #FFF; border-bottom-right-radius: 4px; }
+        .chat-view-input-row { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border-light); flex-shrink: 0; }
+        .chat-view-input-row input { flex: 1; padding: 12px 18px; border-radius: var(--radius-pill); border: 1px solid var(--border-light); background: #FAFAFA; outline: none; font-size: 14px; }
+        .chat-view-send { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-brand); border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        @media (max-width: 768px) {
+            .chat-view-overlay { left: 0; }
+        }
+
+        /* ── PWA INSTALL BUTTON ── */
+        #btn-install-app { display: none; align-items: center; justify-content: center; cursor: pointer; }
+
         /* ── STORY VIEWER ── */
         #story-viewer-overlay {
             position: fixed; inset: 0; background: #000; z-index: 100003; display: none;
@@ -344,7 +381,10 @@
                     <div class="chat-header-area">
                         <div class="chat-header-top">
                             <h1>Chats</h1>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                            <div style="display:flex; align-items:center; gap:16px;">
+                                <svg id="btn-install-app" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Install App"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                            </div>
                         </div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -353,7 +393,7 @@
                         <div class="stories-scroll" id="stories-scroll"></div>
                     </div>
                     <div class="chat-list-container" id="chat-list-container">
-                        <div class="chat-item">
+                        <div class="chat-item" data-uid="demo-andrew-nichols" data-name="Andrew Nichols" data-avatar="https://i.pravatar.cc/100?img=68">
                             <div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=68'); border: none;"></div>
                             <div class="chat-preview">
                                 <h3>Andrew Nichols</h3>
@@ -401,6 +441,25 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Chat Conversation View -->
+    <div id="chat-view-overlay" class="chat-view-overlay">
+        <div class="chat-view-header">
+            <svg class="chat-view-back" id="chat-view-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <div class="chat-view-avatar" id="chat-view-avatar"></div>
+            <div class="chat-view-info">
+                <h4 id="chat-view-name">Contact</h4>
+                <p id="chat-view-status">Online</p>
+            </div>
+        </div>
+        <div class="chat-view-messages" id="chat-view-messages"></div>
+        <div class="chat-view-input-row">
+            <input type="text" id="chat-view-input" placeholder="Type a message...">
+            <button class="chat-view-send" id="chat-view-send">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
         </div>
     </div>
 
@@ -841,6 +900,118 @@
                 setTimeout(() => { hideLoading(); }, 800);
                 isInitialLoad = false;
             }
+        });
+
+        // --- 8. PWA: install prompt + service worker ---
+        let deferredInstallPrompt = null;
+        const installBtn = document.getElementById('btn-install-app');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            if (installBtn) installBtn.style.display = 'flex';
+        });
+
+        installBtn?.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const choice = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            installBtn.style.display = 'none';
+            if (choice.outcome === 'accepted') notify('App installed successfully');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            if (installBtn) installBtn.style.display = 'none';
+            notify('Web Messenger installed on your device');
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.error('Service worker registration failed:', err));
+            });
+        }
+
+        // --- 9. Chat Conversation View ---
+        let activeChatUid = null;
+        let unsubscribeChatMessages = null;
+
+        function threadIdFor(uidA, uidB) {
+            return [uidA, uidB].sort().join('_');
+        }
+
+        function openChatView(otherUid, otherName, otherAvatar) {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            activeChatUid = otherUid;
+            document.getElementById('chat-view-name').textContent = otherName || 'Contact';
+            document.getElementById('chat-view-status').textContent = 'Online';
+            const avatarEl = document.getElementById('chat-view-avatar');
+            avatarEl.style.backgroundImage = otherAvatar ? `url('${otherAvatar}')` : 'none';
+
+            const messagesEl = document.getElementById('chat-view-messages');
+            messagesEl.innerHTML = '';
+
+            if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
+
+            const threadId = threadIdFor(user.uid, otherUid);
+            unsubscribeChatMessages = onValue(ref(database, `dm_threads/${threadId}/messages`), (snap) => {
+                messagesEl.innerHTML = '';
+                if (snap.exists()) {
+                    const items = Object.values(snap.val()).sort((a, b) => a.createdAt - b.createdAt);
+                    items.forEach(msg => {
+                        const bubble = document.createElement('div');
+                        bubble.className = 'msg-bubble ' + (msg.senderUid === user.uid ? 'out' : 'in');
+                        bubble.textContent = msg.text;
+                        messagesEl.appendChild(bubble);
+                    });
+                }
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            });
+
+            document.getElementById('chat-view-overlay').classList.add('active');
+        }
+
+        function closeChatView() {
+            document.getElementById('chat-view-overlay').classList.remove('active');
+            if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
+            unsubscribeChatMessages = null;
+            activeChatUid = null;
+        }
+
+        // Open chat when a friend/chat card is clicked
+        document.getElementById('chat-list-container').addEventListener('click', (e) => {
+            const card = e.target.closest('.chat-item');
+            if (!card) return;
+            openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
+        });
+
+        document.getElementById('chat-view-back').addEventListener('click', closeChatView);
+
+        async function sendChatMessage() {
+            const user = auth.currentUser;
+            const input = document.getElementById('chat-view-input');
+            const text = input.value.trim();
+            if (!text || !activeChatUid || !user) return;
+
+            const threadId = threadIdFor(user.uid, activeChatUid);
+            const newMsgRef = push(ref(database, `dm_threads/${threadId}/messages`));
+            input.value = '';
+            try {
+                await set(newMsgRef, {
+                    text: text,
+                    senderUid: user.uid,
+                    createdAt: Date.now()
+                });
+            } catch (err) {
+                showCustomModal('Message Failed', 'Your message could not be sent. Please try again.');
+            }
+        }
+
+        document.getElementById('chat-view-send').addEventListener('click', sendChatMessage);
+        document.getElementById('chat-view-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
         });
 
         function initChatListeners() {

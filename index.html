@@ -191,8 +191,9 @@
         .search-box svg { position: absolute; left: 14px; top: 12px; width: 18px; height: 18px; color: rgba(255,255,255,0.7); }
 
         /* ── STORIES ── */
-        .stories-scroll { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; }
+        .stories-scroll { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; transition: opacity 0.2s ease; }
         .stories-scroll::-webkit-scrollbar { display: none; }
+        .stories-scroll.uploading { opacity: 0.5; pointer-events: none; }
         .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; }
         .story-ring { width: 54px; height: 54px; border-radius: 50%; padding: 2.5px; background: rgba(255,255,255,0.35); }
         .story-ring.has-story { background: linear-gradient(135deg, #FFB800 0%, #FF453A 50%, #5E5CE6 100%); }
@@ -551,8 +552,6 @@
         const googleProvider = new GoogleAuthProvider();
 
         // --- Cloudinary Config (direct unsigned upload, no widget script) ---
-        // TODO: replace these two values with your actual Cloudinary cloud name and
-        // an unsigned upload preset (Cloudinary Console → Settings → Upload → Add upload preset → Signing Mode: Unsigned)
         const CLOUDINARY_CLOUD_NAME = "dqkujefxj";
         const CLOUDINARY_UPLOAD_PRESET = "banter_box";
         const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
@@ -668,15 +667,19 @@
             profileSheetOverlay.classList.remove('active');
         });
 
-        // Save Profile Edits
+        // Save Profile Edits (no full-screen overlay — just a local button state)
         document.getElementById('btn-save-profile').addEventListener('click', async () => {
             const user = auth.currentUser;
             if (!user) return;
             
             const newName = document.getElementById('profile-name').value.trim();
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
-            
-            showLoading();
+            const saveBtn = document.getElementById('btn-save-profile');
+            const originalLabel = saveBtn.textContent;
+
+            saveBtn.disabled = true;
+            saveBtn.style.opacity = '0.7';
+            saveBtn.textContent = 'Saving...';
             try {
                 await updateProfile(user, { displayName: newName, photoURL: finalPhoto });
                 await update(ref(database, 'users/' + user.uid), {
@@ -690,7 +693,9 @@
             } catch (err) {
                 showCustomModal("Error Updating Profile", err.message);
             } finally {
-                hideLoading();
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '';
+                saveBtn.textContent = originalLabel;
             }
         });
 
@@ -790,7 +795,8 @@
             const user = auth.currentUser;
             if (!user) return;
 
-            showLoading();
+            const storiesBar = document.getElementById('stories-scroll');
+            storiesBar.classList.add('uploading');
             try {
                 const { url, type } = await uploadToCloudinary(file);
                 const newRef = push(ref(database, `stories/${user.uid}`));
@@ -803,7 +809,7 @@
             } catch (err) {
                 showCustomModal("Upload Failed", "We couldn't upload your story. Please try again.");
             } finally {
-                hideLoading();
+                storiesBar.classList.remove('uploading');
                 e.target.value = "";
             }
         });

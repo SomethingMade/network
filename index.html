@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Messenger.</title>
+    <title>Web Messenger</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Mapped strictly from your UI design */
+            /* Light mode default palette */
             --primary-green: #1A3B32;
             --primary-light: #2A4F40;
             --accent-peach: #F5DAC8;
@@ -17,12 +17,34 @@
             --text-muted: #888888;
             --border-light: #F0F0F0;
             --radius-pill: 50px;
+            --shadow-soft: 0 10px 25px rgba(0,0,0,0.05);
         }
         
+        /* Disable text selection and mobile long-press context menu globally */
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background-color: var(--bg-body); color: var(--text-main); overflow: hidden; height: 100vh; }
+        
+        body { 
+            background-color: var(--bg-body); 
+            color: var(--text-main); 
+            overflow: hidden; 
+            height: 100vh; 
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
 
-        /* ── UTILITIES & LOADING (Kept from your original) ── */
+        /* Images and Avatars ignore pointer events */
+        img, .avatar { pointer-events: none; }
+
+        /* Re-enable selection and interaction for inputs */
+        input, textarea {
+            -webkit-user-select: auto;
+            user-select: auto;
+            pointer-events: auto;
+        }
+
+        /* ── UTILITIES & LOADING ── */
         #loading-overlay {
             position: fixed; inset: 0; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(3px); z-index: 100000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -36,9 +58,27 @@
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         
-        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: var(--radius-pill); color: white; font-weight: 500; box-shadow: 0 10px 25px rgba(0,0,0,0.2); display: none; z-index: 10000; }
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: var(--radius-pill); color: white; font-weight: 500; box-shadow: var(--shadow-soft); display: none; z-index: 10000; }
 
-        /* ── AUTHENTICATION SCREEN (Restyled to match new theme) ── */
+        /* ── CUSTOM MODALS ── */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
+            display: flex; align-items: center; justify-content: center; z-index: 100001;
+            opacity: 0; visibility: hidden; transition: 0.2s ease;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .custom-modal {
+            background: var(--bg-body); width: 100%; max-width: 400px; border-radius: 24px; padding: 32px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1); transform: translateY(20px); transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+        .modal-overlay.active .custom-modal { transform: translateY(0); }
+        .custom-modal h3 { color: var(--primary-green); font-size: 20px; margin-bottom: 12px; }
+        .custom-modal p { color: var(--text-muted); font-size: 15px; margin-bottom: 24px; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 12px; }
+        .modal-actions button { flex: 1; }
+
+        /* ── AUTHENTICATION SCREEN ── */
         #auth-screen { position: fixed; inset: 0; z-index: 9999; display: flex; background: var(--bg-body); }
         #auth-image-side { flex: 1.2; background: var(--primary-green); display: flex; flex-direction: column; justify-content: flex-end; padding: 60px; position: relative; overflow: hidden;}
         #auth-image-side::after { content:''; position: absolute; top: -50%; right: -20%; width: 100%; height: 150%; background: rgba(255,255,255,0.05); transform: rotate(15deg); border-radius: 100px; }
@@ -53,10 +93,11 @@
         .pill-input { width: 100%; padding: 14px 20px; border: 1px solid var(--border-light); border-radius: var(--radius-pill); font-size: 15px; outline: none; background: #FAFAFA; margin-bottom: 16px; }
         .pill-input:focus { border-color: var(--primary-green); }
         
-        .btn-pill { width: 100%; padding: 14px 24px; border-radius: var(--radius-pill); font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-pill { width: 100%; padding: 14px 24px; border-radius: var(--radius-pill); font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: 0.2s;}
         .btn-primary { background: var(--primary-green); color: white; }
         .btn-primary:hover { background: var(--primary-light); }
-        .btn-outline { background: transparent; border: 1px solid var(--border-light); margin-top: 12px; }
+        .btn-outline { background: transparent; border: 1px solid var(--border-light); color: var(--text-main); }
+        .btn-outline:hover { background: #FAFAFA; }
         
         .toggle-auth { margin-top: 24px; font-size: 14px; color: var(--text-muted); text-align: center; }
         .toggle-auth span { color: var(--primary-green); font-weight: 600; cursor: pointer; }
@@ -72,9 +113,12 @@
         .nav-icon.active { color: var(--primary-green); }
         .profile-btn { margin-top: auto; width: 40px; height: 40px; border-radius: 50%; background: var(--accent-peach); display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; color: var(--primary-green); font-weight: bold;}
 
-        /* Middle Pane: Chat List */
+        /* Middle Pane: Chat List & Tabs */
         .chat-pane { display: flex; flex-direction: column; border-right: 1px solid var(--border-light); background: #FFF; position: relative; }
         
+        .tab-content { display: none; flex-direction: column; height: 100%; }
+        .tab-content.active-tab { display: flex; }
+
         .chat-header-area { background: var(--primary-green); border-bottom-left-radius: 40px; padding: 40px 24px 24px; color: white; }
         .chat-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .chat-header-top h1 { font-size: 24px; font-weight: 600; }
@@ -100,7 +144,6 @@
         .time { font-size: 11px; color: var(--text-muted); }
         .unread-badge { background: var(--accent-peach); color: var(--text-main); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
 
-        /* The floating add button */
         .fab-add { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); width: 56px; height: 56px; border-radius: 50%; background: var(--accent-peach); color: var(--primary-green); border: none; font-size: 28px; cursor: pointer; box-shadow: 0 10px 25px rgba(245, 218, 200, 0.4); display: flex; align-items: center; justify-content: center; }
 
         /* Right Pane: Video Call Workspace */
@@ -131,21 +174,32 @@
         /* Responsive overrides */
         @media (max-width: 1024px) {
             .app-grid { grid-template-columns: 80px 1fr; }
-            .workspace-pane { display: none; /* Hide video on small screens until a chat is clicked */ }
+            .workspace-pane { display: none; }
         }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
             .side-nav { flex-direction: row; height: 70px; padding: 0 24px; position: fixed; bottom: 0; width: 100%; border-right: none; border-top: 1px solid var(--border-light); justify-content: space-between; z-index: 100; }
             .chat-list-container { padding-bottom: 90px; }
+            #auth-image-side { display: none; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-    </div>
+    <div id="loading-overlay"><div class="spinner"></div></div>
+    
     <div id="toast-notification" class="toast"></div>
+
+    <div id="custom-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3 id="modal-title">Alert</h3>
+            <p id="modal-message">Message goes here</p>
+            <div class="modal-actions">
+                <button id="modal-btn-cancel" class="btn-pill btn-outline" style="display: none;">Cancel</button>
+                <button id="modal-btn-confirm" class="btn-pill btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
 
     <div id="auth-screen">
         <div id="auth-image-side">
@@ -154,21 +208,17 @@
                 <p style="font-size: 18px; opacity: 0.9;">Secure, real-time connection seamlessly bridging mobile and desktop.</p>
             </div>
         </div>
-        
         <div id="auth-form-side">
             <div class="auth-card">
                 <h2>Welcome back</h2>
                 <p id="auth-subtitle">Sign in to sync your chats</p>
-                
                 <input type="email" id="auth-email" class="pill-input" placeholder="Email address">
                 <input type="password" id="auth-pass" class="pill-input" placeholder="Password">
-                
-                <button id="btn-email-auth" class="btn-pill btn-primary">Sign In</button>
+                <button id="btn-email-auth" class="btn-pill btn-primary" style="margin-bottom: 16px;">Sign In</button>
                 <button id="btn-google-auth" class="btn-pill btn-outline" style="display:flex; align-items:center; justify-content:center; gap:8px;">
                     <svg style="width:18px; height:18px;" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                     Google
                 </button>
-                
                 <p class="toggle-auth">Need an account? <span id="toggle-auth-btn">Sign up</span></p>
             </div>
         </div>
@@ -178,45 +228,57 @@
         <div class="app-grid">
             
             <nav class="side-nav">
-                <svg class="nav-icon active" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <svg class="nav-icon active" data-tab="tab-chats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <svg class="nav-icon" data-tab="tab-calls" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                <svg class="nav-icon" data-tab="tab-contacts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                 <button class="profile-btn" id="btn-logout" title="Sign Out">KP</button>
             </nav>
 
             <aside class="chat-pane">
-                <div class="chat-header-area">
-                    <div class="chat-header-top">
-                        <h1>Chats</h1>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                
+                <div id="tab-chats" class="tab-content active-tab">
+                    <div class="chat-header-area">
+                        <div class="chat-header-top">
+                            <h1>Chats</h1>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                        </div>
+                        <div class="search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" placeholder="Search chats...">
+                        </div>
+                        <div class="active-users-scroll">
+                            <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=11');"></div><div class="online-dot"></div></div>
+                            <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=12');"></div><div class="online-dot"></div></div>
+                        </div>
                     </div>
-                    
-                    <div class="search-box">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <input type="text" placeholder="Search...">
-                    </div>
-
-                    <div class="active-users-scroll">
-                        <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=11');"></div><div class="online-dot"></div></div>
-                        <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=12');"></div><div class="online-dot"></div></div>
-                        <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=13');"></div></div>
-                        <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=14');"></div><div class="online-dot"></div></div>
-                        <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=15');"></div></div>
+                    <div class="chat-list-container" id="chat-list-container">
+                        <div class="chat-item">
+                            <div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=68'); border: none;"></div>
+                            <div class="chat-preview">
+                                <h3>Andrew Nichols</h3>
+                                <p>Yeah, we all here! Hurry up!</p>
+                            </div>
+                            <div class="chat-meta"><span class="time">09:26</span><span class="unread-badge">2</span></div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="chat-list-container" id="chat-list-container">
-                    <div class="chat-item">
-                        <div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=68'); border: none;"></div>
-                        <div class="chat-preview">
-                            <h3>Andrew Nichols</h3>
-                            <p>Yeah, we all here! Hurry up!</p>
-                        </div>
-                        <div class="chat-meta">
-                            <span class="time">09:26</span>
-                            <span class="unread-badge">2</span>
+                <div id="tab-calls" class="tab-content">
+                    <div class="chat-header-area">
+                        <div class="chat-header-top"><h1>Recent Calls</h1></div>
+                    </div>
+                    <div class="chat-list-container"><p style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 14px;">No recent calls to display.</p></div>
+                </div>
+
+                <div id="tab-contacts" class="tab-content">
+                    <div class="chat-header-area">
+                        <div class="chat-header-top"><h1>Contacts</h1></div>
+                        <div class="search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" placeholder="Find people...">
                         </div>
                     </div>
+                    <div class="chat-list-container"><p style="text-align: center; color: var(--text-muted); margin-top: 40px; font-size: 14px;">Your contact list is empty.</p></div>
                 </div>
 
                 <button class="fab-add">+</button>
@@ -227,25 +289,18 @@
                     <h2>Irene Casey</h2>
                     <p>Currently Speaking • 01:24</p>
                 </div>
-
                 <div class="glass-panel">
                     <button class="end-call-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                     </button>
-
                     <div class="glass-controls">
                         <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></div>
                         <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></div>
                         <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2-2.4-3.5-4.4-3.5h-1.2c-.3-3-2.9-5.3-5.9-5.3-3.4 0-6.1 2.8-6.1 6.2 0 .1 0 .2.1.3C2.1 9.4 1 11.2 1 13.2 1 15.9 3.2 18 5.8 18h14.4c1.7 0 3-1.3 3-3z"></path></svg></div>
                     </div>
-
                     <div class="participants-grid">
-                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');">
-                            <span class="participant-name">Jonathan</span>
-                        </div>
-                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');">
-                            <span class="participant-name">Amy</span>
-                        </div>
+                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');"><span class="participant-name">Jonathan</span></div>
+                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');"><span class="participant-name">Amy</span></div>
                         <div class="participant-card participant-connecting">
                             <div class="connecting-avatar"></div>
                             <span class="participant-name" style="text-align: center; width: 100%; bottom: 20px;">Paul<br><span style="font-size:9px; opacity:0.8;">is connecting</span></span>
@@ -253,7 +308,6 @@
                     </div>
                 </div>
             </main>
-
         </div>
     </div>
 
@@ -262,6 +316,55 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
+        // --- 1. Prevent Right-Click/Long Press ---
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // --- 2. Custom Modals & UI Helpers ---
+        function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
+        function hideLoading() { document.getElementById("loading-overlay").classList.remove("active"); }
+
+        function notify(message, type = "success") {
+            const toast = document.getElementById("toast-notification");
+            toast.textContent = message;
+            toast.style.backgroundColor = type === "success" ? "#10B981" : "var(--danger-red)";
+            toast.style.display = "block";
+            setTimeout(() => { toast.style.display = "none"; }, 4000);
+        }
+
+        function showCustomModal(title, message, isConfirm = false) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('custom-modal-overlay');
+                document.getElementById('modal-title').textContent = title;
+                document.getElementById('modal-message').textContent = message;
+                
+                const btnCancel = document.getElementById('modal-btn-cancel');
+                const btnConfirm = document.getElementById('modal-btn-confirm');
+                
+                btnCancel.style.display = isConfirm ? 'block' : 'none';
+                overlay.classList.add('active');
+
+                btnConfirm.onclick = () => { overlay.classList.remove('active'); resolve(true); };
+                btnCancel.onclick = () => { overlay.classList.remove('active'); resolve(false); };
+            });
+        }
+
+        // --- 3. Tab Switching Logic ---
+        function initTabs() {
+            const navIcons = document.querySelectorAll('.nav-icon');
+            const tabContents = document.querySelectorAll('.tab-content');
+            navIcons.forEach(icon => {
+                icon.addEventListener('click', () => {
+                    navIcons.forEach(nav => nav.classList.remove('active'));
+                    icon.classList.add('active');
+                    tabContents.forEach(tab => tab.classList.remove('active-tab'));
+                    const targetTab = document.getElementById(icon.getAttribute('data-tab'));
+                    if(targetTab) targetTab.classList.add('active-tab');
+                });
+            });
+        }
+        initTabs();
+
+        // --- 4. Firebase Configuration & Auth ---
         const firebaseConfig = {
             apiKey: "AIzaSyBQSPwpVbGrdCuOoyitAeWQHIeipj2MgIY",
             authDomain: "newstart-64c43.firebaseapp.com",
@@ -279,17 +382,6 @@
 
         let authMode = "login"; 
 
-        function notify(message, type = "success") {
-            const toast = document.getElementById("toast-notification");
-            toast.textContent = message;
-            toast.style.backgroundColor = type === "success" ? "#10B981" : "var(--danger-red)";
-            toast.style.display = "block";
-            setTimeout(() => { toast.style.display = "none"; }, 4000);
-        }
-
-        function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
-        function hideLoading() { document.getElementById("loading-overlay").classList.remove("active"); }
-
         document.getElementById('toggle-auth-btn').addEventListener('click', () => {
             authMode = authMode === "login" ? "signup" : "login";
             document.getElementById('auth-subtitle').textContent = authMode === "login" ? "Sign in to sync your chats" : "Create a new account";
@@ -302,25 +394,28 @@
         document.getElementById('btn-email-auth').addEventListener('click', async () => {
             const email = document.getElementById('auth-email').value.trim();
             const pass = document.getElementById('auth-pass').value;
-            if(!email || !pass) return notify("Please enter credentials.", "error");
+            if(!email || !pass) return showCustomModal("Required", "Please enter your email and password.");
             showLoading();
             try {
                 if (authMode === "login") await signInWithEmailAndPassword(auth, email, pass);
                 else await createUserWithEmailAndPassword(auth, email, pass);
-            } catch (err) { notify(err.message.replace("Firebase: ", ""), "error"); } 
+            } catch (err) { showCustomModal("Authentication Error", err.message.replace("Firebase: ", "")); } 
             finally { hideLoading(); }
         });
 
         document.getElementById('btn-google-auth').addEventListener('click', async () => {
             showLoading();
             try { await signInWithPopup(auth, googleProvider); } 
-            catch (err) { notify(err.message.replace("Firebase: ", ""), "error"); }
+            catch (err) { showCustomModal("Google Sign In Failed", err.message.replace("Firebase: ", "")); }
             finally { hideLoading(); }
         });
 
         document.getElementById('btn-logout').addEventListener('click', async () => {
-            showLoading();
-            try { await signOut(auth); } finally { hideLoading(); }
+            const confirmOut = await showCustomModal("Sign Out", "Are you sure you want to log out of the messenger?", true);
+            if(confirmOut) {
+                showLoading();
+                try { await signOut(auth); } finally { hideLoading(); }
+            }
         });
 
         onAuthStateChanged(auth, (user) => {
@@ -334,16 +429,11 @@
             }
         });
 
+        // --- 5. Realtime Database Example ---
         function initChatListeners() {
-            // Example of binding your Firebase DB to the new UI structure
             onValue(ref(database, "chats"), (snap) => {
-                const container = document.getElementById("chat-list-container");
-                // container.innerHTML = ""; // Clear placeholders once you have real data
                 if(snap.exists()) {
-                    snap.forEach(child => {
-                        const data = child.val();
-                        // Build DOM elements exactly like the static HTML
-                    });
+                    // Logic to render chats inside document.getElementById("chat-list-container")
                 }
             });
         }

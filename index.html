@@ -35,23 +35,21 @@
             user-select: none;
         }
 
-        /* Images and Avatars ignore pointer events */
         img, .avatar { pointer-events: none; }
 
-        /* Re-enable selection and interaction for inputs */
         input, textarea {
             -webkit-user-select: auto;
             user-select: auto;
             pointer-events: auto;
         }
 
-        /* ── UTILITIES & LOADING ── */
+        /* ── UTILITIES & LOADING SPLASH ── */
         #loading-overlay {
-            position: fixed; inset: 0; background: var(--bg-body); z-index: 100000;
+            /* Matched to typical logo background. Change #FFFFFF if your logo has a different hex background */
+            position: fixed; inset: 0; background: #FFFFFF; z-index: 100000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             opacity: 0; visibility: hidden; transition: opacity 0.5s ease, visibility 0.5s;
         }
-        /* Active by default for the initial splash screen */
         #loading-overlay.active { opacity: 1; visibility: visible; }
         
         .spinner {
@@ -81,8 +79,14 @@
         .modal-actions { display: flex; gap: 12px; }
         .modal-actions button { flex: 1; }
 
+        /* Profile Specific Modal UI */
+        .profile-avatar-preview {
+            width: 80px; height: 80px; border-radius: 50%; background-color: var(--border-light);
+            margin: 0 auto 24px; background-size: cover; background-position: center;
+            display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--primary-blue); font-weight: 700;
+        }
+
         /* ── AUTHENTICATION SCREEN ── */
-        /* Initially hidden to prevent flash of login screen */
         #auth-screen { position: fixed; inset: 0; z-index: 9999; display: none; background: var(--bg-body); }
         #auth-image-side { flex: 1.2; background: var(--gradient-brand); display: flex; flex-direction: column; justify-content: flex-end; padding: 60px; position: relative; overflow: hidden;}
         #auth-image-side::after { content:''; position: absolute; top: -50%; right: -20%; width: 100%; height: 150%; background: rgba(255,255,255,0.05); transform: rotate(15deg); border-radius: 100px; }
@@ -115,7 +119,16 @@
         .nav-icon { width: 24px; height: 24px; color: #D1D5DB; cursor: pointer; transition: 0.2s; }
         .nav-icon:hover { color: var(--text-muted); }
         .nav-icon.active { color: var(--primary-blue); }
-        .profile-btn { margin-top: auto; width: 40px; height: 40px; border-radius: 50%; background: rgba(10, 132, 255, 0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; color: var(--primary-blue); font-weight: bold;}
+        
+        /* Profile Avatar Button */
+        .profile-btn { 
+            margin-top: auto; width: 44px; height: 44px; border-radius: 50%; 
+            background-color: rgba(10, 132, 255, 0.1); background-size: cover; background-position: center;
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; border: 2px solid transparent; color: var(--primary-blue); 
+            font-weight: bold; font-size: 16px; transition: 0.2s;
+        }
+        .profile-btn:hover { border-color: var(--primary-blue); transform: scale(1.05); }
 
         /* Middle Pane: Chat List & Tabs */
         .chat-pane { display: flex; flex-direction: column; border-right: 1px solid var(--border-light); background: #FFF; position: relative; }
@@ -166,16 +179,8 @@
         .end-call-btn svg { color: white; width: 24px; height: 24px; transform: rotate(135deg); }
 
         .glass-controls { display: flex; gap: 24px; margin-bottom: 24px; color: white; }
-        .glass-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.8; transition: 0.2s; }
+        .glass-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: opacity; opacity: 0.8; transition: 0.2s; }
         .glass-icon:hover { opacity: 1; }
-
-        .participants-grid { display: flex; gap: 16px; }
-        .participant-card { flex: 1; height: 120px; border-radius: 16px; background-size: cover; background-position: center; position: relative; overflow: hidden; }
-        .participant-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px; background: linear-gradient(to top, rgba(0,0,0,0.6), transparent); }
-        .participant-name { position: absolute; bottom: 12px; left: 12px; color: white; font-size: 12px; font-weight: 500; z-index: 1; }
-        
-        .participant-connecting { background: var(--gradient-brand); display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .connecting-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); margin-bottom: 8px; }
 
         /* Responsive overrides */
         @media (max-width: 1024px) {
@@ -206,6 +211,24 @@
             <div class="modal-actions">
                 <button id="modal-btn-cancel" class="btn-pill btn-outline" style="display: none;">Cancel</button>
                 <button id="modal-btn-confirm" class="btn-pill btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="profile-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3>Your Profile</h3>
+            <div class="profile-avatar-preview" id="profile-avatar-preview"></div>
+            <input type="text" id="profile-name" class="pill-input" placeholder="Display Name">
+            <input type="text" id="profile-photo-url" class="pill-input" placeholder="Photo URL (Optional)">
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 24px;">Paste an image link to update your avatar.</p>
+            
+            <div class="modal-actions" style="flex-direction: column; gap: 12px;">
+                <button id="btn-save-profile" class="btn-pill btn-primary">Save Changes</button>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button id="btn-close-profile" class="btn-pill btn-outline">Cancel</button>
+                    <button id="btn-logout" class="btn-pill btn-outline" style="color: var(--danger-red); border-color: rgba(255, 69, 58, 0.3);">Sign Out</button>
+                </div>
             </div>
         </div>
     </div>
@@ -241,7 +264,8 @@
                 <svg class="nav-icon active" data-tab="tab-chats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 <svg class="nav-icon" data-tab="tab-calls" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                 <svg class="nav-icon" data-tab="tab-contacts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                <button class="profile-btn" id="btn-logout" title="Sign Out">KP</button>
+                
+                <button class="profile-btn" id="btn-profile" title="View Profile"></button>
             </nav>
 
             <aside class="chat-pane">
@@ -255,10 +279,6 @@
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" placeholder="Search chats...">
-                        </div>
-                        <div class="active-users-scroll">
-                            <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=11');"></div><div class="online-dot"></div></div>
-                            <div class="avatar-wrapper"><div class="avatar" style="background-image: url('https://i.pravatar.cc/100?img=12');"></div><div class="online-dot"></div></div>
                         </div>
                     </div>
                     <div class="chat-list-container" id="chat-list-container">
@@ -308,14 +328,6 @@
                         <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></div>
                         <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2-2.4-3.5-4.4-3.5h-1.2c-.3-3-2.9-5.3-5.9-5.3-3.4 0-6.1 2.8-6.1 6.2 0 .1 0 .2.1.3C2.1 9.4 1 11.2 1 13.2 1 15.9 3.2 18 5.8 18h14.4c1.7 0 3-1.3 3-3z"></path></svg></div>
                     </div>
-                    <div class="participants-grid">
-                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');"><span class="participant-name">Jonathan</span></div>
-                        <div class="participant-card" style="background-image: url('https://images.unsplash.com/photo-1517841905240-472988babdf9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80');"><span class="participant-name">Amy</span></div>
-                        <div class="participant-card participant-connecting">
-                            <div class="connecting-avatar"></div>
-                            <span class="participant-name" style="text-align: center; width: 100%; bottom: 20px;">Paul<br><span style="font-size:9px; opacity:0.8;">is connecting</span></span>
-                        </div>
-                    </div>
                 </div>
             </main>
         </div>
@@ -323,13 +335,13 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
         // --- 1. Prevent Right-Click/Long Press ---
         document.addEventListener('contextmenu', event => event.preventDefault());
 
-        // --- 2. Custom Modals & UI Helpers ---
+        // --- 2. UI Helpers ---
         function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
         function hideLoading() { document.getElementById("loading-overlay").classList.remove("active"); }
 
@@ -391,7 +403,7 @@
         const googleProvider = new GoogleAuthProvider();
 
         let authMode = "login"; 
-        let isInitialLoad = true; // Tracks the first app startup sequence
+        let isInitialLoad = true;
 
         document.getElementById('toggle-auth-btn').addEventListener('click', () => {
             authMode = authMode === "login" ? "signup" : "login";
@@ -421,41 +433,113 @@
             finally { hideLoading(); }
         });
 
+        // --- 5. Profile Management ---
+        const profileModal = document.getElementById('profile-modal-overlay');
+        const btnProfile = document.getElementById('btn-profile');
+
+        function updateAvatarUI(user) {
+            if (!user) return;
+            const initial = user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : "?");
+            
+            if (user.photoURL) {
+                btnProfile.style.backgroundImage = `url('${user.photoURL}')`;
+                btnProfile.textContent = "";
+            } else {
+                btnProfile.style.backgroundImage = "none";
+                btnProfile.textContent = initial;
+            }
+        }
+
+        // Open Profile Modal
+        btnProfile.addEventListener('click', () => {
+            const user = auth.currentUser;
+            if (user) {
+                document.getElementById('profile-name').value = user.displayName || "";
+                document.getElementById('profile-photo-url').value = user.photoURL || "";
+                
+                // Set Modal Preview
+                const preview = document.getElementById('profile-avatar-preview');
+                if (user.photoURL) {
+                    preview.style.backgroundImage = `url('${user.photoURL}')`;
+                    preview.textContent = "";
+                } else {
+                    preview.style.backgroundImage = "none";
+                    preview.textContent = user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email.charAt(0).toUpperCase());
+                }
+                profileModal.classList.add('active');
+            }
+        });
+
+        // Live Preview on Input
+        document.getElementById('profile-photo-url').addEventListener('input', (e) => {
+            const preview = document.getElementById('profile-avatar-preview');
+            const nameInput = document.getElementById('profile-name').value;
+            if(e.target.value) {
+                preview.style.backgroundImage = `url('${e.target.value}')`;
+                preview.textContent = "";
+            } else {
+                preview.style.backgroundImage = "none";
+                preview.textContent = nameInput ? nameInput.charAt(0).toUpperCase() : "?";
+            }
+        });
+
+        document.getElementById('btn-close-profile').addEventListener('click', () => {
+            profileModal.classList.remove('active');
+        });
+
+        // Save Profile Edits
+        document.getElementById('btn-save-profile').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            
+            const newName = document.getElementById('profile-name').value.trim();
+            const newPhoto = document.getElementById('profile-photo-url').value.trim();
+            
+            showLoading();
+            try {
+                await updateProfile(user, { displayName: newName, photoURL: newPhoto });
+                updateAvatarUI(user);
+                profileModal.classList.remove('active');
+                notify("Profile updated successfully");
+            } catch (err) {
+                showCustomModal("Error Updating Profile", err.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Relocated Logout Button
         document.getElementById('btn-logout').addEventListener('click', async () => {
             const confirmOut = await showCustomModal("Sign Out", "Are you sure you want to log out of the messenger?", true);
             if(confirmOut) {
+                profileModal.classList.remove('active');
                 showLoading();
                 try { await signOut(auth); } finally { hideLoading(); }
             }
         });
 
-        // The auth observer triggers immediately upon load, confirming our session status behind the splash screen.
+        // Session Observer
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // User is signed in: show app directly, skip login screen
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
+                updateAvatarUI(user); // Initialize Avatar
                 initChatListeners();
             } else {
-                // No user: default to showing login screen
                 document.getElementById('auth-screen').style.display = 'flex';
                 document.getElementById('messenger-screen').style.display = 'none';
             }
 
-            // Remove splash screen cleanly after checking auth status
             if (isInitialLoad) {
-                setTimeout(() => {
-                    hideLoading();
-                }, 800); // Artificial 800ms delay to make the splash brand reveal feel natural
+                setTimeout(() => { hideLoading(); }, 800);
                 isInitialLoad = false;
             }
         });
 
-        // --- 5. Realtime Database Example ---
         function initChatListeners() {
             onValue(ref(database, "chats"), (snap) => {
                 if(snap.exists()) {
-                    // Logic to render chats inside document.getElementById("chat-list-container")
+                    // Chat rendering logic goes here
                 }
             });
         }

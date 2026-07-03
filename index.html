@@ -47,15 +47,17 @@
 
         /* ── UTILITIES & LOADING ── */
         #loading-overlay {
-            position: fixed; inset: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px); z-index: 100000;
+            position: fixed; inset: 0; background: var(--bg-body); z-index: 100000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            opacity: 0; visibility: hidden; transition: opacity 0.3s ease;
+            opacity: 0; visibility: hidden; transition: opacity 0.5s ease, visibility 0.5s;
         }
+        /* Active by default for the initial splash screen */
         #loading-overlay.active { opacity: 1; visibility: visible; }
+        
         .spinner {
-            width: 48px; height: 48px; border: 4px solid var(--border-light);
+            width: 40px; height: 40px; border: 3px solid var(--border-light);
             border-top-color: var(--primary-blue); border-radius: 50%;
-            animation: spin 1s linear infinite; margin-top: 24px;
+            animation: spin 1s linear infinite; margin-top: 32px;
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         
@@ -80,7 +82,8 @@
         .modal-actions button { flex: 1; }
 
         /* ── AUTHENTICATION SCREEN ── */
-        #auth-screen { position: fixed; inset: 0; z-index: 9999; display: flex; background: var(--bg-body); }
+        /* Initially hidden to prevent flash of login screen */
+        #auth-screen { position: fixed; inset: 0; z-index: 9999; display: none; background: var(--bg-body); }
         #auth-image-side { flex: 1.2; background: var(--gradient-brand); display: flex; flex-direction: column; justify-content: flex-end; padding: 60px; position: relative; overflow: hidden;}
         #auth-image-side::after { content:''; position: absolute; top: -50%; right: -20%; width: 100%; height: 150%; background: rgba(255,255,255,0.05); transform: rotate(15deg); border-radius: 100px; }
         .auth-brand-overlay { position: relative; z-index: 1; color: #FFFFFF; }
@@ -189,9 +192,8 @@
 </head>
 <body>
 
-    <!-- Splash Screen Logo -->
-    <div id="loading-overlay">
-        <img src="https://i.postimg.cc/Bv3sQWxd/1783111354171.png" alt="Loading Logo" style="width: 120px;">
+    <div id="loading-overlay" class="active">
+        <img src="https://i.postimg.cc/Bv3sQWxd/1783111354171.png" alt="Loading Logo" style="width: 140px;">
         <div class="spinner"></div>
     </div>
     
@@ -211,7 +213,6 @@
     <div id="auth-screen">
         <div id="auth-image-side">
             <div class="auth-brand-overlay">
-                <!-- Authentication Banner Logo -->
                 <img src="https://i.postimg.cc/Bv3sQWxd/1783111354171.png" alt="Brand Logo" style="width: 150px; margin-bottom: 24px;">
                 <h1>Web<br>Messenger.</h1>
                 <p style="font-size: 18px; opacity: 0.9;">Secure, real-time connection seamlessly bridging mobile and desktop.</p>
@@ -390,6 +391,7 @@
         const googleProvider = new GoogleAuthProvider();
 
         let authMode = "login"; 
+        let isInitialLoad = true; // Tracks the first app startup sequence
 
         document.getElementById('toggle-auth-btn').addEventListener('click', () => {
             authMode = authMode === "login" ? "signup" : "login";
@@ -427,14 +429,25 @@
             }
         });
 
+        // The auth observer triggers immediately upon load, confirming our session status behind the splash screen.
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                // User is signed in: show app directly, skip login screen
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
                 initChatListeners();
             } else {
+                // No user: default to showing login screen
                 document.getElementById('auth-screen').style.display = 'flex';
                 document.getElementById('messenger-screen').style.display = 'none';
+            }
+
+            // Remove splash screen cleanly after checking auth status
+            if (isInitialLoad) {
+                setTimeout(() => {
+                    hideLoading();
+                }, 800); // Artificial 800ms delay to make the splash brand reveal feel natural
+                isInitialLoad = false;
             }
         });
 

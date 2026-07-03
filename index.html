@@ -57,6 +57,11 @@
             border-top-color: var(--primary-blue); border-radius: 50%;
             animation: spin 1s linear infinite; margin-top: 32px;
         }
+        .spinner-sm {
+            width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.4);
+            border-top-color: #FFF; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         
         .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: var(--radius-pill); color: white; font-weight: 500; box-shadow: var(--shadow-soft); display: none; z-index: 10000; }
@@ -79,12 +84,41 @@
         .modal-actions { display: flex; gap: 12px; }
         .modal-actions button { flex: 1; }
 
-        /* Profile Specific Modal UI */
-        .profile-avatar-preview {
-            width: 80px; height: 80px; border-radius: 50%; background-color: var(--border-light);
-            margin: 0 auto 24px; background-size: cover; background-position: center;
-            display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--primary-blue); font-weight: 700;
+        /* ── BOTTOM SHEET (Profile) ── */
+        .bottom-sheet-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
+            z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s;
+            display: flex; align-items: flex-end; justify-content: center;
         }
+        .bottom-sheet-overlay.active { opacity: 1; visibility: visible; }
+        .bottom-sheet {
+            background: var(--bg-body); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0;
+            padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+            transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            max-height: 85vh; overflow-y: auto;
+        }
+        .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
+        .sheet-handle { width: 40px; height: 5px; background: var(--border-light); border-radius: 10px; margin: 0 auto 20px; }
+        .sheet-title { font-size: 18px; font-weight: 700; margin-bottom: 24px; text-align: center; }
+
+        .sheet-avatar-upload { position: relative; width: 96px; height: 96px; margin: 0 auto 28px; cursor: pointer; }
+        .sheet-avatar-upload .avatar-circle {
+            width: 96px; height: 96px; border-radius: 50%; background-color: var(--border-light);
+            background-size: cover; background-position: center; display: flex; align-items: center;
+            justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700;
+            border: 3px solid #FFF; box-shadow: var(--shadow-soft);
+        }
+        .sheet-avatar-upload .camera-badge {
+            position: absolute; bottom: 0; right: 0; width: 32px; height: 32px; border-radius: 50%;
+            background: var(--gradient-brand); display: flex; align-items: center; justify-content: center;
+            border: 3px solid #FFF; color: white;
+        }
+        .sheet-avatar-upload .camera-badge svg { width: 15px; height: 15px; }
+        .sheet-upload-spinner {
+            position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.25); border-radius: 50%;
+        }
+        .sheet-avatar-upload.uploading .sheet-upload-spinner { display: flex; }
 
         /* ── AUTHENTICATION SCREEN ── */
         #auth-screen { position: fixed; inset: 0; z-index: 9999; display: none; background: var(--bg-body); }
@@ -140,16 +174,25 @@
         .chat-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .chat-header-top h1 { font-size: 24px; font-weight: 600; }
         
-        .search-box { position: relative; margin-bottom: 24px; }
+        .search-box { position: relative; margin-bottom: 20px; }
         .search-box input { width: 100%; padding: 12px 16px 12px 40px; background: rgba(255,255,255,0.15); border: none; border-radius: var(--radius-pill); color: white; font-size: 14px; outline: none; }
         .search-box input::placeholder { color: rgba(255,255,255,0.7); }
         .search-box svg { position: absolute; left: 14px; top: 12px; width: 18px; height: 18px; color: rgba(255,255,255,0.7); }
 
-        .active-users-scroll { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-        .active-users-scroll::-webkit-scrollbar { display: none; }
-        .avatar-wrapper { position: relative; flex-shrink: 0; }
-        .avatar { width: 50px; height: 50px; border-radius: 50%; background-color: #E5E7EB; background-size: cover; background-position: center; border: 2px solid white; }
-        .online-dot { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; background: var(--success-green); border: 2px solid white; border-radius: 50%; }
+        /* ── STORIES ── */
+        .stories-scroll { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; }
+        .stories-scroll::-webkit-scrollbar { display: none; }
+        .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; }
+        .story-ring { width: 54px; height: 54px; border-radius: 50%; padding: 2.5px; background: rgba(255,255,255,0.35); }
+        .story-ring.has-story { background: linear-gradient(135deg, #FFB800 0%, #FF453A 50%, #5E5CE6 100%); }
+        .story-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: rgba(255,255,255,0.9); padding: 2px; }
+        .story-avatar-img { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display:flex; align-items:center; justify-content:center; font-weight:700; color: var(--primary-blue); font-size: 16px; position: relative; }
+        .story-add-badge {
+            position: absolute; bottom: -2px; right: -2px; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--primary-blue); border: 2px solid #FFF; color: white; display: flex;
+            align-items: center; justify-content: center; font-size: 13px; font-weight: 700; line-height: 1;
+        }
+        .story-label { font-size: 11px; color: rgba(255,255,255,0.9); max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .chat-list-container { flex: 1; overflow-y: auto; padding: 16px 24px; }
         .chat-item { display: flex; align-items: center; gap: 16px; padding: 16px 0; cursor: pointer; border-bottom: 1px solid #FAFAFA; transition: 0.2s; }
@@ -181,6 +224,24 @@
         .glass-controls { display: flex; gap: 24px; margin-bottom: 24px; color: white; }
         .glass-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: opacity; opacity: 0.8; transition: 0.2s; }
         .glass-icon:hover { opacity: 1; }
+
+        /* ── STORY VIEWER ── */
+        #story-viewer-overlay {
+            position: fixed; inset: 0; background: #000; z-index: 100003; display: none;
+            align-items: center; justify-content: center;
+        }
+        #story-viewer-overlay.active { display: flex; }
+        .story-viewer-inner { position: relative; width: 100%; max-width: 460px; height: 100%; max-height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .story-media { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .story-progress-row { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 3; }
+        .story-progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+        .story-progress-fill { height: 100%; width: 0%; background: #FFF; }
+        .story-viewer-header { position: absolute; top: 24px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px; z-index: 3; }
+        .story-viewer-header .avatar { width: 32px; height: 32px; border: none; }
+        .story-viewer-header span { color: white; font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+        .story-viewer-close { margin-left: auto; color: white; cursor: pointer; width: 24px; height: 24px; }
+        .story-tap-zone { position: absolute; top: 0; bottom: 0; width: 40%; z-index: 2; }
+        .story-tap-zone.left { left: 0; } .story-tap-zone.right { right: 0; }
 
         /* Responsive overrides */
         @media (max-width: 1024px) {
@@ -215,15 +276,24 @@
         </div>
     </div>
 
-    <div id="profile-modal-overlay" class="modal-overlay">
-        <div class="custom-modal">
-            <h3>Your Profile</h3>
-            <div class="profile-avatar-preview" id="profile-avatar-preview"></div>
+    <!-- Profile Bottom Sheet -->
+    <div id="profile-bottom-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Your Profile</div>
+
+            <div class="sheet-avatar-upload" id="sheet-avatar-upload">
+                <div class="avatar-circle" id="profile-avatar-preview"></div>
+                <div class="camera-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                </div>
+                <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+            </div>
+            <input type="file" id="profile-photo-input" accept="image/*" style="display:none;">
+
             <input type="text" id="profile-name" class="pill-input" placeholder="Display Name">
-            <input type="text" id="profile-photo-url" class="pill-input" placeholder="Photo URL (Optional)">
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 24px;">Paste an image link to update your avatar.</p>
-            
-            <div class="modal-actions" style="flex-direction: column; gap: 12px;">
+
+            <div class="modal-actions" style="flex-direction: column; gap: 12px; margin-top: 8px;">
                 <button id="btn-save-profile" class="btn-pill btn-primary">Save Changes</button>
                 <div style="display: flex; gap: 8px; width: 100%;">
                     <button id="btn-close-profile" class="btn-pill btn-outline">Cancel</button>
@@ -280,6 +350,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" placeholder="Search chats...">
                         </div>
+                        <div class="stories-scroll" id="stories-scroll"></div>
                     </div>
                     <div class="chat-list-container" id="chat-list-container">
                         <div class="chat-item">
@@ -333,10 +404,28 @@
         </div>
     </div>
 
+    <!-- Story upload input -->
+    <input type="file" id="story-file-input" accept="image/*,video/*" style="display:none;">
+
+    <!-- Story Viewer -->
+    <div id="story-viewer-overlay">
+        <div class="story-viewer-inner">
+            <div class="story-progress-row" id="story-progress-row"></div>
+            <div class="story-viewer-header">
+                <div class="avatar" id="story-viewer-avatar"></div>
+                <span id="story-viewer-name"></span>
+                <svg class="story-viewer-close" id="story-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <img class="story-media" id="story-viewer-media" src="" alt="Story">
+            <div class="story-tap-zone left" id="story-tap-left"></div>
+            <div class="story-tap-zone right" id="story-tap-right"></div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, push, set, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
         // --- 1. Prevent Right-Click/Long Press ---
         document.addEventListener('contextmenu', event => event.preventDefault());
@@ -402,6 +491,23 @@
         const database = getDatabase(app);
         const googleProvider = new GoogleAuthProvider();
 
+        // --- Cloudinary Config (direct unsigned upload, no widget script) ---
+        // TODO: replace these two values with your actual Cloudinary cloud name and
+        // an unsigned upload preset (Cloudinary Console → Settings → Upload → Add upload preset → Signing Mode: Unsigned)
+        const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUD_NAME";
+        const CLOUDINARY_UPLOAD_PRESET = "YOUR_UNSIGNED_PRESET";
+        const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+
+        async function uploadToCloudinary(file) {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+            const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: formData });
+            if (!res.ok) throw new Error("Cloudinary upload failed");
+            const data = await res.json();
+            return { url: data.secure_url, type: data.resource_type === "video" ? "video" : "image" };
+        }
+
         let authMode = "login"; 
         let isInitialLoad = true;
 
@@ -433,9 +539,10 @@
             finally { hideLoading(); }
         });
 
-        // --- 5. Profile Management ---
-        const profileModal = document.getElementById('profile-modal-overlay');
+        // --- 5. Profile Management (Bottom Sheet) ---
+        const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
         const btnProfile = document.getElementById('btn-profile');
+        let pendingPhotoURL = null;
 
         function updateAvatarUI(user) {
             if (!user) return;
@@ -450,14 +557,13 @@
             }
         }
 
-        // Open Profile Modal
+        // Open Profile Sheet
         btnProfile.addEventListener('click', () => {
             const user = auth.currentUser;
             if (user) {
                 document.getElementById('profile-name').value = user.displayName || "";
-                document.getElementById('profile-photo-url').value = user.photoURL || "";
-                
-                // Set Modal Preview
+                pendingPhotoURL = user.photoURL || null;
+
                 const preview = document.getElementById('profile-avatar-preview');
                 if (user.photoURL) {
                     preview.style.backgroundImage = `url('${user.photoURL}')`;
@@ -466,25 +572,41 @@
                     preview.style.backgroundImage = "none";
                     preview.textContent = user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email.charAt(0).toUpperCase());
                 }
-                profileModal.classList.add('active');
+                profileSheetOverlay.classList.add('active');
             }
         });
 
-        // Live Preview on Input
-        document.getElementById('profile-photo-url').addEventListener('input', (e) => {
-            const preview = document.getElementById('profile-avatar-preview');
-            const nameInput = document.getElementById('profile-name').value;
-            if(e.target.value) {
-                preview.style.backgroundImage = `url('${e.target.value}')`;
+        // Tap avatar to trigger Cloudinary upload (no widget, direct file picker + fetch upload)
+        document.getElementById('sheet-avatar-upload').addEventListener('click', () => {
+            document.getElementById('profile-photo-input').click();
+        });
+
+        document.getElementById('profile-photo-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const wrapper = document.getElementById('sheet-avatar-upload');
+            wrapper.classList.add('uploading');
+            try {
+                const { url } = await uploadToCloudinary(file);
+                pendingPhotoURL = url;
+                const preview = document.getElementById('profile-avatar-preview');
+                preview.style.backgroundImage = `url('${url}')`;
                 preview.textContent = "";
-            } else {
-                preview.style.backgroundImage = "none";
-                preview.textContent = nameInput ? nameInput.charAt(0).toUpperCase() : "?";
+            } catch (err) {
+                showCustomModal("Upload Failed", "We couldn't upload that image. Please check your connection and try again.");
+            } finally {
+                wrapper.classList.remove('uploading');
+                e.target.value = "";
             }
+        });
+
+        // Close sheet on backdrop tap
+        profileSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === profileSheetOverlay) profileSheetOverlay.classList.remove('active');
         });
 
         document.getElementById('btn-close-profile').addEventListener('click', () => {
-            profileModal.classList.remove('active');
+            profileSheetOverlay.classList.remove('active');
         });
 
         // Save Profile Edits
@@ -493,13 +615,18 @@
             if (!user) return;
             
             const newName = document.getElementById('profile-name').value.trim();
-            const newPhoto = document.getElementById('profile-photo-url').value.trim();
+            const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
             
             showLoading();
             try {
-                await updateProfile(user, { displayName: newName, photoURL: newPhoto });
+                await updateProfile(user, { displayName: newName, photoURL: finalPhoto });
+                await update(ref(database, 'users/' + user.uid), {
+                    name: newName || (user.email ? user.email.split('@')[0] : "User"),
+                    photoURL: finalPhoto,
+                    email: user.email || ""
+                });
                 updateAvatarUI(user);
-                profileModal.classList.remove('active');
+                profileSheetOverlay.classList.remove('active');
                 notify("Profile updated successfully");
             } catch (err) {
                 showCustomModal("Error Updating Profile", err.message);
@@ -512,10 +639,182 @@
         document.getElementById('btn-logout').addEventListener('click', async () => {
             const confirmOut = await showCustomModal("Sign Out", "Are you sure you want to log out of the messenger?", true);
             if(confirmOut) {
-                profileModal.classList.remove('active');
+                profileSheetOverlay.classList.remove('active');
                 showLoading();
                 try { await signOut(auth); } finally { hideLoading(); }
             }
+        });
+
+        // --- 6. Stories ---
+        const STORY_TTL = 24 * 60 * 60 * 1000; // 24 hours
+        let cachedUsers = {};
+        let cachedStories = {};
+
+        function renderStoriesBar(usersData, storiesData) {
+            const container = document.getElementById('stories-scroll');
+            const user = auth.currentUser;
+            if (!container || !user) return;
+            container.innerHTML = "";
+
+            const now = Date.now();
+
+            // Own story bubble first
+            const ownRaw = (storiesData && storiesData[user.uid]) ? Object.values(storiesData[user.uid]) : [];
+            const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
+            const ownProfile = (usersData && usersData[user.uid]) || {};
+            container.appendChild(buildStoryItem(
+                user.uid,
+                ownProfile.name || user.displayName || "You",
+                ownProfile.photoURL || user.photoURL || "",
+                ownItems,
+                true
+            ));
+
+            // Other users with active stories
+            Object.keys(storiesData || {}).forEach(uid => {
+                if (uid === user.uid) return;
+                const items = Object.values(storiesData[uid]).filter(s => now - s.createdAt < STORY_TTL);
+                if (items.length === 0) return;
+                const profile = (usersData && usersData[uid]) || {};
+                container.appendChild(buildStoryItem(uid, profile.name || "User", profile.photoURL || "", items, false));
+            });
+        }
+
+        function buildStoryItem(uid, name, photoURL, items, isOwn) {
+            const wrap = document.createElement('div');
+            wrap.className = 'story-item';
+
+            const ring = document.createElement('div');
+            ring.className = 'story-ring' + (items.length > 0 ? ' has-story' : '');
+
+            const inner = document.createElement('div');
+            inner.className = 'story-ring-inner';
+
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'story-avatar-img';
+            if (photoURL) {
+                avatarDiv.style.backgroundImage = `url('${photoURL}')`;
+            } else {
+                avatarDiv.textContent = (name || "?").charAt(0).toUpperCase();
+            }
+
+            if (isOwn && items.length === 0) {
+                const badge = document.createElement('div');
+                badge.className = 'story-add-badge';
+                badge.textContent = '+';
+                avatarDiv.appendChild(badge);
+            }
+
+            inner.appendChild(avatarDiv);
+            ring.appendChild(inner);
+            wrap.appendChild(ring);
+
+            const label = document.createElement('div');
+            label.className = 'story-label';
+            label.textContent = isOwn ? 'Your Story' : name;
+            wrap.appendChild(label);
+
+            wrap.addEventListener('click', () => {
+                if (items.length > 0) {
+                    openStoryViewer(name, photoURL, items);
+                } else if (isOwn) {
+                    document.getElementById('story-file-input').click();
+                }
+            });
+
+            return wrap;
+        }
+
+        document.getElementById('story-file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const user = auth.currentUser;
+            if (!user) return;
+
+            showLoading();
+            try {
+                const { url, type } = await uploadToCloudinary(file);
+                const newRef = push(ref(database, `stories/${user.uid}`));
+                await set(newRef, {
+                    mediaURL: url,
+                    type: type,
+                    createdAt: Date.now()
+                });
+                notify("Story added");
+            } catch (err) {
+                showCustomModal("Upload Failed", "We couldn't upload your story. Please try again.");
+            } finally {
+                hideLoading();
+                e.target.value = "";
+            }
+        });
+
+        // --- 7. Story Viewer ---
+        let storyState = { items: [], index: 0, timer: null };
+
+        function openStoryViewer(name, photoURL, items) {
+            storyState.items = items.slice().sort((a, b) => a.createdAt - b.createdAt);
+            storyState.index = 0;
+
+            document.getElementById('story-viewer-name').textContent = name;
+            const avatarEl = document.getElementById('story-viewer-avatar');
+            avatarEl.style.backgroundImage = photoURL ? `url('${photoURL}')` : "none";
+
+            const progressRow = document.getElementById('story-progress-row');
+            progressRow.innerHTML = "";
+            storyState.items.forEach(() => {
+                const track = document.createElement('div');
+                track.className = 'story-progress-track';
+                const fill = document.createElement('div');
+                fill.className = 'story-progress-fill';
+                track.appendChild(fill);
+                progressRow.appendChild(track);
+            });
+
+            document.getElementById('story-viewer-overlay').classList.add('active');
+            playStory();
+        }
+
+        function playStory() {
+            clearTimeout(storyState.timer);
+            const fills = document.querySelectorAll('.story-progress-fill');
+            fills.forEach((f, i) => {
+                f.style.transition = 'none';
+                f.style.width = i < storyState.index ? '100%' : '0%';
+            });
+
+            const current = storyState.items[storyState.index];
+            if (!current) { closeStoryViewer(); return; }
+            document.getElementById('story-viewer-media').src = current.mediaURL;
+
+            requestAnimationFrame(() => {
+                const activeFill = fills[storyState.index];
+                if (activeFill) {
+                    activeFill.style.transition = 'width 5s linear';
+                    activeFill.style.width = '100%';
+                }
+            });
+
+            storyState.timer = setTimeout(() => {
+                storyState.index++;
+                if (storyState.index >= storyState.items.length) { closeStoryViewer(); }
+                else { playStory(); }
+            }, 5000);
+        }
+
+        function closeStoryViewer() {
+            clearTimeout(storyState.timer);
+            document.getElementById('story-viewer-overlay').classList.remove('active');
+        }
+
+        document.getElementById('story-viewer-close').addEventListener('click', closeStoryViewer);
+        document.getElementById('story-tap-left').addEventListener('click', () => {
+            if (storyState.index > 0) { storyState.index--; playStory(); }
+        });
+        document.getElementById('story-tap-right').addEventListener('click', () => {
+            storyState.index++;
+            if (storyState.index >= storyState.items.length) { closeStoryViewer(); }
+            else { playStory(); }
         });
 
         // Session Observer
@@ -524,6 +823,14 @@
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
                 updateAvatarUI(user); // Initialize Avatar
+
+                // Sync basic profile record so other users can see name/photo (chats, stories, etc.)
+                update(ref(database, 'users/' + user.uid), {
+                    name: user.displayName || (user.email ? user.email.split('@')[0] : "User"),
+                    photoURL: user.photoURL || "",
+                    email: user.email || ""
+                });
+
                 initChatListeners();
             } else {
                 document.getElementById('auth-screen').style.display = 'flex';
@@ -541,6 +848,16 @@
                 if(snap.exists()) {
                     // Chat rendering logic goes here
                 }
+            });
+
+            onValue(ref(database, "users"), (snap) => {
+                cachedUsers = snap.exists() ? snap.val() : {};
+                renderStoriesBar(cachedUsers, cachedStories);
+            });
+
+            onValue(ref(database, "stories"), (snap) => {
+                cachedStories = snap.exists() ? snap.val() : {};
+                renderStoriesBar(cachedUsers, cachedStories);
             });
         }
     </script>

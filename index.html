@@ -47,6 +47,7 @@
         input, textarea { -webkit-user-select: auto; user-select: auto; pointer-events: auto; }
 
         .avatar { width: 48px; height: 48px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
+        .avatar[data-full] { pointer-events: auto; cursor: zoom-in; }
         .empty-msg { text-align: center; color: #888888; margin-top: 40px; font-size: 14px; }
 
         /* ── UTILITIES & LOADING SPLASH ── */
@@ -174,6 +175,17 @@
         /* Unread Badge on Chat List Item */
         .unread-badge { background: #FF453A; color: white; font-size: 11px; font-weight: bold; border-radius: 50px; padding: 2px 6px; min-width: 20px; text-align: center; display: inline-block; margin-top: 4px; }
 
+        /* ── CHAT REQUESTS BANNER (non-contact senders) ── */
+        .chat-request-banner { flex-shrink: 0; padding: 14px 24px 4px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #F0F0F0; max-height: 220px; overflow-y: auto; }
+        .chat-request-banner-title { font-size: 12px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .chat-request-row { display: flex; align-items: center; gap: 12px; }
+        .chat-request-info { flex: 1; min-width: 0; }
+        .chat-request-info h4 { font-size: 14px; font-weight: 600; color: #111111; }
+        .chat-request-info p { font-size: 12px; color: #888888; }
+        .btn-add-contact { flex-shrink: 0; padding: 8px 16px; border-radius: 50px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; background: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 100%); color: white; transition: 0.2s; }
+        .btn-add-contact:hover { opacity: 0.9; }
+        .btn-add-contact:disabled { opacity: 0.6; cursor: default; }
+
         /* Add Friend Floating Button */
         .fab-add { position: absolute; bottom: 32px; right: 32px; width: 60px; height: 60px; border-radius: 50%; background: #0A84FF; color: white; border: none; font-size: 32px; cursor: pointer; box-shadow: 0 10px 25px rgba(10, 132, 255, 0.4); display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 50; }
         .fab-add:hover { transform: scale(1.05); background: #5E5CE6; }
@@ -240,6 +252,13 @@
             50% { transform: translateY(-100px) scale(1.2); opacity: 1; }
             100% { transform: translateY(-200px) scale(1); opacity: 0; }
         }
+
+        /* ── FULL IMAGE VIEWER (avatar preview) ── */
+        #image-viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #image-viewer-overlay.active { opacity: 1; visibility: visible; }
+        #image-viewer-overlay img { max-width: 85%; max-height: 85%; border-radius: 16px; object-fit: contain; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .image-viewer-close { position: absolute; top: 28px; right: 28px; width: 26px; height: 26px; color: white; cursor: pointer; transition: 0.2s; }
+        .image-viewer-close:hover { opacity: 0.75; }
 
         @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } }
         @media (max-width: 768px) {
@@ -381,6 +400,7 @@
                         </div>
                         <div class="stories-scroll" id="stories-scroll"></div>
                     </div>
+                    <div class="chat-request-banner" id="chat-requests-container" style="display:none;"></div>
                     <div class="chat-list-container" id="chat-list-container"></div>
                 </div>
 
@@ -463,6 +483,11 @@
         </div>
     </div>
 
+    <div id="image-viewer-overlay">
+        <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <img id="image-viewer-img" src="" alt="Full image">
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -495,6 +520,21 @@
                 btnCancel.onclick = () => { overlay.classList.remove('active'); resolve(false); };
             });
         }
+
+        // --- FULL IMAGE VIEWER ---
+        function openImageViewer(url) {
+            if (!url) return;
+            document.getElementById('image-viewer-img').src = url;
+            document.getElementById('image-viewer-overlay').classList.add('active');
+        }
+        function closeImageViewer() {
+            document.getElementById('image-viewer-overlay').classList.remove('active');
+            document.getElementById('image-viewer-img').src = '';
+        }
+        document.getElementById('image-viewer-close').addEventListener('click', closeImageViewer);
+        document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'image-viewer-overlay') closeImageViewer();
+        });
 
         // --- TIME FORMATTING LOGIC ---
         function formatTime(timestamp) {
@@ -1098,6 +1138,95 @@
             }
         }
 
+        // --- CHAT REQUESTS (people who messaged you but aren't in your contacts) ---
+        let cachedContacts = {};
+        let cachedUserChatsData = {};
+
+        function renderChatRequests() {
+            const container = document.getElementById('chat-requests-container');
+            if (!container) return;
+
+            const pendingUids = Object.keys(cachedUserChatsData).filter(uid => !cachedContacts[uid]);
+
+            if (pendingUids.length === 0) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = '';
+
+            const title = document.createElement('div');
+            title.className = 'chat-request-banner-title';
+            title.textContent = pendingUids.length === 1 ? 'Message Request' : `Message Requests (${pendingUids.length})`;
+            container.appendChild(title);
+
+            pendingUids.forEach(uid => {
+                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+                const row = document.createElement('div');
+                row.className = 'chat-request-row';
+
+                const avatarWrap = document.createElement('div');
+                if (profile.photoURL) {
+                    avatarWrap.className = 'avatar';
+                    avatarWrap.style.backgroundImage = `url('${profile.photoURL}')`;
+                    avatarWrap.setAttribute('data-full', profile.photoURL);
+                } else {
+                    avatarWrap.className = 'avatar';
+                    avatarWrap.style.backgroundColor = '#0A84FF';
+                    avatarWrap.style.color = 'white';
+                    avatarWrap.style.display = 'flex';
+                    avatarWrap.style.alignItems = 'center';
+                    avatarWrap.style.justifyContent = 'center';
+                    avatarWrap.style.fontWeight = 'bold';
+                    avatarWrap.style.fontSize = '18px';
+                    avatarWrap.textContent = (profile.name || '?').charAt(0).toUpperCase();
+                }
+                row.appendChild(avatarWrap);
+
+                const info = document.createElement('div');
+                info.className = 'chat-request-info';
+                info.innerHTML = `<h4>${profile.name || 'Unknown User'}</h4><p>Sent you a message</p>`;
+                row.appendChild(info);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn-add-contact';
+                btn.dataset.uid = uid;
+                btn.textContent = 'Add';
+                row.appendChild(btn);
+
+                container.appendChild(row);
+            });
+        }
+
+        document.getElementById('chat-requests-container').addEventListener('click', async (e) => {
+            const avatarEl = e.target.closest('.avatar[data-full]');
+            if (avatarEl) {
+                e.stopPropagation();
+                openImageViewer(avatarEl.getAttribute('data-full'));
+                return;
+            }
+
+            const btn = e.target.closest('.btn-add-contact');
+            if (btn) {
+                const uid = btn.dataset.uid;
+                const user = auth.currentUser;
+                if (!user || !uid) return;
+                btn.disabled = true;
+                btn.textContent = 'Adding...';
+                try {
+                    await set(ref(database, `contacts/${user.uid}/${uid}`), true);
+                    notify('Added to contacts');
+                } catch (err) {
+                    showCustomModal('Error', 'Could not add this contact.');
+                    btn.disabled = false;
+                    btn.textContent = 'Add';
+                }
+            }
+        });
+
         // --- Real Chat Data Renderers ---
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
@@ -1109,7 +1238,7 @@
             
             const initial = profile.name.charAt(0).toUpperCase();
             const avatarHtml = profile.photoURL 
-                ? `<div class="avatar" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
+                ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
                 : `<div class="avatar" style="background-color: #0A84FF; color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
             
             let metaHtml = "";
@@ -1250,11 +1379,23 @@
         }
 
         document.getElementById('chat-list-container').addEventListener('click', (e) => {
+            const avatarEl = e.target.closest('.avatar[data-full]');
+            if (avatarEl) {
+                e.stopPropagation();
+                openImageViewer(avatarEl.getAttribute('data-full'));
+                return;
+            }
             const card = e.target.closest('.chat-item');
             if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
         });
 
         document.getElementById('contacts-list-container').addEventListener('click', (e) => {
+            const avatarEl = e.target.closest('.avatar[data-full]');
+            if (avatarEl) {
+                e.stopPropagation();
+                openImageViewer(avatarEl.getAttribute('data-full'));
+                return;
+            }
             const card = e.target.closest('.chat-item');
             if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
         });
@@ -1298,6 +1439,7 @@
             onValue(ref(database, "users"), (snap) => {
                 cachedUsers = snap.exists() ? snap.val() : {};
                 renderStoriesBar(cachedUsers, cachedStories);
+                renderChatRequests();
 
                 // Auto-refresh header text when someone you're chatting with logs off or reconnects
                 if (activeChatUid) {
@@ -1322,10 +1464,12 @@
             });
 
             onValue(ref(database, `contacts/${user.uid}`), (snap) => {
+                cachedContacts = snap.exists() ? snap.val() : {};
+
                 const contactsList = document.getElementById('contacts-list-container');
                 contactsList.innerHTML = '';
                 if(snap.exists()) {
-                    Object.keys(snap.val()).forEach(contactUid => {
+                    Object.keys(cachedContacts).forEach(contactUid => {
                         renderChatItem(contactUid, null, contactsList, false);
                     });
                 } else {
@@ -1334,6 +1478,7 @@
                 
                 // Keep the filter applied when list updates
                 filterListItems(contactSearchInput, 'contacts-list-container');
+                renderChatRequests();
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {
@@ -1341,8 +1486,10 @@
                 chatList.innerHTML = '';
                 let totalUnread = 0;
 
+                cachedUserChatsData = snap.exists() ? snap.val() : {};
+
                 if(snap.exists()) {
-                    const chats = snap.val();
+                    const chats = cachedUserChatsData;
                     const sortedUids = Object.keys(chats).sort((a,b) => chats[b].timestamp - chats[a].timestamp);
                     
                     sortedUids.forEach(chatUid => {
@@ -1366,6 +1513,7 @@
                 
                 updateTotalUnreadBadge(totalUnread);
                 filterListItems(chatSearchInput, 'chat-list-container');
+                renderChatRequests();
             });
         }
     </script>

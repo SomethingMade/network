@@ -339,7 +339,7 @@
             
             <nav class="side-nav">
                 <div class="nav-item active" data-tab="tab-chats">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1-2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     <span>Chats</span>
                 </div>
                 <div class="nav-item" data-tab="tab-calls">
@@ -370,7 +370,7 @@
                         </div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" placeholder="Search chats...">
+                            <input type="text" id="search-chats" placeholder="Search chats...">
                         </div>
                         <div class="stories-scroll" id="stories-scroll"></div>
                     </div>
@@ -389,7 +389,7 @@
                         <div class="chat-header-top"><h1>Contacts</h1></div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" placeholder="Find people...">
+                            <input type="text" id="search-contacts" placeholder="Find people...">
                         </div>
                     </div>
                     <div class="chat-list-container" id="contacts-list-container"></div>
@@ -488,6 +488,29 @@
                 btnCancel.onclick = () => { overlay.classList.remove('active'); resolve(false); };
             });
         }
+
+        // --- FILTER FUNCTIONALITY ---
+        function filterListItems(inputElement, containerId) {
+            const query = inputElement.value.toLowerCase();
+            const container = document.getElementById(containerId);
+            const items = container.querySelectorAll('.chat-item');
+            
+            items.forEach(item => {
+                const name = item.querySelector('.chat-preview h3').textContent.toLowerCase();
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        const chatSearchInput = document.getElementById('search-chats');
+        const contactSearchInput = document.getElementById('search-contacts');
+
+        chatSearchInput.addEventListener('input', () => filterListItems(chatSearchInput, 'chat-list-container'));
+        contactSearchInput.addEventListener('input', () => filterListItems(contactSearchInput, 'contacts-list-container'));
+
 
         // --- HASH ROUTING & BACK BUTTON LOGIC ---
         window.addEventListener('hashchange', () => {
@@ -997,11 +1020,23 @@
             }
         });
 
+        // Delete story handler with modal confirmation
         document.getElementById('story-viewer-delete').addEventListener('click', async (e) => {
             e.stopPropagation();
             const current = storyState.items[storyState.index];
             const user = auth.currentUser;
             if (!current || !current.key || !user || !storyState.isOwn) return;
+
+            // Pause the timer to prevent the story from proceeding while the modal is open
+            clearTimeout(storyState.timer);
+
+            const confirmDelete = await showCustomModal("Delete Story", "Are you sure you want to delete this story?", true);
+            
+            // If the user cancelled, resume the story
+            if (!confirmDelete) {
+                playStory();
+                return;
+            }
 
             try {
                 await remove(ref(database, `stories/${user.uid}/${current.key}`));
@@ -1202,6 +1237,9 @@
                 } else {
                     contactsList.innerHTML = '<p class="empty-msg">Your contact list is empty.</p>';
                 }
+                
+                // Keep the filter applied when list updates
+                filterListItems(contactSearchInput, 'contacts-list-container');
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {
@@ -1216,6 +1254,9 @@
                 } else {
                     chatList.innerHTML = '<p class="empty-msg">No recent messages yet.</p>';
                 }
+                
+                // Keep the filter applied when list updates
+                filterListItems(chatSearchInput, 'chat-list-container');
             });
         }
     </script>

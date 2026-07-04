@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Web Messenger.</title>
+    <title>Web Messenger</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0A84FF">
@@ -610,6 +610,35 @@
             });
         }
         initTabs();
+
+        // --- PWA INSTALL PROMPT ---
+        let deferredInstallPrompt = null;
+        const btnInstallApp = document.getElementById('btn-install-app');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            btnInstallApp.style.display = 'flex';
+        });
+
+        btnInstallApp.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            try {
+                const { outcome } = await deferredInstallPrompt.userChoice;
+                if (outcome === 'accepted') notify('App installed successfully');
+            } finally {
+                deferredInstallPrompt = null;
+                btnInstallApp.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            btnInstallApp.style.display = 'none';
+            deferredInstallPrompt = null;
+            notify('App installed successfully');
+        });
 
         const firebaseConfig = {
             apiKey: "AIzaSyBQSPwpVbGrdCuOoyitAeWQHIeipj2MgIY",

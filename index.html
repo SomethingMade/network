@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Web Messenger.</title>
+    <title>Web Messenger</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0A84FF">
@@ -163,8 +163,11 @@
         .story-avatar-img { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display:flex; align-items:center; justify-content:center; font-weight:700; color: #0A84FF; font-size: 16px; position: relative; }
         .story-label { font-size: 11px; color: rgba(255,255,255,0.9); max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        .chat-list-container { flex: 1; overflow-y: auto; padding: 16px 24px; }
-        .chat-item { display: flex; align-items: center; gap: 16px; padding: 16px 0; cursor: pointer; border-bottom: 1px solid #FAFAFA; transition: 0.2s; }
+        .chat-list-container { flex: 1; overflow-y: auto; padding: 12px 16px; }
+        .chat-item { display: flex; align-items: center; gap: 16px; padding: 12px; margin-bottom: 2px; border-radius: 12px; cursor: pointer; transition: 0.15s ease; }
+        .chat-item:hover { background: #FAFAFA; }
+        .chat-item.active-chat { background: #EAF4FF; }
+        .chat-item.active-chat:hover { background: #EAF4FF; }
         .chat-item:hover .chat-preview h3 { color: #0A84FF; }
         .chat-preview { flex: 1; }
         .chat-preview h3 { font-size: 15px; font-weight: 600; color: #111111; margin-bottom: 4px; transition: color 0.2s; }
@@ -190,19 +193,15 @@
         .fab-add { position: absolute; bottom: 32px; right: 32px; width: 60px; height: 60px; border-radius: 50%; background: #0A84FF; color: white; border: none; font-size: 32px; cursor: pointer; box-shadow: 0 10px 25px rgba(10, 132, 255, 0.4); display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 50; }
         .fab-add:hover { transform: scale(1.05); background: #5E5CE6; }
 
-        /* Right Pane: Video Call Workspace */
-        .workspace-pane { position: relative; background: url('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80') center/cover no-repeat; display: flex; flex-direction: column; justify-content: space-between; padding: 40px; }
-        .video-overlay-text { text-align: center; color: white; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        .video-overlay-text h2 { font-size: 28px; font-weight: 600; margin-bottom: 4px; }
-        .video-overlay-text p { font-size: 12px; letter-spacing: 2px; opacity: 0.8; text-transform: uppercase; }
-
-        .glass-panel { background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 32px; padding: 32px; max-width: 600px; margin: 0 auto; width: 100%; position: relative; }
-        .glass-controls { display: flex; gap: 24px; margin-bottom: 24px; color: white; justify-content: center; }
-        .glass-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.8; transition: 0.2s; }
-        .glass-icon:hover { opacity: 1; }
+        /* Right Pane: Empty State (no chat selected) */
+        .workspace-pane { position: relative; background: #F7F8FA; display: flex; align-items: center; justify-content: center; padding: 40px; }
+        .workspace-empty { text-align: center; max-width: 380px; }
+        .workspace-empty-icon { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, rgba(10,132,255,0.1) 0%, rgba(94,92,230,0.1) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 28px; color: #0A84FF; }
+        .workspace-empty h2 { font-size: 24px; font-weight: 700; color: #111111; margin-bottom: 10px; }
+        .workspace-empty p { font-size: 14px; color: #888888; line-height: 1.6; }
 
         /* ── CHAT CONVERSATION VIEW ── */
-        .chat-view-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 88px; background: #FFF; z-index: 500; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); display: flex; flex-direction: column; }
+        .chat-view-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 468px; background: #FFF; z-index: 500; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); display: flex; flex-direction: column; border-left: 1px solid #F0F0F0; }
         .chat-view-overlay.active { transform: translateX(0); }
         .chat-view-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid #F0F0F0; flex-shrink: 0; }
         .chat-view-back { width: 22px; height: 22px; cursor: pointer; color: #111111; flex-shrink: 0; }
@@ -260,7 +259,8 @@
         .image-viewer-close { position: absolute; top: 28px; right: 28px; width: 26px; height: 26px; color: white; cursor: pointer; transition: 0.2s; }
         .image-viewer-close:hover { opacity: 0.75; }
 
-        @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } }
+        @media (min-width: 1025px) { .chat-view-back { display: none; } }
+        @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
             .side-nav { flex-direction: row; height: 80px; padding: 0 16px; position: fixed; bottom: 0; width: 100%; border-right: none; border-top: 1px solid #F0F0F0; justify-content: space-around; z-index: 100; box-shadow: 0 -4px 15px rgba(0,0,0,0.03); padding-bottom: env(safe-area-inset-bottom); }
@@ -268,6 +268,7 @@
             .chat-list-container { padding-bottom: 100px; }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
+            .chat-view-back { display: block; }
             .fab-add { position: fixed; bottom: 100px; right: 24px; z-index: 99; }
         }
     </style>
@@ -426,15 +427,12 @@
             </aside>
 
             <main class="workspace-pane">
-                <div class="video-overlay-text">
-                    <h2>Select a Chat</h2>
-                    <p>Web Messenger Live Space</p>
-                </div>
-                <div class="glass-panel" style="opacity: 0.4;">
-                    <div class="glass-controls">
-                        <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path></svg></div>
-                        <div class="glass-icon"><svg viewBox="0 0 24 24" width="20" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></div>
+                <div class="workspace-empty">
+                    <div class="workspace-empty-icon">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     </div>
+                    <h2>Web Messenger</h2>
+                    <p>Select a chat from the list to start messaging, or add a friend to begin a new conversation.</p>
                 </div>
             </main>
         </div>
@@ -583,6 +581,7 @@
                 if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
                 unsubscribeChatMessages = null;
                 activeChatUid = null;
+                highlightActiveChat();
             }
             if (hash !== 'story' && storyActive) {
                 clearTimeout(storyState.timer);
@@ -1257,10 +1256,16 @@
         });
 
         // --- Real Chat Data Renderers ---
+        function highlightActiveChat() {
+            document.querySelectorAll('#chat-list-container .chat-item, #contacts-list-container .chat-item').forEach(el => {
+                el.classList.toggle('active-chat', el.dataset.uid === activeChatUid);
+            });
+        }
+
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
             const item = document.createElement('div');
-            item.className = 'chat-item';
+            item.className = 'chat-item' + (uid === activeChatUid ? ' active-chat' : '');
             item.dataset.uid = uid;
             item.dataset.name = profile.name;
             item.dataset.avatar = profile.photoURL;
@@ -1405,6 +1410,7 @@
             });
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
+            highlightActiveChat();
         }
 
         document.getElementById('chat-list-container').addEventListener('click', (e) => {

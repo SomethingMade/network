@@ -236,6 +236,8 @@
         .story-viewer-delete:hover { transform: scale(1.1); }
         .story-viewer-close { color: white; cursor: pointer; width: 24px; height: 24px; transition: 0.2s; }
         .story-viewer-close:hover { opacity: 0.8; }
+        .story-mute-btn { color: white; cursor: pointer; width: 22px; height: 22px; transition: 0.2s; }
+        .story-mute-btn:hover { opacity: 0.8; }
         
         .story-tap-zone { position: absolute; top: 0; bottom: 0; width: 40%; z-index: 2; }
         .story-tap-zone.left { left: 0; } .story-tap-zone.right { right: 0; }
@@ -465,18 +467,20 @@
                 <div class="avatar" id="story-viewer-avatar" style="width:32px;height:32px;"></div>
                 <span id="story-viewer-name"></span>
                 <div class="story-controls-right">
-                    <svg class="story-viewer-delete" id="story-viewer-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    <svg class="story-viewer-close" id="story-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg class="story-viewer-delete story-interactive" id="story-viewer-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    <svg class="story-mute-btn story-interactive" id="story-mute-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"></svg>
+                    <svg class="story-viewer-close story-interactive" id="story-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </div>
             </div>
             
             <img class="story-media" id="story-viewer-media" src="" alt="Story">
+            <video class="story-media" id="story-viewer-video" muted playsinline style="display:none;"></video>
             
             <div class="story-tap-zone left" id="story-tap-left"></div>
             <div class="story-tap-zone right" id="story-tap-right"></div>
             
             <div class="story-controls-bottom" id="story-controls-bottom">
-                <svg class="story-like-btn" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             </div>
         </div>
     </div>
@@ -585,6 +589,7 @@
             }
             if (hash !== 'story' && storyActive) {
                 clearTimeout(storyState.timer);
+                document.getElementById('story-viewer-video').pause();
                 document.getElementById('story-viewer-overlay').classList.remove('active');
             }
 
@@ -665,7 +670,7 @@
             const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: formData });
             if (!res.ok) throw new Error("Cloudinary upload failed");
             const data = await res.json();
-            return { url: data.secure_url, type: data.resource_type === "video" ? "video" : "image" };
+            return { url: data.secure_url, type: data.resource_type === "video" ? "video" : "image", duration: data.duration || null };
         }
 
         let authMode = "login"; 
@@ -971,12 +976,13 @@
             try {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    const { url, type } = await uploadToCloudinary(file);
+                    const { url, type, duration } = await uploadToCloudinary(file);
                     const newRef = push(ref(database, `stories/${user.uid}`));
                     await set(newRef, {
                         mediaURL: url,
                         type: type,
-                        createdAt: Date.now()
+                        createdAt: Date.now(),
+                        ...(type === 'video' && duration ? { duration } : {})
                     });
                 }
                 notify("Stories added");
@@ -989,7 +995,8 @@
         });
 
         // --- STORY VIEWER ENGINE ---
-        let storyState = { items: [], index: 0, timer: null, isOwn: false, currentUid: null };
+        let storiesGloballyMuted = true;
+        let storyState = { items: [], index: 0, timer: null, isOwn: false, currentUid: null, totalMs: 0, elapsedMs: 0, startedAt: 0, suppressNextClick: false };
 
         function setupProgressBars() {
             const progressRow = document.getElementById('story-progress-row');
@@ -1038,6 +1045,7 @@
 
         function playStory() {
             clearTimeout(storyState.timer);
+            storyState.timer = null;
             const current = storyState.items[storyState.index];
             if (!current) { history.back(); return; }
             
@@ -1047,7 +1055,11 @@
                 f.style.width = i < storyState.index ? '100%' : '0%';
             });
 
-            document.getElementById('story-viewer-media').src = current.mediaURL;
+            const imgEl = document.getElementById('story-viewer-media');
+            const videoEl = document.getElementById('story-viewer-video');
+            const muteBtn = document.getElementById('story-mute-btn');
+            videoEl.onloadedmetadata = null;
+            videoEl.pause();
 
             // Sync Like Button State
             const user = auth.currentUser;
@@ -1060,19 +1072,96 @@
                 likeBtn.innerHTML = '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>';
             }
 
+            storyState.elapsedMs = 0;
+
+            if (current.type === 'video') {
+                imgEl.style.display = 'none';
+                videoEl.style.display = 'block';
+                videoEl.src = current.mediaURL;
+                videoEl.currentTime = 0;
+                videoEl.muted = storiesGloballyMuted;
+                muteBtn.style.display = 'flex';
+                updateMuteIcon();
+
+                const begin = (rawDuration) => {
+                    storyState.totalMs = Math.min(rawDuration || 60, 60) * 1000;
+                    resumeStory();
+                };
+                if (current.duration) begin(current.duration);
+                else videoEl.onloadedmetadata = () => begin(videoEl.duration);
+            } else {
+                videoEl.style.display = 'none';
+                videoEl.removeAttribute('src');
+                muteBtn.style.display = 'none';
+                imgEl.style.display = 'block';
+                imgEl.src = current.mediaURL;
+                storyState.totalMs = 30000;
+                resumeStory();
+            }
+        }
+
+        function updateMuteIcon() {
+            const btn = document.getElementById('story-mute-btn');
+            if (storiesGloballyMuted) {
+                btn.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>';
+            } else {
+                btn.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>';
+            }
+        }
+
+        function pauseStory() {
+            if (!storyState.timer) return;
+            clearTimeout(storyState.timer);
+            storyState.timer = null;
+            storyState.elapsedMs = Math.min(storyState.totalMs, storyState.elapsedMs + (Date.now() - storyState.startedAt));
+
+            const fills = document.querySelectorAll('.story-progress-fill');
+            const activeFill = fills[storyState.index];
+            if (activeFill && storyState.totalMs > 0) {
+                const pct = Math.min(100, (storyState.elapsedMs / storyState.totalMs) * 100);
+                activeFill.style.transition = 'none';
+                activeFill.style.width = pct + '%';
+            }
+
+            const current = storyState.items[storyState.index];
+            if (current && current.type === 'video') {
+                document.getElementById('story-viewer-video').pause();
+            }
+        }
+
+        function resumeStory() {
+            if (storyState.timer) return;
+            const current = storyState.items[storyState.index];
+            if (!current) return;
+
+            const remainingMs = Math.max(0, storyState.totalMs - storyState.elapsedMs);
+            const videoEl = document.getElementById('story-viewer-video');
+
+            if (remainingMs <= 0) {
+                storyState.index++;
+                if (storyState.index >= storyState.items.length) { history.back(); }
+                else { playStory(); }
+                return;
+            }
+
+            storyState.startedAt = Date.now();
+            const fills = document.querySelectorAll('.story-progress-fill');
+            const activeFill = fills[storyState.index];
             requestAnimationFrame(() => {
-                const activeFill = fills[storyState.index];
                 if (activeFill) {
-                    activeFill.style.transition = 'width 5s linear';
+                    activeFill.style.transition = `width ${remainingMs / 1000}s linear`;
                     activeFill.style.width = '100%';
                 }
             });
 
+            if (current.type === 'video') { videoEl.play().catch(() => {}); }
+
             storyState.timer = setTimeout(() => {
+                videoEl.pause();
                 storyState.index++;
                 if (storyState.index >= storyState.items.length) { history.back(); }
                 else { playStory(); }
-            }, 5000);
+            }, remainingMs);
         }
 
         // Like Button Interaction
@@ -1115,7 +1204,7 @@
             if (!current || !current.key || !user || !storyState.isOwn) return;
 
             // Pause timer and temporarily hide overlay using opacity
-            clearTimeout(storyState.timer);
+            pauseStory();
             const viewer = document.getElementById('story-viewer-overlay');
             viewer.style.opacity = '0';
 
@@ -1124,9 +1213,9 @@
             // Restore visibility
             viewer.style.opacity = '';
 
-            // If the user cancelled, resume the story
+            // If the user cancelled, resume the story from where it paused
             if (!confirmDelete) {
-                playStory();
+                resumeStory();
                 return;
             }
 
@@ -1148,8 +1237,54 @@
         });
 
         document.getElementById('story-viewer-close').addEventListener('click', () => history.back());
-        document.getElementById('story-tap-left').addEventListener('click', () => { if (storyState.index > 0) { storyState.index--; playStory(); } });
-        document.getElementById('story-tap-right').addEventListener('click', () => { storyState.index++; if (storyState.index >= storyState.items.length) { history.back(); } else { playStory(); } });
+
+        document.getElementById('story-mute-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            storiesGloballyMuted = !storiesGloballyMuted;
+            document.getElementById('story-viewer-video').muted = storiesGloballyMuted;
+            updateMuteIcon();
+        });
+
+        // Hold anywhere on the story (except the icon controls) to pause; release to resume.
+        let holdTimeout = null;
+        let isHolding = false;
+
+        function isInteractiveTarget(el) {
+            return !!(el && el.closest && el.closest('.story-interactive'));
+        }
+
+        function handleHoldStart(e) {
+            if (isInteractiveTarget(e.target)) return;
+            clearTimeout(holdTimeout);
+            holdTimeout = setTimeout(() => {
+                isHolding = true;
+                pauseStory();
+            }, 180);
+        }
+
+        function handleHoldEnd() {
+            clearTimeout(holdTimeout);
+            if (isHolding) {
+                isHolding = false;
+                storyState.suppressNextClick = true;
+                resumeStory();
+            }
+        }
+
+        const storyViewerOverlayEl = document.getElementById('story-viewer-overlay');
+        storyViewerOverlayEl.addEventListener('pointerdown', handleHoldStart);
+        storyViewerOverlayEl.addEventListener('pointerup', handleHoldEnd);
+        storyViewerOverlayEl.addEventListener('pointerleave', handleHoldEnd);
+        storyViewerOverlayEl.addEventListener('pointercancel', handleHoldEnd);
+
+        document.getElementById('story-tap-left').addEventListener('click', () => {
+            if (storyState.suppressNextClick) { storyState.suppressNextClick = false; return; }
+            if (storyState.index > 0) { storyState.index--; playStory(); }
+        });
+        document.getElementById('story-tap-right').addEventListener('click', () => {
+            if (storyState.suppressNextClick) { storyState.suppressNextClick = false; return; }
+            storyState.index++; if (storyState.index >= storyState.items.length) { history.back(); } else { playStory(); }
+        });
 
         function updateTotalUnreadBadge(count) {
             const navItem = document.querySelector('.nav-item[data-tab="tab-chats"]');

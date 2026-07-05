@@ -72,7 +72,7 @@ exports.sendDmPushNotification = onValueCreated(
             },
         });
 
-        // Clean up dead/unregistered tokens so they stop accumulating.
+        // Clean .up dead/unregistered tokens so they stop accumulating.
         const staleTokenUpdates = {};
         response.responses.forEach((res, idx) => {
             if (!res.success) {

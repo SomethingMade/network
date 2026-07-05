@@ -317,6 +317,15 @@
         .story-reply-tag img, .story-reply-tag video { width: 34px; height: 46px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: rgba(0,0,0,0.05); }
         .story-reply-tag span { font-size: 12px; opacity: 0.85; }
 
+        /* Story Views */
+        .story-views-bar { position: absolute; bottom: 20px; left: 16px; z-index: 10; display: flex; align-items: center; gap: 6px; color: white; font-size: 13px; font-weight: 700; cursor: pointer; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+        .story-views-bar svg { width: 20px; height: 20px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); flex-shrink: 0; }
+        .story-viewers-list-item { display: flex; align-items: center; gap: 14px; padding: 10px 4px; }
+        .story-viewers-list-item .avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #0A84FF; font-size: 16px; }
+        .sv-info { display: flex; flex-direction: column; gap: 2px; }
+        .sv-name { font-size: 14px; font-weight: 600; color: #111111; }
+        .sv-time { font-size: 12px; color: #888888; }
+
         /* ── FULL IMAGE VIEWER (avatar preview) ── */
         #image-viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #image-viewer-overlay.active { opacity: 1; visibility: visible; }
@@ -613,6 +622,19 @@
                 </div>
                 <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             </div>
+
+            <div class="story-views-bar story-interactive" id="story-views-bar" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <span id="story-views-count">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="story-views-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 75vh; display: flex; flex-direction: column; padding-bottom: 12px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Viewed by</div>
+            <div id="story-viewers-list" style="flex:1; overflow-y:auto;"></div>
         </div>
     </div>
 
@@ -730,6 +752,7 @@
                 clearTimeout(storyState.timer);
                 document.getElementById('story-viewer-video').pause();
                 document.getElementById('story-viewer-overlay').classList.remove('active');
+                document.getElementById('story-views-sheet-overlay').classList.remove('active');
             }
 
             if (hash.startsWith('tab-')) {
@@ -1405,6 +1428,13 @@
                 likeBtn.innerHTML = '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>';
             }
 
+            if (storyState.isOwn) {
+                updateStoryViewsUI(current);
+            } else {
+                document.getElementById('story-views-bar').style.display = 'none';
+                recordStoryView(current, storyState.currentUid);
+            }
+
             storyState.elapsedMs = 0;
 
             if (current.type === 'video') {
@@ -1525,6 +1555,77 @@
                 e.currentTarget.classList.remove('liked');
                 e.currentTarget.innerHTML = '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>';
                 await remove(likeRef);
+            }
+        });
+
+        function updateStoryViewsUI(current) {
+            const bar = document.getElementById('story-views-bar');
+            const count = current.views ? Object.keys(current.views).length : 0;
+            bar.style.display = 'flex';
+            document.getElementById('story-views-count').textContent = count;
+        }
+
+        async function recordStoryView(current, ownerUid) {
+            const user = auth.currentUser;
+            if (!user || !current || !current.key || !ownerUid) return;
+            if (ownerUid === user.uid) return;
+            if (current.views && current.views[user.uid]) return;
+
+            const profile = cachedUsers[user.uid] || {};
+            const viewPayload = {
+                name: profile.name || user.displayName || 'User',
+                photoURL: profile.photoURL || user.photoURL || '',
+                viewedAt: Date.now()
+            };
+            current.views = current.views || {};
+            current.views[user.uid] = viewPayload;
+
+            try {
+                await set(ref(database, `stories/${ownerUid}/${current.key}/views/${user.uid}`), viewPayload);
+            } catch (err) { /* fail silently, non-critical */ }
+        }
+
+        function openStoryViewersSheet() {
+            const current = storyState.items[storyState.index];
+            if (!current || !storyState.isOwn) return;
+            pauseStory();
+
+            const listEl = document.getElementById('story-viewers-list');
+            listEl.innerHTML = '';
+            const viewers = Object.entries(current.views || {})
+                .map(([uid, v]) => ({ uid, ...v }))
+                .sort((a, b) => (b.viewedAt || 0) - (a.viewedAt || 0));
+
+            if (viewers.length === 0) {
+                listEl.innerHTML = '<p class="empty-msg" style="margin: 20px 0;">No views yet</p>';
+            } else {
+                viewers.forEach(v => {
+                    const profile = cachedUsers[v.uid] || {};
+                    const photoURL = profile.photoURL || v.photoURL || '';
+                    const name = profile.name || v.name || 'User';
+
+                    const row = document.createElement('div');
+                    row.className = 'story-viewers-list-item';
+                    const avatarHtml = photoURL
+                        ? `<div class="avatar" style="background-image:url('${photoURL}');"></div>`
+                        : `<div class="avatar">${name.charAt(0).toUpperCase()}</div>`;
+                    row.innerHTML = `${avatarHtml}<div class="sv-info"><span class="sv-name">${name}</span><span class="sv-time">${formatTime(v.viewedAt || Date.now())}</span></div>`;
+                    listEl.appendChild(row);
+                });
+            }
+
+            document.getElementById('story-views-sheet-overlay').classList.add('active');
+        }
+
+        document.getElementById('story-views-bar').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openStoryViewersSheet();
+        });
+
+        document.getElementById('story-views-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'story-views-sheet-overlay') {
+                e.target.classList.remove('active');
+                resumeStory();
             }
         });
 
@@ -1934,14 +2035,40 @@
 
         document.getElementById('btn-msg-delete').addEventListener('click', async () => {
             if (activeContextMenuMsg && activeContextMenuMsg.key) {
+                const user = auth.currentUser;
+                const otherUid = activeChatUid;
                 try {
-                    const threadId = threadIdFor(auth.currentUser.uid, activeChatUid);
+                    const threadId = threadIdFor(user.uid, otherUid);
                     await remove(ref(database, `dm_threads/${threadId}/messages/${activeContextMenuMsg.key}`));
+                    await syncDeletedMessagePreview(user.uid, otherUid, activeContextMenuMsg.createdAt);
                     notify('Message deleted');
                 } catch(err) { notify('Could not delete', 'error'); }
             }
             document.getElementById('msg-options-sheet-overlay').classList.remove('active');
         });
+
+        // If the deleted message was the most recent one shown on the chat/friend cards,
+        // update the preview text on both sides so the list reflects the deletion.
+        const DELETED_MSG_PREVIEW = 'This message was deleted';
+        async function syncDeletedMessagePreview(myUid, otherUid, deletedCreatedAt) {
+            if (!otherUid || !deletedCreatedAt) return;
+            try {
+                const [mySnap, theirSnap] = await Promise.all([
+                    get(ref(database, `user_chats/${myUid}/${otherUid}`)),
+                    get(ref(database, `user_chats/${otherUid}/${myUid}`))
+                ]);
+                const updates = {};
+                if (mySnap.exists() && mySnap.val().timestamp === deletedCreatedAt) {
+                    updates[`user_chats/${myUid}/${otherUid}/text`] = DELETED_MSG_PREVIEW;
+                }
+                if (theirSnap.exists() && theirSnap.val().timestamp === deletedCreatedAt) {
+                    updates[`user_chats/${otherUid}/${myUid}/text`] = DELETED_MSG_PREVIEW;
+                }
+                if (Object.keys(updates).length > 0) {
+                    await update(ref(database), updates);
+                }
+            } catch (err) { /* non-critical, ignore */ }
+        }
 
         document.getElementById('btn-msg-forward').addEventListener('click', () => {
             document.getElementById('msg-options-sheet-overlay').classList.remove('active');
@@ -2020,7 +2147,8 @@
                 text: bubble.dataset.text,
                 senderUid: bubble.dataset.senderUid,
                 mediaURL: bubble.dataset.mediaURL,
-                mediaType: bubble.dataset.mediaType
+                mediaType: bubble.dataset.mediaType,
+                createdAt: bubble.dataset.createdAt ? Number(bubble.dataset.createdAt) : null
             };
 
             // Long press timer
@@ -2105,6 +2233,7 @@
                         // Populate dataset for Context & Swipe operations
                         bubble.dataset.key = msg.key;
                         bubble.dataset.senderUid = msg.senderUid;
+                        bubble.dataset.createdAt = msg.createdAt;
                         if(msg.text) bubble.dataset.text = msg.text;
                         if(msg.mediaURL) bubble.dataset.mediaURL = msg.mediaURL;
                         if(msg.mediaType) bubble.dataset.mediaType = msg.mediaType;

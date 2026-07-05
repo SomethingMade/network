@@ -216,7 +216,13 @@
         .msg-bubble.media { max-width: 58%; padding: 0; background: transparent !important; border-radius: 0; }
         .msg-bubble.media.in, .msg-bubble.media.out { background: transparent; }
         .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; border-radius: 16px; cursor: pointer; background: #EAEAEA; }
+        .msg-media-img { pointer-events: auto; }
         .msg-media-video { cursor: default; }
+        /* Pending (uploading) bubble state */
+        .msg-bubble.pending { position: relative; opacity: 0.85; }
+        .msg-bubble.pending.media img, .msg-bubble.pending.media video { filter: brightness(0.85); }
+        .pending-spinner-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: inherit; }
+        .msg-bubble.pending .msg-doc-card { opacity: 0.9; }
         /* Document card (kept inside a normal bubble) */
         .msg-doc-card { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 180px; }
         .msg-doc-icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -611,6 +617,19 @@
         document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'image-viewer-overlay') closeImageViewer();
         });
+
+        // --- OPEN DOCUMENT USING THE DEVICE'S OWN APPS (instead of an in-page browser tab) ---
+        function openDocumentExternally(url, fileName) {
+            if (!url) return;
+            const link = document.createElement('a');
+            link.href = url;
+            if (fileName) link.download = fileName;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
 
         // --- TIME FORMATTING LOGIC ---
         function formatTime(timestamp) {
@@ -1835,6 +1854,55 @@
         let unsubscribeChatMessages = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 
+        // --- PENDING (in-flight) UPLOAD BUBBLES: kept in memory so a media/document send never triggers the full-screen splash. ---
+        let pendingUploadsByChat = {};
+
+        function renderPendingUploadBubble(item) {
+            const bubble = document.createElement('div');
+            bubble.className = 'msg-bubble out pending' + (item.kind !== 'document' ? ' media' : '');
+            bubble.dataset.pendingId = item.id;
+
+            if (item.kind === 'document') {
+                const card = document.createElement('div');
+                card.className = 'msg-doc-card';
+                card.innerHTML = `
+                    <div class="msg-doc-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    </div>
+                    <div class="msg-doc-info">
+                        <span class="msg-doc-name">${item.fileName}</span>
+                        <span class="msg-doc-size">${formatFileSize(item.fileSize)}</span>
+                    </div>`;
+                bubble.appendChild(card);
+            } else if (item.isVideo) {
+                const vid = document.createElement('video');
+                vid.className = 'msg-media-video';
+                vid.src = item.previewURL;
+                vid.muted = true;
+                vid.playsInline = true;
+                bubble.appendChild(vid);
+            } else {
+                const img = document.createElement('img');
+                img.className = 'msg-media-img';
+                img.src = item.previewURL;
+                bubble.appendChild(img);
+            }
+
+            const overlay = document.createElement('div');
+            overlay.className = 'pending-spinner-overlay';
+            overlay.innerHTML = '<div class="spinner-sm"></div>';
+            bubble.appendChild(overlay);
+
+            return bubble;
+        }
+
+        function renderPendingUploadsInto(messagesEl, chatUid) {
+            const items = pendingUploadsByChat[chatUid] || [];
+            items.forEach(item => {
+                messagesEl.appendChild(renderPendingUploadBubble(item));
+            });
+        }
+
         function updateActiveChatStatus() {
             if (!activeChatUid) return;
             const otherProfile = cachedUsers[activeChatUid] || {};
@@ -1929,7 +1997,7 @@
                                     <span class="msg-doc-name">${msg.fileName || 'Document'}</span>
                                     <span class="msg-doc-size">${formatFileSize(msg.fileSize)}</span>
                                 </div>`;
-                            card.addEventListener('click', () => window.open(msg.mediaURL, '_blank'));
+                            card.addEventListener('click', () => openDocumentExternally(msg.mediaURL, msg.fileName));
                             bubble.appendChild(card);
                         } else {
                             const textEl = document.createElement('div');
@@ -1940,6 +2008,8 @@
                         messagesEl.appendChild(bubble);
                     });
                 }
+                // Re-attach any still-in-flight uploads for this chat so they aren't wiped by the refresh
+                renderPendingUploadsInto(messagesEl, otherUid);
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             });
             window.location.hash = 'chat';
@@ -2019,12 +2089,45 @@
             document.getElementById('chat-document-input').click();
         });
 
-        async function sendFileMessage(file, kind) {
+        // Sends a single file: shows an inline uploading bubble (no full-screen splash), uploads,
+        // then writes the message. The bubble is removed once the real message arrives via the
+        // realtime listener (or on failure, immediately, with an error toast).
+        async function queueFileUpload(file, kind) {
             const user = auth.currentUser;
-            if (!user || !activeChatUid || !file) return;
+            const chatUid = activeChatUid;
+            if (!user || !chatUid || !file) return;
+
+            const isVideo = kind === 'media' && file.type.startsWith('video');
+            const item = {
+                id: 'p' + Date.now() + Math.random().toString(36).slice(2),
+                kind: kind,
+                isVideo: isVideo,
+                previewURL: kind === 'media' ? URL.createObjectURL(file) : null,
+                fileName: file.name,
+                fileSize: file.size
+            };
+
+            pendingUploadsByChat[chatUid] = pendingUploadsByChat[chatUid] || [];
+            pendingUploadsByChat[chatUid].push(item);
+
+            // If this chat is currently open, show the bubble immediately.
+            if (chatUid === activeChatUid) {
+                const messagesEl = document.getElementById('chat-view-messages');
+                messagesEl.appendChild(renderPendingUploadBubble(item));
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            const removePending = () => {
+                const list = pendingUploadsByChat[chatUid] || [];
+                pendingUploadsByChat[chatUid] = list.filter(p => p.id !== item.id);
+                if (item.previewURL) URL.revokeObjectURL(item.previewURL);
+                const el = document.querySelector(`.msg-bubble[data-pending-id="${item.id}"]`);
+                if (el) el.remove();
+            };
+
             try {
                 const { url, type, bytes } = await uploadToCloudinary(file);
-                const threadId = threadIdFor(user.uid, activeChatUid);
+                const threadId = threadIdFor(user.uid, chatUid);
                 const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
 
                 const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaURL: url };
@@ -2041,29 +2144,26 @@
 
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
-                updates[`user_chats/${user.uid}/${activeChatUid}`] = { text: previewText, timestamp: msgPayload.createdAt, unreadCount: 0 };
-                updates[`user_chats/${activeChatUid}/${user.uid}/text`] = previewText;
-                updates[`user_chats/${activeChatUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
-                updates[`user_chats/${activeChatUid}/${user.uid}/unreadCount`] = increment(1);
+                updates[`user_chats/${user.uid}/${chatUid}`] = { text: previewText, timestamp: msgPayload.createdAt, unreadCount: 0 };
+                updates[`user_chats/${chatUid}/${user.uid}/text`] = previewText;
+                updates[`user_chats/${chatUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
+                updates[`user_chats/${chatUid}/${user.uid}/unreadCount`] = increment(1);
 
                 await update(ref(database), updates);
+                // The realtime listener on dm_threads will re-render and include the real message;
+                // clear the pending placeholder now that it's been persisted.
+                removePending();
             } catch (err) {
-                showCustomModal('Upload Failed', "We couldn't send that file. Please try again.");
+                removePending();
+                notify("Couldn't send that file. Please try again.", 'error');
             }
         }
 
-        async function handleAttachInputChange(e, kind) {
+        function handleAttachInputChange(e, kind) {
             const files = Array.from(e.target.files || []);
             e.target.value = '';
-            if (!files.length) return;
-            showLoading();
-            try {
-                for (const file of files) {
-                    await sendFileMessage(file, kind);
-                }
-            } finally {
-                hideLoading();
-            }
+            if (!files.length || !activeChatUid) return;
+            files.forEach(file => { queueFileUpload(file, kind); });
         }
 
         document.getElementById('chat-media-input').addEventListener('change', (e) => handleAttachInputChange(e, 'media'));

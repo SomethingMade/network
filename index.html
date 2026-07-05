@@ -242,17 +242,29 @@
         .story-tap-zone { position: absolute; top: 0; bottom: 0; width: 40%; z-index: 2; }
         .story-tap-zone.left { left: 0; } .story-tap-zone.right { right: 0; }
 
-        /* Story Like Button & Floating Hearts */
-        .story-controls-bottom { position: absolute; bottom: 24px; right: 24px; z-index: 10; display: flex; align-items: center; justify-content: flex-end; width: 100%; pointer-events: none; }
-        .story-like-btn { width: 34px; height: 34px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; }
+        /* Story Like Button, Reply Bar & Floating Hearts */
+        .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 16px; pointer-events: none; }
+        .story-like-btn { width: 34px; height: 34px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
         .story-like-btn.liked { fill: #FF453A; color: #FF453A; }
-        
+
+        .story-reply-bar { flex: 1; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 50px; padding: 10px 18px; pointer-events: auto; }
+        .story-reply-input { flex: 1; background: transparent; border: none; outline: none; color: white; font-size: 14px; min-width: 0; }
+        .story-reply-input::placeholder { color: rgba(255,255,255,0.75); }
+        .story-reply-send { width: 20px; height: 20px; color: #FFF; cursor: pointer; flex-shrink: 0; transition: 0.2s; }
+        .story-reply-send:hover { opacity: 0.8; }
+
         .floating-heart { position: absolute; bottom: 50px; right: 24px; width: 40px; height: 40px; fill: #FF453A; opacity: 0; animation: floatUp 1.5s ease-out forwards; z-index: 11; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(255, 69, 58, 0.4));}
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.8); opacity: 1; }
             50% { transform: translateY(-100px) scale(1.2); opacity: 1; }
             100% { transform: translateY(-200px) scale(1); opacity: 0; }
         }
+
+        /* Story reply preview tag inside chat bubbles */
+        .story-reply-tag { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.3); }
+        .msg-bubble.in .story-reply-tag { border-bottom-color: rgba(0,0,0,0.1); }
+        .story-reply-tag img, .story-reply-tag video { width: 34px; height: 46px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: rgba(0,0,0,0.05); }
+        .story-reply-tag span { font-size: 12px; opacity: 0.85; }
 
         /* ── FULL IMAGE VIEWER (avatar preview) ── */
         #image-viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
@@ -480,6 +492,10 @@
             <div class="story-tap-zone right" id="story-tap-right"></div>
             
             <div class="story-controls-bottom" id="story-controls-bottom">
+                <div class="story-reply-bar story-interactive">
+                    <input type="text" id="story-reply-input" class="story-reply-input" placeholder="Reply to story..." autocomplete="off">
+                    <svg class="story-reply-send" id="story-reply-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </div>
                 <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             </div>
         </div>
@@ -1036,6 +1052,9 @@
 
             document.getElementById('story-viewer-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('story-controls-bottom').style.display = isOwn ? 'none' : 'flex';
+            const replyInputEl = document.getElementById('story-reply-input');
+            replyInputEl.value = '';
+            document.getElementById('story-reply-send').style.display = 'none';
 
             setupProgressBars();
             window.location.hash = 'story';
@@ -1195,6 +1214,55 @@
                 await remove(likeRef);
             }
         });
+
+        // --- STORY REPLY (send a comment on someone's story as a DM) ---
+        const storyReplyInput = document.getElementById('story-reply-input');
+        const storyReplySend = document.getElementById('story-reply-send');
+
+        storyReplyInput.addEventListener('input', () => {
+            storyReplySend.style.display = storyReplyInput.value.trim() ? 'block' : 'none';
+        });
+        storyReplyInput.addEventListener('focus', () => { pauseStory(); });
+        storyReplyInput.addEventListener('blur', () => { resumeStory(); });
+        storyReplyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); sendStoryReply(); }
+        });
+        storyReplySend.addEventListener('click', (e) => { e.stopPropagation(); sendStoryReply(); });
+
+        async function sendStoryReply() {
+            const text = storyReplyInput.value.trim();
+            const user = auth.currentUser;
+            const current = storyState.items[storyState.index];
+            const otherUid = storyState.currentUid;
+            if (!text || !user || !current || storyState.isOwn || !otherUid) return;
+
+            const threadId = threadIdFor(user.uid, otherUid);
+            const msgPayload = {
+                text: text,
+                senderUid: user.uid,
+                createdAt: Date.now(),
+                replyToStory: { mediaURL: current.mediaURL, type: current.type || 'image' }
+            };
+            const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+
+            const updates = {};
+            updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+            updates[`user_chats/${user.uid}/${otherUid}`] = { text: 'You replied to their story', timestamp: msgPayload.createdAt, unreadCount: 0 };
+            updates[`user_chats/${otherUid}/${user.uid}/text`] = 'Replied to your story';
+            updates[`user_chats/${otherUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
+            updates[`user_chats/${otherUid}/${user.uid}/unreadCount`] = increment(1);
+
+            storyReplyInput.value = '';
+            storyReplySend.style.display = 'none';
+            storyReplyInput.blur();
+
+            try {
+                await update(ref(database), updates);
+                notify('Reply sent');
+            } catch (err) {
+                showCustomModal('Error', 'Could not send your reply.');
+            }
+        }
 
         // Delete story handler with temporary hide logic
         document.getElementById('story-viewer-delete').addEventListener('click', async (e) => {
@@ -1537,7 +1605,21 @@
                     items.forEach(msg => {
                         const bubble = document.createElement('div');
                         bubble.className = 'msg-bubble ' + (msg.senderUid === user.uid ? 'out' : 'in');
-                        bubble.textContent = msg.text;
+
+                        if (msg.replyToStory && msg.replyToStory.mediaURL) {
+                            const tag = document.createElement('div');
+                            tag.className = 'story-reply-tag';
+                            const thumb = msg.replyToStory.type === 'video'
+                                ? `<video src="${msg.replyToStory.mediaURL}" muted></video>`
+                                : `<img src="${msg.replyToStory.mediaURL}" alt="Story">`;
+                            tag.innerHTML = `${thumb}<span>Replied to story</span>`;
+                            bubble.appendChild(tag);
+                        }
+
+                        const textEl = document.createElement('div');
+                        textEl.textContent = msg.text;
+                        bubble.appendChild(textEl);
+
                         messagesEl.appendChild(bubble);
                     });
                 }

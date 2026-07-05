@@ -982,6 +982,11 @@
         function showNewMessageNotification(chatUid, meta) {
             if (!('Notification' in window) || Notification.permission !== 'granted') return;
             if (chatUid === activeChatUid && document.visibilityState === 'visible') return;
+            // When the tab isn't visible, the FCM background handler in
+            // firebase-messaging-sw.js already shows a push notification for this.
+            // Showing one here too would duplicate it (different SW registration,
+            // so the notification `tag` can't dedupe across them).
+            if (document.visibilityState !== 'visible') return;
 
             const profile = cachedUsers[chatUid] || {};
             const title = profile.name || 'New message';
@@ -1032,7 +1037,7 @@
 
         // --- FIREBASE CLOUD MESSAGING (PUSH NOTIFICATIONS) ---
         // Generate this in Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
-        const FCM_VAPID_KEY = "BKOsn-S9ti0UEtUqRA9zzegFMaI8TrL2CKA1cpPqUjvAIsZ4SJkMe7127cg9T4S-tJHrHsLpf1gLFjZazmxQvGQ";
+        const FCM_VAPID_KEY = "PASTE_YOUR_VAPID_KEY_HERE";
         let messaging = null;
         let fcmSwRegistration = null;
         let currentFcmToken = null;

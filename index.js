@@ -55,10 +55,10 @@ exports.sendDmPushNotification = onValueCreated(
         const messaging = getMessaging();
         const response = await messaging.sendEachForMulticast({
             tokens,
-            notification: {
-                title: senderName,
-                body,
-            },
+            // IMPORTANT: no top-level "notification" field here.
+            // If present, the browser auto-displays it on receipt AND
+            // onBackgroundMessage() in the SW fires and shows it again,
+            // producing two notifications per message. Data-only avoids that.
             data: {
                 title: senderName,
                 body,

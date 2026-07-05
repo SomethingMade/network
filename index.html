@@ -752,6 +752,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -912,107 +913,6 @@
             notify('App installed successfully');
         });
 
-        const NOTIF_SW_CODE = `
-            self.addEventListener('notificationclick', function(event) {
-                event.notification.close();
-                const uid = event.notification.data && event.notification.data.uid;
-                event.waitUntil(
-                    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-                        for (const client of clientList) {
-                            if ('focus' in client) {
-                                client.postMessage({ type: 'open-chat', uid: uid });
-                                return client.focus();
-                            }
-                        }
-                        if (clients.openWindow) return clients.openWindow('/');
-                    })
-                );
-            });
-        `;
-
-        let notifSwRegistration = null;
-        const btnEnableNotifications = document.getElementById('btn-enable-notifications');
-        const NOTIF_ICON = "https://i.postimg.cc/Bv3sQWxd/1783111354171.png";
-
-        async function registerNotificationSW() {
-            if (!('serviceWorker' in navigator)) return null;
-            if (notifSwRegistration) return notifSwRegistration;
-            try {
-                const blob = new Blob([NOTIF_SW_CODE], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                notifSwRegistration = await navigator.serviceWorker.register(swUrl);
-                return notifSwRegistration;
-            } catch (err) {
-                console.error('Notification service worker registration failed', err);
-                return null;
-            }
-        }
-
-        function updateNotificationBtnVisibility() {
-            if (!('Notification' in window)) { btnEnableNotifications.style.display = 'none'; return; }
-            btnEnableNotifications.style.display = Notification.permission === 'granted' ? 'none' : 'flex';
-        }
-
-        btnEnableNotifications.addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (!('Notification' in window)) return;
-            try {
-                const perm = await Notification.requestPermission();
-                updateNotificationBtnVisibility();
-                if (perm === 'granted') {
-                    notify('Notifications enabled');
-                    registerNotificationSW();
-                } else if (perm === 'denied') {
-                    notify('Notifications are blocked. Enable them in your browser settings.', 'error');
-                }
-            } catch (err) { console.error('Notification permission request failed', err); }
-        });
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', (event) => {
-                if (event.data && event.data.type === 'open-chat' && event.data.uid) {
-                    const profile = cachedUsers[event.data.uid] || {};
-                    openChatView(event.data.uid, profile.name, profile.photoURL);
-                }
-            });
-        }
-
-        function showNewMessageNotification(chatUid, meta) {
-            if (!('Notification' in window) || Notification.permission !== 'granted') return;
-            if (chatUid === activeChatUid && document.visibilityState === 'visible') return;
-
-            const profile = cachedUsers[chatUid] || {};
-            const title = profile.name || 'New message';
-            const options = {
-                body: meta.text || 'Sent you a message',
-                icon: profile.photoURL || NOTIF_ICON,
-                badge: NOTIF_ICON,
-                tag: 'chat-' + chatUid,
-                renotify: true,
-                data: { uid: chatUid }
-            };
-
-            const fallbackNotify = () => {
-                try {
-                    const n = new Notification(title, options);
-                    n.onclick = () => {
-                        window.focus();
-                        openChatView(chatUid, profile.name, profile.photoURL);
-                        n.close();
-                    };
-                } catch (err) { console.error('Notification failed', err); }
-            };
-
-            if (notifSwRegistration) {
-                notifSwRegistration.showNotification(title, options).catch(fallbackNotify);
-            } else if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistration().then((reg) => {
-                    if (reg) reg.showNotification(title, options).catch(fallbackNotify);
-                    else fallbackNotify();
-                }).catch(fallbackNotify);
-            } else { fallbackNotify(); }
-        }
-
         const firebaseConfig = {
             apiKey: "AIzaSyBQSPwpVbGrdCuOoyitAeWQHIeipj2MgIY",
             authDomain: "newstart-64c43.firebaseapp.com",
@@ -1026,7 +926,71 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const database = getDatabase(app);
+        const messaging = getMessaging(app);
         const googleProvider = new GoogleAuthProvider();
+
+        /* --- FCM PUSH NOTIFICATIONS --- */
+        const btnEnableNotifications = document.getElementById('btn-enable-notifications');
+
+        function updateNotificationBtnVisibility() {
+            if (!('Notification' in window)) { btnEnableNotifications.style.display = 'none'; return; }
+            btnEnableNotifications.style.display = Notification.permission === 'granted' ? 'none' : 'flex';
+        }
+
+        btnEnableNotifications.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (!('Notification' in window)) return;
+            try {
+                const permission = await Notification.requestPermission();
+                updateNotificationBtnVisibility();
+                if (permission === 'granted') {
+                    // Replace YOUR_PUBLIC_VAPID_KEY_HERE with the VAPID key from your Firebase Console
+                    const currentToken = await getToken(messaging, { vapidKey: 'BKOsn-S9ti0UEtUqRA9zzegFMaI8TrL2CKA1cpPqUjvAIsZ4SJkMe7127cg9T4S-tJHrHsLpf1gLFjZazmxQvGQ' });
+                    if (currentToken && auth.currentUser) {
+                        await update(ref(database, `users/${auth.currentUser.uid}`), { fcmToken: currentToken });
+                        notify('Push notifications enabled!');
+                    } else {
+                        notify('Failed to generate notification token.', 'error');
+                    }
+                } else if (permission === 'denied') {
+                    notify('Notifications are blocked. Enable them in your browser settings.', 'error');
+                }
+            } catch (err) { 
+                console.error('Notification permission request failed', err); 
+                notify('An error occurred enabling notifications.', 'error');
+            }
+        });
+
+        // Handle Foreground Messages (When the app is open)
+        onMessage(messaging, (payload) => {
+            const senderUid = payload.data.senderUid;
+            if (senderUid !== activeChatUid || document.visibilityState !== 'visible') {
+                notify(`New message from ${payload.notification.title}`);
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    try {
+                        const n = new Notification(payload.notification.title, {
+                            body: payload.notification.body,
+                            icon: payload.notification.icon || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png"
+                        });
+                        n.onclick = () => {
+                            window.focus();
+                            const profile = cachedUsers[senderUid] || {};
+                            openChatView(senderUid, payload.notification.title, profile.photoURL);
+                            n.close();
+                        };
+                    } catch(e) { console.error('Error showing foreground notification', e); }
+                }
+            }
+        });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'open-chat' && event.data.uid) {
+                    const profile = cachedUsers[event.data.uid] || {};
+                    openChatView(event.data.uid, profile.name, profile.photoURL);
+                }
+            });
+        }
 
         const CLOUDINARY_CLOUD_NAME = "dqkujefxj";
         const CLOUDINARY_UPLOAD_PRESET = "banter_box";
@@ -2406,7 +2370,14 @@
                 updateAvatarUI(user);
 
                 updateNotificationBtnVisibility();
-                if ('Notification' in window && Notification.permission === 'granted') registerNotificationSW();
+                
+                // Auto refresh FCM token upon auth
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    try {
+                        const token = await getToken(messaging, { vapidKey: 'YOUR_PUBLIC_VAPID_KEY_HERE' });
+                        if (token) await update(ref(database, `users/${user.uid}`), { fcmToken: token });
+                    } catch (e) { console.error('Token auto-refresh failed', e); }
+                }
                 
                 await update(ref(database, 'users/' + user.uid), {
                     name: user.displayName || (user.email ? user.email.split('@')[0] : "User"),
@@ -3272,16 +3243,6 @@
                 let totalUnread = 0;
 
                 cachedUserChatsData = snap.exists() ? snap.val() : {};
-
-                if (userChatsInitialized) {
-                    Object.keys(cachedUserChatsData).forEach((chatUid) => {
-                        const meta = cachedUserChatsData[chatUid];
-                        const prevMeta = previousUserChatsData[chatUid];
-                        const isNewerMessage = meta.timestamp && (!prevMeta || meta.timestamp > prevMeta.timestamp);
-                        const isIncoming = meta.unreadCount && meta.unreadCount > 0;
-                        if (isNewerMessage && isIncoming) showNewMessageNotification(chatUid, meta);
-                    });
-                }
                 previousUserChatsData = JSON.parse(JSON.stringify(cachedUserChatsData));
                 userChatsInitialized = true;
 

@@ -67,7 +67,7 @@ exports.sendDmPushNotification = onValueCreated(
             },
             webpush: {
                 fcmOptions: {
-                    link: "/",
+                    link: "https://somethingmade.github.io/network/",
                 },
             },
         });

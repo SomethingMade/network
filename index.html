@@ -393,7 +393,7 @@
                     <span>Calls</span>
                 </div>
                 <div class="nav-item" data-tab="tab-contacts">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                     <span>Contacts</span>
                 </div>
                 
@@ -1674,13 +1674,16 @@
 
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+            const isSelf = auth.currentUser && uid === auth.currentUser.uid;
+            const displayName = isSelf ? 'My Account' : profile.name;
+
             const item = document.createElement('div');
             item.className = 'chat-item' + (uid === activeChatUid ? ' active-chat' : '');
             item.dataset.uid = uid;
-            item.dataset.name = profile.name;
+            item.dataset.name = displayName;
             item.dataset.avatar = profile.photoURL;
             
-            const initial = profile.name.charAt(0).toUpperCase();
+            const initial = displayName.charAt(0).toUpperCase();
             const avatarHtml = profile.photoURL 
                 ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
                 : `<div class="avatar" style="background-color: #0A84FF; color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
@@ -1700,13 +1703,13 @@
 
                 metaHtml = `<div class="chat-meta"><span class="time">${timeStr}</span>${badgeHtml}</div>`;
             } else if (!isChatPane) {
-                snippetHtml = `<p>In your contacts</p>`;
+                snippetHtml = isSelf ? `<p>That's you</p>` : `<p>In your contacts</p>`;
             }
 
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
-                    <h3>${profile.name}</h3>
+                    <h3>${displayName}</h3>
                     ${snippetHtml}
                 </div>
                 ${metaHtml}

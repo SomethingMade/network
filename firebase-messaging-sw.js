@@ -1,14 +1,9 @@
-// firebase-messaging-sw.js
-// This file MUST be uploaded as a real static file at the ROOT of your site
-// (same folder as index.html, served at https://yourdomain.com/firebase-messaging-sw.js).
-// It cannot be created dynamically from a blob URL like the in-app notification
-// service worker — FCM needs to fetch and re-fetch this exact URL to receive
-// push events even when the app/tab is completely closed.
-
 importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js");
 
-// Must match the firebaseConfig used in index.html
+// =========================================================================
+// 1. INITIALIZE FIREBASE
+// =========================================================================
 firebase.initializeApp({
     apiKey: "AIzaSyBQSPwpVbGrdCuOoyitAeWQHIeipj2MgIY",
     authDomain: "newstart-64c43.firebaseapp.com",
@@ -22,39 +17,105 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 const NOTIF_ICON = "https://i.postimg.cc/Bv3sQWxd/1783111354171.png";
 
-// Called when a push arrives while there is no focused tab for this origin.
+// =========================================================================
+// 2. FIREBASE CLOUD MESSAGING (BACKGROUND HANDLER)
+// =========================================================================
 messaging.onBackgroundMessage((payload) => {
-    const data = payload.data || {};
-    const title = data.title || (payload.notification && payload.notification.title) || 'New message';
-    const body = data.body || (payload.notification && payload.notification.body) || '';
-    const chatUid = data.chatUid || '';
+    // Extract variables directly from our data-only payload
+    const { title, body, icon, url, chatUid } = payload.data || {};
 
-    self.registration.showNotification(title, {
-        body: body,
-        icon: data.icon || NOTIF_ICON,
+    const notificationOptions = {
+        body: body || 'Sent you a message',
+        icon: icon || NOTIF_ICON,
         badge: NOTIF_ICON,
-        tag: chatUid ? ('chat-' + chatUid) : undefined,
-        data: { uid: chatUid }
-    });
+        tag: chatUid ? ('chat-' + chatUid) : 'new-message',
+        data: { 
+            url: url || '/',
+            uid: chatUid 
+        }
+    };
+
+    // Manually trigger the singular notification
+    self.registration.showNotification(title || 'New Message', notificationOptions);
 });
 
-// Reuse the same click behavior as the in-app notification SW: focus/open the
-// app and let index.html's own message listener route to the right chat.
+// =========================================================================
+// 3. NOTIFICATION CLICK HANDLER
+// =========================================================================
 self.addEventListener('notificationclick', (event) => {
-    event.notification.close();
-    const chatUid = (event.notification.data && event.notification.data.uid) || '';
+    event.notification.close(); // Immediately close the notification UI
+
+    const urlToOpen = event.notification.data.url;
+    const chatUid = event.notification.data.uid;
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // If the app is already open in a tab, focus it and tell the frontend to open the specific chat
             for (const client of clientList) {
                 if ('focus' in client) {
-                    client.postMessage({ type: 'open-chat', uid: chatUid });
+                    if (chatUid) client.postMessage({ type: 'open-chat', uid: chatUid });
                     return client.focus();
                 }
             }
+            // If no app window is open, launch a new one
             if (self.clients.openWindow) {
-                return self.clients.openWindow('./');
+                return self.clients.openWindow(urlToOpen);
             }
+        })
+    );
+});
+
+// =========================================================================
+// 4. PWA CACHING LOGIC (APP SHELL)
+// =========================================================================
+const CACHE_NAME = "web-messenger-shell-v1";
+const APP_SHELL = [
+    "./",
+    "./index.html",
+    "./manifest.json"
+];
+
+self.addEventListener("install", (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).catch(() => {})
+    );
+    self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+    event.waitUntil(
+        caches.keys().then((keys) =>
+            Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+        )
+    );
+    self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+    const url = event.request.url;
+
+    // Never cache Firebase/Cloudinary/API calls — always go to network for live data.
+    if (
+        url.includes("firebaseio.com") ||
+        url.includes("googleapis.com") ||
+        url.includes("firebasestorage") ||
+        url.includes("cloudinary.com")
+    ) {
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then((cached) => {
+            return (
+                cached ||
+                fetch(event.request)
+                    .then((response) => {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+                        return response;
+                    })
+                    .catch(() => cached)
+            );
         })
     );
 });

@@ -913,41 +913,8 @@
             notify('App installed successfully');
         });
 
-        const NOTIF_SW_CODE = `
-            self.addEventListener('notificationclick', function(event) {
-                event.notification.close();
-                const uid = event.notification.data && event.notification.data.uid;
-                event.waitUntil(
-                    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-                        for (const client of clientList) {
-                            if ('focus' in client) {
-                                client.postMessage({ type: 'open-chat', uid: uid });
-                                return client.focus();
-                            }
-                        }
-                        if (clients.openWindow) return clients.openWindow('/');
-                    })
-                );
-            });
-        `;
-
-        let notifSwRegistration = null;
         const btnEnableNotifications = document.getElementById('btn-enable-notifications');
         const NOTIF_ICON = "https://i.postimg.cc/Bv3sQWxd/1783111354171.png";
-
-        async function registerNotificationSW() {
-            if (!('serviceWorker' in navigator)) return null;
-            if (notifSwRegistration) return notifSwRegistration;
-            try {
-                const blob = new Blob([NOTIF_SW_CODE], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                notifSwRegistration = await navigator.serviceWorker.register(swUrl);
-                return notifSwRegistration;
-            } catch (err) {
-                console.error('Notification service worker registration failed', err);
-                return null;
-            }
-        }
 
         function updateNotificationBtnVisibility() {
             if (!('Notification' in window)) { btnEnableNotifications.style.display = 'none'; return; }
@@ -962,7 +929,6 @@
                 updateNotificationBtnVisibility();
                 if (perm === 'granted') {
                     notify('Notifications enabled');
-                    registerNotificationSW();
                     setupPushNotifications(auth.currentUser);
                 } else if (perm === 'denied') {
                     notify('Notifications are blocked. Enable them in your browser settings.', 'error');
@@ -977,47 +943,6 @@
                     openChatView(event.data.uid, profile.name, profile.photoURL);
                 }
             });
-        }
-
-        function showNewMessageNotification(chatUid, meta) {
-            if (!('Notification' in window) || Notification.permission !== 'granted') return;
-            if (chatUid === activeChatUid && document.visibilityState === 'visible') return;
-            // When the tab isn't visible, the FCM background handler in
-            // firebase-messaging-sw.js already shows a push notification for this.
-            // Showing one here too would duplicate it (different SW registration,
-            // so the notification `tag` can't dedupe across them).
-            if (document.visibilityState !== 'visible') return;
-
-            const profile = cachedUsers[chatUid] || {};
-            const title = profile.name || 'New message';
-            const options = {
-                body: meta.text || 'Sent you a message',
-                icon: profile.photoURL || NOTIF_ICON,
-                badge: NOTIF_ICON,
-                tag: 'chat-' + chatUid,
-                renotify: true,
-                data: { uid: chatUid }
-            };
-
-            const fallbackNotify = () => {
-                try {
-                    const n = new Notification(title, options);
-                    n.onclick = () => {
-                        window.focus();
-                        openChatView(chatUid, profile.name, profile.photoURL);
-                        n.close();
-                    };
-                } catch (err) { console.error('Notification failed', err); }
-            };
-
-            if (notifSwRegistration) {
-                notifSwRegistration.showNotification(title, options).catch(fallbackNotify);
-            } else if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistration().then((reg) => {
-                    if (reg) reg.showNotification(title, options).catch(fallbackNotify);
-                    else fallbackNotify();
-                }).catch(fallbackNotify);
-            } else { fallbackNotify(); }
         }
 
         const firebaseConfig = {
@@ -1046,8 +971,6 @@
             if (!('serviceWorker' in navigator)) return null;
             if (fcmSwRegistration) return fcmSwRegistration;
             try {
-                // Must be a real static file at the origin root (not a blob URL) so it can
-                // wake up and show notifications even when the app/tab is fully closed.
                 fcmSwRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
                 return fcmSwRegistration;
             } catch (err) {
@@ -1081,10 +1004,29 @@
                     ua: navigator.userAgent
                 });
 
-                // Foreground messages: the in-app RTDB listener already shows a local
-                // notification while the tab is open, so we just log here to avoid duplicates.
+                // UNIFIED FOREGROUND PATH
                 onMessage(messaging, (payload) => {
                     console.log('FCM foreground message received', payload);
+                    const { title, body, icon, url, chatUid } = payload.data || {};
+                    
+                    // Guard: If the user is actively viewing this exact chat, do not annoy them
+                    if (chatUid === activeChatUid && document.visibilityState === 'visible') {
+                        return;
+                    }
+
+                    // Use the core FCM service worker registration to show the notification
+                    navigator.serviceWorker.ready.then((registration) => {
+                        registration.showNotification(title || 'New Message', {
+                            body: body || 'Sent you a message',
+                            icon: icon || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
+                            badge: "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
+                            tag: chatUid ? ('chat-' + chatUid) : 'new-message',
+                            data: {
+                                url: url || '/',
+                                uid: chatUid
+                            }
+                        });
+                    });
                 });
             } catch (err) {
                 console.error('setupPushNotifications failed', err);
@@ -2485,7 +2427,6 @@
 
                 updateNotificationBtnVisibility();
                 if ('Notification' in window && Notification.permission === 'granted') {
-                    registerNotificationSW();
                     setupPushNotifications(user);
                 }
                 
@@ -3354,15 +3295,7 @@
 
                 cachedUserChatsData = snap.exists() ? snap.val() : {};
 
-                if (userChatsInitialized) {
-                    Object.keys(cachedUserChatsData).forEach((chatUid) => {
-                        const meta = cachedUserChatsData[chatUid];
-                        const prevMeta = previousUserChatsData[chatUid];
-                        const isNewerMessage = meta.timestamp && (!prevMeta || meta.timestamp > prevMeta.timestamp);
-                        const isIncoming = meta.unreadCount && meta.unreadCount > 0;
-                        if (isNewerMessage && isIncoming) showNewMessageNotification(chatUid, meta);
-                    });
-                }
+                // The manual showNewMessageNotification loop has been removed to allow FCM to handle it via data payloads.
                 previousUserChatsData = JSON.parse(JSON.stringify(cachedUserChatsData));
                 userChatsInitialized = true;
 

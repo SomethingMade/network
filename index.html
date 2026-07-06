@@ -1013,10 +1013,13 @@
                 // UNIFIED FOREGROUND PATH
                 onMessage(messaging, (payload) => {
                     console.log('FCM foreground message received', payload);
-                    const { title, body, icon, url, chatUid } = payload.data || {};
-                    
-                    // Guard: If the user is actively viewing this exact chat, do not annoy them
+                    const { title, body, icon, url, chatUid, groupId } = payload.data || {};
+
+                    // Guard: If the user is actively viewing this exact chat/group, do not annoy them
                     if (chatUid === activeChatUid && document.visibilityState === 'visible') {
+                        return;
+                    }
+                    if (groupId && groupId === activeGroupId && document.visibilityState === 'visible') {
                         return;
                     }
 
@@ -1026,10 +1029,11 @@
                             body: body || 'Sent you a message',
                             icon: icon || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
                             badge: "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
-                            tag: chatUid ? ('chat-' + chatUid) : 'new-message',
+                            tag: groupId ? ('group-' + groupId) : (chatUid ? ('chat-' + chatUid) : 'new-message'),
                             data: {
                                 url: url || '/',
-                                uid: chatUid
+                                uid: chatUid,
+                                groupId: groupId
                             }
                         });
                     });

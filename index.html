@@ -195,6 +195,11 @@
         .segmented-control { display: flex; background: #FAFAFA; border: 1px solid #F0F0F0; border-radius: 50px; padding: 4px; margin-bottom: 16px; }
         .segmented-control button { flex: 1; border: none; background: transparent; padding: 10px; border-radius: 50px; font-size: 14px; font-weight: 600; color: #888888; cursor: pointer; transition: 0.2s; }
         .segmented-control button.active { background: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 100%); color: white; }
+        .contact-action-btn { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid #F0F0F0; background: transparent; cursor: pointer; transition: 0.2s; }
+        .contact-action-btn.danger { color: #FF453A; border-color: rgba(255, 69, 58, 0.3); }
+        .contact-action-btn.danger:hover { background: #FFF0F0; }
+        .contact-action-btn.primary { color: #0A84FF; border-color: rgba(10, 132, 255, 0.3); }
+        .contact-action-btn.primary:hover { background: #F0F8FF; }
         .group-member-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
         .group-member-row .avatar { width: 38px; height: 38px; }
         .group-member-row h4 { font-size: 14px; font-weight: 600; flex: 1; }
@@ -613,8 +618,13 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-contacts" placeholder="Find people...">
                         </div>
+                        <div class="segmented-control" id="contacts-sub-tabs">
+                            <button type="button" class="active" data-subtab="all">All Contacts</button>
+                            <button type="button" data-subtab="blocked">Blocked</button>
+                        </div>
                     </div>
                     <div class="chat-list-container" id="contacts-list-container"></div>
+                    <div class="chat-list-container" id="blocked-list-container" style="display:none;"></div>
                 </div>
 
                 <button type="button" class="fab-add" id="fab-add-friend" title="Add a Friend">+</button>
@@ -2387,6 +2397,99 @@
 
         // --- CHAT REQUESTS & CONTACTS ---
         let cachedContacts = {};
+        let cachedBlocked = {};
+
+        function renderContactRow(uid, container, isBlockedView) {
+            const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+            const displayName = profile.name || 'Unknown User';
+
+            const item = document.createElement('div');
+            item.className = 'chat-item';
+            item.dataset.uid = uid;
+            item.dataset.name = displayName;
+            item.dataset.avatar = profile.photoURL || '';
+
+            const initial = displayName.charAt(0).toUpperCase();
+            const avatarHtml = profile.photoURL
+                ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>`
+                : `<div class="avatar" style="background-color: #0A84FF; color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+
+            item.innerHTML = `
+                ${avatarHtml}
+                <div class="chat-preview">
+                    <h3>${displayName}</h3>
+                    <p>${isBlockedView ? 'Blocked' : 'In your contacts'}</p>
+                </div>
+                <button type="button" class="contact-action-btn ${isBlockedView ? 'primary' : 'danger'}" data-action="${isBlockedView ? 'unblock' : 'block'}">${isBlockedView ? 'Unblock' : 'Block'}</button>
+            `;
+            container.appendChild(item);
+        }
+
+        function renderContactsLists() {
+            const contactsList = document.getElementById('contacts-list-container');
+            const blockedList = document.getElementById('blocked-list-container');
+            contactsList.innerHTML = '';
+            blockedList.innerHTML = '';
+
+            const visibleContactUids = Object.keys(cachedContacts).filter(uid => !cachedBlocked[uid]);
+            if (visibleContactUids.length > 0) {
+                visibleContactUids.forEach(uid => renderContactRow(uid, contactsList, false));
+            } else {
+                contactsList.innerHTML = '<p class="empty-msg">Your contact list is empty.</p>';
+            }
+
+            const blockedUids = Object.keys(cachedBlocked);
+            if (blockedUids.length > 0) {
+                blockedUids.forEach(uid => renderContactRow(uid, blockedList, true));
+            } else {
+                blockedList.innerHTML = '<p class="empty-msg">No blocked contacts.</p>';
+            }
+
+            filterListItems(contactSearchInput, 'contacts-list-container');
+        }
+
+        async function handleContactAction(e) {
+            const actionBtn = e.target.closest('.contact-action-btn');
+            if (!actionBtn) return false;
+            e.stopPropagation();
+
+            const card = actionBtn.closest('.chat-item');
+            const uid = card.dataset.uid;
+            const name = card.dataset.name;
+            const action = actionBtn.dataset.action;
+            const user = auth.currentUser;
+            if (!user || !uid) return true;
+
+            if (action === 'block') {
+                const confirmBlock = await showCustomModal('Block Contact', `Block ${name}? They won't be able to reach you until you unblock them.`, true);
+                if (!confirmBlock) return true;
+                try {
+                    await set(ref(database, `blocks/${user.uid}/${uid}`), true);
+                    notify(`${name} has been blocked`);
+                } catch (err) {
+                    showCustomModal('Error', 'Could not block this contact.');
+                }
+            } else if (action === 'unblock') {
+                try {
+                    await remove(ref(database, `blocks/${user.uid}/${uid}`));
+                    notify(`${name} has been unblocked`);
+                } catch (err) {
+                    showCustomModal('Error', 'Could not unblock this contact.');
+                }
+            }
+            return true;
+        }
+
+        document.getElementById('contacts-sub-tabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-subtab]');
+            if (!btn) return;
+            document.querySelectorAll('#contacts-sub-tabs button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const isBlocked = btn.dataset.subtab === 'blocked';
+            document.getElementById('contacts-list-container').style.display = isBlocked ? 'none' : 'block';
+            document.getElementById('blocked-list-container').style.display = isBlocked ? 'block' : 'none';
+        });
+
         let cachedUserChatsData = {};
         let previousUserChatsData = {};
         let userChatsInitialized = false;
@@ -2722,8 +2825,9 @@
             
             const listEl = document.getElementById('forward-contacts-list');
             listEl.innerHTML = '';
-            Object.keys(cachedContacts).forEach(uid => { renderChatItem(uid, null, listEl, false); });
-            if (Object.keys(cachedContacts).length === 0) {
+            const forwardableUids = Object.keys(cachedContacts).filter(uid => !cachedBlocked[uid]);
+            forwardableUids.forEach(uid => { renderChatItem(uid, null, listEl, false); });
+            if (forwardableUids.length === 0) {
                 listEl.innerHTML = '<p class="empty-msg" style="margin-top:20px;">No contacts to forward to.</p>';
             }
             
@@ -2988,11 +3092,18 @@
             if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
         });
 
-        document.getElementById('contacts-list-container').addEventListener('click', (e) => {
+        document.getElementById('contacts-list-container').addEventListener('click', async (e) => {
+            if (await handleContactAction(e)) return;
             const avatarEl = e.target.closest('.avatar[data-full]');
             if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
             const card = e.target.closest('.chat-item');
             if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
+        });
+
+        document.getElementById('blocked-list-container').addEventListener('click', async (e) => {
+            if (await handleContactAction(e)) return;
+            const avatarEl = e.target.closest('.avatar[data-full]');
+            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
         });
 
         document.getElementById('chat-view-back').addEventListener('click', (e) => {
@@ -3377,19 +3488,13 @@
 
             onValue(ref(database, `contacts/${user.uid}`), (snap) => {
                 cachedContacts = snap.exists() ? snap.val() : {};
-
-                const contactsList = document.getElementById('contacts-list-container');
-                contactsList.innerHTML = '';
-                if(snap.exists()) {
-                    Object.keys(cachedContacts).forEach(contactUid => {
-                        renderChatItem(contactUid, null, contactsList, false);
-                    });
-                } else {
-                    contactsList.innerHTML = '<p class="empty-msg">Your contact list is empty.</p>';
-                }
-                
-                filterListItems(contactSearchInput, 'contacts-list-container');
+                renderContactsLists();
                 renderChatRequests();
+            });
+
+            onValue(ref(database, `blocks/${user.uid}`), (snap) => {
+                cachedBlocked = snap.exists() ? snap.val() : {};
+                renderContactsLists();
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {

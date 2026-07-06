@@ -441,6 +441,12 @@
     <div id="group-info-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet">
             <div class="sheet-handle"></div>
+            <div class="sheet-avatar-upload" id="group-avatar-upload" style="cursor:default;">
+                <div class="avatar-circle" id="group-avatar-preview"></div>
+                <div class="camera-badge" id="group-avatar-camera-badge" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+            </div>
+            <input type="file" id="group-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
             <div class="sheet-title" id="group-info-title">Group</div>
             <div class="group-info-section">
                 <p id="group-info-description" style="color:#888888; font-size:14px; text-align:center; margin-bottom:4px;"></p>
@@ -1610,6 +1616,30 @@
 
         // Group info sheet
         const groupInfoSheet = document.getElementById('group-info-sheet-overlay');
+        const groupAvatarUpload = document.getElementById('group-avatar-upload');
+        const groupAvatarPreview = document.getElementById('group-avatar-preview');
+        const groupAvatarCameraBadge = document.getElementById('group-avatar-camera-badge');
+        const groupPhotoInput = document.getElementById('group-photo-input');
+
+        function canEditGroupPhoto(group, uid) {
+            if (!group || !uid) return false;
+            // Private groups: any member can change the photo.
+            // Public groups: only the owner can change the photo.
+            return group.isPublic ? group.ownerUid === uid : !!(group.members && group.members[uid]);
+        }
+
+        function renderGroupAvatarPreview(group) {
+            if (group.photoURL) {
+                groupAvatarPreview.style.backgroundImage = `url('${group.photoURL}')`;
+                groupAvatarPreview.textContent = "";
+            } else {
+                groupAvatarPreview.style.backgroundImage = "none";
+                groupAvatarPreview.style.backgroundColor = "#5E5CE6";
+                groupAvatarPreview.style.color = "white";
+                groupAvatarPreview.textContent = groupInitials(group.name);
+            }
+        }
+
         document.getElementById('btn-group-info').addEventListener('click', () => {
             if (!activeGroupId) return;
             const group = cachedGroups[activeGroupId];
@@ -1619,6 +1649,12 @@
             document.getElementById('group-info-description').textContent = group.description || 'No description';
             const badge = document.getElementById('group-info-visibility-badge');
             badge.textContent = group.isPublic ? 'Public Group' : 'Private Group';
+
+            renderGroupAvatarPreview(group);
+            const user = auth.currentUser;
+            const editable = canEditGroupPhoto(group, user ? user.uid : null);
+            groupAvatarUpload.style.cursor = editable ? 'pointer' : 'default';
+            groupAvatarCameraBadge.style.display = editable ? 'flex' : 'none';
 
             const memberIds = group.members ? Object.keys(group.members) : [];
             document.getElementById('group-info-members-label').textContent = `Members (${memberIds.length})`;
@@ -1641,6 +1677,37 @@
         });
         groupInfoSheet.addEventListener('click', (e) => {
             if (e.target === groupInfoSheet) groupInfoSheet.classList.remove('active');
+        });
+
+        groupAvatarUpload.addEventListener('click', (e) => {
+            e.preventDefault();
+            const user = auth.currentUser;
+            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            if (!canEditGroupPhoto(group, user ? user.uid : null)) return;
+            groupPhotoInput.click();
+        });
+
+        groupPhotoInput.addEventListener('change', async (e) => {
+            e.preventDefault();
+            const file = e.target.files[0];
+            const user = auth.currentUser;
+            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            if (!file || !user || !group || !activeGroupId) return;
+            if (!canEditGroupPhoto(group, user.uid)) return;
+
+            groupAvatarUpload.classList.add('uploading');
+            try {
+                const { url } = await uploadToCloudinary(file);
+                await update(ref(database, `groups/${activeGroupId}`), { photoURL: url });
+                groupAvatarPreview.style.backgroundImage = `url('${url}')`;
+                groupAvatarPreview.textContent = "";
+                notify('Group photo updated');
+            } catch (err) {
+                showCustomModal("Upload Failed", "We couldn't upload that image.");
+            } finally {
+                groupAvatarUpload.classList.remove('uploading');
+                e.target.value = "";
+            }
         });
         document.getElementById('btn-leave-group').addEventListener('click', async () => {
             const user = auth.currentUser;
@@ -1668,6 +1735,8 @@
             activeGroupId = groupId;
             activeChatUid = null;
             cancelReplyMode();
+
+            update(ref(database, `user_group_chats/${user.uid}/${groupId}`), { unreadCount: 0 }).catch(() => {});
 
             document.getElementById('chat-view-name').textContent = group.name;
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
@@ -1731,11 +1800,42 @@
             const text = input.value.trim();
             if (!text || !activeGroupId || !user) return;
 
-            const msgPayload = { text: text, senderUid: user.uid, createdAt: Date.now() };
+            const group = cachedGroups[activeGroupId] || {};
+            const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
+            const msgPayload = { text: text, senderUid: user.uid, senderName: senderName, createdAt: Date.now() };
             input.value = '';
             try {
                 const newMsgKey = push(ref(database, `group_threads/${activeGroupId}/messages`)).key;
-                await set(ref(database, `group_threads/${activeGroupId}/messages/${newMsgKey}`), msgPayload);
+                const updates = {};
+                updates[`group_threads/${activeGroupId}/messages/${newMsgKey}`] = msgPayload;
+
+                // Fan out an unread/preview marker to every other member so their chat
+                // list updates and, once the matching Cloud Function trigger is deployed,
+                // an FCM push notification can be sent to their devices.
+                const memberIds = group.members ? Object.keys(group.members) : [];
+                memberIds.forEach(memberUid => {
+                    if (memberUid === user.uid) {
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}`] = {
+                            groupName: group.name || 'Group',
+                            groupPhotoURL: group.photoURL || '',
+                            text: text,
+                            senderUid: user.uid,
+                            senderName: senderName,
+                            timestamp: msgPayload.createdAt,
+                            unreadCount: 0
+                        };
+                    } else {
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/groupName`] = group.name || 'Group';
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/groupPhotoURL`] = group.photoURL || '';
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/text`] = text;
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/senderUid`] = user.uid;
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/senderName`] = senderName;
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/timestamp`] = msgPayload.createdAt;
+                        updates[`user_group_chats/${memberUid}/${activeGroupId}/unreadCount`] = increment(1);
+                    }
+                });
+
+                await update(ref(database), updates);
             } catch (err) {
                 showCustomModal('Message Failed', 'Your message could not be sent.');
             }

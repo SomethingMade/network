@@ -13,10 +13,15 @@ function previewFor(msg) {
             ? msg.text.slice(0, MAX_PREVIEW_LEN) + "…"
             : msg.text;
     }
-    if (msg.type === "image") return "📷 Photo";
-    if (msg.type === "video") return "🎥 Video";
-    if (msg.type === "voice") return "🎤 Voice note";
-    if (msg.type === "document" || msg.type === "raw") return "📄 Document";
+    
+    // Checks msg.mediaType to align with your frontend DM payload structure
+    const type = msg.mediaType || msg.type;
+    
+    if (type === "image") return "📷 Photo";
+    if (type === "video") return "🎥 Video";
+    if (type === "voice" || type === "audio") return "🎤 Voice note";
+    if (type === "document" || type === "raw") return "📄 Document";
+    
     return "New message";
 }
 
@@ -53,26 +58,21 @@ exports.sendDmPushNotification = onValueCreated(
         const body = previewFor(msg);
 
         const messaging = getMessaging();
+        
         const response = await messaging.sendEachForMulticast({
             tokens,
-            // IMPORTANT: no top-level "notification" field here.
-            // If present, the browser auto-displays it on receipt AND
-            // onBackgroundMessage() in the SW fires and shows it again,
-            // producing two notifications per message. Data-only avoids that.
+            // STRICTLY DATA-ONLY: No 'notification' or 'webpush' fields here.
+            // This prevents Firebase from auto-generating a second notification.
             data: {
                 title: senderName,
                 body,
                 chatUid: senderUid,
-                icon: senderProfile.photoURL || "",
-            },
-            webpush: {
-                fcmOptions: {
-                    link: "https://somethingmade.github.io/network/",
-                },
-            },
+                icon: senderProfile.photoURL || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
+                url: "https://somethingmade.github.io/network/"
+            }
         });
 
-        // Clean .up dead/unregistered tokens so they stop accumulating.
+        // Clean up dead/unregistered tokens so they stop accumulating
         const staleTokenUpdates = {};
         response.responses.forEach((res, idx) => {
             if (!res.success) {

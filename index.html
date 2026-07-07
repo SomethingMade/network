@@ -339,6 +339,7 @@
         .msg-bubble.out { align-self: flex-end; background: var(--gradient-brand); color: #FFF; border-bottom-right-radius: 4px; }
         
         .msg-bubble.media { max-width: 58%; padding: 0; background: transparent !important; border-radius: 0; }
+        .read-receipt { align-self: flex-end; font-size: 11px; color: var(--text-secondary); margin-top: -4px; padding-right: 6px; }
         .msg-bubble.media.in, .msg-bubble.media.out { background: transparent; }
         .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; border-radius: 16px; cursor: pointer; background: var(--bg-hover); }
         .msg-media-img { pointer-events: auto; }
@@ -1267,6 +1268,12 @@
             return `${days}d ago`;
         }
 
+        function formatClockTime(timestamp) {
+            if (!timestamp) return '';
+            const d = new Date(timestamp);
+            return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+        }
+
         function isNearBottom(el, threshold = 120) {
             if (!el) return true;
             return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
@@ -1359,8 +1366,10 @@
                 document.getElementById('chat-view-overlay').classList.remove('active');
                 if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
                 if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
+                if (typeof unsubscribeReadReceipt === 'function') unsubscribeReadReceipt();
                 unsubscribeChatMessages = null;
                 unsubscribeTyping = null;
+                unsubscribeReadReceipt = null;
                 
                 // Unbind bidirectional block listeners on closing chat
                 if (activeChatBlockListenerRef) {
@@ -2477,6 +2486,8 @@
             if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
+            if (typeof unsubscribeReadReceipt === 'function') unsubscribeReadReceipt();
+            unsubscribeReadReceipt = null;
 
             const groupMemberCountLabel = group.members ? `${Object.keys(group.members).length} members` : '';
             let currentGroupIsTyping = false;
@@ -3454,7 +3465,7 @@
             const container = document.getElementById('chat-requests-container');
             if (!container) return;
 
-            const pendingUids = Object.keys(cachedUserChatsData).filter(uid => !cachedContacts[uid]);
+            const pendingUids = Object.keys(cachedUserChatsData).filter(uid => uid !== AI_UID && !cachedContacts[uid]);
             if (pendingUids.length === 0) {
                 container.style.display = 'none';
                 container.innerHTML = '';
@@ -3661,6 +3672,8 @@
         let activeChatUid = null;
         let unsubscribeChatMessages = null;
         let unsubscribeTyping = null;
+        let unsubscribeReadReceipt = null;
+        let activeChatOtherLastRead = 0;
         let isActiveThreadInitialLoad = true;
         let chatListTypingUnsubscribers = {};
         let groupListTypingUnsubscribers = {};
@@ -4009,6 +4022,22 @@
         chatMessagesContainer.addEventListener('pointercancel', cancelBubbleInteraction);
         chatMessagesContainer.addEventListener('pointerleave', cancelBubbleInteraction);
 
+        function renderReadReceipt(messagesEl) {
+            const existing = messagesEl.querySelector('.read-receipt');
+            if (existing) existing.remove();
+            if (!activeChatOtherLastRead) return;
+            const bubbles = messagesEl.querySelectorAll('.msg-bubble');
+            if (!bubbles.length) return;
+            const lastBubble = bubbles[bubbles.length - 1];
+            if (!lastBubble.classList.contains('out')) return;
+            const createdAt = parseInt(lastBubble.dataset.createdAt, 10);
+            if (!createdAt || activeChatOtherLastRead < createdAt) return;
+            const receipt = document.createElement('div');
+            receipt.className = 'read-receipt';
+            receipt.textContent = `Seen ${formatClockTime(activeChatOtherLastRead)}`;
+            messagesEl.appendChild(receipt);
+        }
+
         function openChatView(otherUid, otherName, otherAvatar) {
             const user = auth.currentUser;
             if (!user) return;
@@ -4067,9 +4096,23 @@
             
             if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
+            if (typeof unsubscribeReadReceipt === 'function') unsubscribeReadReceipt();
 
             let currentChatIsTyping = false;
             const threadId = threadIdFor(user.uid, otherUid);
+            const isAIThread = otherUid === AI_UID;
+
+            // Mark this thread as read by me, right now
+            if (!isAIThread) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
+
+            // Read-receipt listener: track when the other person last read this thread
+            activeChatOtherLastRead = 0;
+            if (!isAIThread) {
+                unsubscribeReadReceipt = onValue(ref(database, `dm_threads/${threadId}/readReceipts/${otherUid}`), (snap) => {
+                    activeChatOtherLastRead = snap.exists() ? snap.val() : 0;
+                    renderReadReceipt(messagesEl);
+                });
+            }
 
             // Typing listener logic for Chat View
             unsubscribeTyping = onValue(ref(database, `dm_threads/${threadId}/typing/${otherUid}`), (snap) => {
@@ -4214,6 +4257,8 @@
                     });
                 }
                 renderPendingUploadsInto(messagesEl, otherUid);
+                renderReadReceipt(messagesEl);
+                if (!isAIThread) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
                 
                 // Re-append typing bubble if they were typing before innerHTML got wiped
                 if (currentChatIsTyping) {

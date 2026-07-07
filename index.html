@@ -328,6 +328,39 @@
         .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; border-radius: 16px; cursor: pointer; background: var(--bg-hover); }
         .msg-media-img { pointer-events: auto; }
         .msg-media-video { cursor: default; }
+        .msg-media-wrap { position: relative; }
+        .msg-media-save-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            padding: 0;
+            transition: background 0.15s ease, transform 0.1s ease;
+            z-index: 2;
+        }
+        .msg-media-save-btn:hover { background: rgba(0,0,0,0.75); }
+        .msg-media-save-btn:active { transform: scale(0.92); }
+        .msg-media-save-btn svg { width: 16px; height: 16px; }
+        .image-viewer-save {
+            position: absolute;
+            top: 28px;
+            right: 74px;
+            width: 26px;
+            height: 26px;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .image-viewer-save:hover { opacity: 0.75; }
 
         .msg-bubble.pending { position: relative; opacity: 0.85; }
         .msg-bubble.pending.media img, .msg-bubble.pending.media video { filter: brightness(0.85); }
@@ -952,6 +985,7 @@
     </div>
 
     <div id="image-viewer-overlay">
+        <svg class="image-viewer-save" id="image-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <img id="image-viewer-img" src="" alt="Full image">
     </div>
@@ -1019,19 +1053,60 @@
             });
         }
 
+        let currentViewerImageUrl = '';
         function openImageViewer(url) {
             if (!url) return;
+            currentViewerImageUrl = url;
             document.getElementById('image-viewer-img').src = url;
             document.getElementById('image-viewer-overlay').classList.add('active');
         }
         function closeImageViewer() {
             document.getElementById('image-viewer-overlay').classList.remove('active');
             document.getElementById('image-viewer-img').src = '';
+            currentViewerImageUrl = '';
         }
         document.getElementById('image-viewer-close').addEventListener('click', closeImageViewer);
+        document.getElementById('image-viewer-save').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentViewerImageUrl) downloadMediaFile(currentViewerImageUrl, 'image');
+        });
         document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'image-viewer-overlay') closeImageViewer();
         });
+
+        // Downloads an image/video to the user's device (Downloads folder / Photos on most mobile browsers).
+        async function downloadMediaFile(url, kind = 'file') {
+            if (!url) return;
+            const extGuess = kind === 'video' ? 'mp4' : 'jpg';
+            const fileName = `${kind}-${Date.now()}.${extGuess}`;
+            try {
+                showLoading();
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) throw new Error('Fetch failed');
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                notify('Saved to your device');
+            } catch (err) {
+                console.error('downloadMediaFile error:', err);
+                // Fallback for browsers that block the cross-origin fetch: open it directly
+                // so the user can long-press (mobile) or right-click (desktop) to save it.
+                window.open(url, '_blank', 'noopener,noreferrer');
+                notify('Opened in a new tab — long-press or right-click to save', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function saveIconSvg() {
+            return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+        }
 
         function openDocumentExternally(url, fileName) {
             if (!url) return;
@@ -3552,20 +3627,40 @@
 
                         if (msg.mediaURL && msg.mediaType === 'image') {
                             if (!msg.replyToMessage) bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
                             const img = document.createElement('img');
                             img.className = 'msg-media-img';
                             img.src = msg.mediaURL;
                             img.alt = 'Photo';
                             img.addEventListener('click', () => openImageViewer(msg.mediaURL));
-                            bubble.appendChild(img);
+                            mediaWrap.appendChild(img);
+                            const saveBtn = document.createElement('button');
+                            saveBtn.type = 'button';
+                            saveBtn.className = 'msg-media-save-btn';
+                            saveBtn.title = 'Save image';
+                            saveBtn.innerHTML = saveIconSvg();
+                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'image'); });
+                            mediaWrap.appendChild(saveBtn);
+                            bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'video') {
                             if (!msg.replyToMessage) bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
                             const vid = document.createElement('video');
                             vid.className = 'msg-media-video';
                             vid.src = msg.mediaURL;
                             vid.controls = true;
                             vid.playsInline = true;
-                            bubble.appendChild(vid);
+                            mediaWrap.appendChild(vid);
+                            const saveBtn = document.createElement('button');
+                            saveBtn.type = 'button';
+                            saveBtn.className = 'msg-media-save-btn';
+                            saveBtn.title = 'Save video';
+                            saveBtn.innerHTML = saveIconSvg();
+                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'video'); });
+                            mediaWrap.appendChild(saveBtn);
+                            bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'audio') {
                             const card = document.createElement('div');
                             card.className = 'msg-voice-card';

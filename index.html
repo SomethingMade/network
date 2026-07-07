@@ -4343,7 +4343,7 @@
                     const data = snap.data();
                     if (!data) return;
 
-                    if (data.status === 'COMPLETED' && data.response) {
+                    if (data.status && data.status.state === 'COMPLETED' && data.response) {
                         unsub();
                         set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
                         const replyTime = Date.now();
@@ -4352,17 +4352,20 @@
                         replyUpdates[`dm_threads/${threadId}/messages/${replyKey}`] = { text: data.response, senderUid: AI_UID, createdAt: replyTime };
                         replyUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: data.response, timestamp: replyTime, unreadCount: 0 };
                         update(ref(database), replyUpdates);
-                    } else if (data.status === 'ERRORED') {
+                    } else if (data.status && data.status.state === 'ERRORED') {
                         unsub();
                         set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                        showCustomModal('Goza AI', "I couldn't process that right now. Please try again.");
+                        showCustomModal('Goza AI', data.status.error ? `Error: ${data.status.error}` : "I couldn't process that right now. Please try again.");
                     }
-                }, () => {
+                }, (err) => {
+                    console.error('Goza AI snapshot listener error', err);
                     set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                    showCustomModal('Goza AI', `Couldn't read the response (${err.code || err.message}).`);
                 });
             } catch (err) {
+                console.error('Goza AI addDoc failed', err);
                 set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                showCustomModal('Goza AI', "I couldn't process that right now. Please try again.");
+                showCustomModal('Goza AI', `Couldn't send that (${err.code || err.message}). Check Firestore rules.`);
             }
         }
 

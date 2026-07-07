@@ -672,7 +672,7 @@
             
             <nav class="side-nav">
                 <div class="nav-item active" data-tab="tab-chats">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1-2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                     <span>Chats</span>
                 </div>
                 <div class="nav-item" data-tab="tab-groups">
@@ -1543,14 +1543,31 @@
             item.className = 'chat-item' + (groupId === activeGroupId ? ' active-chat' : '');
             item.dataset.groupId = groupId;
             const memberCount = group.members ? Object.keys(group.members).length : 0;
+            const defaultPreviewText = `${memberCount} member${memberCount === 1 ? '' : 's'} · ${group.isPublic ? 'Public' : 'Private'}`;
             item.innerHTML = `
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
                     <h3>${group.name}</h3>
-                    <p>${memberCount} member${memberCount === 1 ? '' : 's'} · ${group.isPublic ? 'Public' : 'Private'}</p>
+                    <p>${defaultPreviewText}</p>
                 </div>
             `;
             container.appendChild(item);
+
+            const user = auth.currentUser;
+            if (user) {
+                groupListTypingUnsubscribers[groupId] = onValue(ref(database, `group_threads/${groupId}/typing`), (typingSnap) => {
+                    const typingData = typingSnap.exists() ? typingSnap.val() : {};
+                    const isAnyoneTyping = Object.keys(typingData).some(uid => uid !== user.uid && typingData[uid]);
+                    const previewEl = item.querySelector('.chat-preview p');
+                    if (previewEl) {
+                        if (isAnyoneTyping) {
+                            previewEl.innerHTML = '<span class="typing-text">typing...</span>';
+                        } else {
+                            previewEl.textContent = defaultPreviewText;
+                        }
+                    }
+                });
+            }
         }
 
         function renderDiscoverGroupItem(groupId, group, container) {
@@ -1594,6 +1611,11 @@
 
             const myContainer = document.getElementById('my-groups-list-container');
             const discoverContainer = document.getElementById('discover-groups-list-container');
+
+            // Cleanup old group typing listeners before re-rendering the list
+            Object.values(groupListTypingUnsubscribers).forEach(unsub => unsub());
+            groupListTypingUnsubscribers = {};
+
             myContainer.innerHTML = '';
             discoverContainer.innerHTML = '';
 
@@ -1950,8 +1972,42 @@
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
 
+            const groupMemberCountLabel = group.members ? `${Object.keys(group.members).length} members` : '';
+            let currentGroupIsTyping = false;
+
+            function appendGroupTypingBubbleIfNeeded() {
+                if (currentGroupIsTyping && messagesEl && !document.getElementById('typing-indicator-bubble')) {
+                    const typingBubble = document.createElement('div');
+                    typingBubble.id = 'typing-indicator-bubble';
+                    typingBubble.className = 'typing-bubble';
+                    typingBubble.innerHTML = `<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>`;
+                    messagesEl.appendChild(typingBubble);
+                    scrollToBottom();
+                }
+            }
+
+            // Typing listener logic for Group Chat View
+            unsubscribeTyping = onValue(ref(database, `group_threads/${groupId}/typing`), (snap) => {
+                const typingData = snap.exists() ? snap.val() : {};
+                const typingUids = Object.keys(typingData).filter(uid => uid !== user.uid && typingData[uid]);
+                currentGroupIsTyping = typingUids.length > 0;
+                let typingBubble = document.getElementById('typing-indicator-bubble');
+                const statusEl = document.getElementById('chat-view-status');
+
+                if (currentGroupIsTyping) {
+                    appendGroupTypingBubbleIfNeeded();
+                    if (statusEl) {
+                        const names = typingUids.map(uid => (cachedUsers[uid] && cachedUsers[uid].name) || 'Someone');
+                        statusEl.textContent = names.length === 1 ? `${names[0]} is typing...` : `${names.length} people are typing...`;
+                    }
+                } else {
+                    if (typingBubble) typingBubble.remove();
+                    if (statusEl) statusEl.textContent = groupMemberCountLabel;
+                }
+            });
+
             unsubscribeGroupMessages = onValue(ref(database, `group_threads/${groupId}/messages`), (snap) => {
-                messagesEl.innerHTML = '';
+                messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
                 if (snap.exists()) {
                     const items = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })).sort((a, b) => a.createdAt - b.createdAt);
                     items.forEach(msg => {
@@ -1976,6 +2032,7 @@
                         messagesEl.appendChild(bubble);
                     });
                 }
+                appendGroupTypingBubbleIfNeeded();
                 scrollToBottom();
             });
 
@@ -1994,6 +2051,11 @@
             const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
             const msgPayload = { text: text, senderUid: user.uid, senderName: senderName, createdAt: Date.now() };
             input.value = '';
+
+            // Immediately stop showing you as typing
+            clearTimeout(typingTimeout);
+            set(ref(database, `group_threads/${activeGroupId}/typing/${user.uid}`), false);
+
             try {
                 const newMsgKey = push(ref(database, `group_threads/${activeGroupId}/messages`)).key;
                 const updates = {};
@@ -2878,6 +2940,7 @@
         let unsubscribeChatMessages = null;
         let unsubscribeTyping = null;
         let chatListTypingUnsubscribers = {};
+        let groupListTypingUnsubscribers = {};
         let replyingToMessage = null;
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
@@ -2887,10 +2950,12 @@
 
         document.getElementById('chat-view-input').addEventListener('input', () => {
             const user = auth.currentUser;
-            if (!user || !activeChatUid || activeGroupId) return;
-            const threadId = threadIdFor(user.uid, activeChatUid);
-            const typingRef = ref(database, `dm_threads/${threadId}/typing/${user.uid}`);
-            
+            if (!user || (!activeChatUid && !activeGroupId)) return;
+
+            const typingRef = activeGroupId
+                ? ref(database, `group_threads/${activeGroupId}/typing/${user.uid}`)
+                : ref(database, `dm_threads/${threadIdFor(user.uid, activeChatUid)}/typing/${user.uid}`);
+
             set(typingRef, true);
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {

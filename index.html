@@ -362,6 +362,55 @@
         }
         .image-viewer-save:hover { opacity: 0.75; }
 
+        .msg-reaction-bar {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            background: var(--bg-surface);
+            padding: 10px 14px;
+            border-radius: 28px;
+            margin: 0 auto 10px;
+            width: fit-content;
+            max-width: calc(100% - 32px);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.18);
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+            pointer-events: none;
+        }
+        .bottom-sheet-overlay.active .msg-reaction-bar { transform: translateY(0); opacity: 1; pointer-events: auto; }
+        .reaction-emoji-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+        .reaction-emoji-btn:hover, .reaction-emoji-btn:active { transform: scale(1.25); background: var(--bg-hover); }
+
+        .msg-reactions {
+            position: absolute;
+            bottom: -11px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 12px;
+            line-height: 1;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+            z-index: 1;
+            cursor: default;
+        }
+        .msg-bubble.out .msg-reactions { right: 8px; }
+        .msg-bubble.in .msg-reactions { left: 8px; }
+        .msg-reactions-count { font-size: 10px; font-weight: 700; color: var(--text-secondary); margin-left: 2px; }
+
         .msg-bubble.pending { position: relative; opacity: 0.85; }
         .msg-bubble.pending.media img, .msg-bubble.pending.media video { filter: brightness(0.85); }
         .pending-spinner-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2); border-radius: inherit; }
@@ -711,14 +760,24 @@
     </div>
 
     <div id="msg-options-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="padding-bottom: 24px;">
-            <div class="sheet-handle"></div>
-            <div class="sheet-title" style="margin-bottom: 8px;">Message Options</div>
-            <div class="attach-options" style="flex-direction: column; gap:0; padding:0;">
-                <button class="msg-option-btn" id="btn-msg-reply">Reply to Message</button>
-                <button class="msg-option-btn" id="btn-msg-copy">Copy Text</button>
-                <button class="msg-option-btn" id="btn-msg-forward">Forward</button>
-                <button class="msg-option-btn" id="btn-msg-delete" style="color: var(--danger-red);">Delete for Everyone</button>
+        <div style="display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:420px;">
+            <div class="msg-reaction-bar" id="msg-reaction-bar">
+                <button type="button" class="reaction-emoji-btn" data-emoji="❤️">❤️</button>
+                <button type="button" class="reaction-emoji-btn" data-emoji="😂">😂</button>
+                <button type="button" class="reaction-emoji-btn" data-emoji="😮">😮</button>
+                <button type="button" class="reaction-emoji-btn" data-emoji="😢">😢</button>
+                <button type="button" class="reaction-emoji-btn" data-emoji="🙏">🙏</button>
+                <button type="button" class="reaction-emoji-btn" data-emoji="👍">👍</button>
+            </div>
+            <div class="bottom-sheet" style="padding-bottom: 24px;">
+                <div class="sheet-handle"></div>
+                <div class="sheet-title" style="margin-bottom: 8px;">Message Options</div>
+                <div class="attach-options" style="flex-direction: column; gap:0; padding:0;">
+                    <button class="msg-option-btn" id="btn-msg-reply">Reply to Message</button>
+                    <button class="msg-option-btn" id="btn-msg-copy">Copy Text</button>
+                    <button class="msg-option-btn" id="btn-msg-forward">Forward</button>
+                    <button class="msg-option-btn" id="btn-msg-delete" style="color: var(--danger-red);">Delete for Everyone</button>
+                </div>
             </div>
         </div>
     </div>
@@ -2291,6 +2350,9 @@
                         const bubble = document.createElement('div');
                         bubble.className = 'msg-bubble ' + (isOwn ? 'out' : 'in');
                         bubble.dataset.key = msg.key;
+                        bubble.dataset.senderUid = msg.senderUid;
+                        bubble.dataset.createdAt = msg.createdAt;
+                        if (msg.text) bubble.dataset.text = msg.text;
 
                         if (!isOwn) {
                             const senderName = document.createElement('div');
@@ -2305,6 +2367,12 @@
                         const textEl = document.createElement('div');
                         textEl.textContent = msg.text || '';
                         bubble.appendChild(textEl);
+
+                        if (msg.reactions) {
+                            const badge = buildReactionsBadge(msg.reactions);
+                            if (badge) bubble.appendChild(badge);
+                        }
+
                         messagesEl.appendChild(bubble);
                     });
                 }
@@ -3355,6 +3423,56 @@
             document.getElementById('msg-options-sheet-overlay').classList.add('active');
         }
 
+        // Resolves the DB path for a message's reactions map, depending on whether we're in a DM or a group chat.
+        function reactionsPathForMsg(msgKey) {
+            const user = auth.currentUser;
+            if (!user || !msgKey) return null;
+            if (activeGroupId) return `group_threads/${activeGroupId}/messages/${msgKey}/reactions`;
+            if (activeChatUid) return `dm_threads/${threadIdFor(user.uid, activeChatUid)}/messages/${msgKey}/reactions`;
+            return null;
+        }
+
+        async function toggleReaction(msgKey, emoji) {
+            const user = auth.currentUser;
+            const path = reactionsPathForMsg(msgKey);
+            if (!user || !path) return;
+            const myReactionRef = ref(database, `${path}/${user.uid}`);
+            try {
+                const snap = await get(myReactionRef);
+                const current = snap.exists() ? snap.val() : null;
+                if (current === emoji) {
+                    await remove(myReactionRef);
+                } else {
+                    await set(myReactionRef, emoji);
+                }
+            } catch (err) {
+                notify('Could not react to message', 'error');
+            }
+        }
+
+        document.getElementById('msg-reaction-bar').addEventListener('click', (e) => {
+            const btn = e.target.closest('.reaction-emoji-btn');
+            if (!btn || !activeContextMenuMsg || !activeContextMenuMsg.key) return;
+            toggleReaction(activeContextMenuMsg.key, btn.dataset.emoji);
+            document.getElementById('msg-options-sheet-overlay').classList.remove('active');
+        });
+
+        // Builds the small overlapping pill that shows reactions on a bubble
+        function buildReactionsBadge(reactions) {
+            if (!reactions) return null;
+            const entries = Object.values(reactions);
+            if (entries.length === 0) return null;
+            const counts = {};
+            entries.forEach(e => { counts[e] = (counts[e] || 0) + 1; });
+            const uniqueEmojis = Object.keys(counts);
+            const badge = document.createElement('div');
+            badge.className = 'msg-reactions';
+            let html = uniqueEmojis.slice(0, 3).map(e => `<span>${e}</span>`).join('');
+            if (entries.length > 1) html += `<span class="msg-reactions-count">${entries.length}</span>`;
+            badge.innerHTML = html;
+            return badge;
+        }
+
         // Context Menu Handlers
         document.getElementById('btn-msg-reply').addEventListener('click', () => {
             document.getElementById('msg-options-sheet-overlay').classList.remove('active');
@@ -3420,7 +3538,9 @@
 
         // Close Bottom Sheets
         document.getElementById('msg-options-sheet-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'msg-options-sheet-overlay') e.target.classList.remove('active');
+            if (!e.target.closest('.bottom-sheet') && !e.target.closest('.msg-reaction-bar')) {
+                e.currentTarget.classList.remove('active');
+            }
         });
         document.getElementById('forward-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'forward-sheet-overlay') e.target.classList.remove('active');
@@ -3709,6 +3829,11 @@
                             const textEl = document.createElement('div');
                             textEl.textContent = msg.text;
                             bubble.appendChild(textEl);
+                        }
+
+                        if (msg.reactions) {
+                            const badge = buildReactionsBadge(msg.reactions);
+                            if (badge) bubble.appendChild(badge);
                         }
 
                         messagesEl.appendChild(bubble);

@@ -1129,6 +1129,7 @@
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1538,7 +1539,16 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const database = getDatabase(app);
+        const firestoreDb = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
+
+        // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
+        // NOTE: AI_FIRESTORE_COLLECTION must match the "Firestore Collection Path" you configure
+        // when installing the extension. Use a per-user wildcard path so each user's chat stays
+        // private, e.g. set the extension's Collection Path to:  ai_discussions/{uid}/messages
+        const AI_UID = "goza-ai-assistant";
+        const AI_NAME = "Goza AI";
+        const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
 
         let recaptchaVerifier = null;
         let confirmationResult = null;
@@ -3530,7 +3540,8 @@
         }
 
         function renderChatItem(uid, metaData, container, isChatPane = false) {
-            const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+            const isAI = uid === AI_UID;
+            const profile = isAI ? { name: AI_NAME, photoURL: '' } : (cachedUsers[uid] || { name: 'Unknown User', photoURL: '' });
             const isSelf = auth.currentUser && uid === auth.currentUser.uid;
             const displayName = isSelf ? 'My Account' : profile.name;
 
@@ -3541,15 +3552,19 @@
             item.dataset.avatar = profile.photoURL;
             
             const initial = displayName.charAt(0).toUpperCase();
-            const avatarHtml = profile.photoURL 
-                ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
-                : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+            const avatarHtml = isAI
+                ? `<div class="avatar" style="background: linear-gradient(135deg, #7C4DFF, #18C7FF); border: none; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg></div>`
+                : (profile.photoURL 
+                    ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
+                    : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`);
             
             let metaHtml = "";
             let snippetHtml = "";
             let badgeHtml = "";
 
-            if (isChatPane && metaData && metaData.timestamp) {
+            if (isAI && !isChatPane) {
+                snippetHtml = `<p>Ask me anything</p>`;
+            } else if (isChatPane && metaData && metaData.timestamp) {
                 const d = new Date(metaData.timestamp);
                 const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
                 snippetHtml = `<p>${metaData.text}</p>`;
@@ -3609,6 +3624,20 @@
                     const username = await ensureUsername(user);
                     document.getElementById('display-username').textContent = '@' + username;
                 } catch (err) { console.error('Username assignment failed', err); }
+
+                try {
+                    const aiChatSnap = await get(ref(database, `user_chats/${user.uid}/${AI_UID}`));
+                    if (!aiChatSnap.exists()) {
+                        const welcomeText = "Hi! I'm Goza AI 👋 Ask me anything.";
+                        const welcomeTime = Date.now();
+                        const threadId = threadIdFor(user.uid, AI_UID);
+                        const welcomeKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                        const seedUpdates = {};
+                        seedUpdates[`dm_threads/${threadId}/messages/${welcomeKey}`] = { text: welcomeText, senderUid: AI_UID, createdAt: welcomeTime };
+                        seedUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: welcomeText, timestamp: welcomeTime, unreadCount: 0 };
+                        await update(ref(database), seedUpdates);
+                    }
+                } catch (err) { console.error('Goza AI seed failed', err); }
 
                 const connectedRef = ref(database, '.info/connected');
                 onValue(connectedRef, (snap) => {
@@ -3712,8 +3741,15 @@
 
         function updateActiveChatStatus() {
             if (!activeChatUid) return;
-            const otherProfile = cachedUsers[activeChatUid] || {};
             const statusEl = document.getElementById('chat-view-status');
+
+            if (activeChatUid === AI_UID) {
+                statusEl.textContent = 'Always here to help';
+                statusEl.style.color = 'var(--success-green)';
+                return;
+            }
+
+            const otherProfile = cachedUsers[activeChatUid] || {};
             
             if (otherProfile.status === 'online') {
                 statusEl.textContent = 'Online';
@@ -3981,8 +4017,9 @@
             isActiveThreadInitialLoad = true;
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             document.getElementById('btn-group-info').style.display = 'none';
-            document.getElementById('chat-attach-btn').style.display = 'flex';
-            document.getElementById('chat-mic-btn').style.display = 'flex';
+            const isAIChat = otherUid === AI_UID;
+            document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
+            document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode();
             
@@ -3990,10 +4027,19 @@
             updateActiveChatStatus(); 
             
             const avatarEl = document.getElementById('chat-view-avatar');
-            if(otherAvatar) {
+            if (otherUid === AI_UID) {
+                avatarEl.style.backgroundImage = "none";
+                avatarEl.style.background = "linear-gradient(135deg, #7C4DFF, #18C7FF)";
+                avatarEl.style.display = "flex";
+                avatarEl.style.alignItems = "center";
+                avatarEl.style.justifyContent = "center";
+                avatarEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg>';
+            } else if(otherAvatar) {
+                avatarEl.innerHTML = "";
                 avatarEl.style.backgroundImage = `url('${otherAvatar}')`;
                 avatarEl.textContent = "";
             } else {
+                avatarEl.innerHTML = "";
                 avatarEl.style.backgroundImage = "none";
                 avatarEl.style.backgroundColor = "var(--primary-blue)";
                 avatarEl.style.color = "#FFFFFF";
@@ -4224,9 +4270,16 @@
             const user = auth.currentUser;
             const input = document.getElementById('chat-view-input');
             const text = input.value.trim();
-            
-            if (theyBlockedMeActive || (activeChatUid && cachedBlocked[activeChatUid])) return; // extra safety net
+
             if (!text || !activeChatUid || !user) return;
+
+            if (activeChatUid === AI_UID) {
+                input.value = '';
+                cancelReplyMode();
+                return sendMessageToAI(text, user);
+            }
+
+            if (theyBlockedMeActive || cachedBlocked[activeChatUid]) return; // extra safety net
 
             const threadId = threadIdFor(user.uid, activeChatUid);
             const msgPayload = { text: text, senderUid: user.uid, createdAt: Date.now() };
@@ -4258,6 +4311,59 @@
 
             try { await update(ref(database), updates); } 
             catch (err) { showCustomModal('Message Failed', 'Your message could not be sent.'); }
+        }
+
+        // --- GOZA AI ASSISTANT MESSAGING ---
+        // Writes the user's message straight into the normal dm_threads thread (so it renders
+        // with the existing bubble/typing/scroll code), bumps the AI card's position in the chat
+        // list like a real contact, then hands the prompt to Firestore for the Gemini extension
+        // to pick up. The AI's reply is written back into the same dm_thread once it's ready.
+        async function sendMessageToAI(text, user) {
+            const threadId = threadIdFor(user.uid, AI_UID);
+            const now = Date.now();
+            const msgPayload = { text: text, senderUid: user.uid, createdAt: now };
+            const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+
+            const updates = {};
+            updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+            updates[`user_chats/${user.uid}/${AI_UID}`] = { text: text, timestamp: now, unreadCount: 0 };
+
+            try { await update(ref(database), updates); }
+            catch (err) { return showCustomModal('Message Failed', 'Your message could not be sent.'); }
+
+            set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), true);
+
+            try {
+                const docRef = await addDoc(collection(firestoreDb, AI_FIRESTORE_COLLECTION(user.uid)), {
+                    prompt: text,
+                    createTime: fsServerTimestamp()
+                });
+
+                const unsub = onSnapshot(docRef, async (snap) => {
+                    const data = snap.data();
+                    if (!data) return;
+
+                    if (data.status === 'COMPLETED' && data.response) {
+                        unsub();
+                        set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                        const replyTime = Date.now();
+                        const replyKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                        const replyUpdates = {};
+                        replyUpdates[`dm_threads/${threadId}/messages/${replyKey}`] = { text: data.response, senderUid: AI_UID, createdAt: replyTime };
+                        replyUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: data.response, timestamp: replyTime, unreadCount: 0 };
+                        update(ref(database), replyUpdates);
+                    } else if (data.status === 'ERRORED') {
+                        unsub();
+                        set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                        showCustomModal('Goza AI', "I couldn't process that right now. Please try again.");
+                    }
+                }, () => {
+                    set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                });
+            } catch (err) {
+                set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                showCustomModal('Goza AI', "I couldn't process that right now. Please try again.");
+            }
         }
 
         function sendActiveMessage() { activeGroupId ? sendGroupMessage() : sendChatMessage(); }

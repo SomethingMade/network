@@ -1781,6 +1781,7 @@
 
         // --- GROUPS ---
         let cachedGroups = {};
+        let cachedGroupChatsMeta = {};
         let cachedGroupInvites = {};
         let activeGroupId = null;
         let unsubscribeGroupMessages = null;
@@ -1793,18 +1794,31 @@
                 : `<div class="avatar" style="background-color: var(--accent-purple); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${groupInitials(group.name)}</div>`;
         }
 
-        function renderMyGroupItem(groupId, group, container) {
+        function renderMyGroupItem(groupId, group, container, metaData) {
             const item = document.createElement('div');
             item.className = 'chat-item' + (groupId === activeGroupId ? ' active-chat' : '');
             item.dataset.groupId = groupId;
             const memberCount = group.members ? Object.keys(group.members).length : 0;
             const defaultPreviewText = `${memberCount} member${memberCount === 1 ? '' : 's'} · ${group.isPublic ? 'Public' : 'Private'}`;
+
+            let snippetText = defaultPreviewText;
+            let metaHtml = '';
+            if (metaData && metaData.timestamp) {
+                const senderPrefix = auth.currentUser && metaData.senderUid === auth.currentUser.uid ? 'You: ' : (metaData.senderName ? `${metaData.senderName}: ` : '');
+                snippetText = `${senderPrefix}${metaData.text || ''}`;
+                const d = new Date(metaData.timestamp);
+                const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+                const badgeHtml = (metaData.unreadCount && metaData.unreadCount > 0) ? `<div class="unread-badge">${metaData.unreadCount}</div>` : '';
+                metaHtml = `<div class="chat-meta"><span class="time">${timeStr}</span>${badgeHtml}</div>`;
+            }
+
             item.innerHTML = `
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
                     <h3>${group.name}</h3>
-                    <p>${defaultPreviewText}</p>
+                    <p>${snippetText}</p>
                 </div>
+                ${metaHtml}
             `;
             container.appendChild(item);
 
@@ -1818,7 +1832,7 @@
                         if (isAnyoneTyping) {
                             previewEl.innerHTML = '<span class="typing-text">typing...</span>';
                         } else {
-                            previewEl.textContent = defaultPreviewText;
+                            previewEl.textContent = snippetText;
                         }
                     }
                 });
@@ -1880,8 +1894,12 @@
             if (myGroupIds.length === 0) {
                 myContainer.innerHTML = '<p class="empty-msg">You haven\'t joined any groups yet.</p>';
             } else {
-                myGroupIds.sort((a, b) => (cachedGroups[b].createdAt || 0) - (cachedGroups[a].createdAt || 0));
-                myGroupIds.forEach(gid => renderMyGroupItem(gid, cachedGroups[gid], myContainer));
+                myGroupIds.sort((a, b) => {
+                    const bTime = (cachedGroupChatsMeta[b] && cachedGroupChatsMeta[b].timestamp) || cachedGroups[b].createdAt || 0;
+                    const aTime = (cachedGroupChatsMeta[a] && cachedGroupChatsMeta[a].timestamp) || cachedGroups[a].createdAt || 0;
+                    return bTime - aTime;
+                });
+                myGroupIds.forEach(gid => renderMyGroupItem(gid, cachedGroups[gid], myContainer, cachedGroupChatsMeta[gid]));
             }
 
             if (discoverGroupIds.length === 0) {
@@ -4119,6 +4137,15 @@
 
             onValue(ref(database, "groups"), (snap) => {
                 cachedGroups = snap.exists() ? snap.val() : {};
+                renderGroupsLists();
+            });
+
+            onValue(ref(database, `user_group_chats/${user.uid}`), (snap) => {
+                cachedGroupChatsMeta = snap.exists() ? snap.val() : {};
+                if (activeGroupId && cachedGroupChatsMeta[activeGroupId] && cachedGroupChatsMeta[activeGroupId].unreadCount > 0) {
+                    update(ref(database, `user_group_chats/${user.uid}/${activeGroupId}`), { unreadCount: 0 });
+                    cachedGroupChatsMeta[activeGroupId].unreadCount = 0;
+                }
                 renderGroupsLists();
             });
 

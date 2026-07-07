@@ -265,6 +265,21 @@
         .contact-action-btn.danger:hover { background: rgba(255, 69, 58, 0.1); }
         .contact-action-btn.primary { color: var(--primary-blue); border-color: rgba(10, 132, 255, 0.3); }
         .contact-action-btn.primary:hover { background: rgba(10, 132, 255, 0.1); }
+
+        /* ── DEVICE CONTACTS SYNC ── */
+        .sync-contacts-card { margin: 4px 16px 8px; padding: 18px; border-radius: 20px; background: var(--gradient-brand); color: #fff; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .sync-contacts-card:active { transform: scale(0.98); }
+        .sync-contacts-card .sync-icon { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sync-contacts-card .sync-icon svg { width: 20px; height: 20px; }
+        .sync-contacts-card .sync-text h4 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .sync-contacts-card .sync-text p { font-size: 12px; opacity: 0.85; }
+        .sync-contacts-card.syncing { opacity: 0.7; pointer-events: none; }
+        .device-contacts-note { padding: 4px 20px 14px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; flex-shrink: 0; }
+        .device-contact-row .chat-preview p { font-size: 12px; }
+        .invite-btn { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: none; background: var(--gradient-brand); color: #fff; cursor: pointer; transition: 0.2s; }
+        .invite-btn:active { transform: scale(0.96); }
+        .chat-btn-small { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid var(--primary-blue); background: transparent; color: var(--primary-blue); cursor: pointer; transition: 0.2s; }
+        .chat-btn-small:hover { background: rgba(10, 132, 255, 0.1); }
         .group-member-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--text-primary); }
         .group-member-row .avatar { width: 38px; height: 38px; }
         .group-member-row h4 { font-size: 14px; font-weight: 600; flex: 1; }
@@ -702,6 +717,8 @@
             <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
 
             <input type="text" id="profile-name" class="pill-input" placeholder="Display Name">
+            <input type="text" id="profile-about" class="pill-input" placeholder="About / Status" maxlength="80">
+            <p id="profile-phone-display" style="font-size:12px; color:var(--text-secondary); text-align:center; margin-top:-8px; margin-bottom:20px;"></p>
 
             <div class="settings-section">
                 <h4>Settings</h4>
@@ -944,10 +961,22 @@
                         </div>
                         <div class="segmented-control" id="contacts-sub-tabs">
                             <button type="button" class="active" data-subtab="all">All Contacts</button>
+                            <button type="button" data-subtab="device">From Phone</button>
                             <button type="button" data-subtab="blocked">Blocked</button>
                         </div>
                     </div>
                     <div class="chat-list-container" id="contacts-list-container"></div>
+                    <div class="chat-list-container" id="device-contacts-list-container" style="display:none;">
+                        <div class="sync-contacts-card" id="btn-sync-device-contacts">
+                            <div class="sync-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+                            <div class="sync-text">
+                                <h4 id="sync-contacts-title">Sync Phone Contacts</h4>
+                                <p id="sync-contacts-subtitle">Find friends already on Web Messenger</p>
+                            </div>
+                        </div>
+                        <p class="device-contacts-note">We only use your contacts to match phone numbers already on Web Messenger. Nothing is uploaded or stored.</p>
+                        <div id="device-contacts-results"></div>
+                    </div>
                     <div class="chat-list-container" id="blocked-list-container" style="display:none;"></div>
                 </div>
 
@@ -1786,6 +1815,9 @@
                 document.getElementById('username-edit-section').style.display = myProfile.usernameChanged ? 'none' : 'block';
                 document.getElementById('username-locked-note').style.display = myProfile.usernameChanged ? 'block' : 'none';
 
+                document.getElementById('profile-about').value = myProfile.about || '';
+                document.getElementById('profile-phone-display').textContent = user.phoneNumber ? `Phone: ${user.phoneNumber}` : '';
+
                 profileSheetOverlay.classList.add('active');
             }
         });
@@ -1883,6 +1915,7 @@
             if (!user) return;
             
             const newName = document.getElementById('profile-name').value.trim();
+            const newAbout = document.getElementById('profile-about').value.trim();
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
             const saveBtn = document.getElementById('btn-save-profile');
             const originalLabel = saveBtn.textContent;
@@ -1895,6 +1928,7 @@
                 await update(ref(database, 'users/' + user.uid), {
                     name: newName || (user.email ? user.email.split('@')[0] : "User"),
                     photoURL: finalPhoto,
+                    about: newAbout,
                     email: user.email || ""
                 });
                 updateAvatarUI(user);
@@ -3233,9 +3267,173 @@
             if (!btn) return;
             document.querySelectorAll('#contacts-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const isBlocked = btn.dataset.subtab === 'blocked';
-            document.getElementById('contacts-list-container').style.display = isBlocked ? 'none' : 'block';
-            document.getElementById('blocked-list-container').style.display = isBlocked ? 'block' : 'none';
+            const subtab = btn.dataset.subtab;
+            document.getElementById('contacts-list-container').style.display = subtab === 'all' ? 'block' : 'none';
+            document.getElementById('device-contacts-list-container').style.display = subtab === 'device' ? 'block' : 'none';
+            document.getElementById('blocked-list-container').style.display = subtab === 'blocked' ? 'block' : 'none';
+        });
+
+        // --- DEVICE CONTACTS SYNC (Contact Picker API) ---
+        const contactPickerSupported = ('contacts' in navigator && 'ContactsManager' in window);
+
+        function normalizePhone(raw) {
+            if (!raw) return '';
+            const digits = String(raw).replace(/[^0-9]/g, '');
+            // Compare using the last 10 digits so local vs. country-code formats still match
+            return digits.slice(-10);
+        }
+
+        function renderDeviceContactRow(container, { name, uid, isMatch }) {
+            const item = document.createElement('div');
+            item.className = 'chat-item device-contact-row';
+
+            let avatarHtml, metaHtml, actionsHtml;
+            if (isMatch) {
+                const profile = cachedUsers[uid] || { name, photoURL: '' };
+                const displayName = profile.name || name;
+                const initial = displayName.charAt(0).toUpperCase();
+                avatarHtml = profile.photoURL
+                    ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border:none;"></div>`
+                    : `<div class="avatar" style="background-color: var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+                metaHtml = `<h3>${displayName}</h3><p>On Web Messenger${profile.about ? ' · ' + profile.about : ''}</p>`;
+                const alreadyContact = !!cachedContacts[uid];
+                actionsHtml = `<button type="button" class="chat-btn-small" data-action="device-chat" data-uid="${uid}" data-name="${displayName}" data-avatar="${profile.photoURL || ''}">${alreadyContact ? 'Chat' : 'Add'}</button>`;
+            } else {
+                avatarHtml = `<div class="avatar" style="background-color: var(--bg-hover); color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${(name || '?').charAt(0).toUpperCase()}</div>`;
+                metaHtml = `<h3>${name}</h3><p>Not on Web Messenger yet</p>`;
+                actionsHtml = `<button type="button" class="invite-btn" data-action="device-invite" data-name="${name}">Invite</button>`;
+            }
+
+            item.innerHTML = `${avatarHtml}<div class="chat-preview">${metaHtml}</div>${actionsHtml}`;
+            container.appendChild(item);
+        }
+
+        async function syncDeviceContacts() {
+            const card = document.getElementById('btn-sync-device-contacts');
+            const title = document.getElementById('sync-contacts-title');
+            const subtitle = document.getElementById('sync-contacts-subtitle');
+            const resultsEl = document.getElementById('device-contacts-results');
+            const user = auth.currentUser;
+            if (!user) return;
+
+            if (!contactPickerSupported) {
+                showCustomModal("Not Supported Here", "Contact syncing works in Chrome on Android. On other browsers, use the + button to add friends by @username instead.");
+                return;
+            }
+
+            card.classList.add('syncing');
+            const originalTitle = title.textContent;
+            title.textContent = 'Syncing...';
+            subtitle.textContent = 'Reading your contacts';
+
+            try {
+                const deviceContacts = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+                if (!deviceContacts || deviceContacts.length === 0) return;
+
+                const myPhoneKey = normalizePhone(user.phoneNumber || '');
+
+                // Build lookup of app users by normalized phone
+                const phoneToUid = {};
+                Object.keys(cachedUsers).forEach(uid => {
+                    const key = normalizePhone(cachedUsers[uid].phoneNumber);
+                    if (key) phoneToUid[key] = uid;
+                });
+
+                const matched = [];
+                const unmatched = [];
+                const seenUids = new Set();
+                const seenNames = new Set();
+
+                deviceContacts.forEach(c => {
+                    const cName = (c.name && c.name[0]) || 'Contact';
+                    const tels = c.tel || [];
+                    let foundUid = null;
+                    for (const t of tels) {
+                        const key = normalizePhone(t);
+                        if (key && key === myPhoneKey) { foundUid = 'SELF'; break; }
+                        if (key && phoneToUid[key]) { foundUid = phoneToUid[key]; break; }
+                    }
+                    if (foundUid === 'SELF') return;
+                    if (foundUid) {
+                        if (!seenUids.has(foundUid)) {
+                            seenUids.add(foundUid);
+                            matched.push({ name: cName, uid: foundUid });
+                        }
+                    } else if (!seenNames.has(cName)) {
+                        seenNames.add(cName);
+                        unmatched.push({ name: cName });
+                    }
+                });
+
+                resultsEl.innerHTML = '';
+                const matchTitle = document.createElement('div');
+                matchTitle.className = 'group-section-title';
+                matchTitle.textContent = `On Web Messenger (${matched.length})`;
+                resultsEl.appendChild(matchTitle);
+
+                if (matched.length > 0) {
+                    matched.forEach(m => renderDeviceContactRow(resultsEl, { name: m.name, uid: m.uid, isMatch: true }));
+                } else {
+                    const p = document.createElement('p');
+                    p.className = 'empty-msg';
+                    p.textContent = 'None of your synced contacts are on Web Messenger yet.';
+                    resultsEl.appendChild(p);
+                }
+
+                if (unmatched.length > 0) {
+                    const inviteTitle = document.createElement('div');
+                    inviteTitle.className = 'group-section-title';
+                    inviteTitle.textContent = `Invite to Web Messenger (${unmatched.length})`;
+                    resultsEl.appendChild(inviteTitle);
+                    unmatched.forEach(m => renderDeviceContactRow(resultsEl, { name: m.name, isMatch: false }));
+                }
+
+                notify(`Synced ${deviceContacts.length} contact${deviceContacts.length === 1 ? '' : 's'}`);
+            } catch (err) {
+                if (err && err.name !== 'AbortError') {
+                    showCustomModal("Couldn't Access Contacts", "We weren't able to read your contacts. Please try again.");
+                }
+            } finally {
+                card.classList.remove('syncing');
+                title.textContent = originalTitle;
+                subtitle.textContent = 'Find friends already on Web Messenger';
+            }
+        }
+
+        document.getElementById('btn-sync-device-contacts').addEventListener('click', syncDeviceContacts);
+
+        document.getElementById('device-contacts-results').addEventListener('click', async (e) => {
+            const chatBtn = e.target.closest('[data-action="device-chat"]');
+            const inviteBtn = e.target.closest('[data-action="device-invite"]');
+            const user = auth.currentUser;
+
+            if (chatBtn && user) {
+                const uid = chatBtn.dataset.uid;
+                const name = chatBtn.dataset.name;
+                const avatar = chatBtn.dataset.avatar;
+                try {
+                    if (!cachedContacts[uid]) {
+                        await set(ref(database, `contacts/${user.uid}/${uid}`), true);
+                        notify(`${name} added to your contacts`);
+                    }
+                    openChatView(uid, name, avatar);
+                } catch (err) {
+                    showCustomModal("Error", "Could not start this chat.");
+                }
+            } else if (inviteBtn) {
+                const name = inviteBtn.dataset.name;
+                const inviteText = `Hey ${name}! I'm using Web Messenger to chat — join me here: ${window.location.origin}${window.location.pathname}`;
+                if (navigator.share) {
+                    try { await navigator.share({ text: inviteText }); } catch (err) { /* user cancelled */ }
+                } else {
+                    try {
+                        await navigator.clipboard.writeText(inviteText);
+                        notify('Invite link copied to clipboard');
+                    } catch (err) {
+                        showCustomModal("Invite", inviteText);
+                    }
+                }
+            }
         });
 
         let cachedUserChatsData = {};

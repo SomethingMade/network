@@ -585,6 +585,21 @@
         .story-views-bar svg { width: 20px; height: 20px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); flex-shrink: 0; }
         .story-viewers-list-item { display: flex; align-items: center; gap: 14px; padding: 10px 4px; }
         .story-viewers-list-item .avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--primary-blue); font-size: 16px; }
+
+        /* Story Music */
+        .music-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 6px; border-radius: 12px; cursor: pointer; transition: 0.15s ease; }
+        .music-result-item:hover { background: var(--bg-hover); }
+        .music-result-art { width: 44px; height: 44px; border-radius: 8px; background-size: cover; background-position: center; background-color: var(--bg-hover); flex-shrink: 0; }
+        .music-result-info { flex: 1; min-width: 0; }
+        .music-result-info .m-title { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-result-info .m-artist { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .music-preview-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-blue); color: #fff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+        .music-preview-btn svg { width: 14px; height: 14px; }
+        .music-empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: 14px; }
+        .story-music-chip { position: absolute; top: 62px; left: 12px; z-index: 10; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 50px; padding: 5px 12px 5px 6px; color: #fff; font-size: 12px; font-weight: 600; max-width: 80%; }
+        .story-music-chip img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+        .story-music-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .story-music-chip.spinning-note { animation: none; }
         .sv-info { display: flex; flex-direction: column; gap: 2px; }
         .sv-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
         .sv-time { font-size: 12px; color: var(--text-secondary); }
@@ -1107,6 +1122,21 @@
     <input type="file" id="chat-media-input" accept="image/*,video/*" multiple style="display:none;">
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
 
+    <div id="story-music-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 80vh; display: flex; flex-direction: column; padding-bottom: 12px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Add music to your story</div>
+            <div style="position:relative;">
+                <input type="text" id="story-music-search-input" class="pill-input" placeholder="Search for a song or artist..." autocomplete="off" style="margin-bottom: 12px;">
+            </div>
+            <div id="story-music-results" style="flex:1; overflow-y:auto; min-height: 120px;"></div>
+            <div style="display:flex; gap:10px; margin-top: 10px;">
+                <button type="button" id="story-music-skip-btn" style="flex:1; padding:14px; border-radius:50px; border:1.5px solid var(--border-color); background:none; color:var(--text-primary); font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;">Skip music</button>
+            </div>
+        </div>
+    </div>
+    <audio id="story-music-audio" style="display:none;" preload="none"></audio>
+
     <input type="file" id="story-file-input" accept="image/jpeg, image/png, image/webp, video/mp4" multiple style="display:none;">
 
     <div id="story-viewer-overlay">
@@ -1120,6 +1150,10 @@
                     <svg class="story-mute-btn story-interactive" id="story-mute-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"></svg>
                     <svg class="story-viewer-close story-interactive" id="story-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </div>
+            </div>
+            <div class="story-music-chip" id="story-music-chip" style="display:none;">
+                <img id="story-music-chip-art" src="" alt="">
+                <span id="story-music-chip-text"></span>
             </div>
             
             <img class="story-media" id="story-viewer-media" src="" alt="Story">
@@ -1416,6 +1450,8 @@
             if (hash !== 'story' && storyActive) {
                 clearTimeout(storyState.timer);
                 document.getElementById('story-viewer-video').pause();
+                document.getElementById('story-music-audio').pause();
+                document.getElementById('story-music-chip').style.display = 'none';
                 document.getElementById('story-viewer-overlay').classList.remove('active');
                 document.getElementById('story-views-sheet-overlay').classList.remove('active');
             }
@@ -2897,13 +2933,21 @@
             return wrap;
         }
 
-        document.getElementById('story-file-input').addEventListener('change', async (e) => {
+        let pendingStoryFiles = null;
+
+        document.getElementById('story-file-input').addEventListener('change', (e) => {
             e.preventDefault();
             const files = e.target.files;
             if (!files || files.length === 0) return;
             const user = auth.currentUser;
             if (!user) return;
+            pendingStoryFiles = files;
+            openStoryMusicPicker();
+        });
 
+        async function uploadStoriesWithMusic(files, music) {
+            const user = auth.currentUser;
+            if (!user) return;
             const storiesBar = document.getElementById('stories-scroll');
             storiesBar.classList.add('uploading');
             try {
@@ -2915,7 +2959,8 @@
                         mediaURL: url,
                         type: type,
                         createdAt: Date.now(),
-                        ...(type === 'video' && duration ? { duration } : {})
+                        ...(type === 'video' && duration ? { duration } : {}),
+                        ...(music ? { music } : {})
                     });
                 }
                 notify("Stories added");
@@ -2923,7 +2968,120 @@
                 showCustomModal("Upload Failed", "We couldn't upload all stories.");
             } finally {
                 storiesBar.classList.remove('uploading');
-                e.target.value = "";
+                document.getElementById('story-file-input').value = "";
+                pendingStoryFiles = null;
+            }
+        }
+
+        // --- STORY MUSIC PICKER (iTunes Search API — 30s licensed previews) ---
+        let musicSearchDebounce = null;
+        let musicPreviewAudio = null;
+        let musicPreviewActiveBtn = null;
+
+        function stopMusicPreview() {
+            if (musicPreviewAudio) { musicPreviewAudio.pause(); musicPreviewAudio = null; }
+            if (musicPreviewActiveBtn) { musicPreviewActiveBtn.innerHTML = playIconSVG(); musicPreviewActiveBtn = null; }
+        }
+
+        function playIconSVG() { return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>'; }
+        function pauseIconSVG() { return '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg>'; }
+
+        function openStoryMusicPicker() {
+            document.getElementById('story-music-search-input').value = '';
+            document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to play behind your story</div>';
+            document.getElementById('story-music-sheet-overlay').classList.add('active');
+            setTimeout(() => document.getElementById('story-music-search-input').focus(), 250);
+        }
+
+        function closeStoryMusicPicker() {
+            stopMusicPreview();
+            document.getElementById('story-music-sheet-overlay').classList.remove('active');
+        }
+
+        document.getElementById('story-music-search-input').addEventListener('input', (e) => {
+            const q = e.target.value.trim();
+            clearTimeout(musicSearchDebounce);
+            if (!q) {
+                document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to play behind your story</div>';
+                return;
+            }
+            document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Searching…</div>';
+            musicSearchDebounce = setTimeout(() => runMusicSearch(q), 400);
+        });
+
+        async function runMusicSearch(query) {
+            const resultsEl = document.getElementById('story-music-results');
+            try {
+                const resp = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=15`);
+                const data = await resp.json();
+                const tracks = (data.results || []).filter(t => t.previewUrl);
+                if (tracks.length === 0) {
+                    resultsEl.innerHTML = '<div class="music-empty-state">No previewable songs found</div>';
+                    return;
+                }
+                resultsEl.innerHTML = '';
+                tracks.forEach(t => resultsEl.appendChild(buildMusicResultItem(t)));
+            } catch (err) {
+                resultsEl.innerHTML = '<div class="music-empty-state">Couldn\'t load results. Check your connection.</div>';
+            }
+        }
+
+        function buildMusicResultItem(track) {
+            const row = document.createElement('div');
+            row.className = 'music-result-item';
+
+            const art = document.createElement('div');
+            art.className = 'music-result-art';
+            const artworkUrl = (track.artworkUrl100 || '').replace('100x100', '200x200');
+            if (artworkUrl) art.style.backgroundImage = `url('${artworkUrl}')`;
+
+            const info = document.createElement('div');
+            info.className = 'music-result-info';
+            info.innerHTML = `<div class="m-title">${track.trackName || 'Unknown'}</div><div class="m-artist">${track.artistName || ''}</div>`;
+
+            const previewBtn = document.createElement('button');
+            previewBtn.type = 'button';
+            previewBtn.className = 'music-preview-btn';
+            previewBtn.innerHTML = playIconSVG();
+            previewBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (musicPreviewActiveBtn === previewBtn) { stopMusicPreview(); return; }
+                stopMusicPreview();
+                musicPreviewAudio = new Audio(track.previewUrl);
+                musicPreviewAudio.play().catch(() => {});
+                musicPreviewAudio.onended = () => stopMusicPreview();
+                previewBtn.innerHTML = pauseIconSVG();
+                musicPreviewActiveBtn = previewBtn;
+            });
+
+            row.appendChild(art);
+            row.appendChild(info);
+            row.appendChild(previewBtn);
+
+            row.addEventListener('click', () => {
+                stopMusicPreview();
+                closeStoryMusicPicker();
+                const music = {
+                    trackName: track.trackName || 'Unknown',
+                    artistName: track.artistName || '',
+                    artworkUrl: artworkUrl,
+                    previewUrl: track.previewUrl
+                };
+                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, music);
+            });
+
+            return row;
+        }
+
+        document.getElementById('story-music-skip-btn').addEventListener('click', () => {
+            closeStoryMusicPicker();
+            if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null);
+        });
+
+        document.getElementById('story-music-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'story-music-sheet-overlay') {
+                closeStoryMusicPicker();
+                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null);
             }
         });
 
@@ -3016,17 +3174,33 @@
 
             storyState.elapsedMs = 0;
 
+            const musicAudioEl = document.getElementById('story-music-audio');
+            const musicChip = document.getElementById('story-music-chip');
+            musicAudioEl.pause();
+            musicAudioEl.currentTime = 0;
+            const hasMusic = !!(current.music && current.music.previewUrl);
+            if (hasMusic) {
+                musicAudioEl.src = current.music.previewUrl;
+                musicAudioEl.muted = storiesGloballyMuted;
+                document.getElementById('story-music-chip-art').src = current.music.artworkUrl || '';
+                document.getElementById('story-music-chip-text').textContent = `${current.music.trackName}${current.music.artistName ? ' — ' + current.music.artistName : ''}`;
+                musicChip.style.display = 'flex';
+            } else {
+                musicAudioEl.removeAttribute('src');
+                musicChip.style.display = 'none';
+            }
+
             if (current.type === 'video') {
                 imgEl.style.display = 'none';
                 videoEl.style.display = 'block';
                 videoEl.src = current.mediaURL;
                 videoEl.currentTime = 0;
-                videoEl.muted = storiesGloballyMuted;
+                videoEl.muted = hasMusic ? true : storiesGloballyMuted;
                 muteBtn.style.display = 'flex';
                 updateMuteIcon();
 
                 const begin = (rawDuration) => {
-                    storyState.totalMs = Math.min(rawDuration || 60, 60) * 1000;
+                    storyState.totalMs = hasMusic ? 30000 : (Math.min(rawDuration || 60, 60) * 1000);
                     resumeStory();
                 };
                 if (current.duration) begin(current.duration);
@@ -3034,7 +3208,8 @@
             } else {
                 videoEl.style.display = 'none';
                 videoEl.removeAttribute('src');
-                muteBtn.style.display = 'none';
+                muteBtn.style.display = hasMusic ? 'flex' : 'none';
+                if (hasMusic) updateMuteIcon();
                 imgEl.style.display = 'block';
                 imgEl.src = current.mediaURL;
                 storyState.totalMs = 30000;
@@ -3069,6 +3244,9 @@
             if (current && current.type === 'video') {
                 document.getElementById('story-viewer-video').pause();
             }
+            if (current && current.music) {
+                document.getElementById('story-music-audio').pause();
+            }
         }
 
         function resumeStory() {
@@ -3078,6 +3256,7 @@
 
             const remainingMs = Math.max(0, storyState.totalMs - storyState.elapsedMs);
             const videoEl = document.getElementById('story-viewer-video');
+            const musicAudioEl = document.getElementById('story-music-audio');
 
             if (remainingMs <= 0) {
                 storyState.index++;
@@ -3097,9 +3276,14 @@
             });
 
             if (current.type === 'video') { videoEl.play().catch(() => {}); }
+            if (current.music) {
+                musicAudioEl.currentTime = storyState.elapsedMs / 1000;
+                musicAudioEl.play().catch(() => {});
+            }
 
             storyState.timer = setTimeout(() => {
                 videoEl.pause();
+                musicAudioEl.pause();
                 storyState.index++;
                 if (storyState.index >= storyState.items.length) { history.back(); }
                 else { playStory(); }
@@ -3287,6 +3471,7 @@
             e.stopPropagation();
             storiesGloballyMuted = !storiesGloballyMuted;
             document.getElementById('story-viewer-video').muted = storiesGloballyMuted;
+            document.getElementById('story-music-audio').muted = storiesGloballyMuted;
             updateMuteIcon();
         });
 

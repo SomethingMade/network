@@ -631,8 +631,8 @@
     <div id="add-friend-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
             <h3>Add a Friend</h3>
-            <p>Enter your friend's @username below to add them to your contacts.</p>
-            <input type="text" id="friend-id-input" class="pill-input" placeholder="@username" style="text-align:center; font-family:monospace; font-weight:600; font-size:16px;">
+            <p>Enter your friend's @username or phone number below to add them to your contacts.</p>
+            <input type="text" id="friend-id-input" class="pill-input" placeholder="@username or phone number" style="text-align:center; font-family:monospace; font-weight:600; font-size:16px;">
             <div class="modal-actions">
                 <button type="button" id="btn-cancel-add-friend" class="btn-pill btn-outline">Cancel</button>
                 <button type="button" id="btn-confirm-add-friend" class="btn-pill btn-primary">Add Friend</button>
@@ -719,7 +719,37 @@
 
             <input type="text" id="profile-name" class="pill-input" placeholder="Display Name">
             <input type="text" id="profile-about" class="pill-input" placeholder="About / Status" maxlength="80">
-            <p id="profile-phone-display" style="font-size:12px; color:var(--text-secondary); text-align:center; margin-top:-8px; margin-bottom:20px;"></p>
+            <p id="profile-phone-display" style="font-size:12px; color:var(--text-secondary); text-align:center; margin-top:-8px; margin-bottom:8px;"></p>
+
+            <div id="phone-link-section" style="margin-bottom:20px;">
+                <div id="phone-link-add-row" style="display:none;">
+                    <button type="button" id="btn-show-phone-link" class="btn-pill btn-outline" style="font-size:13px; padding:10px;">Add Phone Number</button>
+                    <p style="font-size:11px; color:var(--text-secondary); text-align:center; margin-top:8px;">Link a phone number so friends can find you by number and you can sync device contacts.</p>
+                </div>
+                <div id="phone-link-input-row" style="display:none;">
+                    <div class="input-group" style="display:flex; align-items:center; gap:8px;">
+                        <select id="profile-phone-country-code" class="pill-input" style="flex: 0 0 92px; padding-left:14px; appearance:none;">
+                            <option value="+27" selected>🇿🇦 +27</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+91">🇮🇳 +91</option>
+                            <option value="+234">🇳🇬 +234</option>
+                            <option value="+254">🇰🇪 +254</option>
+                            <option value="+263">🇿🇼 +263</option>
+                            <option value="+61">🇦🇺 +61</option>
+                        </select>
+                        <input type="tel" id="profile-phone-input" class="pill-input" placeholder="82 123 4567" style="flex:1; margin-bottom:0;" inputmode="numeric">
+                    </div>
+                    <button type="button" id="btn-send-profile-otp" class="btn-pill btn-outline" style="font-size:13px; padding:10px; margin-top:10px;">Send Verification Code</button>
+                    <p class="toggle-auth" style="margin-top:8px;"><span id="btn-cancel-profile-phone-add">Cancel</span></p>
+                    <div id="profile-recaptcha-container" style="margin-top:8px;"></div>
+                </div>
+                <div id="phone-link-otp-row" style="display:none;">
+                    <input type="tel" id="profile-otp-input" class="pill-input" placeholder="6-digit code" inputmode="numeric" maxlength="6" style="text-align:center; font-family:monospace; margin-bottom:0;">
+                    <button type="button" id="btn-verify-profile-otp" class="btn-pill btn-primary" style="font-size:13px; padding:10px; margin-top:10px;">Verify & Link</button>
+                    <p class="toggle-auth" style="margin-top:8px;"><span id="btn-cancel-profile-phone-link">Cancel</span></p>
+                </div>
+            </div>
 
             <div class="settings-section">
                 <h4>Settings</h4>
@@ -1127,7 +1157,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -1563,6 +1593,10 @@
         let confirmationResult = null;
         let pendingPhoneNumber = null;
 
+        let profileRecaptchaVerifier = null;
+        let pendingLinkVerificationId = null;
+        let pendingLinkPhoneNumber = null;
+
         const FCM_VAPID_KEY = "BKOsn-S9ti0UEtUqRA9zzegFMaI8TrL2CKA1cpPqUjvAIsZ4SJkMe7127cg9T4S-tJHrHsLpf1gLFjZazmxQvGQ";
         let messaging = null;
         let fcmSwRegistration = null;
@@ -1835,7 +1869,7 @@
                 document.getElementById('username-locked-note').style.display = myProfile.usernameChanged ? 'block' : 'none';
 
                 document.getElementById('profile-about').value = myProfile.about || '';
-                document.getElementById('profile-phone-display').textContent = user.phoneNumber ? `Phone: ${user.phoneNumber}` : '';
+                resetPhoneLinkUI(user);
 
                 profileSheetOverlay.classList.add('active');
             }
@@ -1892,6 +1926,127 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Set Username (one-time)';
+            }
+        });
+
+        // --- PHONE NUMBER LINKING (for email/Google accounts) ---
+        function resetPhoneLinkUI(user) {
+            const display = document.getElementById('profile-phone-display');
+            const addRow = document.getElementById('phone-link-add-row');
+            const inputRow = document.getElementById('phone-link-input-row');
+            const otpRow = document.getElementById('phone-link-otp-row');
+
+            document.getElementById('profile-phone-input').value = '';
+            document.getElementById('profile-otp-input').value = '';
+            pendingLinkVerificationId = null;
+            pendingLinkPhoneNumber = null;
+            inputRow.style.display = 'none';
+            otpRow.style.display = 'none';
+
+            if (user.phoneNumber) {
+                display.textContent = `Phone: ${user.phoneNumber}`;
+                addRow.style.display = 'none';
+            } else {
+                display.textContent = 'No phone number linked yet.';
+                addRow.style.display = 'block';
+            }
+        }
+
+        function ensureProfileRecaptcha() {
+            if (profileRecaptchaVerifier) return profileRecaptchaVerifier;
+            profileRecaptchaVerifier = new RecaptchaVerifier(auth, 'profile-recaptcha-container', {
+                size: 'invisible'
+            });
+            return profileRecaptchaVerifier;
+        }
+
+        function clearProfileRecaptcha() {
+            if (profileRecaptchaVerifier) { try { profileRecaptchaVerifier.clear(); } catch(_) {} profileRecaptchaVerifier = null; }
+        }
+
+        document.getElementById('btn-show-phone-link').addEventListener('click', () => {
+            document.getElementById('phone-link-add-row').style.display = 'none';
+            document.getElementById('phone-link-input-row').style.display = 'block';
+        });
+
+        document.getElementById('btn-cancel-profile-phone-add').addEventListener('click', () => {
+            document.getElementById('phone-link-input-row').style.display = 'none';
+            document.getElementById('phone-link-add-row').style.display = 'block';
+            clearProfileRecaptcha();
+        });
+
+        document.getElementById('btn-cancel-profile-phone-link').addEventListener('click', () => {
+            document.getElementById('phone-link-otp-row').style.display = 'none';
+            document.getElementById('phone-link-input-row').style.display = 'block';
+            pendingLinkVerificationId = null;
+        });
+
+        document.getElementById('btn-send-profile-otp').addEventListener('click', async (e) => {
+            e.preventDefault();
+            const user = auth.currentUser;
+            if (!user) return;
+            const code = document.getElementById('profile-phone-country-code').value;
+            const rawNumber = document.getElementById('profile-phone-input').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
+            if (!rawNumber) return showCustomModal("Required", "Please enter your phone number.");
+            const fullNumber = code + rawNumber;
+
+            const btn = document.getElementById('btn-send-profile-otp');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            try {
+                const verifier = ensureProfileRecaptcha();
+                const provider = new PhoneAuthProvider(auth);
+                pendingLinkVerificationId = await provider.verifyPhoneNumber(fullNumber, verifier);
+                pendingLinkPhoneNumber = fullNumber;
+                document.getElementById('phone-link-input-row').style.display = 'none';
+                document.getElementById('phone-link-otp-row').style.display = 'block';
+                notify(`Code sent to ${fullNumber}`);
+            } catch (err) {
+                let msg = err.message.replace("Firebase: ", "");
+                if (err.code === 'auth/credential-already-in-use' || err.code === 'auth/account-exists-with-different-credential') {
+                    msg = "That phone number is already linked to another account.";
+                }
+                showCustomModal("Couldn't Send Code", msg);
+                clearProfileRecaptcha();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send Verification Code';
+            }
+        });
+
+        document.getElementById('btn-verify-profile-otp').addEventListener('click', async (e) => {
+            e.preventDefault();
+            const user = auth.currentUser;
+            if (!user) return;
+            const otpCode = document.getElementById('profile-otp-input').value.trim();
+            if (!otpCode || otpCode.length < 6) return showCustomModal("Required", "Please enter the 6-digit code.");
+            if (!pendingLinkVerificationId) return showCustomModal("Session Expired", "Please request a new code.");
+
+            const btn = document.getElementById('btn-verify-profile-otp');
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            try {
+                const credential = PhoneAuthProvider.credential(pendingLinkVerificationId, otpCode);
+                await linkWithCredential(user, credential);
+                await update(ref(database, 'users/' + user.uid), {
+                    phoneNumber: user.phoneNumber || pendingLinkPhoneNumber
+                });
+                clearProfileRecaptcha();
+                resetPhoneLinkUI(user);
+                notify("Phone number linked successfully!");
+            } catch (err) {
+                let msg = err.message.replace("Firebase: ", "");
+                if (err.code === 'auth/credential-already-in-use' || err.code === 'auth/account-exists-with-different-credential') {
+                    msg = "That phone number is already linked to another account.";
+                } else if (err.code === 'auth/invalid-verification-code') {
+                    msg = "That code was incorrect. Please try again.";
+                } else if (err.code === 'auth/code-expired') {
+                    msg = "That code has expired. Please request a new one.";
+                }
+                showCustomModal("Verification Failed", msg);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Verify & Link';
             }
         });
 
@@ -1996,14 +2151,24 @@
             showLoading();
             try {
                 let friendUid = null;
-                const cleanedUsername = rawInput.replace(/^@/, '').toLowerCase();
-                const usernameSnap = await get(ref(database, `usernames/${cleanedUsername}`));
+                const digitsOnly = rawInput.replace(/[^0-9]/g, '');
+                const looksLikePhone = digitsOnly.length >= 7 && !rawInput.replace(/[\s+()-]/g, '').match(/[a-zA-Z@_]/);
 
-                if (usernameSnap.exists()) {
-                    friendUid = usernameSnap.val();
+                if (looksLikePhone) {
+                    const key = normalizePhone(digitsOnly);
+                    for (const uid of Object.keys(cachedUsers)) {
+                        if (normalizePhone(cachedUsers[uid].phoneNumber) === key) { friendUid = uid; break; }
+                    }
                 } else {
-                    const directSnap = await get(ref(database, 'users/' + rawInput));
-                    if (directSnap.exists()) friendUid = rawInput;
+                    const cleanedUsername = rawInput.replace(/^@/, '').toLowerCase();
+                    const usernameSnap = await get(ref(database, `usernames/${cleanedUsername}`));
+
+                    if (usernameSnap.exists()) {
+                        friendUid = usernameSnap.val();
+                    } else {
+                        const directSnap = await get(ref(database, 'users/' + rawInput));
+                        if (directSnap.exists()) friendUid = rawInput;
+                    }
                 }
 
                 if (friendUid === user.uid) {
@@ -3338,7 +3503,15 @@
             if (!user) return;
 
             if (!contactPickerSupported) {
-                showCustomModal("Not Supported Here", "Contact syncing works in Chrome on Android. On other browsers, use the + button to add friends by @username instead.");
+                showCustomModal("Not Supported Here", "Contact syncing works in Chrome on Android. On other browsers, use the + button to add friends by @username or phone number instead.");
+                return;
+            }
+
+            if (!user.phoneNumber) {
+                const goToProfile = await showCustomModal("Phone Number Required", "Please add and verify a phone number in your profile before syncing device contacts.", true);
+                if (goToProfile) {
+                    btnProfileNav.click();
+                }
                 return;
             }
 

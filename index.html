@@ -238,7 +238,9 @@
         .chat-item.active-chat:hover { background: rgba(10, 132, 255, 0.1); }
         .chat-item:hover .chat-preview h3 { color: var(--primary-blue); }
         .chat-preview { flex: 1; }
-        .chat-preview h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; transition: color 0.2s; }
+        .chat-preview h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; transition: color 0.2s; display: flex; align-items: center; gap: 4px; }
+        .verified-badge { flex-shrink: 0; vertical-align: middle; position: relative; top: -1px; }
+        #chat-view-name { display: flex; align-items: center; gap: 5px; }
         .chat-preview p { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
         .chat-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .time { font-size: 11px; color: var(--text-secondary); }
@@ -1587,6 +1589,7 @@
         // private, e.g. set the extension's Collection Path to:  ai_discussions/{uid}/messages
         const AI_UID = "goza-ai-assistant";
         const AI_NAME = "Goza AI";
+        const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
 
         let recaptchaVerifier = null;
@@ -3761,7 +3764,7 @@
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
-                    <h3>${displayName}</h3>
+                    <h3>${displayName}${isAI ? VERIFIED_BADGE_SVG : ''}</h3>
                     ${snippetHtml}
                 </div>
                 ${metaHtml}
@@ -4225,7 +4228,7 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode();
             
-            document.getElementById('chat-view-name').textContent = otherName || 'Contact';
+            document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${isAIChat ? VERIFIED_BADGE_SVG : ''}`;
             updateActiveChatStatus(); 
             
             const avatarEl = document.getElementById('chat-view-avatar');

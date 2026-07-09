@@ -664,6 +664,9 @@
         .story-music-chip img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
         .story-music-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .story-music-chip.spinning-note { animation: none; }
+        .story-caption { position: absolute; left: 16px; right: 16px; bottom: 90px; z-index: 9; text-align: center; color: #fff; font-size: 15px; font-weight: 500; line-height: 1.4; text-shadow: 0 1px 6px rgba(0,0,0,0.5); background: rgba(0,0,0,0.28); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 16px; padding: 10px 14px; max-height: 30%; overflow-y: auto; word-break: break-word; display: none; }
+        .story-caption-input { width: 100%; min-height: 90px; resize: none; border: 1.5px solid var(--border-color); border-radius: 16px; padding: 14px 16px; font-size: 15px; background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; margin-bottom: 8px; }
+        .story-caption-counter { text-align: right; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
         .sv-info { display: flex; flex-direction: column; gap: 2px; }
         .sv-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
         .sv-time { font-size: 12px; color: var(--text-secondary); }
@@ -1301,6 +1304,19 @@
     <input type="file" id="chat-media-input" accept="image/*,video/*" multiple style="display:none;">
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
 
+    <div id="story-caption-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="display: flex; flex-direction: column; padding-bottom: 12px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Add a caption</div>
+            <textarea id="story-caption-input" class="story-caption-input" placeholder="Say something about this story... (optional)" maxlength="200"></textarea>
+            <div class="story-caption-counter"><span id="story-caption-count">0</span>/200</div>
+            <div style="display:flex; gap:10px;">
+                <button type="button" id="story-caption-skip-btn" style="flex:1; padding:14px; border-radius:50px; border:1.5px solid var(--border-color); background:none; color:var(--text-primary); font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;">Skip</button>
+                <button type="button" id="story-caption-next-btn" style="flex:1; padding:14px; border-radius:50px; border:none; background: var(--gradient-brand); color:#fff; font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;">Next</button>
+            </div>
+        </div>
+    </div>
+
     <div id="story-music-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 80vh; display: flex; flex-direction: column; padding-bottom: 12px;">
             <div class="sheet-handle"></div>
@@ -1337,6 +1353,7 @@
             
             <img class="story-media" id="story-viewer-media" src="" alt="Story">
             <video class="story-media" id="story-viewer-video" muted playsinline style="display:none;"></video>
+            <div class="story-caption" id="story-viewer-caption"></div>
             
             <div class="story-tap-zone left" id="story-tap-left"></div>
             <div class="story-tap-zone right" id="story-tap-right"></div>
@@ -3272,6 +3289,7 @@
         }
 
         let pendingStoryFiles = null;
+        let pendingStoryCaption = '';
 
         document.getElementById('story-file-input').addEventListener('change', (e) => {
             e.preventDefault();
@@ -3280,10 +3298,46 @@
             const user = auth.currentUser;
             if (!user) return;
             pendingStoryFiles = files;
+            openStoryCaptionSheet();
+        });
+
+        function openStoryCaptionSheet() {
+            const input = document.getElementById('story-caption-input');
+            input.value = '';
+            document.getElementById('story-caption-count').textContent = '0';
+            document.getElementById('story-caption-sheet-overlay').classList.add('active');
+            setTimeout(() => input.focus(), 250);
+        }
+
+        function closeStoryCaptionSheet() {
+            document.getElementById('story-caption-sheet-overlay').classList.remove('active');
+        }
+
+        document.getElementById('story-caption-input').addEventListener('input', (e) => {
+            document.getElementById('story-caption-count').textContent = String(e.target.value.length);
+        });
+
+        document.getElementById('story-caption-next-btn').addEventListener('click', () => {
+            pendingStoryCaption = document.getElementById('story-caption-input').value.trim();
+            closeStoryCaptionSheet();
             openStoryMusicPicker();
         });
 
-        async function uploadStoriesWithMusic(files, music) {
+        document.getElementById('story-caption-skip-btn').addEventListener('click', () => {
+            pendingStoryCaption = '';
+            closeStoryCaptionSheet();
+            openStoryMusicPicker();
+        });
+
+        document.getElementById('story-caption-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'story-caption-sheet-overlay') {
+                pendingStoryCaption = document.getElementById('story-caption-input').value.trim();
+                closeStoryCaptionSheet();
+                openStoryMusicPicker();
+            }
+        });
+
+        async function uploadStoriesWithMusic(files, music, caption) {
             const user = auth.currentUser;
             if (!user) return;
             const storiesBar = document.getElementById('stories-scroll');
@@ -3298,7 +3352,8 @@
                         type: type,
                         createdAt: Date.now(),
                         ...(type === 'video' && duration ? { duration } : {}),
-                        ...(music ? { music } : {})
+                        ...(music ? { music } : {}),
+                        ...(caption ? { caption } : {})
                     });
                 }
                 notify("Stories added");
@@ -3308,6 +3363,7 @@
                 storiesBar.classList.remove('uploading');
                 document.getElementById('story-file-input').value = "";
                 pendingStoryFiles = null;
+                pendingStoryCaption = '';
             }
         }
 
@@ -3405,7 +3461,7 @@
                     artworkUrl: artworkUrl,
                     previewUrl: track.previewUrl
                 };
-                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, music);
+                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, music, pendingStoryCaption);
             });
 
             return row;
@@ -3413,13 +3469,13 @@
 
         document.getElementById('story-music-skip-btn').addEventListener('click', () => {
             closeStoryMusicPicker();
-            if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null);
+            if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null, pendingStoryCaption);
         });
 
         document.getElementById('story-music-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'story-music-sheet-overlay') {
                 closeStoryMusicPicker();
-                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null);
+                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null, pendingStoryCaption);
             }
         });
 
@@ -3526,6 +3582,15 @@
             } else {
                 musicAudioEl.removeAttribute('src');
                 musicChip.style.display = 'none';
+            }
+
+            const captionEl = document.getElementById('story-viewer-caption');
+            if (current.caption) {
+                captionEl.textContent = current.caption;
+                captionEl.style.display = 'block';
+            } else {
+                captionEl.textContent = '';
+                captionEl.style.display = 'none';
             }
 
             if (current.type === 'video') {

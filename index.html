@@ -755,6 +755,39 @@
         </div>
     </div>
 
+    <div id="user-info-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+
+            <div class="wa-sheet-header">
+                <div style="width:38px; flex-shrink:0;"></div>
+                <div class="wa-header-title">Contact Info</div>
+                <button type="button" id="btn-close-user-info" class="wa-header-icon-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <div class="wa-avatar-block">
+                <div class="avatar-circle" id="user-info-avatar"></div>
+            </div>
+
+            <div style="text-align:center; margin-bottom:22px;">
+                <h3 id="user-info-name" style="font-size:19px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Name</h3>
+                <p id="user-info-username" style="font-size:14px; font-weight:600; color:var(--primary-blue);">@username</p>
+            </div>
+
+            <div class="wa-field-group">
+                <div class="wa-field-row">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <div class="wa-field-body">
+                        <span class="wa-field-label">About</span>
+                        <span id="user-info-about" style="font-size:15px; font-weight:500; color:var(--text-primary);">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="profile-bottom-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
@@ -1170,6 +1203,7 @@
                 <p id="chat-view-status">Online</p>
             </div>
             <svg id="btn-group-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Group Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
         </div>
         
         <div class="chat-view-messages" id="chat-view-messages"></div>
@@ -2775,6 +2809,49 @@
             if (e.target === groupInfoSheet) groupInfoSheet.classList.remove('active');
         });
 
+        // View another user's profile (avatar, name, username, about)
+        const userInfoSheet = document.getElementById('user-info-sheet-overlay');
+
+        function openUserProfileSheet(uid) {
+            if (!uid || uid === AI_UID) return;
+            const profile = cachedUsers[uid] || {};
+            const avatarEl = document.getElementById('user-info-avatar');
+            if (profile.photoURL) {
+                avatarEl.style.backgroundImage = `url('${profile.photoURL}')`;
+                avatarEl.style.backgroundColor = '';
+                avatarEl.textContent = '';
+            } else {
+                avatarEl.style.backgroundImage = 'none';
+                avatarEl.style.backgroundColor = 'var(--primary-blue)';
+                avatarEl.style.color = '#FFFFFF';
+                avatarEl.textContent = (profile.name || '?').charAt(0).toUpperCase();
+            }
+            document.getElementById('user-info-name').textContent = profile.name || 'Unknown User';
+            document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
+            document.getElementById('user-info-about').textContent = profile.about || 'No about yet.';
+            userInfoSheet.classList.add('active');
+        }
+
+        document.getElementById('btn-user-info').addEventListener('click', () => {
+            if (activeChatUid) openUserProfileSheet(activeChatUid);
+        });
+        document.getElementById('chat-view-avatar').addEventListener('click', () => {
+            if (activeGroupId) { document.getElementById('btn-group-info').click(); }
+            else if (activeChatUid) { openUserProfileSheet(activeChatUid); }
+        });
+        document.getElementById('chat-view-avatar').style.cursor = 'pointer';
+        document.querySelector('.chat-view-info').addEventListener('click', () => {
+            if (activeGroupId) { document.getElementById('btn-group-info').click(); }
+            else if (activeChatUid) { openUserProfileSheet(activeChatUid); }
+        });
+        document.querySelector('.chat-view-info').style.cursor = 'pointer';
+        userInfoSheet.addEventListener('click', (e) => {
+            if (e.target === userInfoSheet) userInfoSheet.classList.remove('active');
+        });
+        document.getElementById('btn-close-user-info').addEventListener('click', () => {
+            userInfoSheet.classList.remove('active');
+        });
+
         groupAvatarUpload.addEventListener('click', (e) => {
             e.preventDefault();
             const user = auth.currentUser;
@@ -2847,6 +2924,7 @@
             document.getElementById('chat-view-name').textContent = group.name;
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
             document.getElementById('btn-group-info').style.display = 'block';
+            document.getElementById('btn-user-info').style.display = 'none';
             document.getElementById('chat-attach-btn').style.display = 'none';
             document.getElementById('chat-mic-btn').style.display = 'none';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
@@ -4584,6 +4662,7 @@
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             document.getElementById('btn-group-info').style.display = 'none';
             const isAIChat = otherUid === AI_UID;
+            document.getElementById('btn-user-info').style.display = isAIChat ? 'none' : 'block';
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();

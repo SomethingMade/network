@@ -802,6 +802,22 @@
         </div>
     </div>
 
+    <div id="premium-paywall-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+
+            <div class="wa-sheet-header">
+                <div style="width:38px; flex-shrink:0;"></div>
+                <div class="wa-header-title">Get Verified</div>
+                <button type="button" id="btn-close-premium-paywall" class="wa-header-icon-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+
+            <div id="rc-paywall-container" style="min-height: 320px;"></div>
+        </div>
+    </div>
+
     <div id="profile-bottom-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
@@ -893,6 +909,20 @@
                         <button type="button" id="btn-verify-profile-otp" class="btn-pill btn-primary" style="font-size:13px; padding:10px; margin-top:10px;">Verify & Link</button>
                         <p class="toggle-auth" style="margin-top:8px;"><span id="btn-cancel-profile-phone-link">Cancel</span></p>
                     </div>
+                </div>
+            </div>
+
+            <div class="wa-section">
+                <div class="wa-section-title">Premium</div>
+                <div class="wa-list-row wa-row-clickable" id="btn-open-premium">
+                    <div class="wa-row-icon chip-blue">
+                        <svg viewBox="0 0 22 22" fill="none"><path fill="currentColor" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>
+                    </div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title" id="premium-row-title">Get Verified</span>
+                        <span class="wa-row-sub" id="premium-row-sub">Unlock the blue badge & premium features</span>
+                    </div>
+                    <svg class="wa-row-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
             </div>
 
@@ -1363,6 +1393,7 @@
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { Purchases } from "https://esm.sh/@revenuecat/purchases-js@1.41.1";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1858,6 +1889,112 @@
         const AI_UID = "goza-ai-assistant";
         const AI_NAME = "Goza AI";
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
+
+        // Blue variant of the same badge shape, shown next to Verified (paying) users' names.
+        const BLUE_VERIFIED_BADGE_SVG = VERIFIED_BADGE_SVG.replace('#7C4DFF', '#0A84FF');
+
+        // Returns the right badge markup (or '') for a given uid: purple for Goza AI, blue for a paying Verified user.
+        function verifiedBadgeFor(uid, isAI) {
+            if (isAI) return VERIFIED_BADGE_SVG;
+            if (uid && cachedUsers[uid] && cachedUsers[uid].isVerified) return BLUE_VERIFIED_BADGE_SVG;
+            return '';
+        }
+
+        // --- REVENUECAT (VERIFIED BADGE SUBSCRIPTION) ---
+        // Get this from RevenueCat > Project Settings > Web (create a Web Billing config, choosing your connected
+        // Stripe account). It's the "Public API key" for that Web Billing app, looks like "rcb_xxxxxxxx".
+        const RC_WEB_BILLING_PUBLIC_KEY = "YOUR_RC_WEB_BILLING_PUBLIC_KEY";
+        // Must match the identifier of the Entitlement you create in RevenueCat > Entitlements.
+        const RC_VERIFIED_ENTITLEMENT_ID = "verified_badge";
+        let rcPurchases = null;
+
+        async function initRevenueCat(uid) {
+            if (!RC_WEB_BILLING_PUBLIC_KEY || RC_WEB_BILLING_PUBLIC_KEY.indexOf('YOUR_') === 0) {
+                console.warn('RevenueCat is not configured yet — set RC_WEB_BILLING_PUBLIC_KEY.');
+                return;
+            }
+            try {
+                rcPurchases = Purchases.configure({ apiKey: RC_WEB_BILLING_PUBLIC_KEY, appUserId: uid });
+                await syncVerifiedStatus();
+            } catch (err) {
+                console.error('RevenueCat init failed', err);
+            }
+        }
+
+        // Refreshes the local "isVerified" flag from RevenueCat and mirrors it onto users/{uid} in Realtime
+        // Database, so everyone else's client (which only reads RTDB) can render the blue badge too.
+        async function syncVerifiedStatus() {
+            if (!rcPurchases) return null;
+            try {
+                const customerInfo = await rcPurchases.getCustomerInfo();
+                const isVerified = RC_VERIFIED_ENTITLEMENT_ID in customerInfo.entitlements.active;
+                const user = auth.currentUser;
+                if (user) update(ref(database, `users/${user.uid}`), { isVerified });
+                updatePremiumRowUI(isVerified);
+                return customerInfo;
+            } catch (err) {
+                console.error('Could not sync verified status', err);
+                return null;
+            }
+        }
+
+        function updatePremiumRowUI(isVerified) {
+            const title = document.getElementById('premium-row-title');
+            const sub = document.getElementById('premium-row-sub');
+            if (!title || !sub) return;
+            if (isVerified) {
+                title.textContent = 'Verified ✓';
+                sub.textContent = 'Manage your subscription';
+            } else {
+                title.textContent = 'Get Verified';
+                sub.textContent = 'Unlock the blue badge & premium features';
+            }
+        }
+
+        document.getElementById('btn-open-premium').addEventListener('click', async () => {
+            if (!rcPurchases) {
+                showCustomModal('Not Available Yet', "Premium purchases aren't fully set up yet. Please check back soon.");
+                return;
+            }
+            let customerInfo = null;
+            try { customerInfo = await rcPurchases.getCustomerInfo(); } catch (err) { /* fall through to paywall */ }
+            const isVerified = !!customerInfo && RC_VERIFIED_ENTITLEMENT_ID in customerInfo.entitlements.active;
+
+            if (isVerified) {
+                if (customerInfo.managementUrl) {
+                    window.open(customerInfo.managementUrl, '_blank');
+                } else {
+                    showCustomModal('Verified ✓', "You're already verified. Manage your subscription from the receipt email RevenueCat sent you.");
+                }
+                return;
+            }
+
+            const overlay = document.getElementById('premium-paywall-sheet-overlay');
+            const container = document.getElementById('rc-paywall-container');
+            container.innerHTML = '';
+            overlay.classList.add('active');
+
+            try {
+                const purchaseResult = await rcPurchases.presentPaywall({ htmlTarget: container });
+                overlay.classList.remove('active');
+                if (purchaseResult && purchaseResult.customerInfo && RC_VERIFIED_ENTITLEMENT_ID in purchaseResult.customerInfo.entitlements.active) {
+                    notify("You're verified! 🎉");
+                }
+                await syncVerifiedStatus();
+            } catch (err) {
+                overlay.classList.remove('active');
+                console.error('Paywall error', err);
+            }
+        });
+
+        document.getElementById('btn-close-premium-paywall').addEventListener('click', () => {
+            document.getElementById('premium-paywall-sheet-overlay').classList.remove('active');
+        });
+        document.getElementById('premium-paywall-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('premium-paywall-sheet-overlay')) {
+                e.currentTarget.classList.remove('active');
+            }
+        });
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
 
         let recaptchaVerifier = null;
@@ -2820,7 +2957,7 @@
                 const avatarHtml = profile.photoURL
                     ? `<div class="avatar" style="background-image: url('${profile.photoURL}'); border:none;"></div>`
                     : `<div class="avatar" style="background-color:var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">${initial}</div>`;
-                row.innerHTML = `${avatarHtml}<h4>${profile.name}${uid === group.ownerUid ? ' · Owner' : ''}</h4>`;
+                row.innerHTML = `${avatarHtml}<h4>${profile.name}${verifiedBadgeFor(uid, false)}${uid === group.ownerUid ? ' · Owner' : ''}</h4>`;
                 membersList.appendChild(row);
             });
 
@@ -2848,7 +2985,7 @@
                 avatarEl.style.color = '#FFFFFF';
                 avatarEl.textContent = (profile.name || '?').charAt(0).toUpperCase();
             }
-            document.getElementById('user-info-name').textContent = profile.name || 'Unknown User';
+            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').textContent = profile.about || 'No about yet.';
             userInfoSheet.classList.add('active');
@@ -3850,7 +3987,7 @@
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
-                    <h3>${displayName}</h3>
+                    <h3>${displayName}${verifiedBadgeFor(uid, false)}</h3>
                     <p>${isBlockedView ? 'Blocked' : 'In your contacts'}</p>
                 </div>
                 <button type="button" class="contact-action-btn ${isBlockedView ? 'primary' : 'danger'}" data-action="${isBlockedView ? 'unblock' : 'block'}">${isBlockedView ? 'Unblock' : 'Block'}</button>
@@ -4229,7 +4366,7 @@
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
-                    <h3>${displayName}${isAI ? VERIFIED_BADGE_SVG : ''}</h3>
+                    <h3>${displayName}${verifiedBadgeFor(uid, isAI)}</h3>
                     ${snippetHtml}
                 </div>
                 ${metaHtml}
@@ -4271,6 +4408,8 @@
                     email: user.email || "",
                     phoneNumber: user.phoneNumber || ""
                 });
+
+                initRevenueCat(user.uid); // don't block auth flow on this
 
                 try {
                     const username = await ensureUsername(user);
@@ -4722,7 +4861,7 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode();
             
-            document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${isAIChat ? VERIFIED_BADGE_SVG : ''}`;
+            document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}`;
             updateActiveChatStatus(); 
             
             const avatarEl = document.getElementById('chat-view-avatar');

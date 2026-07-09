@@ -76,6 +76,9 @@
         input, textarea, select { -webkit-user-select: auto; user-select: auto; pointer-events: auto; }
 
         .avatar { width: 48px; height: 48px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
+        /* Goza AI avatar — animated infinite-loop gradient, same nebula shift used on the AI trigger elsewhere */
+        .ai-avatar-nebula { background: linear-gradient(120deg, #7C4DFF 0%, #5E5CE6 45%, #18C7FF 100%) !important; background-size: 220% 220% !important; animation: aiAvatarNebulaShift 6s ease infinite; }
+        @keyframes aiAvatarNebulaShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .avatar[data-full] { pointer-events: auto; cursor: zoom-in; }
         .empty-msg { text-align: center; color: var(--text-secondary); margin-top: 40px; font-size: 14px; }
 
@@ -802,22 +805,6 @@
         </div>
     </div>
 
-    <div id="premium-paywall-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet wa-profile-sheet">
-            <div class="sheet-handle"></div>
-
-            <div class="wa-sheet-header">
-                <div style="width:38px; flex-shrink:0;"></div>
-                <div class="wa-header-title">Get Verified</div>
-                <button type="button" id="btn-close-premium-paywall" class="wa-header-icon-btn" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            </div>
-
-            <div id="rc-paywall-container" style="min-height: 320px;"></div>
-        </div>
-    </div>
-
     <div id="profile-bottom-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
@@ -909,20 +896,6 @@
                         <button type="button" id="btn-verify-profile-otp" class="btn-pill btn-primary" style="font-size:13px; padding:10px; margin-top:10px;">Verify & Link</button>
                         <p class="toggle-auth" style="margin-top:8px;"><span id="btn-cancel-profile-phone-link">Cancel</span></p>
                     </div>
-                </div>
-            </div>
-
-            <div class="wa-section">
-                <div class="wa-section-title">Premium</div>
-                <div class="wa-list-row wa-row-clickable" id="btn-open-premium">
-                    <div class="wa-row-icon chip-blue">
-                        <svg viewBox="0 0 22 22" fill="none"><path fill="currentColor" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>
-                    </div>
-                    <div class="wa-row-body">
-                        <span class="wa-row-title" id="premium-row-title">Get Verified</span>
-                        <span class="wa-row-sub" id="premium-row-sub">Unlock the blue badge & premium features</span>
-                    </div>
-                    <svg class="wa-row-action" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
             </div>
 
@@ -1387,10 +1360,6 @@
         <img id="image-viewer-img" src="" alt="Full image">
     </div>
 
-    <!-- Yoco Web SDK — classic (non-module) script, attaches window.YocoSDK. Must load before the
-         module script below so YocoSDK is ready when initYoco() runs. -->
-    <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -1398,7 +1367,6 @@
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
-        import { getRemoteConfig, fetchAndActivate, getValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-remote-config.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1886,16 +1854,6 @@
         const database = getDatabase(app);
         const firestoreDb = getFirestore(app);
         const functionsClient = getFunctions(app);
-        const remoteConfig = getRemoteConfig(app);
-        // Fetch fresh values every hour in production. Lower this (e.g. to 0) temporarily while
-        // testing so config changes show up immediately without waiting out the cache.
-        remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
-        remoteConfig.defaultConfig = {
-            yoco_public_key: "",
-            verified_price_cents: 4900,
-            verified_currency: "ZAR",
-            verified_plan_name: "Verified Badge"
-        };
         const googleProvider = new GoogleAuthProvider();
 
         // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
@@ -1906,137 +1864,12 @@
         const AI_NAME = "Goza AI";
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
-        // Blue variant of the same badge shape, shown next to Verified (paying) users' names.
-        const BLUE_VERIFIED_BADGE_SVG = VERIFIED_BADGE_SVG.replace('#7C4DFF', '#0A84FF');
-
-        // Returns the right badge markup (or '') for a given uid: purple for Goza AI, blue for a paying Verified user.
+        // Returns the badge markup (or '') for a given uid: purple for Goza AI only.
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
-            if (uid && cachedUsers[uid] && cachedUsers[uid].isVerified) return BLUE_VERIFIED_BADGE_SVG;
             return '';
         }
 
-        // --- YOCO (VERIFIED BADGE ONE-OFF PAYMENT, CONFIG VIA FIREBASE REMOTE CONFIG) ---
-        // No keys or prices are hardcoded here — everything is pulled from Remote Config so you can
-        // change price/plan/keys without redeploying this file. Set these parameters in
-        // Firebase Console > Remote Config:
-        //   yoco_public_key      — Yoco Dashboard > Settings > API Keys > "Live/Test Public Key" (pk_...)
-        //   verified_price_cents — price in cents, e.g. 4900 = R49.00
-        //   verified_currency    — "ZAR"
-        //   verified_plan_name   — display name shown on the Yoco popup, e.g. "Verified Badge"
-        let yocoSdkInstance = null;
-        const yocoConfig = { publicKey: '', priceCents: 4900, currency: 'ZAR', planName: 'Verified Badge' };
-
-        async function initYoco(uid) {
-            try {
-                await fetchAndActivate(remoteConfig);
-            } catch (err) {
-                console.warn('Remote Config fetch failed, falling back to defaults', err);
-            }
-
-            yocoConfig.publicKey = getValue(remoteConfig, 'yoco_public_key').asString();
-            yocoConfig.priceCents = getValue(remoteConfig, 'verified_price_cents').asNumber() || 4900;
-            yocoConfig.currency = getValue(remoteConfig, 'verified_currency').asString() || 'ZAR';
-            yocoConfig.planName = getValue(remoteConfig, 'verified_plan_name').asString() || 'Verified Badge';
-
-            if (!yocoConfig.publicKey) {
-                console.warn('Yoco is not configured yet — set yoco_public_key in Remote Config.');
-            } else if (window.YocoSDK) {
-                try {
-                    yocoSdkInstance = new window.YocoSDK({ publicKey: yocoConfig.publicKey });
-                } catch (err) {
-                    console.error('Yoco SDK init failed', err);
-                }
-            } else {
-                console.error('Yoco SDK script did not load — check the <script src="js.yoco.com/..."> tag.');
-            }
-
-            // isVerified itself is only ever set server-side (by the chargeYocoVerified Cloud Function)
-            // after a real charge succeeds — the client just reflects whatever's already in RTDB.
-            try {
-                const snap = await get(ref(database, `users/${uid}/isVerified`));
-                updatePremiumRowUI(!!snap.val());
-            } catch (err) {
-                console.error('Could not read verified status', err);
-            }
-        }
-
-        function updatePremiumRowUI(isVerified) {
-            const title = document.getElementById('premium-row-title');
-            const sub = document.getElementById('premium-row-sub');
-            if (!title || !sub) return;
-            if (isVerified) {
-                title.textContent = 'Verified ✓';
-                sub.textContent = 'You have the blue badge';
-            } else {
-                title.textContent = 'Get Verified';
-                sub.textContent = 'Unlock the blue badge & premium features';
-            }
-        }
-
-        document.getElementById('btn-open-premium').addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-
-            let alreadyVerified = false;
-            try {
-                const snap = await get(ref(database, `users/${user.uid}/isVerified`));
-                alreadyVerified = !!snap.val();
-            } catch (err) { /* fall through, treat as not verified */ }
-
-            if (alreadyVerified) {
-                showCustomModal('Verified ✓', "You're already verified. Contact support if you need to manage this.");
-                return;
-            }
-
-            if (!yocoSdkInstance) {
-                showCustomModal('Not Available Yet', "Premium purchases aren't fully set up yet. Please check back soon.");
-                return;
-            }
-
-            // Yoco's popup renders its own overlay/iframe, so we don't need our custom sheet here —
-            // just launch it directly from the tap.
-            yocoSdkInstance.showPopup({
-                amountInCents: yocoConfig.priceCents,
-                currency: yocoConfig.currency,
-                name: yocoConfig.planName,
-                description: 'Unlock the blue Verified badge',
-                callback: async (result) => {
-                    if (result.error) {
-                        showCustomModal('Payment Failed', result.error.message || 'Something went wrong. Please try again.');
-                        return;
-                    }
-                    // result.id is a single-use charge token — it must be redeemed server-side (Cloud
-                    // Function) with your Yoco SECRET key. Never charge using the public key alone.
-                    try {
-                        const chargeYocoVerified = httpsCallable(functionsClient, 'chargeYocoVerified');
-                        const response = await chargeYocoVerified({
-                            chargeToken: result.id,
-                            amountInCents: yocoConfig.priceCents,
-                            currency: yocoConfig.currency
-                        });
-                        if (response.data && response.data.success) {
-                            notify("You're verified! 🎉");
-                            updatePremiumRowUI(true);
-                        } else {
-                            showCustomModal('Payment Failed', "We couldn't confirm your payment. Please try again or contact support.");
-                        }
-                    } catch (err) {
-                        console.error('Charge confirmation failed', err);
-                        showCustomModal('Payment Failed', "We couldn't confirm your payment. Please try again or contact support.");
-                    }
-                }
-            });
-        });
-
-        document.getElementById('btn-close-premium-paywall').addEventListener('click', () => {
-            document.getElementById('premium-paywall-sheet-overlay').classList.remove('active');
-        });
-        document.getElementById('premium-paywall-sheet-overlay').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('premium-paywall-sheet-overlay')) {
-                e.currentTarget.classList.remove('active');
-            }
-        });
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
 
         let recaptchaVerifier = null;
@@ -4381,7 +4214,7 @@
             
             const initial = displayName.charAt(0).toUpperCase();
             const avatarHtml = isAI
-                ? `<div class="avatar" style="background: linear-gradient(135deg, #7C4DFF, #18C7FF); border: none; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg></div>`
+                ? `<div class="avatar ai-avatar-nebula" style="border: none; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg></div>`
                 : (profile.photoURL 
                     ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
                     : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`);
@@ -4450,8 +4283,6 @@
                     email: user.email || "",
                     phoneNumber: user.phoneNumber || ""
                 });
-
-                initYoco(user.uid); // don't block auth flow on this
 
                 try {
                     const username = await ensureUsername(user);
@@ -4908,17 +4739,22 @@
             
             const avatarEl = document.getElementById('chat-view-avatar');
             if (otherUid === AI_UID) {
+                avatarEl.classList.add('ai-avatar-nebula');
                 avatarEl.style.backgroundImage = "none";
-                avatarEl.style.background = "linear-gradient(135deg, #7C4DFF, #18C7FF)";
+                avatarEl.style.background = "";
                 avatarEl.style.display = "flex";
                 avatarEl.style.alignItems = "center";
                 avatarEl.style.justifyContent = "center";
                 avatarEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg>';
             } else if(otherAvatar) {
+                avatarEl.classList.remove('ai-avatar-nebula');
+                avatarEl.style.background = "";
                 avatarEl.innerHTML = "";
                 avatarEl.style.backgroundImage = `url('${otherAvatar}')`;
                 avatarEl.textContent = "";
             } else {
+                avatarEl.classList.remove('ai-avatar-nebula');
+                avatarEl.style.background = "";
                 avatarEl.innerHTML = "";
                 avatarEl.style.backgroundImage = "none";
                 avatarEl.style.backgroundColor = "var(--primary-blue)";

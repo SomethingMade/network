@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Web Messenger..</title>
+    <title>Web Messenger.</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0A84FF">
@@ -1387,13 +1387,18 @@
         <img id="image-viewer-img" src="" alt="Full image">
     </div>
 
+    <!-- Yoco Web SDK — classic (non-module) script, attaches window.YocoSDK. Must load before the
+         module script below so YocoSDK is ready when initYoco() runs. -->
+    <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        import { Purchases } from "https://esm.sh/@revenuecat/purchases-js@1.41.1";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
+        import { getRemoteConfig, fetchAndActivate, getValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-remote-config.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1880,6 +1885,17 @@
         const auth = getAuth(app);
         const database = getDatabase(app);
         const firestoreDb = getFirestore(app);
+        const functionsClient = getFunctions(app);
+        const remoteConfig = getRemoteConfig(app);
+        // Fetch fresh values every hour in production. Lower this (e.g. to 0) temporarily while
+        // testing so config changes show up immediately without waiting out the cache.
+        remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
+        remoteConfig.defaultConfig = {
+            yoco_public_key: "",
+            verified_price_cents: 4900,
+            verified_currency: "ZAR",
+            verified_plan_name: "Verified Badge"
+        };
         const googleProvider = new GoogleAuthProvider();
 
         // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
@@ -1900,41 +1916,48 @@
             return '';
         }
 
-        // --- REVENUECAT (VERIFIED BADGE SUBSCRIPTION) ---
-        // Get this from RevenueCat > Project Settings > Web (create a Web Billing config, choosing your connected
-        // Stripe account). It's the "Public API key" for that Web Billing app, looks like "rcb_xxxxxxxx".
-        const RC_WEB_BILLING_PUBLIC_KEY = "YOUR_RC_WEB_BILLING_PUBLIC_KEY";
-        // Must match the identifier of the Entitlement you create in RevenueCat > Entitlements.
-        const RC_VERIFIED_ENTITLEMENT_ID = "verified_badge";
-        let rcPurchases = null;
+        // --- YOCO (VERIFIED BADGE ONE-OFF PAYMENT, CONFIG VIA FIREBASE REMOTE CONFIG) ---
+        // No keys or prices are hardcoded here — everything is pulled from Remote Config so you can
+        // change price/plan/keys without redeploying this file. Set these parameters in
+        // Firebase Console > Remote Config:
+        //   yoco_public_key      — Yoco Dashboard > Settings > API Keys > "Live/Test Public Key" (pk_...)
+        //   verified_price_cents — price in cents, e.g. 4900 = R49.00
+        //   verified_currency    — "ZAR"
+        //   verified_plan_name   — display name shown on the Yoco popup, e.g. "Verified Badge"
+        let yocoSdkInstance = null;
+        const yocoConfig = { publicKey: '', priceCents: 4900, currency: 'ZAR', planName: 'Verified Badge' };
 
-        async function initRevenueCat(uid) {
-            if (!RC_WEB_BILLING_PUBLIC_KEY || RC_WEB_BILLING_PUBLIC_KEY.indexOf('YOUR_') === 0) {
-                console.warn('RevenueCat is not configured yet — set RC_WEB_BILLING_PUBLIC_KEY.');
-                return;
-            }
+        async function initYoco(uid) {
             try {
-                rcPurchases = Purchases.configure({ apiKey: RC_WEB_BILLING_PUBLIC_KEY, appUserId: uid });
-                await syncVerifiedStatus();
+                await fetchAndActivate(remoteConfig);
             } catch (err) {
-                console.error('RevenueCat init failed', err);
+                console.warn('Remote Config fetch failed, falling back to defaults', err);
             }
-        }
 
-        // Refreshes the local "isVerified" flag from RevenueCat and mirrors it onto users/{uid} in Realtime
-        // Database, so everyone else's client (which only reads RTDB) can render the blue badge too.
-        async function syncVerifiedStatus() {
-            if (!rcPurchases) return null;
+            yocoConfig.publicKey = getValue(remoteConfig, 'yoco_public_key').asString();
+            yocoConfig.priceCents = getValue(remoteConfig, 'verified_price_cents').asNumber() || 4900;
+            yocoConfig.currency = getValue(remoteConfig, 'verified_currency').asString() || 'ZAR';
+            yocoConfig.planName = getValue(remoteConfig, 'verified_plan_name').asString() || 'Verified Badge';
+
+            if (!yocoConfig.publicKey) {
+                console.warn('Yoco is not configured yet — set yoco_public_key in Remote Config.');
+            } else if (window.YocoSDK) {
+                try {
+                    yocoSdkInstance = new window.YocoSDK({ publicKey: yocoConfig.publicKey });
+                } catch (err) {
+                    console.error('Yoco SDK init failed', err);
+                }
+            } else {
+                console.error('Yoco SDK script did not load — check the <script src="js.yoco.com/..."> tag.');
+            }
+
+            // isVerified itself is only ever set server-side (by the chargeYocoVerified Cloud Function)
+            // after a real charge succeeds — the client just reflects whatever's already in RTDB.
             try {
-                const customerInfo = await rcPurchases.getCustomerInfo();
-                const isVerified = RC_VERIFIED_ENTITLEMENT_ID in customerInfo.entitlements.active;
-                const user = auth.currentUser;
-                if (user) update(ref(database, `users/${user.uid}`), { isVerified });
-                updatePremiumRowUI(isVerified);
-                return customerInfo;
+                const snap = await get(ref(database, `users/${uid}/isVerified`));
+                updatePremiumRowUI(!!snap.val());
             } catch (err) {
-                console.error('Could not sync verified status', err);
-                return null;
+                console.error('Could not read verified status', err);
             }
         }
 
@@ -1944,7 +1967,7 @@
             if (!title || !sub) return;
             if (isVerified) {
                 title.textContent = 'Verified ✓';
-                sub.textContent = 'Manage your subscription';
+                sub.textContent = 'You have the blue badge';
             } else {
                 title.textContent = 'Get Verified';
                 sub.textContent = 'Unlock the blue badge & premium features';
@@ -1952,39 +1975,58 @@
         }
 
         document.getElementById('btn-open-premium').addEventListener('click', async () => {
-            if (!rcPurchases) {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            let alreadyVerified = false;
+            try {
+                const snap = await get(ref(database, `users/${user.uid}/isVerified`));
+                alreadyVerified = !!snap.val();
+            } catch (err) { /* fall through, treat as not verified */ }
+
+            if (alreadyVerified) {
+                showCustomModal('Verified ✓', "You're already verified. Contact support if you need to manage this.");
+                return;
+            }
+
+            if (!yocoSdkInstance) {
                 showCustomModal('Not Available Yet', "Premium purchases aren't fully set up yet. Please check back soon.");
                 return;
             }
-            let customerInfo = null;
-            try { customerInfo = await rcPurchases.getCustomerInfo(); } catch (err) { /* fall through to paywall */ }
-            const isVerified = !!customerInfo && RC_VERIFIED_ENTITLEMENT_ID in customerInfo.entitlements.active;
 
-            if (isVerified) {
-                if (customerInfo.managementUrl) {
-                    window.open(customerInfo.managementUrl, '_blank');
-                } else {
-                    showCustomModal('Verified ✓', "You're already verified. Manage your subscription from the receipt email RevenueCat sent you.");
+            // Yoco's popup renders its own overlay/iframe, so we don't need our custom sheet here —
+            // just launch it directly from the tap.
+            yocoSdkInstance.showPopup({
+                amountInCents: yocoConfig.priceCents,
+                currency: yocoConfig.currency,
+                name: yocoConfig.planName,
+                description: 'Unlock the blue Verified badge',
+                callback: async (result) => {
+                    if (result.error) {
+                        showCustomModal('Payment Failed', result.error.message || 'Something went wrong. Please try again.');
+                        return;
+                    }
+                    // result.id is a single-use charge token — it must be redeemed server-side (Cloud
+                    // Function) with your Yoco SECRET key. Never charge using the public key alone.
+                    try {
+                        const chargeYocoVerified = httpsCallable(functionsClient, 'chargeYocoVerified');
+                        const response = await chargeYocoVerified({
+                            chargeToken: result.id,
+                            amountInCents: yocoConfig.priceCents,
+                            currency: yocoConfig.currency
+                        });
+                        if (response.data && response.data.success) {
+                            notify("You're verified! 🎉");
+                            updatePremiumRowUI(true);
+                        } else {
+                            showCustomModal('Payment Failed', "We couldn't confirm your payment. Please try again or contact support.");
+                        }
+                    } catch (err) {
+                        console.error('Charge confirmation failed', err);
+                        showCustomModal('Payment Failed', "We couldn't confirm your payment. Please try again or contact support.");
+                    }
                 }
-                return;
-            }
-
-            const overlay = document.getElementById('premium-paywall-sheet-overlay');
-            const container = document.getElementById('rc-paywall-container');
-            container.innerHTML = '';
-            overlay.classList.add('active');
-
-            try {
-                const purchaseResult = await rcPurchases.presentPaywall({ htmlTarget: container });
-                overlay.classList.remove('active');
-                if (purchaseResult && purchaseResult.customerInfo && RC_VERIFIED_ENTITLEMENT_ID in purchaseResult.customerInfo.entitlements.active) {
-                    notify("You're verified! 🎉");
-                }
-                await syncVerifiedStatus();
-            } catch (err) {
-                overlay.classList.remove('active');
-                console.error('Paywall error', err);
-            }
+            });
         });
 
         document.getElementById('btn-close-premium-paywall').addEventListener('click', () => {
@@ -4409,7 +4451,7 @@
                     phoneNumber: user.phoneNumber || ""
                 });
 
-                initRevenueCat(user.uid); // don't block auth flow on this
+                initYoco(user.uid); // don't block auth flow on this
 
                 try {
                     const username = await ensureUsername(user);

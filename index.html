@@ -274,9 +274,10 @@
         .stories-scroll::-webkit-scrollbar { display: none; }
         .stories-scroll.uploading { opacity: 0.5; pointer-events: none; }
         .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; }
-        .story-ring { width: 54px; height: 54px; border-radius: 50%; padding: 2.5px; background: rgba(255,255,255,0.35); flex-shrink: 0;}
-        .story-ring.has-story { background: linear-gradient(135deg, #FFB800 0%, #FF453A 50%, #5E5CE6 100%); }
-        .story-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: rgba(255,255,255,0.9); padding: 2px; }
+        .story-ring { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; }
+        .story-ring.has-story { background: none; }
+        .story-ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+        .story-ring-inner { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.9); padding: 2px; position: relative; z-index: 1; }
         .story-avatar-img { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display:flex; align-items:center; justify-content:center; font-weight:700; color: #0A84FF; font-size: 16px; position: relative; }
         .story-label { font-size: 11px; color: rgba(255,255,255,0.9); max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1144,6 +1145,15 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-chats" placeholder="Search chats...">
                         </div>
+                        <svg width="0" height="0" style="position:absolute;">
+                            <defs>
+                                <linearGradient id="storyRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#FFB800"></stop>
+                                    <stop offset="50%" stop-color="#FF453A"></stop>
+                                    <stop offset="100%" stop-color="#5E5CE6"></stop>
+                                </linearGradient>
+                            </defs>
+                        </svg>
                         <div class="stories-scroll" id="stories-scroll"></div>
                     </div>
                     <div class="chat-request-banner" id="chat-requests-container" style="display:none;"></div>
@@ -3164,6 +3174,7 @@
             wrap.className = 'story-item';
             const ring = document.createElement('div');
             ring.className = 'story-ring';
+            ring.style.border = '2px dashed var(--border-color)';
             const inner = document.createElement('div');
             inner.className = 'story-ring-inner';
             const avatarDiv = document.createElement('div');
@@ -3186,15 +3197,54 @@
             return wrap;
         }
 
+        // Builds an Instagram-style segmented ring: one dash per story item.
+        // Each dash is colored (unviewed) or greyed out (already viewed by the current user).
+        function buildStoryRing(items) {
+            const ring = document.createElement('div');
+            ring.className = 'story-ring has-story';
+
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const size = 54;
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'story-ring-svg');
+            svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+            const cx = size / 2, cy = size / 2, r = (size / 2) - 2.5;
+            const circumference = 2 * Math.PI * r;
+            const n = Math.max(items.length, 1);
+            const gapLen = n > 1 ? 6 : 0; // px gap between dashes
+            const segLen = Math.max((circumference / n) - gapLen, 1);
+
+            const user = auth.currentUser;
+            items.forEach((item, i) => {
+                const viewed = !!(user && item.views && item.views[user.uid]);
+                const circle = document.createElementNS(svgNS, 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', r);
+                circle.setAttribute('fill', 'none');
+                circle.setAttribute('stroke', viewed ? 'var(--border-color)' : 'url(#storyRingGradient)');
+                circle.setAttribute('stroke-width', '2.5');
+                circle.setAttribute('stroke-linecap', 'round');
+                circle.setAttribute('stroke-dasharray', `${segLen} ${circumference - segLen}`);
+                circle.setAttribute('stroke-dashoffset', String(-(i * (circumference / n))));
+                svg.appendChild(circle);
+            });
+
+            ring.appendChild(svg);
+
+            const inner = document.createElement('div');
+            inner.className = 'story-ring-inner';
+            ring.appendChild(inner);
+
+            return { ring, inner };
+        }
+
         function buildStoryItem(uid, name, photoURL, items, isOwn) {
             const wrap = document.createElement('div');
             wrap.className = 'story-item';
 
-            const ring = document.createElement('div');
-            ring.className = 'story-ring' + (items.length > 0 ? ' has-story' : '');
-
-            const inner = document.createElement('div');
-            inner.className = 'story-ring-inner';
+            const { ring, inner } = buildStoryRing(items);
 
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'story-avatar-img';

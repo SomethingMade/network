@@ -433,6 +433,9 @@
         .msg-media-save-btn:hover { background: rgba(0,0,0,0.75); }
         .msg-media-save-btn:active { transform: scale(0.92); }
         .msg-media-save-btn svg { width: 16px; height: 16px; }
+        .msg-media-caption { padding: 8px 4px 2px; font-size: 14px; color: var(--text-primary); word-break: break-word; }
+        .msg-media-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: none; }
+        .msg-media-video { pointer-events: auto; }
         .image-viewer-save {
             position: absolute;
             top: 28px;
@@ -684,6 +687,11 @@
         .image-viewer-close { position: absolute; top: 28px; right: 28px; width: 26px; height: 26px; color: white; cursor: pointer; transition: 0.2s; }
         .image-viewer-close:hover { opacity: 0.75; }
 
+        /* ── FULL VIDEO VIEWER (group media) ── */
+        #video-viewer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #video-viewer-overlay.active { opacity: 1; visibility: visible; }
+        #video-viewer-overlay video { max-width: 90%; max-height: 85%; border-radius: 16px; object-fit: contain; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
         @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
         @media (max-width: 768px) {
@@ -772,6 +780,16 @@
             <div class="group-info-section">
                 <p id="group-info-description" style="color:var(--text-secondary); font-size:14px; text-align:center; margin-bottom:4px;"></p>
                 <p style="text-align:center;"><span class="group-badge-pill" id="group-info-visibility-badge">Public</span></p>
+            </div>
+            <div class="group-info-section" id="group-only-owner-post-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-size:14px; font-weight:600; color:var(--text-primary);">Only Admin Can Post</span>
+                    <span style="font-size:12px; color:var(--text-secondary);">Only the owner can send messages, photos &amp; videos</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="group-only-owner-post-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
             <div class="group-info-section">
                 <div class="group-info-section-label" id="group-info-members-label">Members</div>
@@ -1293,6 +1311,7 @@
         </div>
         
         <div id="chat-blocked-banner">You blocked this contact. Tap to unblock.</div>
+        <div id="group-post-restricted-banner" style="display:none; padding:16px; text-align:center; background: var(--bg-hover); color: var(--text-secondary); font-size: 13px; border-top: 1px solid var(--border-color);">Only the group owner can post here</div>
     </div>
 
     <div id="attach-sheet-overlay" class="bottom-sheet-overlay">
@@ -1402,6 +1421,24 @@
         <img id="image-viewer-img" src="" alt="Full image">
     </div>
 
+    <div id="video-viewer-overlay">
+        <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <video id="video-viewer-vid" src="" controls playsinline></video>
+    </div>
+
+    <div id="group-media-caption-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3>Add a caption</h3>
+            <div id="group-media-caption-preview" style="display:flex; justify-content:center; margin-bottom:14px;"></div>
+            <input type="text" id="group-media-caption-input" class="pill-input" placeholder="Add a caption (optional)" maxlength="300">
+            <div class="modal-actions">
+                <button type="button" id="btn-cancel-group-media-caption" class="btn-pill btn-outline">Cancel</button>
+                <button type="button" id="btn-send-group-media-caption" class="btn-pill btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -1409,6 +1446,7 @@
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -1486,6 +1524,31 @@
         });
         document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'image-viewer-overlay') closeImageViewer();
+        });
+
+        let currentViewerVideoUrl = '';
+        function openVideoViewer(url) {
+            if (!url) return;
+            currentViewerVideoUrl = url;
+            const vid = document.getElementById('video-viewer-vid');
+            vid.src = url;
+            document.getElementById('video-viewer-overlay').classList.add('active');
+            vid.play().catch(() => {});
+        }
+        function closeVideoViewer() {
+            const vid = document.getElementById('video-viewer-vid');
+            vid.pause();
+            vid.src = '';
+            document.getElementById('video-viewer-overlay').classList.remove('active');
+            currentViewerVideoUrl = '';
+        }
+        document.getElementById('video-viewer-close').addEventListener('click', closeVideoViewer);
+        document.getElementById('video-viewer-save').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentViewerVideoUrl) downloadMediaFile(currentViewerVideoUrl, 'video');
+        });
+        document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'video-viewer-overlay') closeVideoViewer();
         });
 
         // Downloads an image/video to the user's device (Downloads folder / Photos on most mobile browsers).
@@ -1895,6 +1958,14 @@
         const auth = getAuth(app);
         const database = getDatabase(app);
         const firestoreDb = getFirestore(app);
+        const storage = getStorage(app);
+
+        async function uploadToFirebaseStorage(file, path) {
+            const sRef = storageRef(storage, path);
+            const snapshot = await uploadBytes(sRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+            return url;
+        }
         const functionsClient = getFunctions(app);
         const googleProvider = new GoogleAuthProvider();
 
@@ -2515,6 +2586,7 @@
         let cachedGroupChatsMeta = {};
         let cachedGroupInvites = {};
         let activeGroupId = null;
+        let activeGroupCanPost = true;
         let unsubscribeGroupMessages = null;
 
         function groupInitials(name) { return (name || '?').charAt(0).toUpperCase(); }
@@ -2645,6 +2717,7 @@
 
             if (activeGroupId && cachedGroups[activeGroupId]) {
                 document.getElementById('chat-view-name').textContent = cachedGroups[activeGroupId].name;
+                updateGroupPostingUI(cachedGroups[activeGroupId]);
             }
         }
 
@@ -2834,6 +2907,28 @@
             return group.isPublic ? group.ownerUid === uid : !!(group.members && group.members[uid]);
         }
 
+        function canPostInGroup(group, uid) {
+            if (!group || !uid) return false;
+            if (!group.members || !group.members[uid]) return false;
+            return group.onlyOwnerCanPost ? group.ownerUid === uid : true;
+        }
+
+        // Reflects the current group's posting permission onto the chat input UI.
+        function updateGroupPostingUI(group) {
+            if (!activeGroupId || !group) return;
+            const user = auth.currentUser;
+            const canPost = canPostInGroup(group, user ? user.uid : null);
+            activeGroupCanPost = canPost;
+
+            const inputRow = document.getElementById('chat-view-input-row');
+            const restrictedBanner = document.getElementById('group-post-restricted-banner');
+            const attachBtn = document.getElementById('chat-attach-btn');
+
+            inputRow.style.display = canPost ? 'flex' : 'none';
+            restrictedBanner.style.display = canPost ? 'none' : 'block';
+            attachBtn.style.display = canPost ? 'flex' : 'none';
+        }
+
         function renderGroupAvatarPreview(group) {
             if (group.photoURL) {
                 groupAvatarPreview.style.backgroundImage = `url('${group.photoURL}')`;
@@ -2862,6 +2957,12 @@
             groupAvatarUpload.style.cursor = editable ? 'pointer' : 'default';
             groupAvatarCameraBadge.style.display = editable ? 'flex' : 'none';
 
+            const isOwner = !!(user && group.ownerUid === user.uid);
+            const onlyOwnerToggle = document.getElementById('group-only-owner-post-toggle');
+            onlyOwnerToggle.checked = !!group.onlyOwnerCanPost;
+            onlyOwnerToggle.disabled = !isOwner;
+            document.getElementById('group-only-owner-post-row').style.opacity = isOwner ? '1' : '0.6';
+
             const memberIds = group.members ? Object.keys(group.members) : [];
             document.getElementById('group-info-members-label').textContent = `Members (${memberIds.length})`;
             const membersList = document.getElementById('group-info-members-list');
@@ -2883,6 +2984,23 @@
         });
         groupInfoSheet.addEventListener('click', (e) => {
             if (e.target === groupInfoSheet) groupInfoSheet.classList.remove('active');
+        });
+
+        document.getElementById('group-only-owner-post-toggle').addEventListener('change', async (e) => {
+            const user = auth.currentUser;
+            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            if (!user || !group || !activeGroupId || group.ownerUid !== user.uid) {
+                e.target.checked = !!(group && group.onlyOwnerCanPost);
+                return;
+            }
+            const value = e.target.checked;
+            try {
+                await update(ref(database, `groups/${activeGroupId}`), { onlyOwnerCanPost: value });
+                notify(value ? 'Only you can post in this group now' : 'All members can post now');
+            } catch (err) {
+                e.target.checked = !value;
+                notify('Could not update this setting', 'error');
+            }
         });
 
         // View another user's profile (avatar, name, username, about)
@@ -2993,6 +3111,7 @@
             }
 
             document.getElementById('chat-blocked-banner').style.display = 'none';
+            document.getElementById('group-post-restricted-banner').style.display = 'none';
             document.getElementById('chat-view-input-row').style.display = 'flex';
 
             update(ref(database, `user_group_chats/${user.uid}/${groupId}`), { unreadCount: 0 }).catch(() => {});
@@ -3001,8 +3120,8 @@
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
-            document.getElementById('chat-attach-btn').style.display = 'none';
             document.getElementById('chat-mic-btn').style.display = 'none';
+            updateGroupPostingUI(group);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
             const avatarEl = document.getElementById('chat-view-avatar');
@@ -3071,6 +3190,8 @@
                         bubble.dataset.senderUid = msg.senderUid;
                         bubble.dataset.createdAt = msg.createdAt;
                         if (msg.text) bubble.dataset.text = msg.text;
+                        if (msg.mediaURL) bubble.dataset.mediaURL = msg.mediaURL;
+                        if (msg.mediaType) bubble.dataset.mediaType = msg.mediaType;
 
                         if (!isOwn) {
                             const senderName = document.createElement('div');
@@ -3093,9 +3214,65 @@
                             return;
                         }
 
-                        const textEl = document.createElement('div');
-                        textEl.textContent = msg.text || '';
-                        bubble.appendChild(textEl);
+                        if (msg.mediaURL && msg.mediaType === 'image') {
+                            bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
+                            const img = document.createElement('img');
+                            img.className = 'msg-media-img';
+                            img.src = msg.mediaURL;
+                            img.alt = 'Photo';
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            mediaWrap.appendChild(img);
+                            const saveBtn = document.createElement('button');
+                            saveBtn.type = 'button';
+                            saveBtn.className = 'msg-media-save-btn';
+                            saveBtn.title = 'Save image';
+                            saveBtn.innerHTML = saveIconSvg();
+                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'image'); });
+                            mediaWrap.appendChild(saveBtn);
+                            bubble.appendChild(mediaWrap);
+                            if (msg.text) {
+                                const captionEl = document.createElement('div');
+                                captionEl.className = 'msg-media-caption';
+                                captionEl.textContent = msg.text;
+                                bubble.appendChild(captionEl);
+                            }
+                        } else if (msg.mediaURL && msg.mediaType === 'video') {
+                            bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
+                            const vid = document.createElement('video');
+                            vid.className = 'msg-media-video';
+                            vid.src = msg.mediaURL;
+                            vid.playsInline = true;
+                            vid.muted = true;
+                            vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            mediaWrap.appendChild(vid);
+                            const playHint = document.createElement('div');
+                            playHint.className = 'msg-media-play-hint';
+                            playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+                            playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            mediaWrap.appendChild(playHint);
+                            const saveBtn = document.createElement('button');
+                            saveBtn.type = 'button';
+                            saveBtn.className = 'msg-media-save-btn';
+                            saveBtn.title = 'Save video';
+                            saveBtn.innerHTML = saveIconSvg();
+                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'video'); });
+                            mediaWrap.appendChild(saveBtn);
+                            bubble.appendChild(mediaWrap);
+                            if (msg.text) {
+                                const captionEl = document.createElement('div');
+                                captionEl.className = 'msg-media-caption';
+                                captionEl.textContent = msg.text;
+                                bubble.appendChild(captionEl);
+                            }
+                        } else {
+                            const textEl = document.createElement('div');
+                            textEl.textContent = msg.text || '';
+                            bubble.appendChild(textEl);
+                        }
 
                         if (msg.editedAt) {
                             const editedTag = document.createElement('span');
@@ -3112,6 +3289,7 @@
                         messagesEl.appendChild(bubble);
                     });
                 }
+                renderPendingUploadsInto(messagesEl, groupId);
                 appendGroupTypingBubbleIfNeeded();
                 if (shouldStickToBottom) {
                     scrollToBottom(isActiveThreadInitialLoad);
@@ -3134,6 +3312,10 @@
             if (!text || !activeGroupId || !user) return;
 
             const group = cachedGroups[activeGroupId] || {};
+            if (!canPostInGroup(group, user.uid)) {
+                notify('Only the group owner can post in this group', 'error');
+                return;
+            }
             const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
             const msgPayload = { text: text, senderUid: user.uid, senderName: senderName, createdAt: Date.now() };
             input.value = '';
@@ -5375,6 +5557,7 @@
         const attachSheetOverlay = document.getElementById('attach-sheet-overlay');
         document.getElementById('chat-attach-btn').addEventListener('click', (e) => {
             e.preventDefault();
+            document.getElementById('attach-option-document').style.display = activeGroupId ? 'none' : 'flex';
             attachSheetOverlay.classList.add('active');
         });
         attachSheetOverlay.addEventListener('click', (e) => {
@@ -5467,8 +5650,170 @@
         function handleAttachInputChange(e, kind) {
             const files = Array.from(e.target.files || []);
             e.target.value = '';
-            if (!files.length || !activeChatUid) return;
+            if (!files.length) return;
+
+            if (activeGroupId) {
+                if (kind !== 'media') return;
+                const group = cachedGroups[activeGroupId];
+                const user = auth.currentUser;
+                if (!group || !user || !canPostInGroup(group, user.uid)) {
+                    notify('Only the group owner can post in this group', 'error');
+                    return;
+                }
+                openGroupMediaCaptionQueue(files);
+                return;
+            }
+
+            if (!activeChatUid) return;
             files.forEach(file => { queueFileUpload(file, kind); });
+        }
+
+        // --- GROUP MEDIA WITH CAPTIONS (Firebase Storage) ---
+        let groupMediaQueue = [];
+        let currentGroupMediaCaptionFile = null;
+        let currentGroupMediaCaptionUrl = '';
+
+        function openGroupMediaCaptionQueue(files) {
+            groupMediaQueue = files.slice();
+            processNextGroupMediaCaption();
+        }
+
+        function processNextGroupMediaCaption() {
+            if (!groupMediaQueue.length) return;
+            const file = groupMediaQueue.shift();
+            showGroupMediaCaptionSheet(file);
+        }
+
+        function showGroupMediaCaptionSheet(file) {
+            const isVideo = file.type.startsWith('video');
+            const previewEl = document.getElementById('group-media-caption-preview');
+            previewEl.innerHTML = '';
+            const url = URL.createObjectURL(file);
+            currentGroupMediaCaptionFile = file;
+            currentGroupMediaCaptionUrl = url;
+
+            if (isVideo) {
+                const v = document.createElement('video');
+                v.src = url; v.controls = true; v.playsInline = true; v.muted = true;
+                v.style.maxWidth = '100%'; v.style.maxHeight = '280px'; v.style.borderRadius = '16px';
+                previewEl.appendChild(v);
+            } else {
+                const img = document.createElement('img');
+                img.src = url;
+                img.style.maxWidth = '100%'; img.style.maxHeight = '280px'; img.style.borderRadius = '16px'; img.style.objectFit = 'contain';
+                previewEl.appendChild(img);
+            }
+
+            document.getElementById('group-media-caption-input').value = '';
+            document.getElementById('group-media-caption-overlay').classList.add('active');
+        }
+
+        function closeGroupMediaCaptionSheet() {
+            document.getElementById('group-media-caption-overlay').classList.remove('active');
+            if (currentGroupMediaCaptionUrl) URL.revokeObjectURL(currentGroupMediaCaptionUrl);
+            currentGroupMediaCaptionFile = null;
+            currentGroupMediaCaptionUrl = '';
+        }
+
+        document.getElementById('btn-cancel-group-media-caption').addEventListener('click', () => {
+            closeGroupMediaCaptionSheet();
+            processNextGroupMediaCaption();
+        });
+
+        document.getElementById('btn-send-group-media-caption').addEventListener('click', async () => {
+            const file = currentGroupMediaCaptionFile;
+            const caption = document.getElementById('group-media-caption-input').value.trim();
+            closeGroupMediaCaptionSheet();
+            if (file) await sendGroupMediaMessage(file, caption);
+            processNextGroupMediaCaption();
+        });
+
+        async function sendGroupMediaMessage(file, caption) {
+            const user = auth.currentUser;
+            const groupId = activeGroupId;
+            const group = groupId ? cachedGroups[groupId] : null;
+            if (!user || !group || !groupId || !file) return;
+            if (!canPostInGroup(group, user.uid)) {
+                notify('Only the group owner can post in this group', 'error');
+                return;
+            }
+
+            const isVideo = file.type.startsWith('video');
+            const item = {
+                id: 'p' + Date.now() + Math.random().toString(36).slice(2),
+                kind: 'media',
+                isVideo: isVideo,
+                previewURL: URL.createObjectURL(file),
+                fileName: file.name,
+                fileSize: file.size
+            };
+
+            pendingUploadsByChat[groupId] = pendingUploadsByChat[groupId] || [];
+            pendingUploadsByChat[groupId].push(item);
+
+            if (groupId === activeGroupId) {
+                const messagesEl = document.getElementById('chat-view-messages');
+                messagesEl.appendChild(renderPendingUploadBubble(item));
+                scrollToBottom();
+            }
+
+            const removePending = () => {
+                const list = pendingUploadsByChat[groupId] || [];
+                pendingUploadsByChat[groupId] = list.filter(p => p.id !== item.id);
+                if (item.previewURL) URL.revokeObjectURL(item.previewURL);
+                const el = document.querySelector(`.msg-bubble[data-pending-id="${item.id}"]`);
+                if (el) el.remove();
+            };
+
+            try {
+                const safeName = (file.name || 'media').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const storagePath = `groups/${groupId}/${Date.now()}_${safeName}`;
+                const url = await uploadToFirebaseStorage(file, storagePath);
+
+                const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
+                const msgPayload = {
+                    senderUid: user.uid,
+                    senderName: senderName,
+                    createdAt: Date.now(),
+                    mediaURL: url,
+                    mediaType: isVideo ? 'video' : 'image'
+                };
+                if (caption) msgPayload.text = caption;
+
+                const newMsgKey = push(ref(database, `group_threads/${groupId}/messages`)).key;
+                const updates = {};
+                updates[`group_threads/${groupId}/messages/${newMsgKey}`] = msgPayload;
+
+                const previewText = caption || (isVideo ? '🎥 Video' : '📷 Photo');
+                const memberIds = group.members ? Object.keys(group.members) : [];
+                memberIds.forEach(memberUid => {
+                    if (memberUid === user.uid) {
+                        updates[`user_group_chats/${memberUid}/${groupId}`] = {
+                            groupName: group.name || 'Group',
+                            groupPhotoURL: group.photoURL || '',
+                            text: previewText,
+                            senderUid: user.uid,
+                            senderName: senderName,
+                            timestamp: msgPayload.createdAt,
+                            unreadCount: 0
+                        };
+                    } else {
+                        updates[`user_group_chats/${memberUid}/${groupId}/groupName`] = group.name || 'Group';
+                        updates[`user_group_chats/${memberUid}/${groupId}/groupPhotoURL`] = group.photoURL || '';
+                        updates[`user_group_chats/${memberUid}/${groupId}/text`] = previewText;
+                        updates[`user_group_chats/${memberUid}/${groupId}/senderUid`] = user.uid;
+                        updates[`user_group_chats/${memberUid}/${groupId}/senderName`] = senderName;
+                        updates[`user_group_chats/${memberUid}/${groupId}/timestamp`] = msgPayload.createdAt;
+                        updates[`user_group_chats/${memberUid}/${groupId}/unreadCount`] = increment(1);
+                    }
+                });
+
+                await update(ref(database), updates);
+                removePending();
+            } catch (err) {
+                removePending();
+                notify("Couldn't send that file. Please try again.", 'error');
+            }
         }
 
         document.getElementById('chat-media-input').addEventListener('change', (e) => handleAttachInputChange(e, 'media'));

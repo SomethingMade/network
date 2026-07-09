@@ -493,6 +493,11 @@
         .msg-bubble.out .msg-reactions { right: 8px; }
         .msg-bubble.in .msg-reactions { left: 8px; }
         .msg-reactions-count { font-size: 10px; font-weight: 700; color: var(--text-secondary); margin-left: 2px; }
+        .msg-bubble.deleted { font-style: italic; opacity: 0.75; }
+        .msg-deleted-text { display: flex; align-items: center; gap: 6px; }
+        .msg-deleted-text svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.8; }
+        .msg-edited-tag { display: block; font-size: 11px; opacity: 0.65; margin-top: 2px; font-style: normal; }
+        .msg-bubble.out .msg-edited-tag { text-align: right; }
 
         .msg-bubble.pending { position: relative; opacity: 0.85; }
         .msg-bubble.pending.media img, .msg-bubble.pending.media video { filter: brightness(0.85); }
@@ -1014,6 +1019,7 @@
                     <button class="msg-option-btn" id="btn-msg-reply">Reply to Message</button>
                     <button class="msg-option-btn" id="btn-msg-copy">Copy Text</button>
                     <button class="msg-option-btn" id="btn-msg-forward">Forward</button>
+                    <button class="msg-option-btn" id="btn-msg-edit">Edit Message</button>
                     <button class="msg-option-btn" id="btn-msg-delete" style="color: var(--danger-red);">Delete for Everyone</button>
                 </div>
             </div>
@@ -1249,6 +1255,14 @@
                 <p id="reply-preview-text">Message snippet</p>
             </div>
             <svg id="cancel-reply-btn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
+
+        <div id="edit-preview-bar" class="reply-preview-bar" style="display: none;">
+            <div class="reply-preview-content">
+                <span id="edit-preview-name" style="color: var(--primary-blue);">Editing message</span>
+                <p id="edit-preview-text">Message snippet</p>
+            </div>
+            <svg id="cancel-edit-btn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </div>
         
         <div class="chat-view-input-row" id="chat-view-input-row">
@@ -1650,7 +1664,7 @@
                 }
                 
                 activeChatUid = null;
-                cancelReplyMode();
+                cancelReplyMode(); cancelEditMode();
                 highlightActiveChat();
             }
             if (hash !== 'story' && storyActive) {
@@ -2970,7 +2984,7 @@
             activeGroupId = groupId;
             activeChatUid = null;
             isActiveThreadInitialLoad = true;
-            cancelReplyMode();
+            cancelReplyMode(); cancelEditMode();
             
             // Unbind active Chat block checks if any
             if (activeChatBlockListenerRef) {
@@ -3068,9 +3082,27 @@
                             bubble.appendChild(senderName);
                         }
 
+                        if (msg.deleted) {
+                            bubble.classList.add('deleted');
+                            bubble.dataset.deleted = 'true';
+                            const deletedEl = document.createElement('div');
+                            deletedEl.className = 'msg-deleted-text';
+                            deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
+                            bubble.appendChild(deletedEl);
+                            messagesEl.appendChild(bubble);
+                            return;
+                        }
+
                         const textEl = document.createElement('div');
                         textEl.textContent = msg.text || '';
                         bubble.appendChild(textEl);
+
+                        if (msg.editedAt) {
+                            const editedTag = document.createElement('span');
+                            editedTag.className = 'msg-edited-tag';
+                            editedTag.textContent = 'Edited';
+                            bubble.appendChild(editedTag);
+                        }
 
                         if (msg.reactions) {
                             const badge = buildReactionsBadge(msg.reactions);
@@ -4448,6 +4480,8 @@
         let chatListReadReceiptUnsubscribers = {};
         let groupListTypingUnsubscribers = {};
         let replyingToMessage = null;
+        let editingMessage = null;
+        const EDIT_WINDOW_MS = 15 * 60 * 1000;
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 
@@ -4546,6 +4580,7 @@
 
         // --- SWIPE TO REPLY & LONG PRESS CONTEXT MENUS LOGIC ---
         function activateReplyMode(msgData) {
+            cancelEditMode();
             replyingToMessage = msgData;
             const user = auth.currentUser;
             const senderName = msgData.senderUid === user.uid ? 'You' : (cachedUsers[msgData.senderUid]?.name || 'User');
@@ -4563,8 +4598,28 @@
         }
         document.getElementById('cancel-reply-btn').addEventListener('click', cancelReplyMode);
 
+        // --- EDIT MESSAGE (within 15 minutes of sending) ---
+        function activateEditMode(msgData) {
+            cancelReplyMode(); cancelEditMode();
+            editingMessage = msgData;
+            document.getElementById('edit-preview-text').textContent = msgData.text || '';
+            document.getElementById('edit-preview-bar').style.display = 'flex';
+            const input = document.getElementById('chat-view-input');
+            input.value = msgData.text || '';
+            input.focus();
+        }
+
+        function cancelEditMode() {
+            if (editingMessage) document.getElementById('chat-view-input').value = '';
+            editingMessage = null;
+            document.getElementById('edit-preview-bar').style.display = 'none';
+        }
+        document.getElementById('cancel-edit-btn').addEventListener('click', cancelEditMode);
+
         function openMessageContextMenu(msgData, isOwn) {
             activeContextMenuMsg = msgData;
+            const canEdit = isOwn && !!msgData.text && !msgData.mediaURL && !!msgData.createdAt && (Date.now() - msgData.createdAt) < EDIT_WINDOW_MS;
+            document.getElementById('btn-msg-edit').style.display = canEdit ? 'block' : 'none';
             document.getElementById('btn-msg-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-msg-copy').style.display = msgData.text ? 'block' : 'none';
             document.getElementById('msg-options-sheet-overlay').classList.add('active');
@@ -4634,14 +4689,44 @@
             document.getElementById('msg-options-sheet-overlay').classList.remove('active');
         });
 
+        document.getElementById('btn-msg-edit').addEventListener('click', () => {
+            document.getElementById('msg-options-sheet-overlay').classList.remove('active');
+            if (!activeContextMenuMsg) return;
+            if (Date.now() - activeContextMenuMsg.createdAt >= EDIT_WINDOW_MS) {
+                showCustomModal('Edit Window Expired', 'You can only edit a message within 15 minutes of sending it.');
+                return;
+            }
+            activateEditMode(activeContextMenuMsg);
+        });
+
         document.getElementById('btn-msg-delete').addEventListener('click', async () => {
             if (activeContextMenuMsg && activeContextMenuMsg.key) {
                 const user = auth.currentUser;
-                const otherUid = activeChatUid;
+                const msgKey = activeContextMenuMsg.key;
+                const deletionFields = {
+                    deleted: true,
+                    deletedAt: Date.now(),
+                    text: null,
+                    mediaURL: null,
+                    mediaType: null,
+                    reactions: null,
+                    replyToMessage: null,
+                    replyToStory: null,
+                    fileName: null,
+                    fileSize: null,
+                    duration: null,
+                    isForwarded: null,
+                    editedAt: null
+                };
                 try {
-                    const threadId = threadIdFor(user.uid, otherUid);
-                    await remove(ref(database, `dm_threads/${threadId}/messages/${activeContextMenuMsg.key}`));
-                    await syncDeletedMessagePreview(user.uid, otherUid, activeContextMenuMsg.createdAt);
+                    if (activeGroupId) {
+                        await update(ref(database, `group_threads/${activeGroupId}/messages/${msgKey}`), deletionFields);
+                    } else {
+                        const otherUid = activeChatUid;
+                        const threadId = threadIdFor(user.uid, otherUid);
+                        await update(ref(database, `dm_threads/${threadId}/messages/${msgKey}`), deletionFields);
+                        await syncLastMessagePreview(user.uid, otherUid, activeContextMenuMsg.createdAt, DELETED_MSG_PREVIEW);
+                    }
                     notify('Message deleted');
                 } catch(err) { notify('Could not delete', 'error'); }
             }
@@ -4649,24 +4734,68 @@
         });
 
         const DELETED_MSG_PREVIEW = 'This message was deleted';
-        async function syncDeletedMessagePreview(myUid, otherUid, deletedCreatedAt) {
-            if (!otherUid || !deletedCreatedAt) return;
+
+        // Keeps the chat-list preview text in sync when the most recent message in a thread
+        // gets edited or deleted. Shared by both flows since the logic is identical.
+        async function syncLastMessagePreview(myUid, otherUid, targetCreatedAt, newPreviewText) {
+            if (!otherUid || !targetCreatedAt) return;
             try {
                 const [mySnap, theirSnap] = await Promise.all([
                     get(ref(database, `user_chats/${myUid}/${otherUid}`)),
                     get(ref(database, `user_chats/${otherUid}/${myUid}`))
                 ]);
                 const updates = {};
-                if (mySnap.exists() && mySnap.val().timestamp === deletedCreatedAt) {
-                    updates[`user_chats/${myUid}/${otherUid}/text`] = DELETED_MSG_PREVIEW;
+                if (mySnap.exists() && mySnap.val().timestamp === targetCreatedAt) {
+                    updates[`user_chats/${myUid}/${otherUid}/text`] = newPreviewText;
                 }
-                if (theirSnap.exists() && theirSnap.val().timestamp === deletedCreatedAt) {
-                    updates[`user_chats/${otherUid}/${myUid}/text`] = DELETED_MSG_PREVIEW;
+                if (theirSnap.exists() && theirSnap.val().timestamp === targetCreatedAt) {
+                    updates[`user_chats/${otherUid}/${myUid}/text`] = newPreviewText;
                 }
                 if (Object.keys(updates).length > 0) {
                     await update(ref(database), updates);
                 }
             } catch (err) { /* non-critical, ignore */ }
+        }
+
+        // Saves an in-place text edit for a message, as long as it's still within the 15-minute window.
+        async function saveMessageEdit() {
+            const user = auth.currentUser;
+            const input = document.getElementById('chat-view-input');
+            const newText = input.value.trim();
+            if (!editingMessage || !user || !newText) return;
+
+            if (Date.now() - editingMessage.createdAt >= EDIT_WINDOW_MS) {
+                showCustomModal('Edit Window Expired', 'You can only edit a message within 15 minutes of sending it.');
+                cancelEditMode();
+                return;
+            }
+
+            const msgKey = editingMessage.key;
+            const targetCreatedAt = editingMessage.createdAt;
+
+            try {
+                if (activeGroupId) {
+                    await update(ref(database, `group_threads/${activeGroupId}/messages/${msgKey}`), {
+                        text: newText,
+                        editedAt: Date.now()
+                    });
+                } else {
+                    const otherUid = activeChatUid;
+                    const threadId = threadIdFor(user.uid, otherUid);
+                    await update(ref(database, `dm_threads/${threadId}/messages/${msgKey}`), {
+                        text: newText,
+                        editedAt: Date.now()
+                    });
+                    await syncLastMessagePreview(user.uid, otherUid, targetCreatedAt, newText);
+                }
+                notify('Message edited');
+            } catch (err) {
+                notify('Could not edit message', 'error');
+            } finally {
+                input.value = '';
+                editingMessage = null;
+                document.getElementById('edit-preview-bar').style.display = 'none';
+            }
         }
 
         document.getElementById('btn-msg-forward').addEventListener('click', () => {
@@ -4739,7 +4868,7 @@
         chatMessagesContainer.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             const bubble = e.target.closest('.msg-bubble');
-            if (!bubble || bubble.classList.contains('pending')) return;
+            if (!bubble || bubble.classList.contains('pending') || bubble.classList.contains('deleted')) return;
             
             interactionState.bubble = bubble;
             interactionState.startX = e.clientX;
@@ -4848,7 +4977,7 @@
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
-            cancelReplyMode();
+            cancelReplyMode(); cancelEditMode();
             
             document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}`;
             updateActiveChatStatus(); 
@@ -4955,6 +5084,17 @@
                         if(msg.mediaURL) bubble.dataset.mediaURL = msg.mediaURL;
                         if(msg.mediaType) bubble.dataset.mediaType = msg.mediaType;
 
+                        if (msg.deleted) {
+                            bubble.classList.add('deleted');
+                            bubble.dataset.deleted = 'true';
+                            const deletedEl = document.createElement('div');
+                            deletedEl.className = 'msg-deleted-text';
+                            deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
+                            bubble.appendChild(deletedEl);
+                            messagesEl.appendChild(bubble);
+                            return;
+                        }
+
                         if (msg.isForwarded) {
                             const fwdTag = document.createElement('div');
                             fwdTag.className = 'fwd-tag';
@@ -5051,6 +5191,13 @@
                             bubble.appendChild(textEl);
                         }
 
+                        if (msg.editedAt) {
+                            const editedTag = document.createElement('span');
+                            editedTag.className = 'msg-edited-tag';
+                            editedTag.textContent = 'Edited';
+                            bubble.appendChild(editedTag);
+                        }
+
                         if (msg.reactions) {
                             const badge = buildReactionsBadge(msg.reactions);
                             if (badge) bubble.appendChild(badge);
@@ -5123,7 +5270,7 @@
 
             if (activeChatUid === AI_UID) {
                 input.value = '';
-                cancelReplyMode();
+                cancelReplyMode(); cancelEditMode();
                 return sendMessageToAI(text, user);
             }
 
@@ -5152,7 +5299,7 @@
             updates[`user_chats/${activeChatUid}/${user.uid}/senderUid`] = user.uid;
             
             input.value = '';
-            cancelReplyMode();
+            cancelReplyMode(); cancelEditMode();
             
             // Immediately stop showing you as typing
             clearTimeout(typingTimeout);
@@ -5218,7 +5365,10 @@
             }
         }
 
-        function sendActiveMessage() { activeGroupId ? sendGroupMessage() : sendChatMessage(); }
+        function sendActiveMessage() {
+            if (editingMessage) { saveMessageEdit(); return; }
+            activeGroupId ? sendGroupMessage() : sendChatMessage();
+        }
         document.getElementById('chat-view-send').addEventListener('click', (e) => { e.preventDefault(); sendActiveMessage(); });
         document.getElementById('chat-view-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendActiveMessage(); } });
 
@@ -5260,7 +5410,7 @@
                 text: replyingToMessage.text || '',
                 mediaType: replyingToMessage.mediaType || ''
             } : null;
-            cancelReplyMode(); 
+            cancelReplyMode(); cancelEditMode(); 
 
             pendingUploadsByChat[chatUid] = pendingUploadsByChat[chatUid] || [];
             pendingUploadsByChat[chatUid].push(item);

@@ -5899,23 +5899,29 @@
             };
 
             try {
-                const { url, type, bytes } = await uploadToCloudinary(file);
                 const threadId = threadIdFor(user.uid, chatUid);
-                const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
-
-                const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaURL: url };
-                if (capturedReplyCtx) msgPayload.replyToMessage = capturedReplyCtx;
-
+                let url, msgPayload = { senderUid: user.uid, createdAt: Date.now() };
                 let previewText;
+
                 if (kind === 'document') {
+                    const safeName = (file.name || 'document').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                    const storagePath = `documents/${threadId}/${Date.now()}_${safeName}`;
+                    url = await uploadToFirebaseStorage(file, storagePath);
+                    msgPayload.mediaURL = url;
                     msgPayload.mediaType = 'document';
                     msgPayload.fileName = file.name;
-                    msgPayload.fileSize = bytes || file.size;
+                    msgPayload.fileSize = file.size;
                     previewText = '📄 ' + file.name;
                 } else {
+                    const { url: cUrl, type } = await uploadToCloudinary(file);
+                    url = cUrl;
+                    msgPayload.mediaURL = url;
                     msgPayload.mediaType = type === 'video' ? 'video' : 'image';
                     previewText = msgPayload.mediaType === 'video' ? '🎥 Video' : '📷 Photo';
                 }
+                if (capturedReplyCtx) msgPayload.replyToMessage = capturedReplyCtx;
+
+                const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
 
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;

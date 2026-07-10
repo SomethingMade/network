@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Web Messenger..</title>
+    <title>Web Messenger.</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0A84FF">
@@ -148,6 +148,12 @@
             background: rgba(255,255,255,0.05);
             border: 1.5px solid var(--border-color);
             color: var(--text-primary);
+        }
+
+        body.glass-theme .nav-indicator {
+            background: var(--gradient-brand);
+            opacity: 0.22;
+            box-shadow: 0 4px 18px rgba(124, 108, 255, 0.4);
         }
 
         body.glass-theme ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); }
@@ -345,14 +351,15 @@
         .app-grid { display: grid; grid-template-columns: 88px 380px 1fr; height: 100%; width: 100%; }
 
         /* Left Pane: Sidebar Nav */
-        .side-nav { border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 28px; background: var(--bg-surface); z-index: 10; }
-        .nav-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-secondary); cursor: pointer; transition: 0.2s; font-size: 11px; font-weight: 500; }
+        .side-nav { border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 28px; background: var(--bg-surface); z-index: 10; position: relative; }
+        .nav-indicator { position: absolute; top: 0; left: 0; border-radius: 16px; background: var(--primary-blue); opacity: 0.12; pointer-events: none; z-index: 0; transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s ease, height 0.3s ease, opacity 0.25s ease; }
+        .nav-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-secondary); cursor: pointer; transition: color 0.25s ease; font-size: 11px; font-weight: 500; padding: 8px 14px; border-radius: 16px; }
         .nav-item:hover { color: var(--text-primary); }
         .nav-item.active { color: var(--primary-blue); }
-        .nav-item svg { width: 24px; height: 24px; stroke-width: 2; }
+        .nav-item svg { width: 24px; height: 24px; stroke-width: 2; transition: stroke 0.25s ease; }
         .nav-item.active svg { stroke: var(--primary-blue); }
         
-        .nav-badge { position: absolute; top: -6px; right: 18px; background: var(--danger-red); color: white; font-size: 10px; font-weight: 700; border-radius: 20px; padding: 2px 6px; min-width: 18px; text-align: center; border: 2px solid var(--bg-surface); }
+        .nav-badge { position: absolute; top: 2px; right: 6px; background: var(--danger-red); color: white; font-size: 10px; font-weight: 700; border-radius: 20px; padding: 2px 6px; min-width: 18px; text-align: center; border: 2px solid var(--bg-surface); z-index: 2; }
 
         .nav-item-profile { margin-top: auto; }
         .profile-btn { width: 36px; height: 36px; border-radius: 50%; background-color: rgba(10, 132, 255, 0.1); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid transparent; color: var(--primary-blue); font-weight: bold; font-size: 14px; transition: 0.2s; margin-bottom: 4px; }
@@ -896,13 +903,14 @@
         @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
-            .side-nav { flex-direction: row; height: 80px; padding: 0 16px; position: fixed; bottom: 0; width: 100%; border-right: none; border-top: 1px solid var(--border-color); justify-content: space-around; z-index: 100; box-shadow: 0 -4px 15px rgba(0,0,0,0.03); padding-bottom: env(safe-area-inset-bottom); }
+            .side-nav { flex-direction: row; height: 68px; padding: 0 10px; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); width: auto; border-right: none; border-top: none; border: 1px solid var(--border-color); border-radius: 26px; justify-content: space-around; z-index: 100; box-shadow: 0 12px 30px rgba(0,0,0,0.12); }
             .nav-item-profile { margin-top: 0; }
-            .chat-list-container { padding-bottom: 100px; }
+            .nav-item { padding: 6px 12px; }
+            .chat-list-container { padding-bottom: 112px; }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
             .chat-view-back { display: block; }
-            .fab-add { position: fixed; bottom: 100px; right: 24px; z-index: 99; }
+            .fab-add { position: fixed; bottom: 108px; right: 24px; z-index: 99; }
         }
     </style>
 </head>
@@ -1429,6 +1437,7 @@
         <div class="app-grid">
             
             <nav class="side-nav">
+                <div class="nav-indicator" id="nav-indicator"></div>
                 <div class="nav-item active" data-tab="tab-chats">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                     <span>Chats</span>
@@ -2205,8 +2214,28 @@
 
                 const fabAddFriend = document.getElementById('fab-add-friend');
                 if (fabAddFriend) fabAddFriend.style.display = (hash === 'tab-contacts') ? 'flex' : 'none';
+
+                updateNavIndicator();
             }
         });
+
+        // --- SLIDING NAV INDICATOR ---
+        function updateNavIndicator() {
+            const nav = document.querySelector('.side-nav');
+            const indicator = document.getElementById('nav-indicator');
+            const active = nav ? nav.querySelector('.nav-item.active') : null;
+            if (!nav || !indicator || !active) {
+                if (indicator) indicator.style.opacity = '0';
+                return;
+            }
+            const navRect = nav.getBoundingClientRect();
+            const itemRect = active.getBoundingClientRect();
+            indicator.style.width = itemRect.width + 'px';
+            indicator.style.height = itemRect.height + 'px';
+            indicator.style.transform = `translate(${itemRect.left - navRect.left}px, ${itemRect.top - navRect.top}px)`;
+            indicator.style.opacity = '1';
+        }
+        window.addEventListener('resize', () => requestAnimationFrame(updateNavIndicator));
 
         function initTabs() {
             const navItems = document.querySelectorAll('.nav-item[data-tab]');
@@ -2218,6 +2247,7 @@
                 const currentHash = window.location.hash.replace('#', '');
                 fabAddFriend.style.display = (currentHash === 'tab-contacts') ? 'flex' : 'none';
             }
+            requestAnimationFrame(updateNavIndicator);
         }
         initTabs();
 
@@ -5376,6 +5406,7 @@
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
                 updateAvatarUI(user);
+                requestAnimationFrame(updateNavIndicator);
 
                 updateNotificationBtnVisibility();
                 if ('Notification' in window && Notification.permission === 'granted') {

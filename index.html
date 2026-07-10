@@ -1561,19 +1561,20 @@
             currentViewerImageUrl = url;
             document.getElementById('image-viewer-img').src = url;
             document.getElementById('image-viewer-overlay').classList.add('active');
+            if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
         function closeImageViewer() {
             document.getElementById('image-viewer-overlay').classList.remove('active');
             document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
         }
-        document.getElementById('image-viewer-close').addEventListener('click', closeImageViewer);
+        document.getElementById('image-viewer-close').addEventListener('click', () => history.back());
         document.getElementById('image-viewer-save').addEventListener('click', (e) => {
             e.stopPropagation();
             if (currentViewerImageUrl) downloadMediaFile(currentViewerImageUrl, 'image');
         });
         document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'image-viewer-overlay') closeImageViewer();
+            if (e.target.id === 'image-viewer-overlay') history.back();
         });
 
         let currentViewerVideoUrl = '';
@@ -1584,6 +1585,7 @@
             vid.src = url;
             document.getElementById('video-viewer-overlay').classList.add('active');
             vid.play().catch(() => {});
+            if (window.location.hash !== '#video-viewer') window.location.hash = 'video-viewer';
         }
         function closeVideoViewer() {
             const vid = document.getElementById('video-viewer-vid');
@@ -1592,13 +1594,13 @@
             document.getElementById('video-viewer-overlay').classList.remove('active');
             currentViewerVideoUrl = '';
         }
-        document.getElementById('video-viewer-close').addEventListener('click', closeVideoViewer);
+        document.getElementById('video-viewer-close').addEventListener('click', () => history.back());
         document.getElementById('video-viewer-save').addEventListener('click', (e) => {
             e.stopPropagation();
             if (currentViewerVideoUrl) downloadMediaFile(currentViewerVideoUrl, 'video');
         });
         document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'video-viewer-overlay') closeVideoViewer();
+            if (e.target.id === 'video-viewer-overlay') history.back();
         });
 
         // Downloads an image/video to the user's device (Downloads folder / Photos on most mobile browsers).
@@ -1760,6 +1762,15 @@
             
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
+            const imageViewerActive = document.getElementById('image-viewer-overlay').classList.contains('active');
+            const videoViewerActive = document.getElementById('video-viewer-overlay').classList.contains('active');
+
+            if (hash !== 'image-viewer' && imageViewerActive) {
+                closeImageViewer();
+            }
+            if (hash !== 'video-viewer' && videoViewerActive) {
+                closeVideoViewer();
+            }
 
             if (hash !== 'chat' && chatActive) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -3352,13 +3363,6 @@
                             img.alt = 'Photo';
                             img.addEventListener('click', () => openImageViewer(msg.mediaURL));
                             mediaWrap.appendChild(img);
-                            const saveBtn = document.createElement('button');
-                            saveBtn.type = 'button';
-                            saveBtn.className = 'msg-media-save-btn';
-                            saveBtn.title = 'Save image';
-                            saveBtn.innerHTML = saveIconSvg();
-                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'image'); });
-                            mediaWrap.appendChild(saveBtn);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
                                 const captionEl = document.createElement('div');
@@ -3382,13 +3386,6 @@
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
                             playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(playHint);
-                            const saveBtn = document.createElement('button');
-                            saveBtn.type = 'button';
-                            saveBtn.className = 'msg-media-save-btn';
-                            saveBtn.title = 'Save video';
-                            saveBtn.innerHTML = saveIconSvg();
-                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'video'); });
-                            mediaWrap.appendChild(saveBtn);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
                                 const captionEl = document.createElement('div');
@@ -5479,13 +5476,6 @@
                             img.alt = 'Photo';
                             img.addEventListener('click', () => openImageViewer(msg.mediaURL));
                             mediaWrap.appendChild(img);
-                            const saveBtn = document.createElement('button');
-                            saveBtn.type = 'button';
-                            saveBtn.className = 'msg-media-save-btn';
-                            saveBtn.title = 'Save image';
-                            saveBtn.innerHTML = saveIconSvg();
-                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'image'); });
-                            mediaWrap.appendChild(saveBtn);
                             bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'video') {
                             if (!msg.replyToMessage) bubble.classList.add('media');
@@ -5494,16 +5484,15 @@
                             const vid = document.createElement('video');
                             vid.className = 'msg-media-video';
                             vid.src = msg.mediaURL;
-                            vid.controls = true;
                             vid.playsInline = true;
+                            vid.muted = true;
+                            vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(vid);
-                            const saveBtn = document.createElement('button');
-                            saveBtn.type = 'button';
-                            saveBtn.className = 'msg-media-save-btn';
-                            saveBtn.title = 'Save video';
-                            saveBtn.innerHTML = saveIconSvg();
-                            saveBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadMediaFile(msg.mediaURL, 'video'); });
-                            mediaWrap.appendChild(saveBtn);
+                            const playHint = document.createElement('div');
+                            playHint.className = 'msg-media-play-hint';
+                            playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+                            playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            mediaWrap.appendChild(playHint);
                             bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'audio') {
                             const card = document.createElement('div');

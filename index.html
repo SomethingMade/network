@@ -570,6 +570,15 @@
         .msg-bubble.out .msg-voice-progress { background: #FFFFFF; }
         .msg-voice-time { font-size: 11px; color: var(--text-secondary); }
         .msg-bubble.out .msg-voice-time { color: rgba(255,255,255,0.75); }
+        .msg-voice-waveform { position: relative; height: 24px; width: 158px; max-width: 100%; margin-bottom: 6px; cursor: pointer; }
+        .msg-voice-waveform .wf-bars { position: absolute; top: 0; left: 0; height: 100%; width: 158px; display: flex; align-items: center; gap: 2px; pointer-events: none; }
+        .msg-voice-waveform .wf-bar { flex: 0 0 3px; width: 3px; border-radius: 2px; background: rgba(10, 132, 255, 0.22); transform-origin: center; transition: background-color 0.15s linear; }
+        .msg-bubble.out .msg-voice-waveform .wf-bar { background: rgba(255,255,255,0.32); }
+        .msg-voice-waveform .wf-progress { width: 0%; overflow: hidden; }
+        .msg-voice-waveform .wf-progress .wf-bar { background: var(--primary-blue); }
+        .msg-bubble.out .msg-voice-waveform .wf-progress .wf-bar { background: #FFFFFF; }
+        .msg-voice-waveform.playing .wf-bar { animation: wfWave 0.9s ease-in-out infinite; }
+        @keyframes wfWave { 0%, 100% { transform: scaleY(0.55); } 50% { transform: scaleY(1); } }
 
         /* Block Banner */
         #chat-blocked-banner { display:none; padding:16px; text-align:center; background: var(--bg-hover); color: var(--danger-red); font-size: 13px; cursor: pointer; border-top: 1px solid var(--border-color); }
@@ -5560,14 +5569,20 @@
                             const card = document.createElement('div');
                             card.className = 'msg-voice-card';
                             bubble.dataset.duration = msg.duration || 0;
+                            const barsHtml = generateWaveformBars(msg.mediaURL);
                             card.innerHTML = `
                                 <button type="button" class="msg-voice-play-btn">${playIconSvg()}</button>
                                 <div class="msg-voice-body">
-                                    <div class="msg-voice-track"><div class="msg-voice-progress"></div></div>
+                                    <div class="msg-voice-waveform">
+                                        <div class="wf-bars wf-base">${barsHtml}</div>
+                                        <div class="wf-bars wf-progress">${barsHtml}</div>
+                                    </div>
                                     <span class="msg-voice-time">${formatVoiceTime(msg.duration || 0)}</span>
                                 </div>`;
                             const playBtn = card.querySelector('.msg-voice-play-btn');
                             playBtn.addEventListener('click', () => toggleVoicePlayback(playBtn, msg.mediaURL, bubble));
+                            const waveformEl = card.querySelector('.msg-voice-waveform');
+                            waveformEl.addEventListener('click', (e) => seekVoicePlayback(e, waveformEl, bubble, msg.mediaURL, playBtn));
                             bubble.appendChild(card);
                         } else if (msg.mediaURL && msg.mediaType === 'document') {
                             const card = document.createElement('div');
@@ -6130,6 +6145,31 @@
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
 
+        // Renders "current / total" while a voice note has started playing, and just the
+        // total duration while idle — matches the shared formatVoiceTime m:ss style.
+        function formatVoiceTimeRange(current, total) {
+            if (current > 0) return `${formatVoiceTime(current)} / ${formatVoiceTime(total)}`;
+            return formatVoiceTime(total);
+        }
+
+        // Generates a fixed set of deterministic "amplitude" bars for a voice note's waveform,
+        // seeded from a stable string (the media URL) so the same voice note always renders the
+        // same waveform shape instead of jumping around on every re-render.
+        const WAVEFORM_BAR_COUNT = 32;
+        function generateWaveformBars(seed) {
+            const seedStr = String(seed || 'voice');
+            let h = 0;
+            for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
+            let bars = '';
+            for (let i = 0; i < WAVEFORM_BAR_COUNT; i++) {
+                h = (h * 1103515245 + 12345) >>> 0;
+                const pct = 28 + (h % 73); // 28%-100% bar height
+                const delay = ((i % 8) * 0.07).toFixed(2);
+                bars += `<span class="wf-bar" style="height:${pct}%; animation-delay:${delay}s"></span>`;
+            }
+            return bars;
+        }
+
         function resetRecordingUI() {
             chatInputRow.style.display = 'flex';
             voiceRecordingRow.style.display = 'none';
@@ -6274,21 +6314,30 @@
         let currentlyPlayingVoice = null;
         function toggleVoicePlayback(playBtn, url, bubble) {
             let audioEl = bubble._voiceAudioEl;
-            const track = bubble.querySelector('.msg-voice-progress');
+            const waveform = bubble.querySelector('.msg-voice-waveform');
+            const progressLayer = bubble.querySelector('.wf-progress');
             const timeLabel = bubble.querySelector('.msg-voice-time');
             const totalDuration = parseFloat(bubble.dataset.duration) || 0;
+
+            const stopWaveAnim = () => waveform && waveform.classList.remove('playing');
 
             if (!audioEl) {
                 audioEl = new Audio(url);
                 bubble._voiceAudioEl = audioEl;
-                audioEl.addEventListener('timeupdate', () => {
-                    if (audioEl.duration) track.style.width = ((audioEl.currentTime / audioEl.duration) * 100) + '%';
-                    timeLabel.textContent = formatVoiceTime(audioEl.currentTime);
+                audioEl.addEventListener('loadedmetadata', () => {
+                    if (isFinite(audioEl.duration) && audioEl.duration > 0) bubble.dataset.duration = audioEl.duration;
                 });
+                audioEl.addEventListener('timeupdate', () => {
+                    const duration = audioEl.duration || totalDuration;
+                    if (progressLayer && duration) progressLayer.style.width = Math.min(100, (audioEl.currentTime / duration) * 100) + '%';
+                    timeLabel.textContent = formatVoiceTimeRange(audioEl.currentTime, duration);
+                });
+                audioEl.addEventListener('pause', stopWaveAnim);
                 audioEl.addEventListener('ended', () => {
                     playBtn.innerHTML = playIconSvg();
-                    track.style.width = '0%';
-                    timeLabel.textContent = formatVoiceTime(totalDuration);
+                    stopWaveAnim();
+                    if (progressLayer) progressLayer.style.width = '0%';
+                    timeLabel.textContent = formatVoiceTime(audioEl.duration || totalDuration);
                     if (currentlyPlayingVoice === audioEl) currentlyPlayingVoice = null;
                 });
             }
@@ -6296,14 +6345,43 @@
             if (audioEl.paused) {
                 if (currentlyPlayingVoice && currentlyPlayingVoice !== audioEl) {
                     currentlyPlayingVoice.pause();
+                    const prevWaveform = currentlyPlayingVoice._bubbleEl && currentlyPlayingVoice._bubbleEl.querySelector('.msg-voice-waveform');
+                    if (prevWaveform) prevWaveform.classList.remove('playing');
                 }
+                audioEl._bubbleEl = bubble;
                 audioEl.play();
                 currentlyPlayingVoice = audioEl;
                 playBtn.innerHTML = pauseIconSvg();
+                if (waveform) waveform.classList.add('playing');
             } else {
                 audioEl.pause();
                 playBtn.innerHTML = playIconSvg();
             }
+        }
+
+        // Lets the user tap/click anywhere on the waveform to jump playback to that point,
+        // same as tapping a scrubber. Initializes and starts playback if the note hasn't
+        // been played yet in this session.
+        function seekVoicePlayback(e, waveformEl, bubble, url, playBtn) {
+            const rect = waveformEl.getBoundingClientRect();
+            const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+
+            if (!bubble._voiceAudioEl) {
+                // Not created yet — start playback first so timeupdate/loadedmetadata listeners
+                // are wired up, then seek once metadata is available.
+                toggleVoicePlayback(playBtn, url, bubble);
+                const audioEl = bubble._voiceAudioEl;
+                const applySeek = () => { audioEl.currentTime = ratio * (audioEl.duration || parseFloat(bubble.dataset.duration) || 0); };
+                if (audioEl.readyState >= 1) applySeek();
+                else audioEl.addEventListener('loadedmetadata', applySeek, { once: true });
+                return;
+            }
+
+            const audioEl = bubble._voiceAudioEl;
+            const totalDuration = audioEl.duration || parseFloat(bubble.dataset.duration) || 0;
+            if (!totalDuration) return;
+            audioEl.currentTime = ratio * totalDuration;
+            if (audioEl.paused) toggleVoicePlayback(playBtn, url, bubble);
         }
 
         function playIconSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>'; }

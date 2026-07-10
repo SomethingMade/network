@@ -542,6 +542,11 @@
         .chat-view-send, .chat-attach-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .chat-view-send { background: var(--gradient-brand); color: white; }
         .chat-attach-btn { background: var(--bg-hover); color: var(--text-secondary); transition: 0.2s; }
+        .chat-attach-btn.icon-collapsed {
+            width: 0; min-width: 0; padding: 0; margin: 0; opacity: 0;
+            border: none; overflow: hidden; pointer-events: none;
+            transition: width 0.22s ease, opacity 0.15s ease, margin 0.22s ease;
+        }
         .chat-attach-btn:hover { background: var(--border-color); color: var(--text-primary); }
         .chat-attach-btn.recording-active { background: var(--danger-red); color: white; }
         .voice-recording-row { justify-content: space-between; }
@@ -4815,6 +4820,20 @@
             typingTimeout = setTimeout(() => {
                 set(typingRef, false);
             }, 2000);
+        });
+
+        // Collapse the paperclip & sticker buttons while the input is focused,
+        // giving the text field more room to type. They reappear on blur.
+        const chatInputEl = document.getElementById('chat-view-input');
+        const chatAttachBtnEl = document.getElementById('chat-attach-btn');
+        const chatStickerBtnEl = document.getElementById('chat-sticker-btn');
+        chatInputEl.addEventListener('focus', () => {
+            chatAttachBtnEl.classList.add('icon-collapsed');
+            chatStickerBtnEl.classList.add('icon-collapsed');
+        });
+        chatInputEl.addEventListener('blur', () => {
+            chatAttachBtnEl.classList.remove('icon-collapsed');
+            chatStickerBtnEl.classList.remove('icon-collapsed');
         });
 
         function renderPendingUploadBubble(item) {

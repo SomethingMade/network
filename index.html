@@ -1135,6 +1135,18 @@
         </div>
     </div>
 
+    <div id="chat-item-options-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" id="chat-item-options-title" style="margin-bottom: 8px;">Chat Options</div>
+            <div class="attach-options" style="flex-direction: column; gap:0; padding:0;">
+                <button class="msg-option-btn" id="btn-chat-item-delete" style="color: var(--danger-red);">Delete Chat</button>
+                <button class="msg-option-btn" id="btn-chat-item-remove-friend" style="color: var(--danger-red);">Remove Friend</button>
+            </div>
+        </div>
+    </div>
+
+
     <div id="auth-screen">
         <div id="auth-image-side">
             <div class="auth-brand-overlay">
@@ -5954,10 +5966,99 @@
         }
 
         document.getElementById('chat-list-container').addEventListener('click', (e) => {
+            if (chatItemPressState.triggered) { chatItemPressState.triggered = false; return; }
             const avatarEl = e.target.closest('.avatar[data-full]');
             if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
             const card = e.target.closest('.chat-item');
             if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
+        });
+
+        // --- LONG PRESS CONTEXT MENU (Delete Chat / Remove Friend) ON CHATS TAB CARDS ---
+        let contextMenuChatUid = null;
+        let chatItemPressState = { timer: null, uid: null, name: null, triggered: false, startX: 0, startY: 0 };
+        const chatItemOptionsSheet = document.getElementById('chat-item-options-sheet-overlay');
+        const chatListContainerEl = document.getElementById('chat-list-container');
+
+        function openChatItemContextMenu(uid, name) {
+            if (!uid) return;
+            contextMenuChatUid = uid;
+            document.getElementById('chat-item-options-title').textContent = name || 'Chat Options';
+            document.getElementById('btn-chat-item-remove-friend').style.display = (uid === AI_UID) ? 'none' : 'block';
+            chatItemOptionsSheet.classList.add('active');
+        }
+
+        chatListContainerEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            const card = e.target.closest('.chat-item');
+            if (!card) return;
+            chatItemPressState.triggered = false;
+            chatItemPressState.uid = card.dataset.uid;
+            chatItemPressState.name = card.dataset.name;
+            chatItemPressState.startX = e.clientX;
+            chatItemPressState.startY = e.clientY;
+            chatItemPressState.timer = setTimeout(() => {
+                chatItemPressState.triggered = true;
+                chatItemPressState.timer = null;
+                if (navigator.vibrate) navigator.vibrate(15);
+                openChatItemContextMenu(chatItemPressState.uid, chatItemPressState.name);
+            }, 550);
+        });
+
+        chatListContainerEl.addEventListener('pointermove', (e) => {
+            if (!chatItemPressState.timer) return;
+            if (Math.abs(e.clientX - chatItemPressState.startX) > 10 || Math.abs(e.clientY - chatItemPressState.startY) > 10) {
+                clearTimeout(chatItemPressState.timer);
+                chatItemPressState.timer = null;
+            }
+        });
+
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(evtName => {
+            chatListContainerEl.addEventListener(evtName, () => {
+                if (chatItemPressState.timer) { clearTimeout(chatItemPressState.timer); chatItemPressState.timer = null; }
+            });
+        });
+
+        chatItemOptionsSheet.addEventListener('click', (e) => {
+            if (e.target === chatItemOptionsSheet) chatItemOptionsSheet.classList.remove('active');
+        });
+
+        document.getElementById('btn-chat-item-delete').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            const uid = contextMenuChatUid;
+            chatItemOptionsSheet.classList.remove('active');
+            if (!user || !uid) return;
+
+            const confirmed = await showCustomModal('Delete Chat', 'This removes the chat from your list. The other person will still have their copy.', true);
+            if (!confirmed) return;
+
+            try {
+                await remove(ref(database, `user_chats/${user.uid}/${uid}`));
+                if (activeChatUid === uid) { activeChatUid = null; history.back(); }
+                notify('Chat deleted');
+            } catch (err) {
+                notify('Could not delete this chat', 'error');
+            }
+        });
+
+        document.getElementById('btn-chat-item-remove-friend').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            const uid = contextMenuChatUid;
+            const card = chatListContainerEl.querySelector(`.chat-item[data-uid="${uid}"]`);
+            const name = (card && card.dataset.name) || 'this contact';
+            chatItemOptionsSheet.classList.remove('active');
+            if (!user || !uid) return;
+
+            const confirmed = await showCustomModal('Remove Friend', `Remove ${name} from your friends? Their chat will also be removed from your list.`, true);
+            if (!confirmed) return;
+
+            try {
+                await remove(ref(database, `contacts/${user.uid}/${uid}`));
+                await remove(ref(database, `user_chats/${user.uid}/${uid}`));
+                if (activeChatUid === uid) { activeChatUid = null; history.back(); }
+                notify(`${name} removed from friends`);
+            } catch (err) {
+                notify('Could not remove this friend', 'error');
+            }
         });
 
         document.getElementById('contacts-list-container').addEventListener('click', async (e) => {

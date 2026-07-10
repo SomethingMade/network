@@ -319,6 +319,13 @@
         .btn-add-contact.outline-style { background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
         .group-section-title { flex-shrink: 0; padding: 14px 20px 6px; font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
         .group-badge-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 50px; background: rgba(10, 132, 255, 0.1); color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.3px; }
+        .group-badge-pill.business { background: rgba(124, 77, 255, 0.12); color: #7C4DFF; }
+        .business-page-promo { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; text-align: left; }
+        .business-page-promo h5 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+        .business-page-promo p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px; }
+        .business-page-promo button { width: 100%; }
+        .business-page-locked-note { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); background: rgba(124,77,255,0.08); border-radius: 12px; padding: 10px 12px; margin-bottom: 16px; }
+        .business-page-locked-note svg { flex-shrink: 0; color: #7C4DFF; }
         .segmented-control { display: flex; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 50px; padding: 4px; margin-bottom: 16px; }
         .segmented-control button { flex: 1; border: none; background: transparent; padding: 10px; border-radius: 50px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: 0.2s; }
         .segmented-control button.active { background: var(--gradient-brand); color: white; }
@@ -847,6 +854,15 @@
             <div class="group-info-section">
                 <p id="group-info-description" style="color:var(--text-secondary); font-size:14px; text-align:center; margin-bottom:4px;"></p>
                 <p style="text-align:center;"><span class="group-badge-pill" id="group-info-visibility-badge">Public</span></p>
+            </div>
+            <div class="business-page-promo" id="business-page-promo-box" style="display:none;">
+                <h5>Turn this into a Business Page</h5>
+                <p>Get a verified badge next to your group name and switch to a page format where only you can post updates — members can still view and chat with you.</p>
+                <button type="button" id="btn-convert-business-page" class="btn-pill btn-primary">Convert to Business Page</button>
+            </div>
+            <div class="business-page-locked-note" id="business-page-locked-note" style="display:none;">
+                <svg width="16" height="16" viewBox="0 0 22 22"><path fill="currentColor" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>
+                <span>This is a verified Business Page. Only the owner can post here.</span>
             </div>
             <div class="group-info-section" id="group-only-owner-post-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                 <div style="display:flex; flex-direction:column;">
@@ -2955,9 +2971,22 @@
         function groupInitials(name) { return (name || '?').charAt(0).toUpperCase(); }
 
         function groupAvatarHtml(group) {
-            return group.photoURL
-                ? `<div class="avatar" data-full="${group.photoURL}" style="background-image: url('${group.photoURL}'); border:none;"></div>`
-                : `<div class="avatar" style="background-color: var(--accent-purple); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${groupInitials(group.name)}</div>`;
+            if (group.photoURL) {
+                return `<div class="avatar" data-full="${group.photoURL}" style="background-image: url('${group.photoURL}'); border:none;"></div>`;
+            }
+            const nebulaClass = group.isBusinessPage ? ' ai-avatar-nebula' : '';
+            const bg = group.isBusinessPage ? '' : 'background-color: var(--accent-purple);';
+            return `<div class="avatar${nebulaClass}" style="${bg} color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${groupInitials(group.name)}</div>`;
+        }
+
+        // Returns the verified badge markup for a group name if it's a Business Page.
+        function groupVerifiedBadge(group) {
+            return (group && group.isBusinessPage) ? VERIFIED_BADGE_SVG : '';
+        }
+
+        // Group name label, e.g. for headers and list items, with the verified badge appended when applicable.
+        function groupNameLabel(group) {
+            return `${group.name}${groupVerifiedBadge(group)}`;
         }
 
         function renderMyGroupItem(groupId, group, container, metaData) {
@@ -2981,7 +3010,7 @@
             item.innerHTML = `
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
-                    <h3>${group.name}</h3>
+                    <h3>${groupNameLabel(group)}</h3>
                     <p>${snippetText}</p>
                 </div>
                 ${metaHtml}
@@ -3013,7 +3042,7 @@
             item.innerHTML = `
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
-                    <h3>${group.name}</h3>
+                    <h3>${groupNameLabel(group)}</h3>
                     <p>${memberCount} member${memberCount === 1 ? '' : 's'}</p>
                 </div>
             `;
@@ -3079,7 +3108,7 @@
             filterListItems(groupSearchInput, 'discover-groups-list-container');
 
             if (activeGroupId && cachedGroups[activeGroupId]) {
-                document.getElementById('chat-view-name').textContent = cachedGroups[activeGroupId].name;
+                document.getElementById('chat-view-name').innerHTML = groupNameLabel(cachedGroups[activeGroupId]);
                 updateGroupPostingUI(cachedGroups[activeGroupId]);
             }
         }
@@ -3293,12 +3322,13 @@
         }
 
         function renderGroupAvatarPreview(group) {
+            groupAvatarPreview.classList.toggle('ai-avatar-nebula', !group.photoURL && !!group.isBusinessPage);
             if (group.photoURL) {
                 groupAvatarPreview.style.backgroundImage = `url('${group.photoURL}')`;
                 groupAvatarPreview.textContent = "";
             } else {
                 groupAvatarPreview.style.backgroundImage = "none";
-                groupAvatarPreview.style.backgroundColor = "var(--accent-purple)";
+                groupAvatarPreview.style.backgroundColor = group.isBusinessPage ? "" : "var(--accent-purple)";
                 groupAvatarPreview.style.color = "white";
                 groupAvatarPreview.textContent = groupInitials(group.name);
             }
@@ -3309,10 +3339,16 @@
             const group = cachedGroups[activeGroupId];
             if (!group) return;
 
-            document.getElementById('group-info-title').textContent = group.name;
+            document.getElementById('group-info-title').innerHTML = groupNameLabel(group);
             document.getElementById('group-info-description').textContent = group.description || 'No description';
             const badge = document.getElementById('group-info-visibility-badge');
-            badge.textContent = group.isPublic ? 'Public Group' : 'Private Group';
+            if (group.isBusinessPage) {
+                badge.textContent = 'Verified Business Page';
+                badge.classList.add('business');
+            } else {
+                badge.textContent = group.isPublic ? 'Public Group' : 'Private Group';
+                badge.classList.remove('business');
+            }
 
             renderGroupAvatarPreview(group);
             const user = auth.currentUser;
@@ -3321,9 +3357,16 @@
             groupAvatarCameraBadge.style.display = editable ? 'flex' : 'none';
 
             const isOwner = !!(user && group.ownerUid === user.uid);
+
+            // Business Page conversion promo (owner only, not already converted)
+            document.getElementById('business-page-promo-box').style.display = (isOwner && !group.isBusinessPage) ? 'block' : 'none';
+            document.getElementById('business-page-locked-note').style.display = group.isBusinessPage ? 'flex' : 'none';
+
             const onlyOwnerToggle = document.getElementById('group-only-owner-post-toggle');
-            onlyOwnerToggle.checked = !!group.onlyOwnerCanPost;
-            onlyOwnerToggle.disabled = !isOwner;
+            onlyOwnerToggle.checked = group.isBusinessPage ? true : !!group.onlyOwnerCanPost;
+            onlyOwnerToggle.disabled = !isOwner || !!group.isBusinessPage;
+            // A Business Page always restricts posting to the owner, so hide the manual toggle entirely for it.
+            document.getElementById('group-only-owner-post-row').style.display = group.isBusinessPage ? 'none' : 'flex';
             document.getElementById('group-only-owner-post-row').style.opacity = isOwner ? '1' : '0.6';
 
             const memberIds = group.members ? Object.keys(group.members) : [];
@@ -3363,6 +3406,26 @@
             } catch (err) {
                 e.target.checked = !value;
                 notify('Could not update this setting', 'error');
+            }
+        });
+
+        document.getElementById('btn-convert-business-page').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            if (!user || !group || !activeGroupId || group.ownerUid !== user.uid) return;
+
+            const confirmed = await showCustomModal(
+                'Convert to Business Page',
+                'Your group will become a verified Business Page with a badge next to its name. Only you will be able to post messages, photos & videos — members can still view and reply. This can\'t be undone.',
+                true
+            );
+            if (!confirmed) return;
+
+            try {
+                await update(ref(database, `groups/${activeGroupId}`), { isBusinessPage: true, onlyOwnerCanPost: true });
+                notify('Your group is now a verified Business Page!');
+            } catch (err) {
+                notify('Could not convert this group to a Business Page', 'error');
             }
         });
 
@@ -3479,7 +3542,7 @@
 
             update(ref(database, `user_group_chats/${user.uid}/${groupId}`), { unreadCount: 0 }).catch(() => {});
 
-            document.getElementById('chat-view-name').textContent = group.name;
+            document.getElementById('chat-view-name').innerHTML = groupNameLabel(group);
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
             document.getElementById('chat-view-about-bubble').style.display = 'none';
             document.getElementById('btn-group-info').style.display = 'block';
@@ -3491,8 +3554,9 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
             const avatarEl = document.getElementById('chat-view-avatar');
+            avatarEl.classList.toggle('ai-avatar-nebula', !!group.isBusinessPage);
             avatarEl.style.backgroundImage = "none";
-            avatarEl.style.backgroundColor = "var(--accent-purple)";
+            avatarEl.style.backgroundColor = group.isBusinessPage ? "" : "var(--accent-purple)";
             avatarEl.style.color = "#FFFFFF";
             avatarEl.style.display = "flex";
             avatarEl.style.alignItems = "center";

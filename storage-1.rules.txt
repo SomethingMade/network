@@ -18,6 +18,18 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*|video/.*');
     }
 
+    // Chat documents (PDF, Word, Excel, etc.) — uploaded via the document
+    // attach option in DM chats. Same caveat as groups: rules can't verify
+    // thread membership since that lives in RTDB, so this just requires
+    // sign-in. Membership/visibility is enforced by your RTDB rules on
+    // dm_threads/{threadId}/messages.
+    match /documents/{threadId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 50 * 1024 * 1024 // 50MB cap
+                   && request.resource.contentType.matches('application/pdf|application/msword|application/vnd\\.openxmlformats-officedocument\\..*|application/vnd\\.ms-excel|application/vnd\\.ms-powerpoint|text/plain|text/csv|application/zip|application/x-rar-compressed|application/rtf');
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

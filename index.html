@@ -4582,6 +4582,7 @@
         let cachedUserChatsData = {};
         let previousUserChatsData = {};
         let userChatsInitialized = false;
+        let chatListenersAttached = false;
 
         function renderChatRequests() {
             const container = document.getElementById('chat-requests-container');
@@ -4822,6 +4823,8 @@
             } else {
                 document.getElementById('auth-screen').style.display = 'flex';
                 document.getElementById('messenger-screen').style.display = 'none';
+                chatListenersAttached = false;
+                userChatsInitialized = false;
             }
             if (isInitialLoad) { setTimeout(() => { hideLoading(); }, 800); isInitialLoad = false; }
         });
@@ -6284,6 +6287,12 @@
         function initChatListeners() {
             const user = auth.currentUser;
             if(!user) return;
+            // onAuthStateChanged can fire more than once for the same signed-in session (e.g. after
+            // linking a phone number). Without this guard, every re-fire attaches a fresh, duplicate
+            // set of Firebase listeners, and each incoming message or story then re-renders the chat
+            // list once per attached listener, appearing as duplicated friend cards.
+            if (chatListenersAttached) return;
+            chatListenersAttached = true;
 
             onValue(ref(database, "users"), (snap) => {
                 cachedUsers = snap.exists() ? snap.val() : {};

@@ -685,6 +685,10 @@
         .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 16px; pointer-events: none; }
         .story-like-btn { width: 34px; height: 34px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
         .story-like-btn.liked { fill: var(--danger-red); color: var(--danger-red); }
+        .story-reshare-btn { width: 30px; height: 30px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
+        .story-reshare-btn:active { transform: scale(0.85); opacity: 0.7; }
+        .story-shared-tag { position: absolute; left: 16px; right: 16px; top: 54px; z-index: 9; display: none; align-items: center; gap: 6px; color: rgba(255,255,255,0.9); font-size: 12.5px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+        .story-shared-tag svg { width: 13px; height: 13px; flex-shrink: 0; }
 
         .story-reply-bar { flex: 1; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 50px; padding: 10px 18px; pointer-events: auto; }
         .story-reply-input { flex: 1; background: transparent; border: none; outline: none; color: white; font-size: 14px; min-width: 0; }
@@ -1443,6 +1447,10 @@
                     <svg class="story-viewer-close story-interactive" id="story-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </div>
             </div>
+            <div class="story-shared-tag" id="story-shared-tag">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                <span id="story-shared-tag-text"></span>
+            </div>
             <div class="story-music-chip" id="story-music-chip" style="display:none;">
                 <img id="story-music-chip-art" src="" alt="">
                 <span id="story-music-chip-text"></span>
@@ -1460,6 +1468,7 @@
                     <input type="text" id="story-reply-input" class="story-reply-input" placeholder="Reply to story..." autocomplete="off">
                     <svg class="story-reply-send" id="story-reply-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </div>
+                <svg class="story-reshare-btn story-interactive" id="story-reshare-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             </div>
 
@@ -3969,6 +3978,16 @@
                 captionEl.style.display = 'none';
             }
 
+            const sharedTag = document.getElementById('story-shared-tag');
+            const isShared = !!(current.sharedFrom && current.sharedFrom.name);
+            if (isShared) {
+                document.getElementById('story-shared-tag-text').textContent = `Shared from ${current.sharedFrom.name}`;
+                sharedTag.style.display = 'flex';
+            } else {
+                sharedTag.style.display = 'none';
+            }
+            musicChip.style.top = isShared ? '92px' : '62px';
+
             if (current.type === 'video') {
                 imgEl.style.display = 'none';
                 videoEl.style.display = 'block';
@@ -4097,6 +4116,46 @@
                 e.currentTarget.classList.remove('liked');
                 e.currentTarget.innerHTML = '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>';
                 await remove(likeRef);
+            }
+        });
+
+        document.getElementById('story-reshare-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const current = storyState.items[storyState.index];
+            const user = auth.currentUser;
+            if (!current || !user || storyState.isOwn) return;
+
+            pauseStory();
+            const viewer = document.getElementById('story-viewer-overlay');
+            viewer.style.opacity = '0';
+
+            const confirmed = await showCustomModal("Reshare Story", "Add this story to your own story?", true);
+            viewer.style.opacity = '';
+            if (!confirmed) { resumeStory(); return; }
+
+            try {
+                const myProfile = cachedUsers[user.uid] || {};
+                const originalOwnerUid = storyState.currentUid;
+                const originalOwnerName = document.getElementById('story-viewer-name').textContent || 'User';
+
+                const newRef = push(ref(database, `stories/${user.uid}`));
+                await set(newRef, {
+                    mediaURL: current.mediaURL,
+                    type: current.type,
+                    createdAt: Date.now(),
+                    ...(current.duration ? { duration: current.duration } : {}),
+                    ...(current.music ? { music: current.music } : {}),
+                    ...(current.caption ? { caption: current.caption } : {}),
+                    sharedFrom: {
+                        uid: current.sharedFrom ? current.sharedFrom.uid : originalOwnerUid,
+                        name: current.sharedFrom ? current.sharedFrom.name : originalOwnerName
+                    }
+                });
+                notify("Story shared to your profile");
+                resumeStory();
+            } catch (err) {
+                resumeStory();
+                showCustomModal("Error", "Couldn't reshare that story. Please try again.");
             }
         });
 

@@ -1649,16 +1649,35 @@
             return '<svg viewBox="0 0 18 12" width="16" height="12" fill="none"><path d="M6.4 6.5L10.2 10.5L17 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
         }
 
-        function openDocumentExternally(url, fileName) {
+        // Downloads a document to the user's device instead of opening/previewing it. The `download`
+        // attribute alone is ignored by browsers for cross-origin URLs (like Cloudinary), so we fetch
+        // the file as a blob first, same approach as downloadMediaFile.
+        async function openDocumentExternally(url, fileName) {
             if (!url) return;
-            const link = document.createElement('a');
-            link.href = url;
-            if (fileName) link.download = fileName;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const finalName = fileName || `document-${Date.now()}`;
+            try {
+                showLoading();
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) throw new Error('Fetch failed');
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = finalName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                notify('Saved to your device');
+            } catch (err) {
+                console.error('openDocumentExternally error:', err);
+                // Fallback for browsers that block the cross-origin fetch: open it directly
+                // so the user can use the browser/OS save option.
+                window.open(url, '_blank', 'noopener,noreferrer');
+                notify('Opened in a new tab — use your browser\'s save option', 'error');
+            } finally {
+                hideLoading();
+            }
         }
 
         function formatTime(timestamp) {

@@ -1199,7 +1199,7 @@
                             <h1>Chats</h1>
                             <div style="display:flex; align-items:center; gap:16px;">
                                 <svg id="btn-install-app" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Install App"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                                <svg id="btn-header-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                             </div>
                         </div>
                         <div class="search-box">
@@ -1904,6 +1904,35 @@
             } catch (err) {
                 showCustomModal("Couldn't Clear Cache", "Something went wrong while clearing cached files.");
             }
+        });
+
+        // --- Header "more options" icon: force-refresh the app so newly deployed
+        // CSS/JS changes show up immediately instead of waiting on the service worker. ---
+        async function clearAllCachesAndReload() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(reg => reg.unregister()));
+                }
+                if (window.caches && caches.keys) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(key => caches.delete(key)));
+                }
+            } catch (err) {
+                console.error('Failed to clear caches before reload', err);
+            }
+            window.location.reload();
+        }
+
+        document.getElementById('btn-header-menu').addEventListener('click', async () => {
+            const confirmed = await showCustomModal(
+                "Refresh App",
+                "This clears all cached files and reloads the app so you get the latest version. Your chats and account stay safe on the server.",
+                true
+            );
+            if (!confirmed) return;
+            notify("Refreshing app...");
+            clearAllCachesAndReload();
         });
 
         // --- Invite a Friend ---

@@ -618,6 +618,16 @@
             40% { transform: scale(1); } 
         }
 
+        /* ── STICKERS ── */
+        .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding: 4px 2px 8px; }
+        .sticker-grid-item { aspect-ratio: 1; border-radius: 16px; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.15s ease; border: none; padding: 6px; }
+        .sticker-grid-item:hover { background: var(--border-color); transform: scale(1.06); }
+        .sticker-grid-item:active { transform: scale(0.94); }
+        .sticker-grid-item img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+        .msg-bubble.sticker { background: transparent !important; padding: 0 !important; box-shadow: none !important; }
+        .msg-sticker-img { width: 110px; height: 110px; display: block; }
+
         /* ── ATTACH SHEET ── */
         .attach-options { display: flex; gap: 12px; padding: 4px 0 6px; }
         .attach-option { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; background: none; border: none; cursor: pointer; padding: 14px 8px; border-radius: 18px; transition: 0.2s; font-family: inherit; color: var(--text-primary); }
@@ -1311,6 +1321,9 @@
             <button type="button" class="chat-attach-btn" id="chat-attach-btn">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.48-8.48l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
             </button>
+            <button type="button" class="chat-attach-btn" id="chat-sticker-btn" title="Send a sticker">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
+            </button>
             <input type="text" id="chat-view-input" placeholder="Type a message...">
             <button type="button" class="chat-attach-btn" id="chat-mic-btn" title="Record a voice note">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -1361,6 +1374,14 @@
 
     <input type="file" id="chat-media-input" accept="image/*,video/*" multiple style="display:none;">
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
+
+    <div id="sticker-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 65vh; display: flex; flex-direction: column;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Stickers</div>
+            <div id="sticker-grid" class="sticker-grid"></div>
+        </div>
+    </div>
 
     <div id="story-caption-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="display: flex; flex-direction: column; padding-bottom: 12px;">
@@ -2005,6 +2026,49 @@
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
             return '';
+        }
+
+        // --- STICKERS (open-source animated emoji from Google's Noto Emoji project, Apache 2.0) ---
+        // Each sticker is served as an animated GIF from Google's public CDN: fonts.gstatic.com
+        const STICKER_CATALOG = [
+            { cp: '1f600', ch: '😀' }, { cp: '1f602', ch: '😂' }, { cp: '1f60d', ch: '😍' }, { cp: '1f970', ch: '🥰' },
+            { cp: '1f60e', ch: '😎' }, { cp: '1f973', ch: '🥳' }, { cp: '1f622', ch: '😢' }, { cp: '1f62d', ch: '😭' },
+            { cp: '1f621', ch: '😡' }, { cp: '1f631', ch: '😱' }, { cp: '1f914', ch: '🤔' }, { cp: '1f609', ch: '😉' },
+            { cp: '1f929', ch: '🤩' }, { cp: '1f917', ch: '🤗' }, { cp: '1f92f', ch: '🤯' }, { cp: '1f97a', ch: '🥺' },
+            { cp: '1f634', ch: '😴' }, { cp: '1f44d', ch: '👍' }, { cp: '1f44e', ch: '👎' }, { cp: '1f44f', ch: '👏' },
+            { cp: '1f64f', ch: '🙏' }, { cp: '1f496', ch: '💖' }, { cp: '1f525', ch: '🔥' }, { cp: '1f389', ch: '🎉' },
+            { cp: '1f4af', ch: '💯' }, { cp: '1f64c', ch: '🙌' }, { cp: '1f680', ch: '🚀' }, { cp: '1f91d', ch: '🤝' }
+        ];
+        function stickerUrlFor(cp) { return `https://fonts.gstatic.com/s/e/notoemoji/latest/${cp}/512.gif`; }
+        function buildStickerMsgElement(url) {
+            const img = document.createElement('img');
+            img.className = 'msg-sticker-img';
+            img.src = url;
+            img.alt = 'Sticker';
+            return img;
+        }
+
+        let stickerGridBuilt = false;
+        function buildStickerGridOnce() {
+            if (stickerGridBuilt) return;
+            stickerGridBuilt = true;
+            const grid = document.getElementById('sticker-grid');
+            STICKER_CATALOG.forEach(sticker => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'sticker-grid-item';
+                btn.title = sticker.ch;
+                const img = document.createElement('img');
+                img.src = stickerUrlFor(sticker.cp);
+                img.alt = sticker.ch;
+                img.loading = 'lazy';
+                btn.appendChild(img);
+                btn.addEventListener('click', () => {
+                    document.getElementById('sticker-sheet-overlay').classList.remove('active');
+                    sendStickerMessage(sticker.cp, sticker.ch);
+                });
+                grid.appendChild(btn);
+            });
         }
 
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
@@ -3146,6 +3210,8 @@
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
             document.getElementById('chat-mic-btn').style.display = 'none';
+            document.getElementById('chat-attach-btn').style.display = 'flex';
+            document.getElementById('chat-sticker-btn').style.display = 'flex';
             updateGroupPostingUI(group);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
@@ -3239,7 +3305,10 @@
                             return;
                         }
 
-                        if (msg.mediaURL && msg.mediaType === 'image') {
+                        if (msg.mediaURL && msg.mediaType === 'sticker') {
+                            bubble.classList.add('sticker');
+                            bubble.appendChild(buildStickerMsgElement(msg.mediaURL));
+                        } else if (msg.mediaURL && msg.mediaType === 'image') {
                             bubble.classList.add('media');
                             const mediaWrap = document.createElement('div');
                             mediaWrap.className = 'msg-media-wrap';
@@ -5201,6 +5270,7 @@
             document.getElementById('btn-user-info').style.display = isAIChat ? 'none' : 'block';
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
+            document.getElementById('chat-sticker-btn').style.display = isAIChat ? 'none' : 'flex';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode(); cancelEditMode();
             
@@ -5348,7 +5418,10 @@
                             bubble.appendChild(quoteDiv);
                         }
 
-                        if (msg.mediaURL && msg.mediaType === 'image') {
+                        if (msg.mediaURL && msg.mediaType === 'sticker') {
+                            bubble.classList.add('sticker');
+                            bubble.appendChild(buildStickerMsgElement(msg.mediaURL));
+                        } else if (msg.mediaURL && msg.mediaType === 'image') {
                             if (!msg.replyToMessage) bubble.classList.add('media');
                             const mediaWrap = document.createElement('div');
                             mediaWrap.className = 'msg-media-wrap';
@@ -5614,6 +5687,77 @@
             attachSheetOverlay.classList.remove('active');
             document.getElementById('chat-document-input').click();
         });
+
+        const stickerSheetOverlay = document.getElementById('sticker-sheet-overlay');
+        document.getElementById('chat-sticker-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            buildStickerGridOnce();
+            stickerSheetOverlay.classList.add('active');
+        });
+        stickerSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === stickerSheetOverlay) stickerSheetOverlay.classList.remove('active');
+        });
+
+        async function sendStickerMessage(cp, ch) {
+            const user = auth.currentUser;
+            if (!user) return;
+            const stickerURL = stickerUrlFor(cp);
+            const previewText = `${ch} Sticker`;
+
+            if (activeGroupId) {
+                const groupId = activeGroupId;
+                const group = cachedGroups[groupId];
+                if (!group || !canPostInGroup(group, user.uid)) {
+                    notify('Only the group owner can post in this group', 'error');
+                    return;
+                }
+                const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
+                const msgPayload = { senderUid: user.uid, senderName: senderName, createdAt: Date.now(), mediaURL: stickerURL, mediaType: 'sticker' };
+                try {
+                    const newMsgKey = push(ref(database, `group_threads/${groupId}/messages`)).key;
+                    const updates = {};
+                    updates[`group_threads/${groupId}/messages/${newMsgKey}`] = msgPayload;
+                    const memberIds = group.members ? Object.keys(group.members) : [];
+                    memberIds.forEach(memberUid => {
+                        if (memberUid === user.uid) {
+                            updates[`user_group_chats/${memberUid}/${groupId}`] = {
+                                groupName: group.name || 'Group', groupPhotoURL: group.photoURL || '',
+                                text: previewText, senderUid: user.uid, senderName: senderName,
+                                timestamp: msgPayload.createdAt, unreadCount: 0
+                            };
+                        } else {
+                            updates[`user_group_chats/${memberUid}/${groupId}/groupName`] = group.name || 'Group';
+                            updates[`user_group_chats/${memberUid}/${groupId}/groupPhotoURL`] = group.photoURL || '';
+                            updates[`user_group_chats/${memberUid}/${groupId}/text`] = previewText;
+                            updates[`user_group_chats/${memberUid}/${groupId}/senderUid`] = user.uid;
+                            updates[`user_group_chats/${memberUid}/${groupId}/senderName`] = senderName;
+                            updates[`user_group_chats/${memberUid}/${groupId}/timestamp`] = msgPayload.createdAt;
+                            updates[`user_group_chats/${memberUid}/${groupId}/unreadCount`] = increment(1);
+                        }
+                    });
+                    await update(ref(database), updates);
+                } catch (err) {
+                    showCustomModal('Message Failed', 'Your sticker could not be sent.');
+                }
+            } else if (activeChatUid) {
+                const chatUid = activeChatUid;
+                const threadId = threadIdFor(user.uid, chatUid);
+                const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaURL: stickerURL, mediaType: 'sticker' };
+                try {
+                    const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                    const updates = {};
+                    updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+                    updates[`user_chats/${user.uid}/${chatUid}`] = { text: previewText, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };
+                    updates[`user_chats/${chatUid}/${user.uid}/text`] = previewText;
+                    updates[`user_chats/${chatUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
+                    updates[`user_chats/${chatUid}/${user.uid}/unreadCount`] = increment(1);
+                    updates[`user_chats/${chatUid}/${user.uid}/senderUid`] = user.uid;
+                    await update(ref(database), updates);
+                } catch (err) {
+                    notify("Couldn't send that sticker. Please try again.", 'error');
+                }
+            }
+        }
 
         async function queueFileUpload(file, kind) {
             const user = auth.currentUser;

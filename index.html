@@ -376,7 +376,36 @@
         .chat-view-info { flex: 1; min-width: 0; }
         .chat-view-info h4 { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-view-info p { font-size: 12px; color: var(--success-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-view-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 10px; overflow-x: hidden; background: var(--bg-alt); scroll-behavior: smooth; }
+        .chat-view-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 10px; overflow-x: hidden; background: var(--bg-alt); scroll-behavior: smooth; transition: background-color 0.2s ease; }
+
+        /* ── CHAT WALLPAPERS ── */
+        .chat-view-messages.wallpaper-default-1 {
+            background:
+                radial-gradient(circle at 18% 20%, rgba(10,132,255,0.10) 0%, transparent 42%),
+                radial-gradient(circle at 82% 65%, rgba(94,92,230,0.10) 0%, transparent 46%),
+                var(--bg-alt);
+        }
+        .chat-view-messages.wallpaper-default-2 {
+            background-color: var(--bg-alt);
+            background-image: radial-gradient(rgba(0,0,0,0.07) 1px, transparent 1px);
+            background-size: 18px 18px;
+        }
+        body.dark-theme .chat-view-messages.wallpaper-default-2 {
+            background-image: radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1px);
+        }
+        .chat-view-messages.wallpaper-default-3 {
+            background-color: var(--bg-alt);
+            background-image: repeating-linear-gradient(135deg, rgba(10,132,255,0.06) 0px, rgba(10,132,255,0.06) 2px, transparent 2px, transparent 16px);
+        }
+        .chat-view-messages.wallpaper-custom { background-size: cover; background-position: center; background-repeat: no-repeat; }
+
+        .wallpaper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 8px; }
+        .wallpaper-swatch { position: relative; aspect-ratio: 1; border-radius: 16px; cursor: pointer; border: 2px solid var(--border-color); background-color: var(--bg-alt); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .wallpaper-swatch span { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+        .wallpaper-swatch.wallpaper-upload-swatch { flex-direction: column; gap: 4px; border-style: dashed; color: var(--primary-blue); }
+        .wallpaper-swatch.wallpaper-upload-swatch svg { width: 20px; height: 20px; color: var(--primary-blue); }
+        .wallpaper-swatch.selected { border-color: var(--primary-blue); }
+        .wallpaper-swatch.selected::after { content: ''; position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; background: var(--primary-blue) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>') center/12px no-repeat; }
 
         .scroll-to-bottom-btn {
             position: absolute;
@@ -1039,6 +1068,14 @@
                         <option value="dark">Dark</option>
                     </select>
                 </div>
+                <div class="wa-list-row wa-row-clickable" id="setting-chat-wallpaper">
+                    <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Chat Wallpaper</span>
+                        <span class="wa-row-sub">Applies to all your chats</span>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-secondary);"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
             </div>
 
             <div class="wa-section">
@@ -1143,6 +1180,27 @@
                 <button class="msg-option-btn" id="btn-chat-item-delete" style="color: var(--danger-red);">Delete Chat</button>
                 <button class="msg-option-btn" id="btn-chat-item-remove-friend" style="color: var(--danger-red);">Remove Friend</button>
             </div>
+        </div>
+    </div>
+
+    <div id="wallpaper-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 28px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 4px;">Chat Wallpaper</div>
+            <p style="color:var(--text-secondary); font-size:13px; text-align:center; margin-bottom:20px;">This will apply to all of your chats</p>
+            <div class="wallpaper-grid" id="wallpaper-grid">
+                <div class="wallpaper-swatch" data-wallpaper="none"><span>None</span></div>
+                <div class="wallpaper-swatch wallpaper-default-1" data-wallpaper="default-1"></div>
+                <div class="wallpaper-swatch wallpaper-default-2" data-wallpaper="default-2"></div>
+                <div class="wallpaper-swatch wallpaper-default-3" data-wallpaper="default-3"></div>
+                <div class="wallpaper-swatch" id="wallpaper-custom-swatch" data-wallpaper="custom" style="display:none;"></div>
+                <div class="wallpaper-swatch wallpaper-upload-swatch" id="wallpaper-upload-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span>Upload</span>
+                </div>
+            </div>
+            <div class="sheet-upload-spinner" id="wallpaper-upload-spinner" style="display:none; position:static; margin:4px auto 0;"><div class="spinner-sm" style="border-color: rgba(120,120,120,0.25); border-top-color: var(--primary-blue);"></div></div>
+            <input type="file" id="wallpaper-file-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
         </div>
     </div>
 
@@ -1631,6 +1689,112 @@
 
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
             if (localStorage.getItem('messenger_theme') === 'system') applyTheme('system');
+        });
+
+        // --- CHAT WALLPAPER SETTINGS ---
+        const WALLPAPER_CSS_CLASSES = ['wallpaper-default-1', 'wallpaper-default-2', 'wallpaper-default-3', 'wallpaper-custom'];
+
+        function currentWallpaperValue() {
+            const user = auth.currentUser;
+            if (!user) return 'none';
+            const profile = cachedUsers[user.uid] || {};
+            return profile.chatWallpaper || 'none';
+        }
+
+        // Sets the background on the single, reused chat-view-messages pane, so every chat
+        // (DMs and groups) automatically shows the same wallpaper since they share this element.
+        function applyChatWallpaperToDOM(value) {
+            const messagesEl = document.getElementById('chat-view-messages');
+            if (!messagesEl) return;
+            messagesEl.classList.remove(...WALLPAPER_CSS_CLASSES);
+            messagesEl.style.backgroundImage = '';
+            if (value === 'default-1' || value === 'default-2' || value === 'default-3') {
+                messagesEl.classList.add(`wallpaper-${value}`);
+            } else if (value && /^https?:\/\//.test(value)) {
+                messagesEl.classList.add('wallpaper-custom');
+                messagesEl.style.backgroundImage = `url('${value}')`;
+            }
+        }
+
+        function refreshWallpaperGridSelection(value) {
+            document.querySelectorAll('#wallpaper-grid .wallpaper-swatch').forEach(el => {
+                const key = el.dataset.wallpaper;
+                const isCustomMatch = key === 'custom' && value && /^https?:\/\//.test(value);
+                el.classList.toggle('selected', key === value || isCustomMatch);
+            });
+        }
+
+        document.getElementById('setting-chat-wallpaper').addEventListener('click', () => {
+            const value = currentWallpaperValue();
+            const customSwatch = document.getElementById('wallpaper-custom-swatch');
+            if (value && /^https?:\/\//.test(value)) {
+                customSwatch.style.display = 'flex';
+                customSwatch.style.backgroundImage = `url('${value}')`;
+                customSwatch.dataset.url = value;
+            } else if (!customSwatch.dataset.url) {
+                customSwatch.style.display = 'none';
+            }
+            refreshWallpaperGridSelection(value);
+            document.getElementById('wallpaper-sheet-overlay').classList.add('active');
+        });
+
+        document.getElementById('wallpaper-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'wallpaper-sheet-overlay') e.target.classList.remove('active');
+        });
+
+        document.getElementById('wallpaper-grid').addEventListener('click', async (e) => {
+            const swatch = e.target.closest('.wallpaper-swatch');
+            if (!swatch || swatch.id === 'wallpaper-upload-btn') return;
+            const user = auth.currentUser;
+            if (!user) return;
+
+            let valueToSave;
+            if (swatch.dataset.wallpaper === 'custom') {
+                valueToSave = swatch.dataset.url;
+                if (!valueToSave) return;
+            } else {
+                valueToSave = swatch.dataset.wallpaper;
+            }
+
+            try {
+                await update(ref(database, `users/${user.uid}`), { chatWallpaper: valueToSave });
+                applyChatWallpaperToDOM(valueToSave);
+                refreshWallpaperGridSelection(valueToSave);
+                notify(valueToSave === 'none' ? 'Wallpaper reset to default' : 'Wallpaper updated');
+            } catch (err) {
+                notify('Could not update wallpaper', 'error');
+            }
+        });
+
+        document.getElementById('wallpaper-upload-btn').addEventListener('click', () => {
+            document.getElementById('wallpaper-file-input').click();
+        });
+
+        document.getElementById('wallpaper-file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const user = auth.currentUser;
+            if (!user) { e.target.value = ''; return; }
+
+            const spinner = document.getElementById('wallpaper-upload-spinner');
+            spinner.style.display = 'flex';
+            try {
+                const { url } = await uploadToCloudinary(file);
+                await update(ref(database, `users/${user.uid}`), { chatWallpaper: url });
+                applyChatWallpaperToDOM(url);
+
+                const customSwatch = document.getElementById('wallpaper-custom-swatch');
+                customSwatch.style.display = 'flex';
+                customSwatch.style.backgroundImage = `url('${url}')`;
+                customSwatch.dataset.url = url;
+                refreshWallpaperGridSelection(url);
+                notify('Wallpaper updated');
+            } catch (err) {
+                showCustomModal('Upload Failed', "We couldn't upload that image.");
+            } finally {
+                spinner.style.display = 'none';
+                e.target.value = '';
+            }
         });
 
         function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
@@ -3556,6 +3720,7 @@
 
             document.getElementById('chat-view-name').innerHTML = groupNameLabel(group);
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
+            applyChatWallpaperToDOM(currentWallpaperValue());
             document.getElementById('chat-view-about-bubble').style.display = 'none';
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
@@ -5712,7 +5877,8 @@
             cancelReplyMode(); cancelEditMode();
             
             document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}`;
-            updateActiveChatStatus(); 
+            updateActiveChatStatus();
+            applyChatWallpaperToDOM(currentWallpaperValue());
             
             const avatarEl = document.getElementById('chat-view-avatar');
             if (otherUid === AI_UID) {
@@ -6812,6 +6978,7 @@
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderChatRequests();
                 if (activeChatUid) updateActiveChatStatus();
+                applyChatWallpaperToDOM(currentWallpaperValue());
             });
 
             onValue(ref(database, "stories"), (snap) => {

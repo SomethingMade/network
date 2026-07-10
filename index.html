@@ -237,6 +237,11 @@
         .toggle-auth { margin-top: 28px; font-size: 14px; color: var(--text-secondary); text-align: center; }
         .toggle-auth span { color: var(--primary-blue); font-weight: 600; cursor: pointer; }
         .toggle-auth span:hover { text-decoration: underline; }
+        .otp-boxes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; }
+        .otp-box { width: 46px; height: 56px; text-align: center; font-size: 22px; font-weight: 700; border-radius: 14px; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; transition: 0.2s; }
+        .otp-box:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15); }
+        .otp-box.filled { border-color: var(--primary-blue); }
+        @media (max-width: 380px) { .otp-box { width: 40px; height: 50px; font-size: 19px; } .otp-boxes { gap: 7px; } }
 
         /* ── MAIN MESSENGER APP (3-Pane Grid) ── */
         #messenger-screen { display: none; height: 100vh; width: 100vw; background: var(--bg-base); }
@@ -1156,10 +1161,15 @@
                     <h2>Verify your number</h2>
                     <p id="auth-otp-subtitle">Enter the code we sent you</p>
 
-                    <div class="input-group">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                        <input type="tel" id="auth-otp-code" class="pill-input" placeholder="6-digit code" inputmode="numeric" maxlength="6" style="margin-bottom:0;">
+                    <div class="otp-boxes" id="otp-boxes">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
                     </div>
+                    <input type="hidden" id="auth-otp-code">
 
                     <button type="button" id="btn-verify-otp" class="btn-pill btn-primary" style="margin-top: 20px;">Verify</button>
                     <p class="toggle-auth"><span id="btn-resend-otp">Resend code</span> &nbsp;·&nbsp; <span id="btn-change-number">Change number</span></p>
@@ -2461,11 +2471,65 @@
             stepFallback.style.display = step === 'fallback' ? 'block' : 'none';
         }
 
+        // ── OTP BOXES ── individual per-digit inputs that stay in sync with the hidden
+        // #auth-otp-code field, so the rest of the verify/resend/reset logic below (which reads
+        // and clears that hidden field) doesn't need to change at all.
+        const otpBoxes = Array.from(document.querySelectorAll('.otp-box'));
+        const otpHiddenInput = document.getElementById('auth-otp-code');
+
+        function syncOtpHiddenValue() {
+            otpHiddenInput.value = otpBoxes.map(b => b.value).join('');
+        }
+
+        function clearOtpBoxes(focusFirst = false) {
+            otpBoxes.forEach(b => { b.value = ''; b.classList.remove('filled'); });
+            syncOtpHiddenValue();
+            if (focusFirst) setTimeout(() => otpBoxes[0].focus(), 50);
+        }
+
+        otpBoxes.forEach((box, i) => {
+            box.addEventListener('input', (e) => {
+                const digit = e.target.value.replace(/[^0-9]/g, '').slice(-1);
+                box.value = digit;
+                box.classList.toggle('filled', !!digit);
+                syncOtpHiddenValue();
+                if (digit && i < otpBoxes.length - 1) otpBoxes[i + 1].focus();
+                if (digit && i === otpBoxes.length - 1) document.getElementById('btn-verify-otp').focus();
+            });
+
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !box.value && i > 0) {
+                    otpBoxes[i - 1].focus();
+                    otpBoxes[i - 1].value = '';
+                    otpBoxes[i - 1].classList.remove('filled');
+                    syncOtpHiddenValue();
+                } else if (e.key === 'ArrowLeft' && i > 0) {
+                    otpBoxes[i - 1].focus();
+                } else if (e.key === 'ArrowRight' && i < otpBoxes.length - 1) {
+                    otpBoxes[i + 1].focus();
+                }
+            });
+
+            box.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').slice(0, otpBoxes.length);
+                if (!pasted) return;
+                pasted.split('').forEach((ch, idx) => {
+                    if (otpBoxes[idx]) { otpBoxes[idx].value = ch; otpBoxes[idx].classList.add('filled'); }
+                });
+                syncOtpHiddenValue();
+                const nextEmpty = otpBoxes.findIndex(b => !b.value);
+                (nextEmpty === -1 ? otpBoxes[otpBoxes.length - 1] : otpBoxes[nextEmpty]).focus();
+            });
+
+            box.addEventListener('focus', () => box.select());
+        });
+
         document.getElementById('toggle-fallback-auth-btn').addEventListener('click', () => showAuthStep('fallback'));
         document.getElementById('toggle-phone-auth-btn').addEventListener('click', () => showAuthStep('phone'));
         document.getElementById('btn-change-number').addEventListener('click', () => {
             confirmationResult = null;
-            document.getElementById('auth-otp-code').value = '';
+            clearOtpBoxes();
             showAuthStep('phone');
         });
 
@@ -2489,6 +2553,7 @@
                 confirmationResult = await signInWithPhoneNumber(auth, fullNumber, verifier);
                 pendingPhoneNumber = fullNumber;
                 document.getElementById('auth-otp-subtitle').textContent = `Enter the code sent to ${fullNumber}`;
+                clearOtpBoxes(true);
                 showAuthStep('otp');
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));
@@ -2504,6 +2569,7 @@
                 const verifier = ensureRecaptcha();
                 confirmationResult = await signInWithPhoneNumber(auth, pendingPhoneNumber, verifier);
                 notify('Code resent');
+                clearOtpBoxes(true);
             } catch (err) {
                 showCustomModal("Couldn't Resend Code", err.message.replace("Firebase: ", ""));
             } finally { hideLoading(); }
@@ -2519,6 +2585,7 @@
                 await confirmationResult.confirm(otpCode);
             } catch (err) {
                 showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
+                clearOtpBoxes(true);
             } finally { hideLoading(); }
         });
 
@@ -2820,7 +2887,7 @@
                     await signOut(auth);
                     confirmationResult = null;
                     document.getElementById('auth-phone').value = '';
-                    document.getElementById('auth-otp-code').value = '';
+                    clearOtpBoxes();
                     showAuthStep('phone');
                 } finally { hideLoading(); }
             }

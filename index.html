@@ -4128,8 +4128,9 @@
             storyState.index++; if (storyState.index >= storyState.items.length) { history.back(); } else { playStory(); }
         });
 
-        function updateTotalUnreadBadge(count) {
-            const navItem = document.querySelector('.nav-item[data-tab="tab-chats"]');
+        function updateNavBadge(tabId, count) {
+            const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+            if (!navItem) return;
             let badge = navItem.querySelector('.nav-badge');
             if (count > 0) {
                 if (!badge) {
@@ -4139,6 +4140,14 @@
                 }
                 badge.textContent = count > 99 ? '99+' : count;
             } else if (badge) { badge.remove(); }
+        }
+
+        function updateTotalUnreadBadge(count) {
+            updateNavBadge('tab-chats', count);
+        }
+
+        function updateGroupsUnreadBadge(count) {
+            updateNavBadge('tab-groups', count);
         }
 
         // --- CHAT REQUESTS & CONTACTS ---
@@ -6060,6 +6069,11 @@
                     update(ref(database, `user_group_chats/${user.uid}/${activeGroupId}`), { unreadCount: 0 });
                     cachedGroupChatsMeta[activeGroupId].unreadCount = 0;
                 }
+                let totalGroupUnread = 0;
+                Object.values(cachedGroupChatsMeta).forEach(meta => {
+                    if (meta && meta.unreadCount > 0) totalGroupUnread += meta.unreadCount;
+                });
+                updateGroupsUnreadBadge(totalGroupUnread);
                 renderGroupsLists();
             });
 

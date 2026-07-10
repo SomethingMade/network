@@ -1776,7 +1776,11 @@
                 closeVideoViewer();
             }
 
-            if (hash !== 'chat' && chatActive) {
+            // The image/video viewer opens on top of chat/story (not a real navigation away from
+            // them), so landing on those hashes should never trigger the chat/story close logic below.
+            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer');
+
+            if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
                 if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
                 if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
@@ -1795,7 +1799,7 @@
                 cancelReplyMode(); cancelEditMode();
                 highlightActiveChat();
             }
-            if (hash !== 'story' && storyActive) {
+            if (hash !== 'story' && storyActive && !isNestedViewerHash) {
                 clearTimeout(storyState.timer);
                 document.getElementById('story-viewer-video').pause();
                 document.getElementById('story-music-audio').pause();

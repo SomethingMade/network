@@ -712,6 +712,11 @@
         .view-once-audio-label { font-size: 15px; font-weight: 600; }
         .view-once-audio-box audio { width: 260px; max-width: 80vw; }
 
+        /* View Once anti-save protections (best effort — see note in chat) */
+        .no-save, .no-save * { -webkit-touch-callout: none !important; -webkit-user-select: none !important; user-select: none !important; }
+        .no-save img, .no-save video { -webkit-user-drag: none !important; pointer-events: auto; }
+        .privacy-blur img, .privacy-blur video, .privacy-blur .view-once-audio-box { filter: blur(45px); transition: filter 0.15s ease; }
+
         /* Reply Preview Bar above input */
         .reply-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: var(--bg-hover); border-top: 1px solid var(--border-color); border-left: 4px solid var(--primary-blue); flex-shrink: 0; }
         .reply-preview-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -1832,14 +1837,14 @@
         <video id="video-viewer-vid" src="" controls playsinline></video>
     </div>
 
-    <div id="view-once-audio-overlay">
+    <div id="view-once-audio-overlay" class="no-save" oncontextmenu="return false;">
         <svg class="image-viewer-close" id="view-once-audio-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <div class="view-once-audio-box">
             <div class="view-once-audio-icon">
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
             </div>
             <div class="view-once-audio-label">Voice message · View once</div>
-            <audio id="view-once-audio-el" controls autoplay></audio>
+            <audio id="view-once-audio-el" controls autoplay controlsList="nodownload noremoteplayback" disablePictureInPicture oncontextmenu="return false;"></audio>
         </div>
     </div>
 
@@ -2037,13 +2042,20 @@
         function openImageViewer(url, hideSave) {
             if (!url) return;
             currentViewerImageUrl = url;
-            document.getElementById('image-viewer-img').src = url;
+            const imgEl = document.getElementById('image-viewer-img');
+            imgEl.src = url;
+            imgEl.draggable = !hideSave;
+            imgEl.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
             document.getElementById('image-viewer-save').style.display = hideSave ? 'none' : '';
-            document.getElementById('image-viewer-overlay').classList.add('active');
+            const overlay = document.getElementById('image-viewer-overlay');
+            overlay.classList.toggle('no-save', !!hideSave);
+            overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
+            overlay.classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
         function closeImageViewer() {
-            document.getElementById('image-viewer-overlay').classList.remove('active');
+            const overlay = document.getElementById('image-viewer-overlay');
+            overlay.classList.remove('active', 'privacy-blur');
             document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
         }
@@ -2062,8 +2074,14 @@
             currentViewerVideoUrl = url;
             const vid = document.getElementById('video-viewer-vid');
             vid.src = url;
+            vid.controlsList = hideSave ? 'nodownload noremoteplayback' : '';
+            vid.disablePictureInPicture = !!hideSave;
+            vid.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
             document.getElementById('video-viewer-save').style.display = hideSave ? 'none' : '';
-            document.getElementById('video-viewer-overlay').classList.add('active');
+            const overlay = document.getElementById('video-viewer-overlay');
+            overlay.classList.toggle('no-save', !!hideSave);
+            overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
+            overlay.classList.add('active');
             vid.play().catch(() => {});
             if (window.location.hash !== '#video-viewer') window.location.hash = 'video-viewer';
         }
@@ -2071,7 +2089,7 @@
             const vid = document.getElementById('video-viewer-vid');
             vid.pause();
             vid.src = '';
-            document.getElementById('video-viewer-overlay').classList.remove('active');
+            document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur');
             currentViewerVideoUrl = '';
         }
         document.getElementById('video-viewer-close').addEventListener('click', () => history.back());
@@ -2082,6 +2100,24 @@
         document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'video-viewer-overlay') history.back();
         });
+
+        // Best-effort "screenshot deterrent": blur protected view-once content the instant the
+        // tab/window loses focus (app switch, alt-tab, screenshot tools that switch focus, screen
+        // recorders picking up another window). This cannot block OS-level screenshots — no browser
+        // API allows that — but it keeps the media off-screen the moment focus leaves this tab.
+        function applyPrivacyBlur() {
+            document.querySelectorAll('#image-viewer-overlay.active.no-save, #video-viewer-overlay.active.no-save, #view-once-audio-overlay.active')
+                .forEach(el => el.classList.add('privacy-blur'));
+        }
+        function removePrivacyBlur() {
+            document.querySelectorAll('.privacy-blur').forEach(el => el.classList.remove('privacy-blur'));
+        }
+        window.addEventListener('blur', applyPrivacyBlur);
+        window.addEventListener('focus', removePrivacyBlur);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) applyPrivacyBlur(); else removePrivacyBlur();
+        });
+
 
         // Downloads an image/video to the user's device (Downloads folder / Photos on most mobile browsers).
         async function downloadMediaFile(url, kind = 'file') {
@@ -6261,7 +6297,7 @@
             const audioEl = document.getElementById('view-once-audio-el');
             audioEl.pause();
             audioEl.src = '';
-            document.getElementById('view-once-audio-overlay').classList.remove('active');
+            document.getElementById('view-once-audio-overlay').classList.remove('active', 'privacy-blur');
         }
         document.getElementById('view-once-audio-close').addEventListener('click', () => history.back());
         document.getElementById('view-once-audio-overlay').addEventListener('click', (e) => {

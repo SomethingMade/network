@@ -1768,6 +1768,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+        import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app-check.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -2544,6 +2545,27 @@
         };
 
         const app = initializeApp(firebaseConfig);
+
+        // --- FIREBASE APP CHECK ---
+        // 1. Go to Firebase Console → your project → App Check → Apps, register this web app,
+        //    choose "reCAPTCHA v3" as the provider, and get a site key from
+        //    https://www.google.com/recaptcha/admin (reCAPTCHA v3, register the domain(s) you deploy to).
+        // 2. Paste that site key below in place of "YOUR_RECAPTCHA_V3_SITE_KEY".
+        // 3. In Firebase Console → App Check, enforce App Check for the products you use
+        //    (Realtime Database, Firestore, Storage, Functions) once you've verified it's working.
+        // While developing locally (localhost), App Check will fail the site-key check, so a debug
+        // token is used instead — see the block below.
+        if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+            // Enables App Check debug mode for local development. On first run, check the browser
+            // console for a line like "App Check debug token: <token>" — copy it into
+            // Firebase Console → App Check → Apps → this app → Manage debug tokens.
+            self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        }
+        const appCheck = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider("6Ld9w04tAAAAAKHRgFEgEaHM-AjvAvLHhfjI_5nM"),
+            isTokenAutoRefreshEnabled: true
+        });
+
         const auth = getAuth(app);
         const database = getDatabase(app);
         const firestoreDb = getFirestore(app);

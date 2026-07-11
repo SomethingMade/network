@@ -211,6 +211,10 @@
         /* ── BOTTOM SHEET (Profile & Context Menus) ── */
         .bottom-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: flex-end; justify-content: center; }
         #story-views-sheet-overlay { z-index: 100010; }
+        #force-update-overlay { z-index: 999999; }
+        #force-update-overlay .custom-modal { text-align: center; }
+        #force-update-overlay .force-update-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: white; }
+        #force-update-overlay .force-update-icon svg { width: 30px; height: 30px; }
         .bottom-sheet-overlay.active { opacity: 1; visibility: visible; }
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: 85vh; overflow-y: auto; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
@@ -959,6 +963,19 @@
     </div>
     
     <div id="toast-notification" class="toast"></div>
+
+    <div id="force-update-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <div class="force-update-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+            </div>
+            <h3>Update Required</h3>
+            <p id="force-update-message">A new version of the app is available. Please reload to continue.</p>
+            <div class="modal-actions">
+                <button type="button" id="force-update-reload-btn" class="btn-pill btn-primary">Reload Now</button>
+            </div>
+        </div>
+    </div>
 
     <div id="custom-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
@@ -1804,6 +1821,7 @@
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
         import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app-check.js";
+        import { getRemoteConfig, fetchAndActivate, getValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-remote-config.js";
 
         document.addEventListener('contextmenu', event => event.preventDefault());
 
@@ -2605,6 +2623,62 @@
         const database = getDatabase(app);
         const firestoreDb = getFirestore(app);
         const storage = getStorage(app);
+
+        // --- FORCE UPDATE (via Firebase Remote Config) ---
+        // Bump this string every time you ship a release. It never needs to match
+        // anything automatically — you control it by hand.
+        const APP_VERSION = "1.0.0";
+
+        const remoteConfig = getRemoteConfig(app);
+        // How often the SDK is allowed to re-fetch from the server. 1 hour is a sane
+        // default for production; lower it (e.g. 30000 = 30s) temporarily while testing.
+        remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
+        remoteConfig.defaultConfig = {
+            min_supported_version: "1.0.0",
+            force_update_message: "A new version of the app is available. Please reload to continue."
+        };
+
+        // Compares two "1.2.3"-style version strings. Returns true if `current` is
+        // older than `required`.
+        function isVersionOlder(current, required) {
+            const a = String(current).split('.').map(n => parseInt(n, 10) || 0);
+            const b = String(required).split('.').map(n => parseInt(n, 10) || 0);
+            for (let i = 0; i < Math.max(a.length, b.length); i++) {
+                const av = a[i] || 0, bv = b[i] || 0;
+                if (av < bv) return true;
+                if (av > bv) return false;
+            }
+            return false;
+        }
+
+        function showForceUpdateScreen(message) {
+            const overlay = document.getElementById('force-update-overlay');
+            if (!overlay) return;
+            document.getElementById('force-update-message').textContent = message;
+            overlay.classList.add('active');
+            document.getElementById('loading-overlay').classList.remove('active');
+        }
+
+        async function checkForForcedUpdate() {
+            try {
+                await fetchAndActivate(remoteConfig);
+                const minVersion = getValue(remoteConfig, 'min_supported_version').asString();
+                const message = getValue(remoteConfig, 'force_update_message').asString();
+                if (minVersion && isVersionOlder(APP_VERSION, minVersion)) {
+                    showForceUpdateScreen(message || "A new version of the app is available. Please reload to continue.");
+                    return true;
+                }
+            } catch (err) {
+                // If Remote Config can't be reached (offline, etc.), fail open —
+                // never block users from using the app just because a fetch failed.
+                console.error('Remote Config fetch failed', err);
+            }
+            return false;
+        }
+
+        document.getElementById('force-update-reload-btn').addEventListener('click', () => {
+            window.location.reload();
+        });
 
         async function uploadToFirebaseStorage(file, path) {
             const sRef = storageRef(storage, path);
@@ -5459,6 +5533,8 @@
         }
 
         onAuthStateChanged(auth, async (user) => {
+            if (await checkForForcedUpdate()) return;
+
             if (user) {
                 if (!window.location.hash) window.location.hash = 'tab-chats';
                 

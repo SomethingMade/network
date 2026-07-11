@@ -684,6 +684,34 @@
         .msg-doc-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
         .msg-doc-size { font-size: 11px; opacity: 0.75; }
 
+        /* View Once toggle (chat header) */
+        #btn-view-once-toggle { cursor: pointer; flex-shrink: 0; color: var(--text-primary); transition: color 0.15s ease, transform 0.15s ease; }
+        #btn-view-once-toggle circle { transition: fill 0.15s ease; }
+        #btn-view-once-toggle.active { color: var(--primary-blue); transform: scale(1.08); }
+        #btn-view-once-toggle.active circle { fill: rgba(10, 132, 255, 0.14); }
+
+        /* View Once message card (locked / opened states) */
+        .msg-viewonce-card { display: flex; align-items: center; gap: 10px; min-width: 180px; padding: 2px 0; }
+        .msg-viewonce-card.clickable { cursor: pointer; }
+        .msg-viewonce-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(10, 132, 255, 0.12); color: var(--primary-blue); }
+        .msg-bubble.out .msg-viewonce-icon { background: rgba(255,255,255,0.25); color: #FFFFFF; }
+        .msg-viewonce-card.opened .msg-viewonce-icon { background: rgba(120,120,128,0.16); color: var(--text-secondary); }
+        .msg-bubble.out .msg-viewonce-card.opened .msg-viewonce-icon { background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.7); }
+        .msg-viewonce-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .msg-viewonce-label { font-size: 14px; font-weight: 600; }
+        .msg-viewonce-sub { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+        .msg-bubble.out .msg-viewonce-sub { color: rgba(255,255,255,0.75); }
+        .msg-viewonce-card.opened .msg-viewonce-label { color: var(--text-secondary); font-weight: 500; font-style: italic; }
+        .msg-bubble.out .msg-viewonce-card.opened .msg-viewonce-label { color: rgba(255,255,255,0.75); }
+
+        /* View Once fullscreen audio player */
+        #view-once-audio-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #view-once-audio-overlay.active { opacity: 1; visibility: visible; }
+        .view-once-audio-box { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 32px; color: #FFFFFF; }
+        .view-once-audio-icon { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; }
+        .view-once-audio-label { font-size: 15px; font-weight: 600; }
+        .view-once-audio-box audio { width: 260px; max-width: 80vw; }
+
         /* Reply Preview Bar above input */
         .reply-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: var(--bg-hover); border-top: 1px solid var(--border-color); border-left: 4px solid var(--primary-blue); flex-shrink: 0; }
         .reply-preview-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -1614,6 +1642,10 @@
                 <p id="chat-view-status">Online</p>
                 <div class="about-bubble" id="chat-view-about-bubble" style="display:none;"></div>
             </div>
+            <svg id="btn-view-once-toggle" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;" title="Send as view once">
+                <circle cx="12" cy="12" r="10"></circle>
+                <text x="12" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">1</text>
+            </svg>
             <svg id="btn-group-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Group Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
         </div>
@@ -1798,6 +1830,17 @@
         <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <video id="video-viewer-vid" src="" controls playsinline></video>
+    </div>
+
+    <div id="view-once-audio-overlay">
+        <svg class="image-viewer-close" id="view-once-audio-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <div class="view-once-audio-box">
+            <div class="view-once-audio-icon">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </div>
+            <div class="view-once-audio-label">Voice message · View once</div>
+            <audio id="view-once-audio-el" controls autoplay></audio>
+        </div>
     </div>
 
     <div id="group-media-caption-overlay" class="modal-overlay">
@@ -1991,10 +2034,11 @@
         }
 
         let currentViewerImageUrl = '';
-        function openImageViewer(url) {
+        function openImageViewer(url, hideSave) {
             if (!url) return;
             currentViewerImageUrl = url;
             document.getElementById('image-viewer-img').src = url;
+            document.getElementById('image-viewer-save').style.display = hideSave ? 'none' : '';
             document.getElementById('image-viewer-overlay').classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
@@ -2013,11 +2057,12 @@
         });
 
         let currentViewerVideoUrl = '';
-        function openVideoViewer(url) {
+        function openVideoViewer(url, hideSave) {
             if (!url) return;
             currentViewerVideoUrl = url;
             const vid = document.getElementById('video-viewer-vid');
             vid.src = url;
+            document.getElementById('video-viewer-save').style.display = hideSave ? 'none' : '';
             document.getElementById('video-viewer-overlay').classList.add('active');
             vid.play().catch(() => {});
             if (window.location.hash !== '#video-viewer') window.location.hash = 'video-viewer';
@@ -2218,6 +2263,7 @@
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
             const imageViewerActive = document.getElementById('image-viewer-overlay').classList.contains('active');
             const videoViewerActive = document.getElementById('video-viewer-overlay').classList.contains('active');
+            const viewOnceAudioActive = document.getElementById('view-once-audio-overlay').classList.contains('active');
 
             if (hash !== 'image-viewer' && imageViewerActive) {
                 closeImageViewer();
@@ -2225,10 +2271,13 @@
             if (hash !== 'video-viewer' && videoViewerActive) {
                 closeVideoViewer();
             }
+            if (hash !== 'view-once-audio' && viewOnceAudioActive) {
+                closeViewOnceAudio();
+            }
 
-            // The image/video viewer opens on top of chat/story (not a real navigation away from
+            // The image/video/audio viewers open on top of chat/story (not a real navigation away from
             // them), so landing on those hashes should never trigger the chat/story close logic below.
-            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer');
+            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio');
 
             if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -3969,6 +4018,8 @@
             activeGroupId = groupId;
             activeChatUid = null;
             isActiveThreadInitialLoad = true;
+            disarmViewOnce();
+            document.getElementById('btn-view-once-toggle').style.display = 'none';
             cancelReplyMode(); cancelEditMode();
             
             // Unbind active Chat block checks if any
@@ -6128,12 +6179,102 @@
             messagesEl.appendChild(receipt);
         }
 
+        // --- VIEW ONCE (media & voice notes sent as disappear-after-viewing) ---
+        let viewOnceArmed = false;
+        function updateViewOnceButtonUI() {
+            const btn = document.getElementById('btn-view-once-toggle');
+            if (!btn) return;
+            btn.classList.toggle('active', viewOnceArmed);
+            btn.setAttribute('title', viewOnceArmed ? 'View once is on — tap to turn off' : 'Send as view once');
+        }
+        function toggleViewOnceArmed() {
+            viewOnceArmed = !viewOnceArmed;
+            updateViewOnceButtonUI();
+        }
+        function disarmViewOnce() {
+            if (!viewOnceArmed) return;
+            viewOnceArmed = false;
+            updateViewOnceButtonUI();
+        }
+        const btnViewOnceToggleEl = document.getElementById('btn-view-once-toggle');
+        if (btnViewOnceToggleEl) {
+            btnViewOnceToggleEl.style.cursor = 'pointer';
+            btnViewOnceToggleEl.addEventListener('click', (e) => { e.preventDefault(); toggleViewOnceArmed(); });
+        }
+
+        function viewOnceMediaLabel(mediaType) {
+            if (mediaType === 'video') return 'Video';
+            if (mediaType === 'audio') return 'Voice message';
+            return 'Photo';
+        }
+
+        // Builds the locked / opened card shown in place of view-once media in the message list.
+        function buildViewOnceCard(msg, threadId, isOwn) {
+            const wrap = document.createElement('div');
+            const opened = !!msg.viewOnceViewed;
+            wrap.className = 'msg-viewonce-card' + (opened ? ' opened' : '') + (!opened && !isOwn ? ' clickable' : '');
+
+            const icon = document.createElement('div');
+            icon.className = 'msg-viewonce-icon';
+            icon.innerHTML = opened
+                ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'
+                : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">1</text></svg>';
+            wrap.appendChild(icon);
+
+            const info = document.createElement('div');
+            info.className = 'msg-viewonce-info';
+            const label = document.createElement('div');
+            label.className = 'msg-viewonce-label';
+            label.textContent = opened ? 'Opened' : viewOnceMediaLabel(msg.mediaType);
+            info.appendChild(label);
+            const sub = document.createElement('div');
+            sub.className = 'msg-viewonce-sub';
+            sub.textContent = opened ? (isOwn ? 'Viewed' : '') : (isOwn ? 'View once' : 'Tap to view once');
+            if (sub.textContent) info.appendChild(sub);
+            wrap.appendChild(info);
+
+            if (!opened && !isOwn) {
+                wrap.addEventListener('click', () => openViewOnceMessage(threadId, msg));
+            }
+            return wrap;
+        }
+
+        function openViewOnceMessage(threadId, msg) {
+            if (!threadId || !msg || msg.viewOnceViewed) return;
+            const url = msg.mediaURL;
+            const type = msg.mediaType;
+            update(ref(database, `dm_threads/${threadId}/messages/${msg.key}`), { viewOnceViewed: true, viewOnceViewedAt: Date.now() }).catch(() => {});
+            if (type === 'image') openImageViewer(url, true);
+            else if (type === 'video') openVideoViewer(url, true);
+            else if (type === 'audio') openViewOnceAudio(url);
+        }
+
+        function openViewOnceAudio(url) {
+            if (!url) return;
+            const audioEl = document.getElementById('view-once-audio-el');
+            audioEl.src = url;
+            document.getElementById('view-once-audio-overlay').classList.add('active');
+            audioEl.play().catch(() => {});
+            if (window.location.hash !== '#view-once-audio') window.location.hash = 'view-once-audio';
+        }
+        function closeViewOnceAudio() {
+            const audioEl = document.getElementById('view-once-audio-el');
+            audioEl.pause();
+            audioEl.src = '';
+            document.getElementById('view-once-audio-overlay').classList.remove('active');
+        }
+        document.getElementById('view-once-audio-close').addEventListener('click', () => history.back());
+        document.getElementById('view-once-audio-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'view-once-audio-overlay') history.back();
+        });
+
         function openChatView(otherUid, otherName, otherAvatar) {
             const user = auth.currentUser;
             if (!user) return;
             activeChatUid = otherUid;
             activeGroupId = null;
             isActiveThreadInitialLoad = true;
+            disarmViewOnce();
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             document.getElementById('btn-group-info').style.display = 'none';
             const isAIChat = otherUid === AI_UID;
@@ -6141,6 +6282,7 @@
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-sticker-btn').style.display = isAIChat ? 'none' : 'flex';
+            document.getElementById('btn-view-once-toggle').style.display = isAIChat ? 'none' : 'block';
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode(); cancelEditMode();
             
@@ -6247,8 +6389,9 @@
                         bubble.dataset.senderUid = msg.senderUid;
                         bubble.dataset.createdAt = msg.createdAt;
                         if(msg.text) bubble.dataset.text = msg.text;
-                        if(msg.mediaURL) bubble.dataset.mediaURL = msg.mediaURL;
+                        if(msg.mediaURL && !(msg.viewOnce && !msg.viewOnceViewed)) bubble.dataset.mediaURL = msg.mediaURL;
                         if(msg.mediaType) bubble.dataset.mediaType = msg.mediaType;
+                        if(msg.viewOnce) bubble.dataset.viewOnce = 'true';
 
                         if (msg.deleted) {
                             bubble.classList.add('deleted');
@@ -6292,6 +6435,8 @@
                         if (msg.mediaURL && msg.mediaType === 'sticker') {
                             bubble.classList.add('sticker');
                             bubble.appendChild(buildStickerMsgElement(msg.mediaURL));
+                        } else if (msg.viewOnce && (msg.mediaType === 'image' || msg.mediaType === 'video' || msg.mediaType === 'audio')) {
+                            bubble.appendChild(buildViewOnceCard(msg, threadId, msg.senderUid === user.uid));
                         } else if (msg.mediaURL && msg.mediaType === 'image') {
                             if (!msg.replyToMessage) bubble.classList.add('media');
                             const mediaWrap = document.createElement('div');
@@ -6717,10 +6862,11 @@
             }
         }
 
-        async function queueFileUpload(file, kind) {
+        async function queueFileUpload(file, kind, isViewOnce) {
             const user = auth.currentUser;
             const chatUid = activeChatUid;
             if (!user || !chatUid || !file) return;
+            const applyViewOnce = !!isViewOnce && kind === 'media';
 
             const isVideo = kind === 'media' && file.type.startsWith('video');
             const item = {
@@ -6776,7 +6922,13 @@
                     url = cUrl;
                     msgPayload.mediaURL = url;
                     msgPayload.mediaType = type === 'video' ? 'video' : 'image';
-                    previewText = msgPayload.mediaType === 'video' ? '🎥 Video' : '📷 Photo';
+                    if (applyViewOnce) {
+                        msgPayload.viewOnce = true;
+                        msgPayload.viewOnceViewed = false;
+                        previewText = msgPayload.mediaType === 'video' ? '🔒 Video (view once)' : '🔒 Photo (view once)';
+                    } else {
+                        previewText = msgPayload.mediaType === 'video' ? '🎥 Video' : '📷 Photo';
+                    }
                 }
                 if (capturedReplyCtx) msgPayload.replyToMessage = capturedReplyCtx;
 
@@ -6816,7 +6968,9 @@
             }
 
             if (!activeChatUid) return;
-            files.forEach(file => { queueFileUpload(file, kind); });
+            const wasViewOnce = kind === 'media' && viewOnceArmed;
+            files.forEach(file => { queueFileUpload(file, kind, wasViewOnce); });
+            if (wasViewOnce) disarmViewOnce();
         }
 
         // --- GROUP MEDIA WITH CAPTIONS (Firebase Storage) ---
@@ -7070,6 +7224,7 @@
             if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
             const elapsedSeconds = (Date.now() - recordingStartTime) / 1000;
             const targetUid = recordingChatUid;
+            const wasViewOnce = viewOnceArmed;
 
             mediaRecorder.addEventListener('stop', async () => {
                 resetRecordingUI();
@@ -7079,13 +7234,14 @@
                 }
                 const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                 recordedChunks = [];
-                await sendVoiceNote(blob, targetUid, elapsedSeconds);
+                await sendVoiceNote(blob, targetUid, elapsedSeconds, wasViewOnce);
+                if (wasViewOnce) disarmViewOnce();
             }, { once: true });
 
             mediaRecorder.stop();
         }
 
-        async function sendVoiceNote(blob, chatUid, fallbackDuration) {
+        async function sendVoiceNote(blob, chatUid, fallbackDuration, isViewOnce) {
             const user = auth.currentUser;
             if (!user || !chatUid) return;
 
@@ -7124,8 +7280,12 @@
                     mediaType: 'audio',
                     duration: duration || fallbackDuration || 0
                 };
+                if (isViewOnce) {
+                    msgPayload.viewOnce = true;
+                    msgPayload.viewOnceViewed = false;
+                }
 
-                const previewText = '🎤 Voice message';
+                const previewText = isViewOnce ? '🔒 Voice message (view once)' : '🎤 Voice message';
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
                 updates[`user_chats/${user.uid}/${chatUid}`] = { text: previewText, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };

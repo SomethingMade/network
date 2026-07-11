@@ -550,9 +550,13 @@
         .read-receipt { align-self: flex-end; font-size: 11px; color: var(--text-secondary); margin-top: -4px; padding-right: 6px; display: flex; align-items: center; gap: 4px; }
         .read-receipt .msg-ticks { color: #4FC3FF; }
 
-        /* Seen/sent tick marks on outgoing bubbles */
-        .msg-ticks-wrap { display: flex; justify-content: flex-end; margin-top: 3px; }
-        .msg-bubble.media .msg-ticks-wrap { padding: 4px 10px 6px; }
+        /* Per-bubble timestamp, group verified badge, and seen/sent tick marks */
+        .msg-meta-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 4px; }
+        .msg-bubble.media .msg-meta-wrap, .msg-bubble.sticker .msg-meta-wrap { padding: 4px 10px 6px; margin-top: 0; }
+        .msg-time { font-size: 11px; color: rgba(255,255,255,0.75); }
+        .msg-bubble.in .msg-time { color: var(--text-secondary); }
+        .msg-meta-badge { display: inline-flex; align-items: center; }
+        .msg-meta-badge svg { width: 12px; height: 12px; display: block; }
         .msg-ticks { display: inline-flex; align-items: center; color: rgba(255,255,255,0.65); transition: color 0.2s ease; }
         .msg-ticks.seen { color: #4FC3FF; }
 
@@ -2208,6 +2212,24 @@
             if (!timestamp) return '';
             const d = new Date(timestamp);
             return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+        }
+
+        // Builds the small meta row appended to every message bubble: an optional verified badge
+        // (shown on every bubble inside a verified/Business Page group) followed by the send time.
+        function buildMsgMetaWrap(createdAt, showVerifiedBadge) {
+            const wrap = document.createElement('div');
+            wrap.className = 'msg-meta-wrap';
+            if (showVerifiedBadge) {
+                const badge = document.createElement('span');
+                badge.className = 'msg-meta-badge';
+                badge.innerHTML = VERIFIED_BADGE_SVG;
+                wrap.appendChild(badge);
+            }
+            const timeEl = document.createElement('span');
+            timeEl.className = 'msg-time';
+            timeEl.textContent = formatClockTime(createdAt);
+            wrap.appendChild(timeEl);
+            return wrap;
         }
 
         function isNearBottom(el, threshold = 120) {
@@ -4169,6 +4191,7 @@
                             deletedEl.className = 'msg-deleted-text';
                             deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
                             bubble.appendChild(deletedEl);
+                            bubble.appendChild(buildMsgMetaWrap(msg.createdAt, !!group.isBusinessPage));
                             messagesEl.appendChild(bubble);
                             return;
                         }
@@ -4221,6 +4244,8 @@
                             textEl.textContent = msg.text || '';
                             bubble.appendChild(textEl);
                         }
+
+                        bubble.appendChild(buildMsgMetaWrap(msg.createdAt, !!group.isBusinessPage));
 
                         if (msg.editedAt) {
                             const editedTag = document.createElement('span');
@@ -6180,16 +6205,15 @@
             outBubbles.forEach(bubble => {
                 let ticksEl = bubble.querySelector('.msg-ticks');
                 if (isAIThread) {
-                    if (ticksEl && ticksEl.parentElement) ticksEl.parentElement.remove();
+                    if (ticksEl) ticksEl.remove();
                     return;
                 }
                 if (!ticksEl) {
-                    const wrap = document.createElement('div');
-                    wrap.className = 'msg-ticks-wrap';
+                    const metaWrap = bubble.querySelector('.msg-meta-wrap');
+                    if (!metaWrap) return;
                     ticksEl = document.createElement('span');
                     ticksEl.className = 'msg-ticks';
-                    wrap.appendChild(ticksEl);
-                    bubble.appendChild(wrap);
+                    metaWrap.appendChild(ticksEl);
                 }
                 const createdAt = parseInt(bubble.dataset.createdAt, 10);
                 const seen = !!createdAt && !!activeChatOtherLastRead && activeChatOtherLastRead >= createdAt;
@@ -6436,6 +6460,7 @@
                             deletedEl.className = 'msg-deleted-text';
                             deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
                             bubble.appendChild(deletedEl);
+                            bubble.appendChild(buildMsgMetaWrap(msg.createdAt, false));
                             messagesEl.appendChild(bubble);
                             return;
                         }
@@ -6538,6 +6563,8 @@
                             textEl.textContent = msg.text;
                             bubble.appendChild(textEl);
                         }
+
+                        bubble.appendChild(buildMsgMetaWrap(msg.createdAt, false));
 
                         if (msg.editedAt) {
                             const editedTag = document.createElement('span');

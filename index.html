@@ -259,6 +259,14 @@
 
         .feed-post-card { background: var(--bg-surface); border-radius: 18px; margin: 0 16px 14px; padding: 14px 16px; border: 1px solid var(--border-color); }
         .feed-post-header { display: flex; align-items: center; gap: 10px; }
+        .feed-post-menu-btn { margin-left: auto; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; display: flex; align-items: center; }
+        .feed-post-edited-tag { font-size: 11px; color: var(--text-secondary); }
+        .feed-post-edit-box { margin-top: 10px; }
+        .feed-post-edit-box textarea { width: 100%; resize: none; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-alt); color: var(--text-primary); font-family: inherit; font-size: 14.5px; padding: 10px 12px; outline: none; min-height: 60px; }
+        .feed-post-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+        .feed-post-edit-actions button { border: none; border-radius: var(--radius-pill); padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .feed-post-edit-cancel { background: var(--bg-alt); color: var(--text-primary); }
+        .feed-post-edit-save { background: var(--gradient-brand); color: #fff; }
         .feed-post-header .avatar { width: 38px; height: 38px; background-color: var(--primary-blue); background-size: cover; background-position: center; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 15px; flex-shrink: 0; }
         .feed-post-headtext { display: flex; flex-direction: column; }
         .feed-post-headtext .name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
@@ -1160,6 +1168,17 @@
             <div class="modal-actions">
                 <button type="button" id="btn-cancel-group-invite" class="btn-pill btn-outline">Cancel</button>
                 <button type="button" id="btn-confirm-group-invite" class="btn-pill btn-primary">Send Invite</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="post-options-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 8px;">Post Options</div>
+            <div style="display:flex; flex-direction:column;">
+                <button class="msg-option-btn" id="btn-post-edit">Edit Post</button>
+                <button class="msg-option-btn" id="btn-post-delete" style="color: var(--danger-red); border-bottom:none;">Delete Post</button>
             </div>
         </div>
     </div>
@@ -3259,6 +3278,91 @@
             commentInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); submitActiveComment(); }
             });
+
+            document.getElementById('btn-post-edit').addEventListener('click', () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                if (activePostOptions) enterPostEditMode(activePostOptions.postId, activePostOptions.post, activePostOptions.card);
+            });
+            document.getElementById('btn-post-delete').addEventListener('click', async () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                if (!activePostOptions) return;
+                const confirmed = await showCustomModal('Delete Post?', 'This will permanently remove the post and its comments. This cannot be undone.', true);
+                if (confirmed) deletePost(activePostOptions.postId);
+            });
+            document.getElementById('post-options-sheet-overlay').addEventListener('click', (e) => {
+                if (e.target.id === 'post-options-sheet-overlay') document.getElementById('post-options-sheet-overlay').classList.remove('active');
+            });
+        }
+
+        let activePostOptions = null;
+
+        function openPostOptions(postId, post, card) {
+            activePostOptions = { postId, post, card };
+            document.getElementById('post-options-sheet-overlay').classList.add('active');
+        }
+
+        function enterPostEditMode(postId, post, card) {
+            const body = card.querySelector('.feed-post-body');
+            if (!body || card.querySelector('.feed-post-edit-box')) return;
+
+            const originalTextEl = card.querySelector('.feed-post-text');
+            if (originalTextEl) originalTextEl.style.display = 'none';
+
+            const editBox = document.createElement('div');
+            editBox.className = 'feed-post-edit-box';
+            editBox.innerHTML = `
+                <textarea></textarea>
+                <div class="feed-post-edit-actions">
+                    <button type="button" class="feed-post-edit-cancel">Cancel</button>
+                    <button type="button" class="feed-post-edit-save">Save</button>
+                </div>
+            `;
+            const textarea = editBox.querySelector('textarea');
+            textarea.value = post.text || '';
+            body.prepend(editBox);
+            textarea.focus();
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+            });
+
+            editBox.querySelector('.feed-post-edit-cancel').addEventListener('click', () => {
+                editBox.remove();
+                if (originalTextEl) originalTextEl.style.display = '';
+            });
+            editBox.querySelector('.feed-post-edit-save').addEventListener('click', async () => {
+                const newText = textarea.value.trim();
+                if (!newText && !post.imageUrl) {
+                    notify('A post needs text or an image', 'error');
+                    return;
+                }
+                await savePostEdit(postId, newText);
+                editBox.remove();
+            });
+        }
+
+        async function savePostEdit(postId, newText) {
+            try {
+                await update(ref(database, `posts/${postId}`), {
+                    text: newText,
+                    editedAt: serverTimestamp()
+                });
+                notify('Post updated');
+            } catch (e) {
+                notify('Could not update post', 'error');
+            }
+        }
+
+        async function deletePost(postId) {
+            try {
+                await remove(ref(database, `posts/${postId}`));
+                await remove(ref(database, `postComments/${postId}`));
+                notify('Post deleted');
+            } catch (e) {
+                notify('Could not delete post', 'error');
+            }
         }
 
         function renderFeedPosts() {
@@ -3274,6 +3378,7 @@
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
+            const isOwn = !!(myUid && post.uid === myUid);
             const likedByMe = !!(post.likes && myUid && post.likes[myUid]);
             const card = document.createElement('div');
             card.className = 'feed-post-card';
@@ -3282,17 +3387,24 @@
             const avatarHtml = feedAvatarHtml({ name: post.name, photoURL: post.photoURL });
             const imageHtml = post.imageUrl ? `<div class="feed-post-image"><img src="${post.imageUrl}" alt=""></div>` : '';
             const textHtml = post.text ? `<p class="feed-post-text"></p>` : '';
+            const menuBtnHtml = isOwn ? `
+                <button type="button" class="feed-post-menu-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                </button>` : '';
 
             card.innerHTML = `
                 <div class="feed-post-header">
                     ${avatarHtml}
                     <div class="feed-post-headtext">
                         <span class="name"></span>
-                        <span class="time">${formatTime(post.timestamp)}</span>
+                        <span class="time">${formatTime(post.timestamp)}${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
                     </div>
+                    ${menuBtnHtml}
                 </div>
-                ${textHtml}
-                ${imageHtml}
+                <div class="feed-post-body">
+                    ${textHtml}
+                    ${imageHtml}
+                </div>
                 <div class="feed-post-actions">
                     <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
@@ -3312,6 +3424,9 @@
             card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(postId));
             const img = card.querySelector('.feed-post-image img');
             if (img) img.addEventListener('click', () => openImageViewer(post.imageUrl));
+
+            const menuBtn = card.querySelector('.feed-post-menu-btn');
+            if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, post, card));
 
             return card;
         }

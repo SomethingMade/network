@@ -257,7 +257,9 @@
         #feed-composer-submit { background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 8px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: opacity 0.2s ease; }
         #feed-composer-submit:not(:disabled) { opacity: 1; pointer-events: auto; }
 
-        .feed-post-card { background: var(--bg-surface); border-radius: 18px; margin: 0 16px 14px; padding: 14px 16px; border: 1px solid var(--border-color); }
+        #feed-posts-container { padding: 12px 0; }
+        .feed-post-card { background: var(--bg-surface); margin: 0 0 10px; padding: 14px 16px; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        .feed-post-card + .feed-post-card { border-top: none; }
         .feed-post-header { display: flex; align-items: center; gap: 10px; }
         .feed-post-menu-btn { margin-left: auto; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; display: flex; align-items: center; }
         .feed-post-edited-tag { font-size: 11px; color: var(--text-secondary); }
@@ -2057,7 +2059,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -3180,9 +3182,45 @@
             if (feedListenersAttached) return;
             feedListenersAttached = true;
 
-            onValue(ref(database, 'posts'), (snap) => {
-                cachedPosts = snap.exists() ? snap.val() : {};
-                renderFeedPosts();
+            const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'));
+
+            onChildAdded(postsQuery, (snap) => {
+                const postId = snap.key;
+                const post = snap.val();
+                cachedPosts[postId] = post;
+                const list = document.getElementById('feed-posts-list');
+                if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
+                    list.prepend(buildFeedPostCard(postId, post));
+                }
+                updateFeedEmptyState();
+            });
+
+            onChildChanged(postsQuery, (snap) => {
+                const postId = snap.key;
+                const post = snap.val();
+                cachedPosts[postId] = post;
+                const list = document.getElementById('feed-posts-list');
+                const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
+                // Don't yank the card out from under someone actively editing it.
+                if (existingCard && existingCard.querySelector('.feed-post-edit-box')) return;
+                const newCard = buildFeedPostCard(postId, post);
+                if (existingCard) {
+                    existingCard.replaceWith(newCard);
+                } else if (list) {
+                    list.prepend(newCard);
+                }
+                if (activePostOptions && activePostOptions.postId === postId) {
+                    activePostOptions = { postId, post, card: newCard };
+                }
+            });
+
+            onChildRemoved(postsQuery, (snap) => {
+                const postId = snap.key;
+                delete cachedPosts[postId];
+                const list = document.getElementById('feed-posts-list');
+                const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
+                if (existingCard) existingCard.remove();
+                updateFeedEmptyState();
             });
 
             const composerAvatar = document.getElementById('feed-composer-avatar');
@@ -3365,14 +3403,9 @@
             }
         }
 
-        function renderFeedPosts() {
-            const list = document.getElementById('feed-posts-list');
+        function updateFeedEmptyState() {
             const emptyState = document.getElementById('feed-empty-state');
-            if (!list) return;
-            const entries = Object.entries(cachedPosts).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
-            list.innerHTML = '';
-            emptyState.style.display = entries.length === 0 ? 'block' : 'none';
-            entries.forEach(([postId, post]) => list.appendChild(buildFeedPostCard(postId, post)));
+            if (emptyState) emptyState.style.display = Object.keys(cachedPosts).length === 0 ? 'block' : 'none';
         }
 
         function buildFeedPostCard(postId, post) {
@@ -3437,15 +3470,10 @@
             const post = cachedPosts[postId];
             if (!post) return;
             const likedByMe = !!(post.likes && post.likes[user.uid]);
-            const likeRef = ref(database, `posts/${postId}/likes/${user.uid}`);
-            const countRef = ref(database, `posts/${postId}/likeCount`);
-            if (likedByMe) {
-                await remove(likeRef);
-                await update(ref(database, `posts/${postId}`), { likeCount: increment(-1) });
-            } else {
-                await set(likeRef, true);
-                await update(ref(database, `posts/${postId}`), { likeCount: increment(1) });
-            }
+            const updates = likedByMe
+                ? { [`likes/${user.uid}`]: null, likeCount: increment(-1) }
+                : { [`likes/${user.uid}`]: true, likeCount: increment(1) };
+            await update(ref(database, `posts/${postId}`), updates);
         }
 
         function openPostComments(postId) {

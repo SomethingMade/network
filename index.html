@@ -306,6 +306,19 @@
         .feed-comment-bubble .name { font-size: 12.5px; font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 2px; }
         .feed-comment-bubble .text { font-size: 13.5px; color: var(--text-primary); line-height: 1.35; word-break: break-word; }
         .feed-comment-bubble .time { font-size: 11px; color: var(--text-secondary); margin-top: 3px; display: block; }
+        .feed-comment-item.is-reply { margin-left: 38px; }
+        .feed-comment-item.is-reply .avatar { width: 24px; height: 24px; font-size: 10px; }
+        .feed-comment-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+        .feed-comment-action-btn { background: none; border: none; padding: 0; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 3px; }
+        .feed-comment-action-btn:hover { color: var(--text-primary); }
+        .feed-comment-action-btn.liked { color: var(--danger-red); }
+        .feed-comment-action-btn.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
+        .feed-comment-action-btn svg { width: 13px; height: 13px; }
+        .feed-comment-reply-tag { font-size: 11.5px; font-weight: 600; color: var(--primary-blue); display: block; margin-bottom: 2px; }
+        .feed-comment-replying-banner { display: none; align-items: center; justify-content: space-between; padding: 8px 20px; background: var(--bg-alt); border-top: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-secondary); }
+        .feed-comment-replying-banner.active { display: flex; }
+        .feed-comment-replying-banner b { color: var(--text-primary); }
+        .feed-comment-replying-cancel { background: none; border: none; color: var(--text-secondary); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
         .feed-comment-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color); }
         .feed-comment-input-row .avatar { border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; }
         #post-comment-input { flex: 1; border: none; background: var(--bg-alt); border-radius: var(--radius-pill); padding: 9px 16px; font-size: 13.5px; color: var(--text-primary); outline: none; }
@@ -1211,6 +1224,10 @@
             </div>
             <div id="post-comments-list" style="flex:1; overflow-y:auto; padding: 8px 20px;"></div>
             <div id="post-comments-empty" style="display:none; text-align:center; color: var(--text-secondary); font-size:13px; padding: 24px 0;">No comments yet. Say something!</div>
+            <div class="feed-comment-replying-banner" id="feed-comment-replying-banner">
+                <span>Replying to <b id="feed-comment-replying-name"></b></span>
+                <button type="button" class="feed-comment-replying-cancel" id="btn-cancel-comment-reply">&times;</button>
+            </div>
             <div class="feed-comment-input-row">
                 <div class="avatar" id="comment-input-avatar" style="width:32px; height:32px; flex-shrink:0;"></div>
                 <input type="text" id="post-comment-input" placeholder="Add a comment...">
@@ -3186,6 +3203,7 @@
         let feedComposerMedia = null; // { url, type: 'image' | 'video' }
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
+        let activeReplyToComment = null; // { id, name } or null
         let oldestLoadedPostTimestamp = Infinity;
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
@@ -3372,7 +3390,11 @@
                 delete cachedPosts[postId];
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
-                if (existingCard) existingCard.remove();
+                if (existingCard) {
+                    const vid = existingCard.querySelector('.feed-post-video');
+                    if (vid && feedVideoObserver) feedVideoObserver.unobserve(vid);
+                    existingCard.remove();
+                }
                 updateFeedEmptyState();
             });
 
@@ -3416,7 +3438,7 @@
             });
 
             const FEED_MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10MB
-            const FEED_MAX_VIDEO_BYTES = 15 * 1024 * 1024;  // 15MB
+            const FEED_MAX_VIDEO_BYTES = 50 * 1024 * 1024;  // 50MB
 
             fileInput.addEventListener('change', async () => {
                 const file = fileInput.files[0];
@@ -3503,6 +3525,28 @@
             commentSendBtn.addEventListener('click', submitActiveComment);
             commentInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); submitActiveComment(); }
+            });
+
+            document.getElementById('btn-cancel-comment-reply').addEventListener('click', () => {
+                setReplyToComment(null);
+            });
+
+            document.getElementById('post-comments-list').addEventListener('click', (e) => {
+                const replyBtn = e.target.closest('.js-comment-reply');
+                if (replyBtn) {
+                    setReplyToComment({ id: replyBtn.dataset.commentId, name: replyBtn.dataset.commentName });
+                    return;
+                }
+                const likeBtn = e.target.closest('.js-comment-like');
+                if (likeBtn) {
+                    toggleCommentReaction(activeCommentsPostId, likeBtn.dataset.commentId);
+                    return;
+                }
+                const deleteBtn = e.target.closest('.js-comment-delete');
+                if (deleteBtn) {
+                    deleteComment(activeCommentsPostId, deleteBtn.dataset.commentId);
+                    return;
+                }
             });
 
             document.getElementById('btn-post-edit').addEventListener('click', () => {
@@ -3603,6 +3647,31 @@
             return `${m}:${s}`;
         }
 
+        // Pauses a feed video whenever it scrolls out of the viewport (or is no longer
+        // sufficiently visible), so audio/playback never keeps running behind other cards.
+        let feedVideoObserver = null;
+        function getFeedVideoObserver() {
+            if (feedVideoObserver) return feedVideoObserver;
+            feedVideoObserver = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting && !entry.target.paused) {
+                        entry.target.pause();
+                    }
+                });
+            }, { threshold: 0.35 });
+            return feedVideoObserver;
+        }
+
+        // Also pause any playing feed video the moment the tab/window loses focus or is
+        // backgrounded, so it doesn't keep playing while the user isn't looking at it at all.
+        function pauseAllFeedVideos() {
+            document.querySelectorAll('.feed-post-video').forEach(v => { if (!v.paused) v.pause(); });
+        }
+        window.addEventListener('blur', pauseAllFeedVideos);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) pauseAllFeedVideos();
+        });
+
         // Wires up a fully custom player (play/pause, seekable progress bar, mute, time) for a
         // single feed video, replacing native browser controls entirely.
         function initFeedVideoPlayer(wrap) {
@@ -3681,6 +3750,7 @@
 
             updatePlayUI();
             updateMuteUI();
+            getFeedVideoObserver().observe(video);
         }
 
         // Updates just the like/comment counts (and liked state) on an existing card, in place —
@@ -3800,6 +3870,7 @@
             const commentInput = document.getElementById('post-comment-input');
             commentInput.value = '';
             document.getElementById('btn-send-comment').disabled = true;
+            setReplyToComment(null);
 
             const user = auth.currentUser;
             const myProfile = user ? (cachedUsers[user.uid] || { name: user.displayName, photoURL: user.photoURL }) : {};
@@ -3817,30 +3888,125 @@
             document.getElementById('post-comments-sheet-overlay').classList.remove('active');
             if (postCommentsUnsub) { postCommentsUnsub(); postCommentsUnsub = null; }
             activeCommentsPostId = null;
+            setReplyToComment(null);
+        }
+
+        // Sets (or clears, when passed null) which comment the input is currently replying to,
+        // and updates the "Replying to X" banner above the input row to match.
+        function setReplyToComment(target) {
+            activeReplyToComment = target;
+            const banner = document.getElementById('feed-comment-replying-banner');
+            const nameEl = document.getElementById('feed-comment-replying-name');
+            if (target) {
+                nameEl.textContent = target.name || 'User';
+                banner.classList.add('active');
+                const input = document.getElementById('post-comment-input');
+                input.focus();
+            } else {
+                banner.classList.remove('active');
+            }
+        }
+
+        const COMMENT_LIKE_EMOJI = '❤️';
+
+        function buildCommentEl(commentId, comment, isReply) {
+            const user = auth.currentUser;
+            const item = document.createElement('div');
+            item.className = 'feed-comment-item' + (isReply ? ' is-reply' : '');
+            item.dataset.commentId = commentId;
+
+            const reactions = comment.reactions || {};
+            const likeCount = Object.keys(reactions).length;
+            const likedByMe = !!(user && reactions[user.uid]);
+            const isMine = !!(user && comment.uid === user.uid);
+            const replyName = (comment.name || 'User').replace(/"/g, '&quot;');
+
+            item.innerHTML = `
+                ${feedAvatarHtml({ name: comment.name, photoURL: comment.photoURL })}
+                <div class="feed-comment-bubble">
+                    ${comment.parentId ? `<span class="feed-comment-reply-tag"></span>` : ''}
+                    <span class="name"></span>
+                    <span class="text"></span>
+                    <span class="time">${formatTime(comment.timestamp)}</span>
+                    <div class="feed-comment-actions">
+                        <button type="button" class="feed-comment-action-btn js-comment-like${likedByMe ? ' liked' : ''}" data-comment-id="${commentId}">
+                            <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
+                            ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
+                        </button>
+                        <button type="button" class="feed-comment-action-btn js-comment-reply" data-comment-id="${commentId}" data-comment-name="${replyName}">Reply</button>
+                        ${isMine ? `<button type="button" class="feed-comment-action-btn js-comment-delete" data-comment-id="${commentId}">Delete</button>` : ''}
+                    </div>
+                </div>
+            `;
+            item.querySelector('.name').textContent = comment.name || 'User';
+            item.querySelector('.text').textContent = comment.text || '';
+            const replyTagEl = item.querySelector('.feed-comment-reply-tag');
+            if (replyTagEl && comment.replyToName) replyTagEl.textContent = `↪ Replying to ${comment.replyToName}`;
+            return item;
         }
 
         function renderPostComments(commentsObj) {
             const list = document.getElementById('post-comments-list');
             const emptyEl = document.getElementById('post-comments-empty');
             list.innerHTML = '';
-            const entries = Object.entries(commentsObj).sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+            const entries = Object.entries(commentsObj);
             emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
-            entries.forEach(([, comment]) => {
-                const item = document.createElement('div');
-                item.className = 'feed-comment-item';
-                item.innerHTML = `
-                    ${feedAvatarHtml({ name: comment.name, photoURL: comment.photoURL })}
-                    <div class="feed-comment-bubble">
-                        <span class="name"></span>
-                        <span class="text"></span>
-                        <span class="time">${formatTime(comment.timestamp)}</span>
-                    </div>
-                `;
-                item.querySelector('.name').textContent = comment.name || 'User';
-                item.querySelector('.text').textContent = comment.text || '';
-                list.appendChild(item);
+
+            const topLevel = entries.filter(([, c]) => !c.parentId).sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+            const repliesByParent = {};
+            entries.filter(([, c]) => !!c.parentId).forEach(([id, c]) => {
+                if (!repliesByParent[c.parentId]) repliesByParent[c.parentId] = [];
+                repliesByParent[c.parentId].push([id, c]);
+            });
+            Object.values(repliesByParent).forEach(arr => arr.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0)));
+
+            topLevel.forEach(([commentId, comment]) => {
+                list.appendChild(buildCommentEl(commentId, comment, false));
+                (repliesByParent[commentId] || []).forEach(([replyId, reply]) => {
+                    list.appendChild(buildCommentEl(replyId, reply, true));
+                });
             });
             list.scrollTop = list.scrollHeight;
+        }
+
+        async function toggleCommentReaction(postId, commentId) {
+            const user = auth.currentUser;
+            if (!user || !postId || !commentId) return;
+            const myReactionRef = ref(database, `postComments/${postId}/${commentId}/reactions/${user.uid}`);
+            try {
+                const snap = await get(myReactionRef);
+                if (snap.exists()) {
+                    await remove(myReactionRef);
+                } else {
+                    await set(myReactionRef, COMMENT_LIKE_EMOJI);
+                }
+            } catch (err) {
+                notify('Could not react to comment', 'error');
+            }
+        }
+
+        async function deleteComment(postId, commentId) {
+            const user = auth.currentUser;
+            if (!user || !postId || !commentId) return;
+            const confirmed = await showCustomModal('Delete Comment?', 'This will permanently remove your comment. This cannot be undone.', true);
+            if (!confirmed) return;
+            try {
+                const snap = await get(ref(database, `postComments/${postId}`));
+                const allComments = snap.exists() ? snap.val() : {};
+                const target = allComments[commentId];
+                if (!target || target.uid !== user.uid) return;
+
+                // Deleting a top-level comment also removes any replies underneath it.
+                const idsToRemove = [commentId, ...Object.keys(allComments).filter(id => allComments[id].parentId === commentId)];
+                const updates = {};
+                idsToRemove.forEach(id => { updates[id] = null; });
+                await update(ref(database, `postComments/${postId}`), updates);
+                await update(ref(database, `posts/${postId}`), { commentCount: increment(-idsToRemove.length) });
+
+                if (activeReplyToComment && idsToRemove.includes(activeReplyToComment.id)) setReplyToComment(null);
+            } catch (err) {
+                notify('Could not delete comment', 'error');
+            }
         }
 
         async function submitActiveComment() {
@@ -3852,18 +4018,25 @@
             const text = input.value.trim();
             if (!text) return;
             const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'User', photoURL: user.photoURL || '' };
+            const replyTarget = activeReplyToComment;
 
             input.value = '';
             document.getElementById('btn-send-comment').disabled = true;
+            setReplyToComment(null);
 
             const newCommentRef = push(ref(database, `postComments/${postId}`));
-            await set(newCommentRef, {
+            const newComment = {
                 uid: user.uid,
                 name: myProfile.name || user.displayName || 'User',
                 photoURL: myProfile.photoURL || user.photoURL || '',
                 text: text,
                 timestamp: serverTimestamp()
-            });
+            };
+            if (replyTarget) {
+                newComment.parentId = replyTarget.id;
+                newComment.replyToName = replyTarget.name;
+            }
+            await set(newCommentRef, newComment);
             await update(ref(database, `posts/${postId}`), { commentCount: increment(1) });
         }
 

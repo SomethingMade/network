@@ -264,9 +264,14 @@
         .notif-bell-badge.show { display: flex; }
         .notif-sheet-header { padding: 0 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-mark-all-read { background: none; border: none; color: var(--primary-blue); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 4px; }
-        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; user-select: none; -webkit-user-select: none; }
         .notif-item:last-child { border-bottom: none; }
         .notif-item.unread { background: rgba(10, 132, 255, 0.06); border-radius: 12px; }
+        .notif-item.selected { background: rgba(255, 69, 58, 0.1); border-radius: 12px; }
+        .notif-item-checkbox { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; margin-top: 8px; display: none; align-items: center; justify-content: center; }
+        .notif-item.selection-mode .notif-item-checkbox { display: flex; }
+        .notif-item.selected .notif-item-checkbox { background: var(--danger-red); border-color: var(--danger-red); }
+        .notif-item.selected .notif-item-checkbox::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
         .notif-item .avatar { width: 38px; height: 38px; flex-shrink: 0; }
         .notif-item-body { flex: 1; min-width: 0; }
         .notif-item-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.4; }
@@ -306,11 +311,32 @@
         .feed-post-music-chip img { width: 26px; height: 26px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .feed-post-music-chip span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
         .feed-post-music-chip svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--primary-blue); }
+        .feed-post-tagged-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; font-size: 13px; color: var(--text-secondary); }
+        .feed-post-tagged-label { font-size: 12px; color: var(--text-secondary); }
+        .feed-post-tagged-chip { background: rgba(10, 132, 255, 0.1); color: var(--primary-blue); font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 50px; cursor: pointer; transition: background 0.15s ease; }
+        .feed-post-tagged-chip:hover { background: rgba(10, 132, 255, 0.18); }
+        .feed-post-tagged-chip:active { transform: scale(0.96); }
+        .feed-hashtag { color: var(--primary-blue); font-weight: 600; cursor: pointer; }
+        .feed-hashtag:hover { text-decoration: underline; }
+        .feed-search-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px 20px; display: none; }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
         .feed-composer-music-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; }
         .feed-composer-music-btn span:first-of-type { max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-composer-music-btn.has-music { color: var(--primary-blue); }
+        .feed-composer-tag-btn.has-tags { color: var(--primary-blue); }
+        .feed-composer-tags-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 4px 50px; }
+        .feed-composer-tag-chip { display: flex; align-items: center; gap: 5px; background: rgba(10, 132, 255, 0.1); color: var(--primary-blue); font-size: 12px; font-weight: 600; padding: 5px 8px 5px 10px; border-radius: 50px; }
+        .feed-composer-tag-chip-remove { cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.75; }
+        .tag-people-item { display: flex; align-items: center; gap: 10px; padding: 10px 4px; cursor: pointer; border-radius: 12px; }
+        .tag-people-item:hover { background: var(--bg-hover); }
+        .tag-people-item .avatar { width: 40px; height: 40px; flex-shrink: 0; }
+        .tag-people-item-body { flex: 1; min-width: 0; }
+        .tag-people-item-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .tag-people-item-username { font-size: 12px; color: var(--text-secondary); }
+        .tag-people-item-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .tag-people-item.selected .tag-people-item-check { background: var(--primary-blue); border-color: var(--primary-blue); }
+        .tag-people-item.selected .tag-people-item-check::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
         .feed-composer-music-clear { flex-shrink: 0; opacity: 0.85; font-size: 15px; line-height: 1; padding-left: 2px; }
 
         .feed-post-video-wrap { position: relative; margin-top: 10px; border-radius: 14px; overflow: hidden; background: #000; }
@@ -1268,15 +1294,45 @@
 
     <div id="notifications-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 80vh; display:flex; flex-direction:column; padding: 12px 0 0;">
-            <div class="notif-sheet-header">
+            <div class="notif-sheet-header" id="notif-header-default">
                 <h3 style="margin:0; font-size:16px;">Notifications</h3>
                 <div style="display:flex; align-items:center; gap:14px;">
                     <button type="button" class="notif-mark-all-read" id="btn-mark-all-notifs-read">Mark all read</button>
                     <svg id="btn-close-notifs-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </div>
             </div>
+            <div class="notif-sheet-header" id="notif-header-selection" style="display:none;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <svg id="btn-cancel-notif-selection" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <span id="notif-selection-count" style="font-size:14.5px; font-weight:600;">1 selected</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <button type="button" class="notif-mark-all-read" id="btn-select-all-notifs">Select all</button>
+                    <svg id="btn-delete-selected-notifs" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+                </div>
+            </div>
             <div id="notifications-list" style="flex:1; overflow-y:auto; padding: 4px 20px 24px;"></div>
             <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
+        </div>
+    </div>
+
+    <div id="tag-people-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Tag People</h3>
+                <svg id="btn-close-tag-people-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="padding: 12px 20px 4px;">
+                <div class="input-group">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="tag-people-search-input" class="pill-input" placeholder="Search by name or @username">
+                </div>
+            </div>
+            <div id="tag-people-list" style="flex:1; overflow-y:auto; padding: 8px 20px 4px;"></div>
+            <div id="tag-people-empty" class="notif-empty-state" style="display:none;">No people found.</div>
+            <div style="padding: 12px 20px 24px;">
+                <button type="button" id="btn-done-tagging" class="btn-pill" style="background: var(--gradient-brand); color:#fff;">Done</button>
+            </div>
         </div>
     </div>
 
@@ -1352,6 +1408,11 @@
                     </div>
                 </div>
             </div>
+
+            <button type="button" id="btn-user-info-message" class="btn-pill btn-primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:4px;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <span>Message</span>
+            </button>
         </div>
     </div>
 
@@ -1832,6 +1893,10 @@
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
+                        <div class="search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="search-feed-posts" placeholder="Search posts by username, caption, or #hashtag">
+                        </div>
                     </div>
                     <div class="chat-list-container" id="feed-posts-container">
                         <div class="feed-composer" id="feed-composer">
@@ -1840,6 +1905,7 @@
                                 <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1"></textarea>
                                 <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
                             </div>
+                            <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
                             <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
                                 <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
                                 <video id="feed-composer-preview-video" src="" muted playsinline style="display:none;"></video>
@@ -1851,6 +1917,10 @@
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
                                         <span>Photo/Video</span>
                                     </label>
+                                    <button type="button" class="feed-composer-attach feed-composer-tag-btn" id="feed-composer-tag-btn">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"></path><circle cx="7.5" cy="7.5" r="1.25" fill="currentColor" stroke="none"></circle></svg>
+                                        <span id="feed-composer-tag-btn-text">Tag People</span>
+                                    </button>
                                     <button type="button" class="feed-composer-attach feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                                         <span id="feed-composer-music-btn-text">Music</span>
@@ -1866,6 +1936,7 @@
                         <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
                             <p>No posts yet. Be the first to share something!</p>
                         </div>
+                        <div class="feed-search-empty" id="feed-search-empty">No posts match your search.</div>
                     </div>
                 </div>
 
@@ -2600,6 +2671,48 @@
             });
         }
 
+        // Filters currently-loaded feed post cards by author username/name, caption text, or #hashtag.
+        function filterFeedPosts(inputElement) {
+            const raw = inputElement.value.trim().toLowerCase();
+            const list = document.getElementById('feed-posts-list');
+            const emptyEl = document.getElementById('feed-search-empty');
+            if (!list) return;
+            const cards = list.querySelectorAll('.feed-post-card');
+            const isHashtagQuery = raw.startsWith('#');
+            const cleanQuery = isHashtagQuery ? raw.slice(1) : raw;
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                if (!raw) { card.style.display = ''; visibleCount++; return; }
+                const postId = card.dataset.postId;
+                const post = cachedPosts[postId];
+                if (!post) { card.style.display = 'none'; return; }
+
+                const authorProfile = cachedUsers[post.uid] || {};
+                const username = (authorProfile.username || '').toLowerCase();
+                const name = (post.name || '').toLowerCase();
+                const caption = (post.text || '').toLowerCase();
+                const hashtags = extractHashtags(post.text);
+
+                let matches;
+                if (isHashtagQuery) {
+                    matches = cleanQuery ? hashtags.some(h => h.includes(cleanQuery)) : hashtags.length > 0;
+                } else {
+                    matches = username.includes(raw) || name.includes(raw) || caption.includes(raw) || hashtags.some(h => h.includes(raw));
+                }
+
+                card.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
+            });
+
+            if (emptyEl) emptyEl.style.display = (raw && visibleCount === 0) ? 'block' : 'none';
+        }
+
+        const feedSearchInput = document.getElementById('search-feed-posts');
+        if (feedSearchInput) {
+            feedSearchInput.addEventListener('input', () => filterFeedPosts(feedSearchInput));
+        }
+
         const chatSearchInput = document.getElementById('search-chats');
         const contactSearchInput = document.getElementById('search-contacts');
         chatSearchInput.addEventListener('input', () => filterListItems(chatSearchInput, 'chat-list-container'));
@@ -3277,6 +3390,7 @@
         let cachedPosts = {};
         let feedComposerMedia = null; // { url, type: 'image' | 'video' }
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null, images only
+        let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
         let activeReplyToComment = null; // { id, name } or null
@@ -3412,6 +3526,8 @@
                         if (list) list.appendChild(buildFeedPostCard(postId, post));
                     });
                     reorderFeedCards();
+                    const searchInput = document.getElementById('search-feed-posts');
+                    if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
 
                 if (fetchedCount < FEED_PAGE_SIZE) noMoreOlderPosts = true;
@@ -3457,6 +3573,8 @@
                 if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
                     list.prepend(buildFeedPostCard(postId, post));
                     reorderFeedCards();
+                    const searchInput = document.getElementById('search-feed-posts');
+                    if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
                 updateFeedEmptyState();
             });
@@ -3640,6 +3758,11 @@
                 const myProfile = cachedUsers[u.uid] || { name: u.displayName || 'You', photoURL: u.photoURL || '' };
                 submitBtn.disabled = true;
                 try {
+                    // Union of people typed as @mentions and people picked via the Tag People sheet.
+                    const mentionedUids = new Set([...extractMentionedUids(text), ...composerTaggedUids]);
+                    const mentionsMap = {};
+                    mentionedUids.forEach(uid => { mentionsMap[uid] = true; });
+
                     const newPostRef = push(ref(database, 'posts'));
                     await set(newPostRef, {
                         uid: u.uid,
@@ -3649,13 +3772,16 @@
                         imageUrl: (feedComposerMedia && feedComposerMedia.type === 'image') ? feedComposerMedia.url : null,
                         videoUrl: (feedComposerMedia && feedComposerMedia.type === 'video') ? feedComposerMedia.url : null,
                         music: (feedComposerMedia && feedComposerMedia.type === 'image' && feedComposerMusic) ? feedComposerMusic : null,
+                        mentions: mentionedUids.size ? mentionsMap : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
                         commentCount: 0
                     });
-                    extractMentionedUids(text).forEach((uid) => {
+                    mentionedUids.forEach((uid) => {
                         createNotification(uid, { type: 'mention', postId: newPostRef.key, text });
                     });
+                    composerTaggedUids = new Set();
+                    updateComposerTagsUI();
                     input.value = '';
                     input.style.height = 'auto';
                     clearComposerMedia();
@@ -4000,6 +4126,29 @@
             if (commentCountEl) commentCountEl.textContent = post.commentCount || 0;
         }
 
+        // --- POST TEXT: escape user content, then highlight #hashtags as clickable spans ---
+        function escapeHtmlForPost(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function extractHashtags(text) {
+            if (!text) return [];
+            const matches = text.match(/#[A-Za-z0-9_]+/g);
+            return matches ? matches.map(h => h.slice(1).toLowerCase()) : [];
+        }
+
+        function linkifyHashtags(text) {
+            const escaped = escapeHtmlForPost(text || '');
+            return escaped.replace(/(^|[\s])#([A-Za-z0-9_]+)/g, (match, prefix, tag) => {
+                return `${prefix}<span class="feed-hashtag" data-hashtag="${tag.toLowerCase()}">#${tag}</span>`;
+            });
+        }
+
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
@@ -4041,6 +4190,12 @@
                     </div>
                 </div>` : '';
             const textHtml = post.text ? `<p class="feed-post-text"></p>` : '';
+            const taggedUids = post.mentions ? Object.keys(post.mentions).filter(uid => uid !== post.uid) : [];
+            const taggedHtml = taggedUids.length ? `
+                <div class="feed-post-tagged-row">
+                    <span class="feed-post-tagged-label">with</span>
+                    ${taggedUids.map(uid => `<span class="feed-post-tagged-chip" data-tagged-uid="${uid}"></span>`).join('')}
+                </div>` : '';
             const menuBtnHtml = `
                 <button type="button" class="feed-post-menu-btn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
@@ -4057,6 +4212,7 @@
                 </div>
                 <div class="feed-post-body">
                     ${textHtml}
+                    ${taggedHtml}
                     ${imageHtml}
                     ${videoHtml}
                 </div>
@@ -4073,11 +4229,34 @@
             `;
             // Set text content via textContent to avoid any HTML injection from user-authored fields.
             card.querySelector('.name').textContent = post.name || 'User';
-            if (textHtml) card.querySelector('.feed-post-text').textContent = post.text;
+            if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
                 musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
             }
+
+            card.querySelectorAll('.feed-post-tagged-chip').forEach(chip => {
+                const uid = chip.dataset.taggedUid;
+                const taggedProfile = cachedUsers[uid] || {};
+                chip.textContent = taggedProfile.name || 'User';
+                chip.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    pauseAllFeedMedia();
+                    openUserProfileSheet(uid);
+                });
+            });
+
+            card.querySelectorAll('.feed-hashtag').forEach(tagEl => {
+                tagEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const searchInput = document.getElementById('search-feed-posts');
+                    if (searchInput) {
+                        searchInput.value = '#' + tagEl.dataset.hashtag;
+                        searchInput.focus();
+                        filterFeedPosts(searchInput);
+                    }
+                });
+            });
 
             card.querySelector('.feed-like-btn').addEventListener('click', () => toggleLikePost(postId));
             card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(postId));
@@ -4355,6 +4534,84 @@
             inputEl.addEventListener('blur', () => setTimeout(hideDropdown, 150));
         }
 
+        // --- TAG PEOPLE BOTTOM SHEET (post composer) ---
+        // Reflects composerTaggedUids into the "Tag People" button label and the chip row
+        // under the composer, and lets each chip be removed without reopening the sheet.
+        function updateComposerTagsUI() {
+            const tagBtn = document.getElementById('feed-composer-tag-btn');
+            const tagBtnText = document.getElementById('feed-composer-tag-btn-text');
+            const tagsRow = document.getElementById('feed-composer-tags-row');
+            const count = composerTaggedUids.size;
+            if (tagBtn) tagBtn.classList.toggle('has-tags', count > 0);
+            if (tagBtnText) tagBtnText.textContent = count > 0 ? `Tagged (${count})` : 'Tag People';
+            if (!tagsRow) return;
+            if (count === 0) { tagsRow.style.display = 'none'; tagsRow.innerHTML = ''; return; }
+            tagsRow.style.display = 'flex';
+            tagsRow.innerHTML = '';
+            composerTaggedUids.forEach((uid) => {
+                const u = cachedUsers[uid] || {};
+                const chip = document.createElement('div');
+                chip.className = 'feed-composer-tag-chip';
+                chip.innerHTML = `<span></span><span class="feed-composer-tag-chip-remove">&times;</span>`;
+                chip.querySelector('span').textContent = u.name || 'User';
+                chip.querySelector('.feed-composer-tag-chip-remove').addEventListener('click', () => {
+                    composerTaggedUids.delete(uid);
+                    updateComposerTagsUI();
+                });
+                tagsRow.appendChild(chip);
+            });
+        }
+
+        function renderTagPeopleList(filterText) {
+            const list = document.getElementById('tag-people-list');
+            const emptyEl = document.getElementById('tag-people-empty');
+            const me = auth.currentUser;
+            const q = (filterText || '').trim().toLowerCase();
+
+            const entries = Object.entries(cachedUsers).filter(([uid, u]) => {
+                if (!me || uid === me.uid) return false;
+                if (!u || (!u.name && !u.username)) return false;
+                if (!q) return true;
+                return (u.name && u.name.toLowerCase().includes(q)) || (u.username && u.username.toLowerCase().includes(q));
+            }).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+
+            list.innerHTML = '';
+            emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
+
+            entries.forEach(([uid, u]) => {
+                const item = document.createElement('div');
+                item.className = 'tag-people-item' + (composerTaggedUids.has(uid) ? ' selected' : '');
+                item.innerHTML = `
+                    ${feedAvatarHtml(u)}
+                    <div class="tag-people-item-body">
+                        <div class="tag-people-item-name"></div>
+                        <div class="tag-people-item-username"></div>
+                    </div>
+                    <div class="tag-people-item-check"></div>
+                `;
+                item.querySelector('.tag-people-item-name').textContent = u.name || 'User';
+                item.querySelector('.tag-people-item-username').textContent = u.username ? '@' + u.username : '';
+                item.addEventListener('click', () => {
+                    if (composerTaggedUids.has(uid)) composerTaggedUids.delete(uid);
+                    else composerTaggedUids.add(uid);
+                    item.classList.toggle('selected', composerTaggedUids.has(uid));
+                    updateComposerTagsUI();
+                });
+                list.appendChild(item);
+            });
+        }
+
+        function openTagPeopleSheet() {
+            const searchInput = document.getElementById('tag-people-search-input');
+            searchInput.value = '';
+            renderTagPeopleList('');
+            document.getElementById('tag-people-sheet-overlay').classList.add('active');
+        }
+
+        function closeTagPeopleSheet() {
+            document.getElementById('tag-people-sheet-overlay').classList.remove('active');
+        }
+
         // Writes an in-app notification for `toUid` (skips self-notifications). The Realtime DB
         // write under notifications/{uid}/{id} is what a Cloud Function trigger would watch to
         // send an actual FCM push, mirroring how message pushes already work.
@@ -4410,6 +4667,12 @@
             return `<b>${name}</b> interacted with your post`;
         }
 
+        // --- Notification selection mode: long-press a notification to start selecting,
+        // then delete the selected ones (or all of them) straight out of the database. ---
+        let notifSelectionMode = false;
+        let selectedNotifIds = new Set();
+        let notifPressState = { timer: null, notifId: null, startX: 0, startY: 0 };
+
         function renderNotificationsList() {
             const list = document.getElementById('notifications-list');
             const emptyEl = document.getElementById('notifications-empty');
@@ -4418,20 +4681,66 @@
             emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
 
             entries.forEach(([notifId, notif]) => {
+                const isSelected = selectedNotifIds.has(notifId);
                 const item = document.createElement('div');
-                item.className = 'notif-item' + (!notif.read ? ' unread' : '');
+                item.className = 'notif-item' + (!notif.read ? ' unread' : '') + (notifSelectionMode ? ' selection-mode' : '') + (isSelected ? ' selected' : '');
+                item.dataset.notifId = notifId;
                 item.innerHTML = `
+                    <div class="notif-item-checkbox"></div>
                     ${feedAvatarHtml({ name: notif.fromName, photoURL: notif.fromPhotoURL })}
                     <div class="notif-item-body">
                         <div class="notif-item-text"></div>
                         <div class="notif-item-time">${formatTime(notif.timestamp)}</div>
                     </div>
-                    ${!notif.read ? '<div class="notif-item-dot"></div>' : ''}
+                    ${(!notif.read && !notifSelectionMode) ? '<div class="notif-item-dot"></div>' : ''}
                 `;
                 item.querySelector('.notif-item-text').innerHTML = notifSentenceFor(notif);
-                item.addEventListener('click', () => openNotificationTarget(notifId, notif));
                 list.appendChild(item);
             });
+        }
+
+        function updateNotifSelectionHeader() {
+            const count = selectedNotifIds.size;
+            document.getElementById('notif-header-default').style.display = notifSelectionMode ? 'none' : 'flex';
+            document.getElementById('notif-header-selection').style.display = notifSelectionMode ? 'flex' : 'none';
+            if (notifSelectionMode) {
+                document.getElementById('notif-selection-count').textContent = `${count} selected`;
+            }
+        }
+
+        function enterNotifSelectionMode(notifId) {
+            notifSelectionMode = true;
+            selectedNotifIds = new Set(notifId ? [notifId] : []);
+            updateNotifSelectionHeader();
+            renderNotificationsList();
+        }
+
+        function exitNotifSelectionMode() {
+            notifSelectionMode = false;
+            selectedNotifIds = new Set();
+            updateNotifSelectionHeader();
+            renderNotificationsList();
+        }
+
+        function toggleNotifSelected(notifId) {
+            if (selectedNotifIds.has(notifId)) selectedNotifIds.delete(notifId);
+            else selectedNotifIds.add(notifId);
+            if (selectedNotifIds.size === 0) { exitNotifSelectionMode(); return; }
+            updateNotifSelectionHeader();
+            const item = document.querySelector(`.notif-item[data-notif-id="${notifId}"]`);
+            if (item) item.classList.toggle('selected', selectedNotifIds.has(notifId));
+        }
+
+        async function deleteNotifications(notifIds) {
+            const user = auth.currentUser;
+            if (!user || !notifIds.length) return;
+            const updates = {};
+            notifIds.forEach(id => { updates[`notifications/${user.uid}/${id}`] = null; });
+            try {
+                await update(ref(database), updates);
+            } catch (err) {
+                notify('Could not delete notifications', 'error');
+            }
         }
 
         function openNotificationTarget(notifId, notif) {
@@ -4448,11 +4757,12 @@
 
         function openNotificationsSheet() {
             document.getElementById('notifications-sheet-overlay').classList.add('active');
-            renderNotificationsList();
+            exitNotifSelectionMode();
         }
 
         function closeNotificationsSheet() {
             document.getElementById('notifications-sheet-overlay').classList.remove('active');
+            exitNotifSelectionMode();
         }
 
         function markAllNotificationsRead() {
@@ -4668,6 +4978,78 @@
             if (e.target.id === 'notifications-sheet-overlay') closeNotificationsSheet();
         });
         document.getElementById('btn-mark-all-notifs-read').addEventListener('click', markAllNotificationsRead);
+
+        document.getElementById('btn-cancel-notif-selection').addEventListener('click', exitNotifSelectionMode);
+
+        document.getElementById('btn-select-all-notifs').addEventListener('click', () => {
+            const allIds = Object.keys(cachedNotifications);
+            selectedNotifIds = new Set(allIds);
+            updateNotifSelectionHeader();
+            renderNotificationsList();
+        });
+
+        document.getElementById('btn-delete-selected-notifs').addEventListener('click', async () => {
+            const ids = Array.from(selectedNotifIds);
+            if (!ids.length) return;
+            const confirmed = await showCustomModal(
+                'Delete Notifications?',
+                `This will permanently remove ${ids.length === 1 ? 'this notification' : ids.length + ' notifications'}. This cannot be undone.`,
+                true
+            );
+            if (!confirmed) return;
+            await deleteNotifications(ids);
+            exitNotifSelectionMode();
+        });
+
+        // Tap opens a notification as normal. Long-press (or a held click on desktop) starts
+        // selection mode on that notification so several can be picked and deleted from the DB.
+        const notifListEl = document.getElementById('notifications-list');
+        notifListEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            const item = e.target.closest('.notif-item');
+            if (!item) return;
+            notifPressState.notifId = item.dataset.notifId;
+            notifPressState.startX = e.clientX;
+            notifPressState.startY = e.clientY;
+            notifPressState.timer = setTimeout(() => {
+                notifPressState.timer = null;
+                if (navigator.vibrate) navigator.vibrate(15);
+                enterNotifSelectionMode(notifPressState.notifId);
+            }, 500);
+        });
+        notifListEl.addEventListener('pointermove', (e) => {
+            if (!notifPressState.timer) return;
+            if (Math.abs(e.clientX - notifPressState.startX) > 10 || Math.abs(e.clientY - notifPressState.startY) > 10) {
+                clearTimeout(notifPressState.timer);
+                notifPressState.timer = null;
+            }
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(evtName => {
+            notifListEl.addEventListener(evtName, () => {
+                if (notifPressState.timer) { clearTimeout(notifPressState.timer); notifPressState.timer = null; }
+            });
+        });
+        notifListEl.addEventListener('click', (e) => {
+            const item = e.target.closest('.notif-item');
+            if (!item) return;
+            const notifId = item.dataset.notifId;
+            if (notifSelectionMode) {
+                toggleNotifSelected(notifId);
+                return;
+            }
+            const notif = cachedNotifications[notifId];
+            if (notif) openNotificationTarget(notifId, notif);
+        });
+
+        document.getElementById('feed-composer-tag-btn').addEventListener('click', openTagPeopleSheet);
+        document.getElementById('btn-close-tag-people-sheet').addEventListener('click', closeTagPeopleSheet);
+        document.getElementById('btn-done-tagging').addEventListener('click', closeTagPeopleSheet);
+        document.getElementById('tag-people-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'tag-people-sheet-overlay') closeTagPeopleSheet();
+        });
+        document.getElementById('tag-people-search-input').addEventListener('input', (e) => {
+            renderTagPeopleList(e.target.value);
+        });
 
         const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
@@ -5507,10 +5889,12 @@
 
         // View another user's profile (avatar, name, username, about)
         const userInfoSheet = document.getElementById('user-info-sheet-overlay');
+        let userInfoSheetUid = null;
 
         function openUserProfileSheet(uid) {
             if (!uid || uid === AI_UID) return;
             const profile = cachedUsers[uid] || {};
+            userInfoSheetUid = uid;
             const avatarEl = document.getElementById('user-info-avatar');
             if (profile.photoURL) {
                 avatarEl.style.backgroundImage = `url('${profile.photoURL}')`;
@@ -5525,7 +5909,30 @@
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').textContent = profile.about || 'No about yet.';
+            const msgBtn = document.getElementById('btn-user-info-message');
+            if (msgBtn) {
+                const user = auth.currentUser;
+                msgBtn.style.display = (user && uid === user.uid) ? 'none' : 'flex';
+            }
             userInfoSheet.classList.add('active');
+        }
+
+        const userInfoMessageBtn = document.getElementById('btn-user-info-message');
+        if (userInfoMessageBtn) {
+            userInfoMessageBtn.addEventListener('click', async () => {
+                const uid = userInfoSheetUid;
+                const user = auth.currentUser;
+                if (!uid || !user) return;
+                const profile = cachedUsers[uid] || {};
+                userInfoSheet.classList.remove('active');
+                pauseAllFeedMedia();
+                try {
+                    if (!cachedContacts[uid]) {
+                        await set(ref(database, `contacts/${user.uid}/${uid}`), true);
+                    }
+                } catch (err) { /* non-fatal: still open the chat even if contact save fails */ }
+                openChatView(uid, profile.name, profile.photoURL);
+            });
         }
 
         document.getElementById('btn-user-info').addEventListener('click', () => {

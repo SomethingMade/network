@@ -1602,10 +1602,14 @@
                     <div class="wa-row-body"><span class="wa-row-title">Help &amp; Support</span></div>
                     <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
-                <div class="wa-list-row">
+                <div class="wa-list-row" id="setting-about-version">
                     <div class="wa-row-icon chip-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
-                    <div class="wa-row-body"><span class="wa-row-title">About</span></div>
-                    <span class="setting-item-meta">v1.0</span>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">About</span>
+                        <span class="wa-row-sub" id="profile-update-status" style="display:none;">A new version is available</span>
+                    </div>
+                    <span class="setting-item-meta" id="profile-app-version-label">v1.0.0</span>
+                    <button type="button" id="btn-profile-update" class="wa-row-btn" style="display:none;">Update</button>
                 </div>
             </div>
 
@@ -3160,8 +3164,13 @@
         remoteConfig.settings.minimumFetchIntervalMillis = 3600000;
         remoteConfig.defaultConfig = {
             min_supported_version: "1.0.0",
+            latest_app_version: "1.0.0",
             force_update_message: "A new version of the app is available. Please reload to continue."
         };
+
+        // Profile "About" row always reflects the version actually running right now.
+        const profileVersionLabel = document.getElementById('profile-app-version-label');
+        if (profileVersionLabel) profileVersionLabel.textContent = 'v' + APP_VERSION;
 
         // Compares two "1.2.3"-style version strings. Returns true if `current` is
         // older than `required`.
@@ -3189,10 +3198,15 @@
                 await fetchAndActivate(remoteConfig);
                 const minVersion = getValue(remoteConfig, 'min_supported_version').asString();
                 const message = getValue(remoteConfig, 'force_update_message').asString();
+                const latestVersion = getValue(remoteConfig, 'latest_app_version').asString();
                 if (minVersion && isVersionOlder(APP_VERSION, minVersion)) {
                     showForceUpdateScreen(message || "A new version of the app is available. Please reload to continue.");
                     return true;
                 }
+                // Not old enough to be blocked, but a newer build has been pushed via
+                // Remote Config — surface a non-blocking "Update" affordance on the
+                // profile screen instead of forcing a reload.
+                applyRemoteConfigVersionState(latestVersion);
             } catch (err) {
                 // If Remote Config can't be reached (offline, etc.), fail open —
                 // never block users from using the app just because a fetch failed.
@@ -3201,19 +3215,48 @@
             return false;
         }
 
-        document.getElementById('force-update-reload-btn').addEventListener('click', async () => {
+        // Shows/hides the "Update" button + "A new version is available" note on the
+        // profile About row whenever remote config's latest_app_version is newer than
+        // the build currently running in this tab.
+        function applyRemoteConfigVersionState(latestVersion) {
+            const updateBtn = document.getElementById('btn-profile-update');
+            const statusEl = document.getElementById('profile-update-status');
+            if (!updateBtn || !statusEl) return;
+            const isNewer = latestVersion && isVersionOlder(APP_VERSION, latestVersion);
+            updateBtn.style.display = isNewer ? 'inline-flex' : 'none';
+            statusEl.style.display = isNewer ? 'block' : 'none';
+            updateBtn.dataset.targetVersion = latestVersion || '';
+        }
+
+        // Re-fetches remote config (bypassing the throttle so it's guaranteed fresh),
+        // clears caches, and reloads — used by both the forced-update modal and the
+        // profile screen's optional "Update" button.
+        async function applyPendingUpdate() {
             try {
-                // Bypass the normal 1-hour throttle so this click always pulls the
-                // latest min_supported_version from the server instead of reusing
-                // whatever was last cached in IndexedDB (which could be the same
-                // stale value that triggered this screen in the first place).
                 remoteConfig.settings.minimumFetchIntervalMillis = 0;
                 await fetchAndActivate(remoteConfig);
             } catch (err) {
                 console.error('Failed to force-refresh Remote Config before reload', err);
             }
             clearAllCachesAndReload();
+        }
+
+        document.getElementById('force-update-reload-btn').addEventListener('click', async () => {
+            // Bypass the normal 1-hour throttle so this click always pulls the
+            // latest min_supported_version from the server instead of reusing
+            // whatever was last cached in IndexedDB (which could be the same
+            // stale value that triggered this screen in the first place).
+            await applyPendingUpdate();
         });
+
+        const profileUpdateBtn = document.getElementById('btn-profile-update');
+        if (profileUpdateBtn) {
+            profileUpdateBtn.addEventListener('click', async () => {
+                profileUpdateBtn.disabled = true;
+                profileUpdateBtn.textContent = 'Updating…';
+                await applyPendingUpdate();
+            });
+        }
 
         async function uploadToFirebaseStorage(file, path) {
             const sRef = storageRef(storage, path);

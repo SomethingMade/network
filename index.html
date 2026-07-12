@@ -2783,8 +2783,18 @@
             return false;
         }
 
-        document.getElementById('force-update-reload-btn').addEventListener('click', () => {
-            window.location.reload();
+        document.getElementById('force-update-reload-btn').addEventListener('click', async () => {
+            try {
+                // Bypass the normal 1-hour throttle so this click always pulls the
+                // latest min_supported_version from the server instead of reusing
+                // whatever was last cached in IndexedDB (which could be the same
+                // stale value that triggered this screen in the first place).
+                remoteConfig.settings.minimumFetchIntervalMillis = 0;
+                await fetchAndActivate(remoteConfig);
+            } catch (err) {
+                console.error('Failed to force-refresh Remote Config before reload', err);
+            }
+            clearAllCachesAndReload();
         });
 
         async function uploadToFirebaseStorage(file, path) {

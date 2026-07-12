@@ -1866,6 +1866,7 @@
                 </div>
 
                 <button type="button" class="fab-add" id="fab-add-friend" title="Add a Friend">+</button>
+                <button type="button" class="fab-add" id="fab-new-post" title="New Post">+</button>
             </aside>
 
             <main class="workspace-pane">
@@ -2616,6 +2617,9 @@
                 const fabAddFriend = document.getElementById('fab-add-friend');
                 if (fabAddFriend) fabAddFriend.style.display = (hash === 'tab-contacts') ? 'flex' : 'none';
 
+                const fabNewPost = document.getElementById('fab-new-post');
+                if (fabNewPost) fabNewPost.style.display = (hash === 'tab-feed') ? 'flex' : 'none';
+
                 updateNavIndicator();
             }
         });
@@ -2647,6 +2651,11 @@
             if (fabAddFriend) {
                 const currentHash = window.location.hash.replace('#', '');
                 fabAddFriend.style.display = (currentHash === 'tab-contacts') ? 'flex' : 'none';
+            }
+            const fabNewPost = document.getElementById('fab-new-post');
+            if (fabNewPost) {
+                const currentHash = window.location.hash.replace('#', '');
+                fabNewPost.style.display = (currentHash === 'tab-feed') ? 'flex' : 'none';
             }
             requestAnimationFrame(updateNavIndicator);
         }
@@ -3261,9 +3270,35 @@
         // open edit box or comment sheet state isn't disturbed. Called on new posts / contacts
         // changes / a periodic tick — never on a single like or comment, so a card never jumps
         // out from under someone mid-interaction.
+        //
+        // Moving cards around can shift whichever one the user is actively watching to a
+        // different spot in the list — since scrollTop is just a fixed pixel offset, that makes
+        // it look like the feed "jumped to the top" even though the scroll position itself never
+        // changed. To avoid that, we pin an anchor card (whatever has playing/just-finished media,
+        // or otherwise whatever's currently in view) to its on-screen position after reordering.
+        function findFeedAnchorCard(list, container) {
+            const media = list.querySelectorAll('.feed-post-video, .feed-post-music-audio');
+            for (const el of media) {
+                if (!el.paused || el.ended) {
+                    const card = el.closest('.feed-post-card');
+                    if (card) return card;
+                }
+            }
+            if (!container) return null;
+            const containerTop = container.getBoundingClientRect().top;
+            for (const card of list.children) {
+                if (card.getBoundingClientRect().bottom > containerTop + 1) return card;
+            }
+            return list.children[0] || null;
+        }
+
         function reorderFeedCards() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return;
+            const container = document.getElementById('feed-posts-container');
+            const anchorCard = findFeedAnchorCard(list, container);
+            const anchorOffsetBefore = anchorCard ? anchorCard.getBoundingClientRect().top : null;
+
             const cards = Array.from(list.children);
             cards.sort((a, b) => {
                 const postIdA = a.dataset.postId, postIdB = b.dataset.postId;
@@ -3272,6 +3307,11 @@
                 return computeFeedScore(postIdB, postB) - computeFeedScore(postIdA, postA);
             });
             cards.forEach(card => list.appendChild(card));
+
+            if (anchorCard && container && anchorOffsetBefore !== null) {
+                const anchorOffsetAfter = anchorCard.getBoundingClientRect().top;
+                container.scrollTop += (anchorOffsetAfter - anchorOffsetBefore);
+            }
         }
 
         const FEED_PAGE_SIZE = 15;
@@ -3554,6 +3594,11 @@
                     input.value = '';
                     input.style.height = 'auto';
                     clearComposerMedia();
+                    // This is the user's own deliberate action, not a background re-rank — unlike
+                    // the anchor-preserving reorder, scrolling up here is exactly what they'd want,
+                    // so it can freely override wherever they were previously scrolled to.
+                    const feedContainer = document.getElementById('feed-posts-container');
+                    if (feedContainer) feedContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 } catch (e) {
                     notify('Failed to post');
                 } finally {
@@ -4668,6 +4713,15 @@
         });
         document.getElementById('btn-cancel-add-friend').addEventListener('click', () => {
             addFriendModal.classList.remove('active');
+        });
+
+        // Lets someone jump straight to the composer (which lives at the top of the feed) from
+        // wherever they've scrolled to, instead of hunting for it manually.
+        document.getElementById('fab-new-post').addEventListener('click', () => {
+            const container = document.getElementById('feed-posts-container');
+            const input = document.getElementById('feed-composer-input');
+            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+            if (input) setTimeout(() => input.focus(), 350);
         });
 
         document.getElementById('btn-confirm-add-friend').addEventListener('click', async () => {

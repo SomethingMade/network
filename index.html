@@ -244,7 +244,7 @@
 
         /* --- FEED --- */
         .feed-composer { background: var(--bg-alt); border-radius: 18px; padding: 14px 16px; margin: 12px 16px 4px; }
-        .feed-composer-row { display: flex; gap: 10px; align-items: flex-start; }
+        .feed-composer-row { display: flex; gap: 10px; align-items: flex-start; position: relative; }
         .feed-composer-row .avatar { background-color: var(--primary-blue); background-size: cover; background-position: center; border-radius: 50%; }
         #feed-composer-input { flex: 1; resize: none; border: none; background: transparent; outline: none; font-family: inherit; font-size: 14.5px; color: var(--text-primary); padding-top: 8px; max-height: 120px; }
         #feed-composer-input::placeholder { color: var(--text-secondary); }
@@ -256,6 +256,32 @@
         .feed-composer-attach { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; }
         #feed-composer-submit { background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 8px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: opacity 0.2s ease; }
         #feed-composer-submit:not(:disabled) { opacity: 1; pointer-events: auto; }
+
+        /* ── NOTIFICATIONS BELL + PANEL ── */
+        .notif-bell-btn { position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); flex-shrink: 0; }
+        .notif-bell-btn svg { width: 21px; height: 21px; }
+        .notif-bell-badge { position: absolute; top: -2px; right: -2px; background: var(--danger-red); color: #fff; font-size: 10px; font-weight: 700; border-radius: 50px; min-width: 16px; height: 16px; padding: 0 4px; display: none; align-items: center; justify-content: center; border: 2px solid var(--bg-surface); }
+        .notif-bell-badge.show { display: flex; }
+        .notif-sheet-header { padding: 0 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
+        .notif-mark-all-read { background: none; border: none; color: var(--primary-blue); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 4px; }
+        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item.unread { background: rgba(10, 132, 255, 0.06); border-radius: 12px; }
+        .notif-item .avatar { width: 38px; height: 38px; flex-shrink: 0; }
+        .notif-item-body { flex: 1; min-width: 0; }
+        .notif-item-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.4; }
+        .notif-item-text b { font-weight: 700; }
+        .notif-item-time { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+        .notif-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-blue); flex-shrink: 0; margin-top: 6px; }
+        .notif-empty-state { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 40px 0; }
+
+        /* ── MENTION AUTOCOMPLETE ── */
+        .mention-autocomplete-dropdown { position: absolute; z-index: 30; left: 0; right: 0; bottom: 100%; margin-bottom: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-soft); max-height: 220px; overflow-y: auto; display: none; }
+        .mention-suggestion-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }
+        .mention-suggestion-item:hover { background: var(--bg-hover); }
+        .mention-suggestion-item .avatar { width: 30px; height: 30px; flex-shrink: 0; }
+        .mention-suggestion-name { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .mention-suggestion-username { display: block; font-size: 11.5px; color: var(--text-secondary); }
 
         #feed-posts-container { padding: 12px 0; }
         .feed-post-card { background: var(--bg-surface); margin: 0 0 10px; padding: 14px 16px; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
@@ -328,7 +354,7 @@
         .feed-comment-replying-banner.active { display: flex; }
         .feed-comment-replying-banner b { color: var(--text-primary); }
         .feed-comment-replying-cancel { background: none; border: none; color: var(--text-secondary); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
-        .feed-comment-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color); }
+        .feed-comment-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color); position: relative; }
         .feed-comment-input-row .avatar { border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; }
         #post-comment-input { flex: 1; border: none; background: var(--bg-alt); border-radius: var(--radius-pill); padding: 9px 16px; font-size: 13.5px; color: var(--text-primary); outline: none; }
         #btn-send-comment { background: none; border: none; color: var(--primary-blue); font-weight: 600; font-size: 13.5px; cursor: pointer; opacity: 0.4; pointer-events: none; }
@@ -1233,9 +1259,24 @@
             </div>
             <div class="feed-comment-input-row">
                 <div class="avatar" id="comment-input-avatar" style="width:32px; height:32px; flex-shrink:0;"></div>
-                <input type="text" id="post-comment-input" placeholder="Add a comment...">
+                <input type="text" id="post-comment-input" placeholder="Add a comment... use @ to tag">
+                <div class="mention-autocomplete-dropdown" id="comment-mention-dropdown"></div>
                 <button type="button" id="btn-send-comment" disabled>Send</button>
             </div>
+        </div>
+    </div>
+
+    <div id="notifications-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 80vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Notifications</h3>
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <button type="button" class="notif-mark-all-read" id="btn-mark-all-notifs-read">Mark all read</button>
+                    <svg id="btn-close-notifs-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+            </div>
+            <div id="notifications-list" style="flex:1; overflow-y:auto; padding: 4px 20px 24px;"></div>
+            <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
         </div>
     </div>
 
@@ -1753,6 +1794,10 @@
                                     <span>Install Now</span>
                                 </button>
                                 <svg id="btn-header-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                                <div class="notif-bell-btn js-notif-bell" title="Notifications">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                    <div class="notif-bell-badge js-notif-bell-badge">0</div>
+                                </div>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
@@ -1779,14 +1824,21 @@
                     <div class="chat-header-area">
                         <div class="chat-header-top">
                             <h1>Moments</h1>
-                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            <div style="display:flex; align-items:center; gap:16px;">
+                                <div class="notif-bell-btn js-notif-bell" title="Notifications">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                    <div class="notif-bell-badge js-notif-bell-badge">0</div>
+                                </div>
+                                <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="chat-list-container" id="feed-posts-container">
                         <div class="feed-composer" id="feed-composer">
                             <div class="feed-composer-row">
                                 <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
-                                <textarea id="feed-composer-input" placeholder="What's on your mind?" rows="1"></textarea>
+                                <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1"></textarea>
+                                <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
                             </div>
                             <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
                                 <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
@@ -1823,6 +1875,10 @@
                             <h1>Groups</h1>
                             <div style="display:flex; align-items:center; gap:16px;">
                                 <svg id="btn-create-group" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Create Group"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                <div class="notif-bell-btn js-notif-bell" title="Notifications">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                    <div class="notif-bell-badge js-notif-bell-badge">0</div>
+                                </div>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
@@ -1840,7 +1896,7 @@
 
                 <div id="tab-contacts" class="tab-content">
                     <div class="chat-header-area">
-                        <div class="chat-header-top"><h1>Contacts</h1><div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div></div>
+                        <div class="chat-header-top"><h1>Contacts</h1><div style="display:flex; align-items:center; gap:16px;"><div class="notif-bell-btn js-notif-bell" title="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><div class="notif-bell-badge js-notif-bell-badge">0</div></div><div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div></div></div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-contacts" placeholder="Find people...">
@@ -3228,6 +3284,10 @@
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
 
+        // --- NOTIFICATIONS (likes, comments, replies, mentions) ---
+        let notifListenersAttached = false;
+        let cachedNotifications = {};
+
         function feedAvatarHtml(profile, sizeClass) {
             const name = (profile && profile.name) || 'User';
             const photoURL = profile && profile.photoURL;
@@ -3471,6 +3531,7 @@
             const musicBtn = document.getElementById('feed-composer-music-btn');
             const musicBtnText = document.getElementById('feed-composer-music-btn-text');
             const musicClearBtn = document.getElementById('feed-composer-music-clear');
+            setupMentionAutocomplete(input, document.getElementById('feed-composer-mention-dropdown'));
 
             function refreshSubmitState() {
                 const hasContent = (input.value && input.value.trim().length > 0) || !!feedComposerMedia;
@@ -3592,6 +3653,9 @@
                         likeCount: 0,
                         commentCount: 0
                     });
+                    extractMentionedUids(text).forEach((uid) => {
+                        createNotification(uid, { type: 'mention', postId: newPostRef.key, text });
+                    });
                     input.value = '';
                     input.style.height = 'auto';
                     clearComposerMedia();
@@ -3621,6 +3685,7 @@
             commentInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); submitActiveComment(); }
             });
+            setupMentionAutocomplete(commentInput, document.getElementById('comment-mention-dropdown'));
 
             document.getElementById('btn-cancel-comment-reply').addEventListener('click', () => {
                 setReplyToComment(null);
@@ -3629,7 +3694,7 @@
             document.getElementById('post-comments-list').addEventListener('click', (e) => {
                 const replyBtn = e.target.closest('.js-comment-reply');
                 if (replyBtn) {
-                    setReplyToComment({ id: replyBtn.dataset.commentId, name: replyBtn.dataset.commentName });
+                    setReplyToComment({ id: replyBtn.dataset.commentId, name: replyBtn.dataset.commentName, uid: replyBtn.dataset.commentUid });
                     return;
                 }
                 const likeBtn = e.target.closest('.js-comment-like');
@@ -4039,6 +4104,7 @@
                 ? { [`likes/${user.uid}`]: null, likeCount: increment(-1) }
                 : { [`likes/${user.uid}`]: true, likeCount: increment(1) };
             await update(ref(database, `posts/${postId}`), updates);
+            if (!likedByMe) createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
         }
 
         function openPostComments(postId) {
@@ -4111,7 +4177,7 @@
                             <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
                             ${likeCount > 0 ? `<span>${likeCount}</span>` : ''}
                         </button>
-                        <button type="button" class="feed-comment-action-btn js-comment-reply" data-comment-id="${commentId}" data-comment-name="${replyName}">Reply</button>
+                        <button type="button" class="feed-comment-action-btn js-comment-reply" data-comment-id="${commentId}" data-comment-name="${replyName}" data-comment-uid="${comment.uid || ''}">Reply</button>
                         ${isMine ? `<button type="button" class="feed-comment-action-btn js-comment-delete" data-comment-id="${commentId}">Delete</button>` : ''}
                     </div>
                 </div>
@@ -4216,6 +4282,187 @@
             }
             await set(newCommentRef, newComment);
             await update(ref(database, `posts/${postId}`), { commentCount: increment(1) });
+
+            // Notify whoever this comment concerns: the parent comment's author for a reply,
+            // otherwise the post owner for a fresh top-level comment.
+            if (replyTarget && replyTarget.uid) {
+                createNotification(replyTarget.uid, { type: 'reply', postId, commentId: newCommentRef.key, text });
+            } else {
+                const post = cachedPosts[postId];
+                if (post) createNotification(post.uid, { type: 'comment', postId, commentId: newCommentRef.key, text });
+            }
+            // Anyone @tagged in the comment text gets a mention notification too.
+            extractMentionedUids(text).forEach((uid) => {
+                if (uid !== user.uid) createNotification(uid, { type: 'mention', postId, commentId: newCommentRef.key, text });
+            });
+        }
+
+        // --- MENTIONS ---
+        // Scans text for @username tokens and resolves them against known usernames in cachedUsers.
+        function extractMentionedUids(text) {
+            if (!text) return [];
+            const handles = [...text.matchAll(/@([a-zA-Z0-9_]{2,20})/g)].map(m => m[1].toLowerCase());
+            if (!handles.length) return [];
+            const uids = [];
+            Object.entries(cachedUsers).forEach(([uid, u]) => {
+                if (u && u.username && handles.includes(u.username.toLowerCase()) && !uids.includes(uid)) uids.push(uid);
+            });
+            return uids;
+        }
+
+        // Wires @-mention autocomplete onto a text input/textarea. Shows matching users as the
+        // person types "@" plus a few characters, and inserts "@username " on selection.
+        function setupMentionAutocomplete(inputEl, dropdownEl) {
+            if (!inputEl || !dropdownEl) return;
+            function hideDropdown() { dropdownEl.style.display = 'none'; dropdownEl.innerHTML = ''; }
+
+            inputEl.addEventListener('input', () => {
+                const cursorPos = inputEl.selectionStart;
+                const textBefore = inputEl.value.slice(0, cursorPos);
+                const match = textBefore.match(/(?:^|\s)@([a-zA-Z0-9_]{0,20})$/);
+                if (!match) { hideDropdown(); return; }
+                const query = match[1].toLowerCase();
+                const me = auth.currentUser;
+                const results = Object.entries(cachedUsers)
+                    .filter(([uid, u]) => u && u.username && (!me || uid !== me.uid) && u.username.toLowerCase().startsWith(query))
+                    .slice(0, 6);
+                if (results.length === 0) { hideDropdown(); return; }
+
+                dropdownEl.innerHTML = '';
+                results.forEach(([uid, u]) => {
+                    const item = document.createElement('div');
+                    item.className = 'mention-suggestion-item';
+                    item.innerHTML = `${feedAvatarHtml(u)}<div><span class="mention-suggestion-name"></span><span class="mention-suggestion-username"></span></div>`;
+                    item.querySelector('.mention-suggestion-name').textContent = u.name || 'User';
+                    item.querySelector('.mention-suggestion-username').textContent = '@' + u.username;
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        const curPos = inputEl.selectionStart;
+                        const before = inputEl.value.slice(0, curPos).replace(/@([a-zA-Z0-9_]{0,20})$/, `@${u.username} `);
+                        const after = inputEl.value.slice(curPos);
+                        inputEl.value = before + after;
+                        const newPos = before.length;
+                        inputEl.focus();
+                        inputEl.setSelectionRange(newPos, newPos);
+                        hideDropdown();
+                        inputEl.dispatchEvent(new Event('input'));
+                    });
+                    dropdownEl.appendChild(item);
+                });
+                dropdownEl.style.display = 'block';
+            });
+
+            inputEl.addEventListener('blur', () => setTimeout(hideDropdown, 150));
+        }
+
+        // Writes an in-app notification for `toUid` (skips self-notifications). The Realtime DB
+        // write under notifications/{uid}/{id} is what a Cloud Function trigger would watch to
+        // send an actual FCM push, mirroring how message pushes already work.
+        async function createNotification(toUid, data) {
+            const me = auth.currentUser;
+            if (!me || !toUid || toUid === me.uid) return;
+            try {
+                const myProfile = cachedUsers[me.uid] || {};
+                const notifRef = push(ref(database, `notifications/${toUid}`));
+                await set(notifRef, {
+                    type: data.type,
+                    postId: data.postId || null,
+                    commentId: data.commentId || null,
+                    fromUid: me.uid,
+                    fromName: myProfile.name || me.displayName || 'Someone',
+                    fromPhotoURL: myProfile.photoURL || me.photoURL || '',
+                    text: (data.text || '').slice(0, 140),
+                    timestamp: serverTimestamp(),
+                    read: false
+                });
+            } catch (err) {
+                console.error('createNotification failed', err);
+            }
+        }
+
+        function initNotificationsListener() {
+            const user = auth.currentUser;
+            if (!user || notifListenersAttached) return;
+            notifListenersAttached = true;
+            const notifQuery = query(ref(database, `notifications/${user.uid}`), limitToLast(50));
+            onValue(notifQuery, (snap) => {
+                cachedNotifications = snap.exists() ? snap.val() : {};
+                updateNotifBellUI();
+                const sheet = document.getElementById('notifications-sheet-overlay');
+                if (sheet && sheet.classList.contains('active')) renderNotificationsList();
+            });
+        }
+
+        function updateNotifBellUI() {
+            const unreadCount = Object.values(cachedNotifications).filter(n => !n.read).length;
+            document.querySelectorAll('.js-notif-bell-badge').forEach(badge => {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.classList.toggle('show', unreadCount > 0);
+            });
+        }
+
+        function notifSentenceFor(notif) {
+            const name = notif.fromName || 'Someone';
+            if (notif.type === 'like') return `<b>${name}</b> liked your post`;
+            if (notif.type === 'comment') return `<b>${name}</b> commented: ${notif.text || ''}`;
+            if (notif.type === 'reply') return `<b>${name}</b> replied: ${notif.text || ''}`;
+            if (notif.type === 'mention') return `<b>${name}</b> tagged you: ${notif.text || ''}`;
+            return `<b>${name}</b> interacted with your post`;
+        }
+
+        function renderNotificationsList() {
+            const list = document.getElementById('notifications-list');
+            const emptyEl = document.getElementById('notifications-empty');
+            list.innerHTML = '';
+            const entries = Object.entries(cachedNotifications).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+            emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
+
+            entries.forEach(([notifId, notif]) => {
+                const item = document.createElement('div');
+                item.className = 'notif-item' + (!notif.read ? ' unread' : '');
+                item.innerHTML = `
+                    ${feedAvatarHtml({ name: notif.fromName, photoURL: notif.fromPhotoURL })}
+                    <div class="notif-item-body">
+                        <div class="notif-item-text"></div>
+                        <div class="notif-item-time">${formatTime(notif.timestamp)}</div>
+                    </div>
+                    ${!notif.read ? '<div class="notif-item-dot"></div>' : ''}
+                `;
+                item.querySelector('.notif-item-text').innerHTML = notifSentenceFor(notif);
+                item.addEventListener('click', () => openNotificationTarget(notifId, notif));
+                list.appendChild(item);
+            });
+        }
+
+        function openNotificationTarget(notifId, notif) {
+            if (!notif.read) {
+                const user = auth.currentUser;
+                if (user) update(ref(database, `notifications/${user.uid}/${notifId}`), { read: true });
+            }
+            closeNotificationsSheet();
+            if (notif.postId) {
+                if (location.hash !== '#tab-feed') location.hash = 'tab-feed';
+                setTimeout(() => openPostComments(notif.postId), 250);
+            }
+        }
+
+        function openNotificationsSheet() {
+            document.getElementById('notifications-sheet-overlay').classList.add('active');
+            renderNotificationsList();
+        }
+
+        function closeNotificationsSheet() {
+            document.getElementById('notifications-sheet-overlay').classList.remove('active');
+        }
+
+        function markAllNotificationsRead() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const updates = {};
+            Object.entries(cachedNotifications).forEach(([id, n]) => {
+                if (!n.read) updates[`notifications/${user.uid}/${id}/read`] = true;
+            });
+            if (Object.keys(updates).length) update(ref(database), updates);
         }
 
         function formatFileSize(bytes) {
@@ -4412,6 +4659,15 @@
                 clearOtpBoxes(true);
             } finally { hideLoading(); }
         });
+
+        document.querySelectorAll('.js-notif-bell').forEach(btn => {
+            btn.addEventListener('click', openNotificationsSheet);
+        });
+        document.getElementById('btn-close-notifs-sheet').addEventListener('click', closeNotificationsSheet);
+        document.getElementById('notifications-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'notifications-sheet-overlay') closeNotificationsSheet();
+        });
+        document.getElementById('btn-mark-all-notifs-read').addEventListener('click', markAllNotificationsRead);
 
         const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
@@ -6997,12 +7253,16 @@
                 });
                 initChatListeners();
                 initFeedListeners();
+                initNotificationsListener();
             } else {
                 document.getElementById('auth-screen').style.display = 'flex';
                 document.getElementById('messenger-screen').style.display = 'none';
                 chatListenersAttached = false;
                 userChatsInitialized = false;
                 feedListenersAttached = false;
+                notifListenersAttached = false;
+                cachedNotifications = {};
+                updateNotifBellUI();
                 setTimeout(maybeShowInstallSheet, 800);
             }
             if (isInitialLoad) { setTimeout(() => { hideLoading(); }, 800); isInitialLoad = false; }

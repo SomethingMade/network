@@ -3335,13 +3335,27 @@
             onChildChanged(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
+                const oldPost = cachedPosts[postId];
                 cachedPosts[postId] = post;
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
-                // Don't yank the card out from under someone actively editing it, or interrupt a playing video.
-                const playingVideo = existingCard ? existingCard.querySelector('.feed-post-video') : null;
+
+                // Reactions (likes/comments) should never rebuild the card — that would restart
+                // any playing video and disrupt scroll/edit state. Patch the numbers in place.
+                const contentUnchanged = oldPost &&
+                    oldPost.text === post.text &&
+                    oldPost.imageUrl === post.imageUrl &&
+                    oldPost.videoUrl === post.videoUrl &&
+                    oldPost.editedAt === post.editedAt;
+
+                if (existingCard && contentUnchanged) {
+                    patchFeedPostCounts(existingCard, post);
+                    return;
+                }
+
+                // Actual content edit (or a card we don't have yet) — safe to rebuild, but still
+                // don't yank it out from under someone actively editing it.
                 if (existingCard && existingCard.querySelector('.feed-post-edit-box')) return;
-                if (playingVideo && !playingVideo.paused) return;
                 const newCard = buildFeedPostCard(postId, post);
                 if (existingCard) {
                     existingCard.replaceWith(newCard);
@@ -3667,6 +3681,22 @@
 
             updatePlayUI();
             updateMuteUI();
+        }
+
+        // Updates just the like/comment counts (and liked state) on an existing card, in place —
+        // used for reaction updates so a playing video or open edit box is never disturbed.
+        function patchFeedPostCounts(card, post) {
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const likedByMe = !!(post.likes && myUid && post.likes[myUid]);
+
+            const likeBtn = card.querySelector('.feed-like-btn');
+            const likeCountEl = card.querySelector('.feed-like-count');
+            const commentCountEl = card.querySelector('.feed-comment-count');
+
+            if (likeBtn) likeBtn.classList.toggle('liked', likedByMe);
+            if (likeCountEl) likeCountEl.textContent = post.likeCount || 0;
+            if (commentCountEl) commentCountEl.textContent = post.commentCount || 0;
         }
 
         function buildFeedPostCard(postId, post) {

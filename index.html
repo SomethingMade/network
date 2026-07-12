@@ -3397,10 +3397,20 @@
                 refreshSubmitState();
             });
 
+            const FEED_MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10MB
+            const FEED_MAX_VIDEO_BYTES = 15 * 1024 * 1024;  // 15MB
+
             fileInput.addEventListener('change', async () => {
                 const file = fileInput.files[0];
                 if (!file) return;
                 const isVideo = file.type.startsWith('video/');
+                const maxBytes = isVideo ? FEED_MAX_VIDEO_BYTES : FEED_MAX_IMAGE_BYTES;
+                if (file.size > maxBytes) {
+                    const maxMb = Math.round(maxBytes / (1024 * 1024));
+                    notify(`${isVideo ? 'Videos' : 'Photos'} must be under ${maxMb}MB`, 'error');
+                    fileInput.value = '';
+                    return;
+                }
                 try {
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Uploading...';

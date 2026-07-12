@@ -3287,7 +3287,11 @@
 
                 if (fetchedCount < FEED_PAGE_SIZE) noMoreOlderPosts = true;
             } catch (e) {
-                notify('Could not load more posts', 'error');
+                // Pagination hitting the end (or a transient read issue) isn't something the
+                // user needs to see — just stop trying so we don't hammer the DB on every
+                // scroll tick, and log for our own debugging.
+                console.warn('loadOlderPosts failed:', e);
+                noMoreOlderPosts = true;
             } finally {
                 isLoadingMorePosts = false;
                 if (loadingEl) loadingEl.style.display = 'none';

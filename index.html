@@ -275,8 +275,17 @@
         .feed-post-headtext .name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
         .feed-post-headtext .time { font-size: 12px; color: var(--text-secondary); }
         .feed-post-text { font-size: 14.5px; color: var(--text-primary); line-height: 1.4; margin: 10px 0 0; white-space: pre-wrap; word-break: break-word; }
-        .feed-post-image { margin-top: 10px; border-radius: 14px; overflow: hidden; }
+        .feed-post-image { position: relative; margin-top: 10px; border-radius: 14px; overflow: hidden; }
         .feed-post-image img { width: 100%; max-height: 340px; object-fit: cover; display: block; cursor: pointer; }
+        .feed-post-music-chip { position: absolute; bottom: 10px; left: 10px; z-index: 2; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 50px; padding: 5px 10px 5px 5px; color: #fff; font-size: 11.5px; font-weight: 600; max-width: 85%; cursor: pointer; }
+        .feed-post-music-chip img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+        .feed-post-music-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-post-music-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+        .feed-composer-music-btn { position: absolute; left: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.55); color: #fff; border-radius: 50px; padding: 6px 10px 6px 8px; font-size: 12px; font-weight: 600; cursor: pointer; max-width: calc(100% - 50px); }
+        .feed-composer-music-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .feed-composer-music-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-composer-music-clear { flex-shrink: 0; opacity: 0.85; font-size: 15px; line-height: 1; padding-left: 4px; }
 
         .feed-post-video-wrap { position: relative; margin-top: 10px; border-radius: 14px; overflow: hidden; background: #000; }
         .feed-post-video { width: 100%; max-height: 420px; display: block; background: #000; cursor: pointer; }
@@ -1792,6 +1801,11 @@
                                 <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
                                 <video id="feed-composer-preview-video" src="" muted playsinline style="display:none;"></video>
                                 <div class="feed-composer-preview-remove" id="feed-composer-preview-remove">&times;</div>
+                                <div class="feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                                    <span id="feed-composer-music-btn-text">Add music</span>
+                                    <span class="feed-composer-music-clear" id="feed-composer-music-clear" style="display:none;">&times;</span>
+                                </div>
                             </div>
                             <div class="feed-composer-actions">
                                 <label class="feed-composer-attach" for="feed-composer-file">
@@ -1992,7 +2006,7 @@
     <div id="story-music-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 80vh; display: flex; flex-direction: column; padding-bottom: 12px;">
             <div class="sheet-handle"></div>
-            <div class="sheet-title">Add music to your story</div>
+            <div class="sheet-title" id="music-picker-sheet-title">Add music to your story</div>
             <div style="position:relative;">
                 <input type="text" id="story-music-search-input" class="pill-input" placeholder="Search for a song or artist..." autocomplete="off" style="margin-bottom: 12px;">
             </div>
@@ -3201,6 +3215,7 @@
         let feedListenersAttached = false;
         let cachedPosts = {};
         let feedComposerMedia = null; // { url, type: 'image' | 'video' }
+        let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null, images only
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
         let activeReplyToComment = null; // { id, name } or null
@@ -3392,7 +3407,9 @@
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
                 if (existingCard) {
                     const vid = existingCard.querySelector('.feed-post-video');
-                    if (vid && feedVideoObserver) feedVideoObserver.unobserve(vid);
+                    if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
+                    const musicChip = existingCard.querySelector('.feed-post-music-chip');
+                    if (musicChip && feedMediaObserver) feedMediaObserver.unobserve(musicChip);
                     existingCard.remove();
                 }
                 updateFeedEmptyState();
@@ -3415,14 +3432,30 @@
             const previewImg = document.getElementById('feed-composer-preview-img');
             const previewVideo = document.getElementById('feed-composer-preview-video');
             const previewRemove = document.getElementById('feed-composer-preview-remove');
+            const musicBtn = document.getElementById('feed-composer-music-btn');
+            const musicBtnText = document.getElementById('feed-composer-music-btn-text');
+            const musicClearBtn = document.getElementById('feed-composer-music-clear');
 
             function refreshSubmitState() {
                 const hasContent = (input.value && input.value.trim().length > 0) || !!feedComposerMedia;
                 submitBtn.disabled = !hasContent;
             }
 
+            function updateComposerMusicChip() {
+                if (feedComposerMusic) {
+                    musicBtnText.textContent = `${feedComposerMusic.trackName}${feedComposerMusic.artistName ? ' — ' + feedComposerMusic.artistName : ''}`;
+                    musicClearBtn.style.display = 'inline';
+                } else {
+                    musicBtnText.textContent = 'Add music';
+                    musicClearBtn.style.display = 'none';
+                }
+            }
+
             function clearComposerMedia() {
                 feedComposerMedia = null;
+                feedComposerMusic = null;
+                updateComposerMusicChip();
+                musicBtn.style.display = 'none';
                 preview.style.display = 'none';
                 previewImg.style.display = 'none';
                 previewImg.src = '';
@@ -3456,16 +3489,21 @@
                     submitBtn.textContent = 'Uploading...';
                     const { url, type } = await uploadToCloudinary(file);
                     feedComposerMedia = { url, type: (type === 'video' || isVideo) ? 'video' : 'image' };
+                    feedComposerMusic = null;
+                    updateComposerMusicChip();
                     if (feedComposerMedia.type === 'video') {
                         previewImg.style.display = 'none';
                         previewImg.src = '';
                         previewVideo.src = url;
                         previewVideo.style.display = 'block';
+                        // Videos already carry their own audio, so music is an images-only feature.
+                        musicBtn.style.display = 'none';
                     } else {
                         previewVideo.style.display = 'none';
                         previewVideo.src = '';
                         previewImg.src = url;
                         previewImg.style.display = 'block';
+                        musicBtn.style.display = 'flex';
                     }
                     preview.style.display = 'block';
                 } catch (e) {
@@ -3480,6 +3518,19 @@
             previewRemove.addEventListener('click', () => {
                 clearComposerMedia();
                 refreshSubmitState();
+            });
+
+            musicBtn.addEventListener('click', () => {
+                openMusicPicker('Add music to your photo', (music) => {
+                    feedComposerMusic = music;
+                    updateComposerMusicChip();
+                });
+            });
+
+            musicClearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                feedComposerMusic = null;
+                updateComposerMusicChip();
             });
 
             submitBtn.addEventListener('click', async () => {
@@ -3498,6 +3549,7 @@
                         text: text,
                         imageUrl: (feedComposerMedia && feedComposerMedia.type === 'image') ? feedComposerMedia.url : null,
                         videoUrl: (feedComposerMedia && feedComposerMedia.type === 'video') ? feedComposerMedia.url : null,
+                        music: (feedComposerMedia && feedComposerMedia.type === 'image' && feedComposerMusic) ? feedComposerMusic : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
                         commentCount: 0
@@ -3647,29 +3699,32 @@
             return `${m}:${s}`;
         }
 
-        // Pauses a feed video whenever it scrolls out of the viewport (or is no longer
-        // sufficiently visible), so audio/playback never keeps running behind other cards.
-        let feedVideoObserver = null;
-        function getFeedVideoObserver() {
-            if (feedVideoObserver) return feedVideoObserver;
-            feedVideoObserver = new IntersectionObserver((entries) => {
+        // Pauses feed media (video, or a post's background music) whenever it scrolls out of the
+        // viewport (or is no longer sufficiently visible), so playback never keeps running behind
+        // other cards. Videos are observed directly; a post's music chip is observed instead of the
+        // (hidden, zero-size) audio element, with the audio element stashed on it via __pauseTarget.
+        let feedMediaObserver = null;
+        function getFeedMediaObserver() {
+            if (feedMediaObserver) return feedMediaObserver;
+            feedMediaObserver = new IntersectionObserver((entries) => {
                 entries.forEach((entry) => {
-                    if (!entry.isIntersecting && !entry.target.paused) {
-                        entry.target.pause();
-                    }
+                    if (entry.isIntersecting) return;
+                    const target = entry.target;
+                    const mediaEl = (target.tagName === 'VIDEO' || target.tagName === 'AUDIO') ? target : target.__pauseTarget;
+                    if (mediaEl && !mediaEl.paused) mediaEl.pause();
                 });
             }, { threshold: 0.35 });
-            return feedVideoObserver;
+            return feedMediaObserver;
         }
 
-        // Also pause any playing feed video the moment the tab/window loses focus or is
+        // Also pause any playing feed media the moment the tab/window loses focus or is
         // backgrounded, so it doesn't keep playing while the user isn't looking at it at all.
-        function pauseAllFeedVideos() {
-            document.querySelectorAll('.feed-post-video').forEach(v => { if (!v.paused) v.pause(); });
+        function pauseAllFeedMedia() {
+            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
         }
-        window.addEventListener('blur', pauseAllFeedVideos);
+        window.addEventListener('blur', pauseAllFeedMedia);
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) pauseAllFeedVideos();
+            if (document.hidden) pauseAllFeedMedia();
         });
 
         // Wires up a fully custom player (play/pause, seekable progress bar, mute, time) for a
@@ -3708,8 +3763,8 @@
             function togglePlay(e) {
                 if (e) e.stopPropagation();
                 if (video.paused) {
-                    // Only one feed video plays at a time.
-                    document.querySelectorAll('.feed-post-video').forEach(v => { if (v !== video && !v.paused) v.pause(); });
+                    // Only one feed media element (video or post music) plays at a time.
+                    document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (v !== video && !v.paused) v.pause(); });
                     video.play().catch(() => {});
                 } else {
                     video.pause();
@@ -3750,7 +3805,40 @@
 
             updatePlayUI();
             updateMuteUI();
-            getFeedVideoObserver().observe(video);
+            getFeedMediaObserver().observe(video);
+        }
+
+        // Wires up the tap-to-play/pause music chip on an image post (if it has music attached).
+        // The chip itself is observed for viewport visibility (audio elements have no layout box),
+        // and its audio element is stashed on it so getFeedMediaObserver() can pause the right thing.
+        function initFeedPostMusic(card) {
+            const chip = card.querySelector('.feed-post-music-chip');
+            const audio = card.querySelector('.feed-post-music-audio');
+            if (!chip || !audio) return;
+            const playIcon = chip.querySelector('.feed-music-play-icon');
+
+            function updateIcon() {
+                playIcon.innerHTML = audio.paused
+                    ? '<path d="M8 5v14l11-7z"></path>'
+                    : '<rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect>';
+            }
+
+            chip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (audio.paused) {
+                    // Only one feed media element (video or post music) plays at a time.
+                    document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(el => { if (el !== audio && !el.paused) el.pause(); });
+                    audio.play().catch(() => {});
+                } else {
+                    audio.pause();
+                }
+            });
+            audio.addEventListener('play', updateIcon);
+            audio.addEventListener('pause', updateIcon);
+            updateIcon();
+
+            chip.__pauseTarget = audio;
+            getFeedMediaObserver().observe(chip);
         }
 
         // Updates just the like/comment counts (and liked state) on an existing card, in place —
@@ -3779,7 +3867,14 @@
             card.dataset.postId = postId;
 
             const avatarHtml = feedAvatarHtml({ name: post.name, photoURL: post.photoURL });
-            const imageHtml = post.imageUrl ? `<div class="feed-post-image"><img src="${post.imageUrl}" alt=""></div>` : '';
+            const musicChipHtml = (post.imageUrl && post.music) ? `
+                <div class="feed-post-music-chip">
+                    <img src="${post.music.artworkUrl || ''}" alt="">
+                    <span></span>
+                    <svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                </div>
+                <audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : '';
+            const imageHtml = post.imageUrl ? `<div class="feed-post-image"><img src="${post.imageUrl}" alt="">${musicChipHtml}</div>` : '';
             const videoHtml = post.videoUrl ? `
                 <div class="feed-post-video-wrap">
                     <video class="feed-post-video" src="${post.videoUrl}" playsinline preload="metadata" muted></video>
@@ -3836,6 +3931,10 @@
             // Set text content via textContent to avoid any HTML injection from user-authored fields.
             card.querySelector('.name').textContent = post.name || 'User';
             if (textHtml) card.querySelector('.feed-post-text').textContent = post.text;
+            const musicChipSpan = card.querySelector('.feed-post-music-chip span');
+            if (musicChipSpan && post.music) {
+                musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+            }
 
             card.querySelector('.feed-like-btn').addEventListener('click', () => toggleLikePost(postId));
             card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(postId));
@@ -3844,6 +3943,7 @@
 
             const videoWrap = card.querySelector('.feed-post-video-wrap');
             if (videoWrap) initFeedVideoPlayer(videoWrap);
+            initFeedPostMusic(card);
 
             const menuBtn = card.querySelector('.feed-post-menu-btn');
             if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, post, card));
@@ -5637,10 +5737,13 @@
             }
         }
 
-        // --- STORY MUSIC PICKER (iTunes Search API — 30s licensed previews) ---
+        // --- MUSIC PICKER (iTunes Search API — 30s licensed previews) ---
+        // Shared by both the story composer and the feed post composer: whoever opens it passes
+        // a title + a callback that receives the chosen track (or null if skipped/dismissed).
         let musicSearchDebounce = null;
         let musicPreviewAudio = null;
         let musicPreviewActiveBtn = null;
+        let musicPickerOnSelect = null;
 
         function stopMusicPreview() {
             if (musicPreviewAudio) { musicPreviewAudio.pause(); musicPreviewAudio = null; }
@@ -5650,11 +5753,19 @@
         function playIconSVG() { return '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>'; }
         function pauseIconSVG() { return '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg>'; }
 
-        function openStoryMusicPicker() {
+        function openMusicPicker(title, onSelect) {
+            musicPickerOnSelect = onSelect;
+            document.getElementById('music-picker-sheet-title').textContent = title;
             document.getElementById('story-music-search-input').value = '';
-            document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to play behind your story</div>';
+            document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to add</div>';
             document.getElementById('story-music-sheet-overlay').classList.add('active');
             setTimeout(() => document.getElementById('story-music-search-input').focus(), 250);
+        }
+
+        function openStoryMusicPicker() {
+            openMusicPicker('Add music to your story', (music) => {
+                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, music, pendingStoryCaption);
+            });
         }
 
         function closeStoryMusicPicker() {
@@ -5666,7 +5777,7 @@
             const q = e.target.value.trim();
             clearTimeout(musicSearchDebounce);
             if (!q) {
-                document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to play behind your story</div>';
+                document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Search for a song to add</div>';
                 return;
             }
             document.getElementById('story-music-results').innerHTML = '<div class="music-empty-state">Searching…</div>';
@@ -5731,7 +5842,7 @@
                     artworkUrl: artworkUrl,
                     previewUrl: track.previewUrl
                 };
-                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, music, pendingStoryCaption);
+                if (musicPickerOnSelect) musicPickerOnSelect(music);
             });
 
             return row;
@@ -5739,13 +5850,13 @@
 
         document.getElementById('story-music-skip-btn').addEventListener('click', () => {
             closeStoryMusicPicker();
-            if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null, pendingStoryCaption);
+            if (musicPickerOnSelect) musicPickerOnSelect(null);
         });
 
         document.getElementById('story-music-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'story-music-sheet-overlay') {
                 closeStoryMusicPicker();
-                if (pendingStoryFiles) uploadStoriesWithMusic(pendingStoryFiles, null, pendingStoryCaption);
+                if (musicPickerOnSelect) musicPickerOnSelect(null);
             }
         });
 

@@ -282,6 +282,7 @@
         .feed-post-action-btn.liked { color: var(--danger-red); }
         .feed-post-action-btn.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
+        .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
 
         .feed-comment-item { display: flex; gap: 10px; padding: 10px 0; }
         .feed-comment-item .avatar { width: 30px; height: 30px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; flex-shrink: 0; }
@@ -1084,6 +1085,7 @@
             }
             body.glass-theme .nav-indicator { background: rgba(255,255,255,0.22); box-shadow: none; }
             .chat-list-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
+            #feed-posts-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
             .chat-view-back { display: block; }
@@ -1767,6 +1769,7 @@
                             </div>
                         </div>
                         <div id="feed-posts-list"></div>
+                        <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
                         <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
                             <p>No posts yet. Be the first to share something!</p>
                         </div>
@@ -2059,7 +2062,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -3166,6 +3169,9 @@
         let feedComposerImage = null; // { url, type }
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
+        let oldestLoadedPostTimestamp = Infinity;
+        let noMoreOlderPosts = false;
+        let isLoadingMorePosts = false;
 
         function feedAvatarHtml(profile, sizeClass) {
             const name = (profile && profile.name) || 'User';
@@ -3176,21 +3182,131 @@
                 : `<div class="avatar ${sizeClass || ''}">${initial}</div>`;
         }
 
+        // --- FEED RANKING ---
+        // Deterministic 0..1 pseudo-random value from a string, so the "randomness" in ranking
+        // stays stable for a given viewer + post pair instead of reshuffling on every re-render.
+        function seededRandom01(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
+            }
+            return (Math.abs(hash) % 10000) / 10000;
+        }
+
+        function computeFeedScore(postId, post) {
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : 'anon';
+            const now = Date.now();
+            const ts = post.timestamp || now;
+            const ageHours = Math.max(0, (now - ts) / 3600000);
+
+            // Recency: decays from 100 toward 0 over ~48h so new posts lead, but don't vanish instantly.
+            const recencyScore = Math.max(0, 100 - ageHours * (100 / 48));
+            // Engagement: comments weighted higher than likes since they're a stronger signal.
+            const engagementScore = (post.likeCount || 0) * 2 + (post.commentCount || 0) * 4;
+            // Affinity: a flat boost for posts from people in your contacts.
+            const contactBonus = (cachedContacts && cachedContacts[post.uid]) ? 40 : 0;
+            // A little randomness so the feed isn't perfectly deterministic, stable per viewer/post.
+            const jitter = seededRandom01(postId + ':' + myUid) * 20;
+
+            return recencyScore + engagementScore + contactBonus + jitter;
+        }
+
+        // Reorders existing post cards in place (moves DOM nodes, doesn't rebuild them) so any
+        // open edit box or comment sheet state isn't disturbed. Called on new posts / contacts
+        // changes / a periodic tick — never on a single like or comment, so a card never jumps
+        // out from under someone mid-interaction.
+        function reorderFeedCards() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return;
+            const cards = Array.from(list.children);
+            cards.sort((a, b) => {
+                const postIdA = a.dataset.postId, postIdB = b.dataset.postId;
+                const postA = cachedPosts[postIdA], postB = cachedPosts[postIdB];
+                if (!postA || !postB) return 0;
+                return computeFeedScore(postIdB, postB) - computeFeedScore(postIdA, postA);
+            });
+            cards.forEach(card => list.appendChild(card));
+        }
+
+        const FEED_PAGE_SIZE = 15;
+
+        // Fetches an older page of posts (one-time read, not a live listener) and appends them.
+        // These older cards still get folded into cachedPosts and reorderFeedCards(), so ranking
+        // stays consistent with the live window; they just won't patch in place on new likes/
+        // comments the way the live window's posts do.
+        async function loadOlderPosts() {
+            if (isLoadingMorePosts || noMoreOlderPosts) return;
+            if (!isFinite(oldestLoadedPostTimestamp)) return;
+            isLoadingMorePosts = true;
+            const loadingEl = document.getElementById('feed-loading-more');
+            if (loadingEl) loadingEl.style.display = 'block';
+
+            try {
+                const olderQuery = query(
+                    ref(database, 'posts'),
+                    orderByChild('timestamp'),
+                    endAt(oldestLoadedPostTimestamp - 1),
+                    limitToLast(FEED_PAGE_SIZE)
+                );
+                const snap = await get(olderQuery);
+                const list = document.getElementById('feed-posts-list');
+                let fetchedCount = 0;
+
+                if (snap.exists()) {
+                    const entries = [];
+                    snap.forEach((child) => { entries.push([child.key, child.val()]); return false; });
+                    fetchedCount = entries.length;
+                    entries.forEach(([postId, post]) => {
+                        if (cachedPosts[postId]) return;
+                        cachedPosts[postId] = post;
+                        if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
+                            oldestLoadedPostTimestamp = post.timestamp;
+                        }
+                        if (list) list.appendChild(buildFeedPostCard(postId, post));
+                    });
+                    reorderFeedCards();
+                }
+
+                if (fetchedCount < FEED_PAGE_SIZE) noMoreOlderPosts = true;
+            } catch (e) {
+                notify('Could not load more posts', 'error');
+            } finally {
+                isLoadingMorePosts = false;
+                if (loadingEl) loadingEl.style.display = 'none';
+            }
+        }
+
+        function initFeedScrollListener() {
+            const container = document.getElementById('feed-posts-container');
+            if (!container || container.dataset.scrollBound) return;
+            container.dataset.scrollBound = 'true';
+            container.addEventListener('scroll', () => {
+                const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 400;
+                if (nearBottom) loadOlderPosts();
+            });
+        }
+
         function initFeedListeners() {
             const user = auth.currentUser;
             if (!user) return;
             if (feedListenersAttached) return;
             feedListenersAttached = true;
+            initFeedScrollListener();
 
-            const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'));
+            const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
 
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
                 cachedPosts[postId] = post;
+                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
+                    oldestLoadedPostTimestamp = post.timestamp;
+                }
                 const list = document.getElementById('feed-posts-list');
                 if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
                     list.prepend(buildFeedPostCard(postId, post));
+                    reorderFeedCards();
                 }
                 updateFeedEmptyState();
             });
@@ -3222,6 +3338,12 @@
                 if (existingCard) existingCard.remove();
                 updateFeedEmptyState();
             });
+
+            // Re-rank when the contacts graph changes (affects the affinity boost), and on a
+            // slow periodic tick so engagement/recency drift eventually reflects in ordering.
+            // Neither of these fires per-like/per-comment — see reorderFeedCards() comment.
+            onValue(ref(database, `contacts/${user.uid}`), () => reorderFeedCards());
+            setInterval(reorderFeedCards, 45000);
 
             const composerAvatar = document.getElementById('feed-composer-avatar');
             const profile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };

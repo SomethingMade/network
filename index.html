@@ -1878,7 +1878,7 @@
                         </div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" id="search-chats" placeholder="Ask Meta AI or Search">
+                            <input type="text" id="search-chats" placeholder="Ask Goza AI or Search">
                         </div>
                         <div class="wa-filter-row" id="wa-filter-row">
                             <button type="button" class="wa-chip active" data-filter="all">All</button>
@@ -8668,7 +8668,9 @@
             const avatarEl = e.target.closest('.avatar[data-full]');
             if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
             const card = e.target.closest('.chat-item');
-            if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
+            if (!card) return;
+            if (card.dataset.groupId) { openGroupChatView(card.dataset.groupId); return; }
+            if (card.dataset.uid) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
         });
 
         // --- LONG PRESS CONTEXT MENU (Delete Chat / Remove Friend) ON CHATS TAB CARDS ---
@@ -9548,6 +9550,7 @@
             onValue(ref(database, "groups"), (snap) => {
                 cachedGroups = snap.exists() ? snap.val() : {};
                 renderGroupsLists();
+                if (userChatsInitialized) renderChatListFromCache();
             });
 
             onValue(ref(database, `user_group_chats/${user.uid}`), (snap) => {
@@ -9562,6 +9565,7 @@
                 });
                 updateGroupsUnreadBadge(totalGroupUnread);
                 renderGroupsLists();
+                if (userChatsInitialized) renderChatListFromCache();
             });
 
             onValue(ref(database, `group_invites/${user.uid}`), (snap) => {
@@ -9615,12 +9619,34 @@
                 let totalUnread = 0;
 
                 const chats = cachedUserChatsData;
-                const hasChats = chats && Object.keys(chats).length > 0;
+                const myGroupIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].members && cachedGroups[gid].members[user.uid]);
+
+                // "All" shows both direct chats and the groups the user belongs to, merged
+                // and sorted together by most recent activity — same as the Groups tab list,
+                // but interleaved here so nothing has to be hunted down in a separate tab.
+                const combinedEntries = [];
+                Object.keys(chats || {}).forEach(chatUid => {
+                    combinedEntries.push({ type: 'dm', id: chatUid, timestamp: chats[chatUid].timestamp || 0 });
+                });
+                myGroupIds.forEach(gid => {
+                    const meta = cachedGroupChatsMeta[gid];
+                    const timestamp = (meta && meta.timestamp) || cachedGroups[gid].createdAt || 0;
+                    combinedEntries.push({ type: 'group', id: gid, timestamp });
+                });
+                combinedEntries.sort((a, b) => b.timestamp - a.timestamp);
+
+                const hasChats = combinedEntries.length > 0;
 
                 if (hasChats) {
-                    const sortedUids = Object.keys(chats).sort((a,b) => chats[b].timestamp - chats[a].timestamp);
-                    
-                    sortedUids.forEach(chatUid => {
+                    combinedEntries.forEach(entry => {
+                        if (entry.type === 'group') {
+                            const groupMeta = cachedGroupChatsMeta[entry.id];
+                            renderMyGroupItem(entry.id, cachedGroups[entry.id], chatList, groupMeta);
+                            if (groupMeta && groupMeta.unreadCount > 0) totalUnread += groupMeta.unreadCount;
+                            return;
+                        }
+
+                        const chatUid = entry.id;
                         const chatMeta = chats[chatUid];
                         
                         if (chatUid === activeChatUid && chatMeta.unreadCount > 0) {

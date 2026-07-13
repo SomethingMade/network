@@ -1156,6 +1156,41 @@
         #video-viewer-overlay.active { opacity: 1; visibility: visible; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
+        /* ── STATUS TAB (video-only grid, gallery of Moments videos) ── */
+        .status-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .status-masonry-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 76px; gap: 6px; padding: 10px; }
+        .status-card { position: relative; grid-row: span 2; border-radius: 14px; overflow: hidden; cursor: pointer; background: #111; transition: transform 0.15s ease; }
+        .status-card:active { transform: scale(0.96); }
+        .status-card.ssz-tall { grid-row: span 3; }
+        .status-card.ssz-wide { grid-column: span 2; grid-row: span 2; }
+        .status-card.ssz-hero { grid-column: span 2; grid-row: span 3; }
+        .status-card video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; background: #111; }
+        .status-card-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.55) 100%); pointer-events: none; }
+        .status-card-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; color: rgba(255,255,255,0.92); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); pointer-events: none; }
+        .status-card-foot { position: absolute; left: 8px; right: 8px; bottom: 7px; display: flex; align-items: center; gap: 6px; pointer-events: none; }
+        .status-card-foot .avatar { width: 20px; height: 20px; border: 1.5px solid rgba(255,255,255,0.85); flex-shrink: 0; }
+        .status-card-foot span { font-size: 11.5px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .status-grid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 60px 30px; color: var(--text-secondary); }
+        .status-grid-empty svg { opacity: 0.4; margin-bottom: 4px; }
+        .status-grid-empty p { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .status-grid-empty span { font-size: 13px; }
+        .status-loading-more { display: none; align-items: center; justify-content: center; padding: 14px 0 22px; }
+
+        .status-card.status-skeleton { cursor: default; background: var(--bg-hover); overflow: hidden; }
+        .status-card.status-skeleton::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+            background-size: 200% 100%; animation: statusShimmer 1.4s ease-in-out infinite;
+        }
+        @keyframes statusShimmer { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
+
+        /* ── FULLSCREEN STATUS VIEWER (story-style playback for grid videos) ── */
+        #status-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100004; display: none; align-items: center; justify-content: center; }
+        #status-viewer-overlay.active { display: flex; }
+        .status-viewer-inner { position: relative; width: 100%; max-width: 460px; height: 100%; max-height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .status-viewer-inner .story-media { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #status-viewer-overlay .story-viewer-header span#status-viewer-name { color: white; font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
         @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
         @media (max-width: 768px) {
@@ -1891,6 +1926,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                     <span>Chats</span>
                 </div>
+                <div class="nav-item" data-tab="tab-status">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"></rect><polygon points="10 9 15 12 10 15 10 9" fill="currentColor" stroke="none"></polygon></svg>
+                    <span>Status</span>
+                </div>
                 <div class="nav-item" data-tab="tab-groups">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     <span>Groups</span>
@@ -2003,6 +2042,28 @@
                             <p>No posts yet. Be the first to share something!</p>
                         </div>
                         <div class="feed-search-empty" id="feed-search-empty">No posts match your search.</div>
+                    </div>
+                </div>
+
+                <div id="tab-status" class="tab-content">
+                    <div class="chat-header-area">
+                        <div class="chat-header-top">
+                            <h1>Status</h1>
+                            <div class="chat-header-icons">
+                                <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-grid-scroll" id="status-grid-scroll">
+                        <div class="status-masonry-grid" id="status-grid"></div>
+                        <div class="status-loading-more" id="status-loading-more" style="display:none;">
+                            <div class="spinner-sm"></div>
+                        </div>
+                        <div class="status-grid-empty" id="status-grid-empty" style="display:none;">
+                            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><polygon points="10 9 15 12 10 15 10 9" fill="currentColor" stroke="none"></polygon></svg>
+                            <p>No video updates yet</p>
+                            <span>Videos shared to Moments will show up here</span>
+                        </div>
                     </div>
                 </div>
 
@@ -2268,6 +2329,24 @@
         <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <video id="video-viewer-vid" src="" controls playsinline></video>
+    </div>
+
+    <div id="status-viewer-overlay">
+        <div class="status-viewer-inner">
+            <div class="story-progress-row" id="status-progress-row"></div>
+            <div class="story-viewer-header">
+                <div class="avatar" id="status-viewer-avatar"></div>
+                <span id="status-viewer-name"></span>
+                <span id="status-viewer-time" style="color:rgba(255,255,255,0.7); font-weight:500; font-size:12px; margin-left:-4px;"></span>
+                <div class="story-controls-right">
+                    <svg class="story-mute-btn" id="status-mute-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                    <svg class="story-viewer-close" id="status-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+            </div>
+            <video id="status-viewer-video" class="story-media" playsinline></video>
+            <div class="story-tap-zone left" id="status-tap-left"></div>
+            <div class="story-tap-zone right" id="status-tap-right"></div>
+        </div>
     </div>
 
     <div id="view-once-audio-overlay" class="no-save" oncontextmenu="return false;">
@@ -2793,6 +2872,7 @@
             const imageViewerActive = document.getElementById('image-viewer-overlay').classList.contains('active');
             const videoViewerActive = document.getElementById('video-viewer-overlay').classList.contains('active');
             const viewOnceAudioActive = document.getElementById('view-once-audio-overlay').classList.contains('active');
+            const statusViewerActive = document.getElementById('status-viewer-overlay').classList.contains('active');
 
             if (hash !== 'image-viewer' && imageViewerActive) {
                 closeImageViewer();
@@ -2803,10 +2883,13 @@
             if (hash !== 'view-once-audio' && viewOnceAudioActive) {
                 closeViewOnceAudio();
             }
+            if (hash !== 'status-viewer' && statusViewerActive) {
+                closeStatusViewer();
+            }
 
             // The image/video/audio viewers open on top of chat/story (not a real navigation away from
             // them), so landing on those hashes should never trigger the chat/story close logic below.
-            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio');
+            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio' || hash === 'status-viewer');
 
             if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -2851,6 +2934,8 @@
 
                 const fabNewPost = document.getElementById('fab-new-post');
                 if (fabNewPost) fabNewPost.style.display = (hash === 'tab-feed') ? 'flex' : 'none';
+
+                if (hash === 'tab-status') renderStatusGrid();
 
                 updateNavIndicator();
             }
@@ -3602,6 +3687,245 @@
                 : `<div class="avatar ${sizeClass || ''}">${initial}</div>`;
         }
 
+        // --- STATUS TAB (masonry grid of Moments videos + fullscreen story-style playback) ---
+        const STATUS_SIZE_PATTERN = ['hero', 'reg', 'reg', 'tall', 'reg', 'wide', 'reg', 'tall', 'reg', 'reg'];
+        const STATUS_MIN_LOAD_MORE = 6; // keep fetching older pages until this many new videos surface (or we hit the end)
+
+        function getStatusVideoPosts() {
+            return Object.entries(cachedPosts)
+                .filter(([, post]) => !!post.videoUrl)
+                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+        }
+
+        function statusSizeClass(postId, i) {
+            const sizeIdx = Math.floor(seededRandom01(postId) * STATUS_SIZE_PATTERN.length);
+            const size = STATUS_SIZE_PATTERN[(sizeIdx + i) % STATUS_SIZE_PATTERN.length];
+            return size === 'reg' ? '' : `ssz-${size === 'hero' ? 'hero' : size === 'wide' ? 'wide' : 'tall'}`;
+        }
+
+        function renderStatusSkeleton(grid, count) {
+            grid.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                const card = document.createElement('div');
+                card.className = `status-card status-skeleton ${statusSizeClass('skeleton-' + i, i)}`;
+                grid.appendChild(card);
+            }
+        }
+
+        function renderStatusGridIfActive() {
+            const tab = document.getElementById('tab-status');
+            if (tab && tab.classList.contains('active-tab')) renderStatusGrid();
+        }
+
+        let statusEmptyCheckTimer = null;
+
+        function renderStatusGrid() {
+            const grid = document.getElementById('status-grid');
+            const emptyState = document.getElementById('status-grid-empty');
+            if (!grid) return;
+            initStatusScrollListener();
+            const items = getStatusVideoPosts();
+
+            // Nothing cached yet — this could mean "no videos exist" or "still waiting on the
+            // first Firebase snapshot". Show shimmering placeholders and give it a moment before
+            // committing to the empty state, so a fresh load doesn't flash "No videos" first.
+            if (!items.length) {
+                if (emptyState) emptyState.style.display = 'none';
+                renderStatusSkeleton(grid, 9);
+                clearTimeout(statusEmptyCheckTimer);
+                statusEmptyCheckTimer = setTimeout(() => {
+                    if (!getStatusVideoPosts().length) {
+                        grid.innerHTML = '';
+                        if (emptyState) emptyState.style.display = 'flex';
+                    }
+                }, 1200);
+                return;
+            }
+            clearTimeout(statusEmptyCheckTimer);
+            if (emptyState) emptyState.style.display = 'none';
+
+            grid.innerHTML = '';
+            items.forEach(([postId, post], i) => {
+                // Deterministic size per post so the masonry layout doesn't reshuffle on re-render.
+                const card = document.createElement('div');
+                card.className = `status-card ${statusSizeClass(postId, i)}`;
+                card.dataset.postId = postId;
+                card.innerHTML = `
+                    <video src="${post.videoUrl}" muted playsinline preload="metadata"></video>
+                    <div class="status-card-shade"></div>
+                    <svg class="status-card-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                    <div class="status-card-foot">
+                        ${feedAvatarHtml({ name: post.name, photoURL: post.photoURL })}
+                        <span></span>
+                    </div>
+                `;
+                card.querySelector('.status-card-foot span').textContent = post.name || 'User';
+                card.addEventListener('click', () => openStatusViewer(postId));
+                grid.appendChild(card);
+            });
+        }
+
+        // --- Pagination: the live window (initFeedListeners) only holds the newest FEED_PAGE_SIZE
+        // posts, so on a chatty feed most of those might not be videos. Keep paging older posts
+        // (shared with the Moments feed's own pagination/cursor) until enough new videos surface.
+        let isLoadingMoreStatus = false;
+
+        function initStatusScrollListener() {
+            const container = document.getElementById('status-grid-scroll');
+            if (!container || container.dataset.scrollBound) return;
+            container.dataset.scrollBound = 'true';
+            container.addEventListener('scroll', () => {
+                const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 500;
+                if (nearBottom) loadMoreStatusVideos();
+            });
+        }
+
+        function showStatusLoadingIndicator(show) {
+            const el = document.getElementById('status-loading-more');
+            if (el) el.style.display = show ? 'flex' : 'none';
+        }
+
+        async function loadMoreStatusVideos() {
+            if (isLoadingMoreStatus || noMoreOlderPosts) return;
+            isLoadingMoreStatus = true;
+            showStatusLoadingIndicator(true);
+            const startCount = getStatusVideoPosts().length;
+            let guard = 0;
+            while (!noMoreOlderPosts && (getStatusVideoPosts().length - startCount) < STATUS_MIN_LOAD_MORE && guard < 10) {
+                await loadOlderPosts();
+                guard++;
+            }
+            renderStatusGrid();
+            showStatusLoadingIndicator(false);
+            isLoadingMoreStatus = false;
+        }
+
+        // --- Fullscreen status viewer (story-style single-video playback with next/prev) ---
+        const statusViewerState = { items: [], index: 0 };
+
+        function openStatusViewer(postId) {
+            statusViewerState.items = getStatusVideoPosts();
+            const idx = statusViewerState.items.findIndex(([id]) => id === postId);
+            statusViewerState.index = idx >= 0 ? idx : 0;
+            if (!statusViewerState.items.length) return;
+
+            setupStatusProgressBars();
+            window.location.hash = 'status-viewer';
+            document.getElementById('status-viewer-overlay').classList.add('active');
+            playStatusItem();
+        }
+
+        function setupStatusProgressBars() {
+            const row = document.getElementById('status-progress-row');
+            row.innerHTML = statusViewerState.items.map(() => '<div class="story-progress-track"><div class="story-progress-fill"></div></div>').join('');
+        }
+
+        function playStatusItem() {
+            const [postId, post] = statusViewerState.items[statusViewerState.index] || [];
+            if (!post) { closeStatusViewer(); history.back(); return; }
+
+            const fills = document.querySelectorAll('#status-progress-row .story-progress-fill');
+            fills.forEach((f, i) => {
+                f.style.transition = 'none';
+                f.style.width = i < statusViewerState.index ? '100%' : '0%';
+            });
+
+            const avatarEl = document.getElementById('status-viewer-avatar');
+            const name = post.name || 'User';
+            if (post.photoURL) {
+                avatarEl.style.backgroundImage = `url('${post.photoURL}')`;
+                avatarEl.textContent = '';
+            } else {
+                avatarEl.style.backgroundImage = 'none';
+                avatarEl.style.backgroundColor = 'var(--primary-blue)';
+                avatarEl.style.color = '#FFFFFF';
+                avatarEl.style.display = 'flex';
+                avatarEl.style.alignItems = 'center';
+                avatarEl.style.justifyContent = 'center';
+                avatarEl.style.fontWeight = 'bold';
+                avatarEl.textContent = name.charAt(0).toUpperCase();
+            }
+            document.getElementById('status-viewer-name').textContent = name;
+            document.getElementById('status-viewer-time').textContent = formatTime(post.timestamp);
+
+            const videoEl = document.getElementById('status-viewer-video');
+            videoEl.pause();
+            videoEl.src = post.videoUrl;
+            videoEl.currentTime = 0;
+            videoEl.muted = statusViewerMuted;
+            updateStatusMuteIcon();
+            videoEl.play().catch(() => {});
+
+            videoEl.ontimeupdate = () => {
+                if (!videoEl.duration) return;
+                const fill = fills[statusViewerState.index];
+                if (fill) {
+                    fill.style.transition = 'none';
+                    fill.style.width = `${(videoEl.currentTime / videoEl.duration) * 100}%`;
+                }
+            };
+            videoEl.onended = () => nextStatusItem();
+        }
+
+        function nextStatusItem() {
+            if (statusViewerState.index < statusViewerState.items.length - 1) {
+                statusViewerState.index++;
+                playStatusItem();
+            } else {
+                history.back();
+            }
+        }
+
+        function prevStatusItem() {
+            if (statusViewerState.index > 0) {
+                statusViewerState.index--;
+                playStatusItem();
+            } else {
+                const videoEl = document.getElementById('status-viewer-video');
+                videoEl.currentTime = 0;
+            }
+        }
+
+        function closeStatusViewer() {
+            const videoEl = document.getElementById('status-viewer-video');
+            videoEl.pause();
+            videoEl.ontimeupdate = null;
+            videoEl.onended = null;
+            videoEl.removeAttribute('src');
+            document.getElementById('status-viewer-overlay').classList.remove('active');
+        }
+
+        let statusViewerMuted = false;
+        function updateStatusMuteIcon() {
+            const btn = document.getElementById('status-mute-btn');
+            btn.innerHTML = statusViewerMuted
+                ? '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>'
+                : '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>';
+        }
+
+        document.getElementById('status-viewer-close').addEventListener('click', () => history.back());
+        document.getElementById('status-mute-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            statusViewerMuted = !statusViewerMuted;
+            document.getElementById('status-viewer-video').muted = statusViewerMuted;
+            updateStatusMuteIcon();
+        });
+        document.getElementById('status-tap-left').addEventListener('click', () => prevStatusItem());
+        document.getElementById('status-tap-right').addEventListener('click', () => nextStatusItem());
+
+        // Swipe down to dismiss, like a story.
+        (function initStatusSwipeToClose() {
+            const inner = document.querySelector('.status-viewer-inner');
+            let startY = null;
+            inner.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; }, { passive: true });
+            inner.addEventListener('touchend', (e) => {
+                if (startY === null) return;
+                const deltaY = e.changedTouches[0].clientY - startY;
+                startY = null;
+                if (deltaY > 90) history.back();
+            }, { passive: true });
+        })();
+
         // --- FEED RANKING ---
         // Deterministic 0..1 pseudo-random value from a string, so the "randomness" in ranking
         // stays stable for a given viewer + post pair instead of reshuffling on every re-render.
@@ -3768,6 +4092,7 @@
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
                 updateFeedEmptyState();
+                if (post.videoUrl) renderStatusGridIfActive();
             });
 
             onChildChanged(postsQuery, (snap) => {
@@ -3803,10 +4128,12 @@
                 if (activePostOptions && activePostOptions.postId === postId) {
                     activePostOptions = { postId, post, card: newCard };
                 }
+                if (post.videoUrl || (oldPost && oldPost.videoUrl)) renderStatusGridIfActive();
             });
 
             onChildRemoved(postsQuery, (snap) => {
                 const postId = snap.key;
+                const removedPost = cachedPosts[postId];
                 delete cachedPosts[postId];
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
@@ -3818,6 +4145,7 @@
                     existingCard.remove();
                 }
                 updateFeedEmptyState();
+                if (removedPost && removedPost.videoUrl) renderStatusGridIfActive();
             });
 
             // Re-rank when the contacts graph changes (affects the affinity boost), and on a

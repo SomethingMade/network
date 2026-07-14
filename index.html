@@ -473,7 +473,27 @@
         .wa-header-save-btn:hover { opacity: 0.92; transform: translateY(-1px); }
         .wa-header-save-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
 
-        .wa-avatar-block { display: flex; justify-content: center; margin-bottom: 22px; }
+        .wa-avatar-block { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; margin-bottom: 22px; }
+
+        .qr-invite-btn {
+            display: flex; align-items: center; gap: 7px;
+            background: var(--bg-alt); border: 1px solid var(--border-color);
+            color: var(--text-primary); font-size: 12.5px; font-weight: 600;
+            padding: 7px 14px; border-radius: var(--radius-pill);
+            cursor: pointer; transition: 0.2s;
+        }
+        .qr-invite-btn svg { width: 15px; height: 15px; color: var(--primary-blue); flex-shrink: 0; }
+        .qr-invite-btn:hover { background: var(--bg-hover); transform: translateY(-1px); }
+        .qr-invite-btn:active { transform: translateY(0); }
+
+        .qr-code-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 0 4px; }
+        .qr-code-canvas-wrap { background: #FFFFFF; padding: 16px; border-radius: 20px; box-shadow: var(--shadow-soft); margin-bottom: 18px; position: relative; }
+        .qr-code-canvas-wrap canvas { display: block; border-radius: 6px; }
+        .qr-code-avatar-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 42px; height: 42px; border-radius: 50%; background: var(--gradient-brand); border: 3px solid #FFFFFF; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 15px; background-size: cover; background-position: center; }
+        .qr-code-name { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
+        .qr-code-username { font-size: 13.5px; color: var(--text-secondary); font-family: monospace; margin-bottom: 22px; }
+        .qr-code-actions { display: flex; gap: 10px; width: 100%; }
+        .qr-code-actions .btn-pill { flex: 1; font-size: 13.5px; padding: 12px; }
 
         .wa-field-group { background: var(--bg-alt); border-radius: 18px; padding: 4px 16px; margin-bottom: 22px; }
         .wa-field-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
@@ -1617,6 +1637,10 @@
                     <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
                 </div>
                 <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <button type="button" id="btn-show-my-qr" class="qr-invite-btn" title="Show my QR code">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><line x1="14" y1="14" x2="14" y2="14.01"></line><line x1="14" y1="18" x2="14" y2="21"></line><line x1="18" y1="14" x2="21" y2="14"></line><line x1="18" y1="18" x2="21" y2="18"></line><line x1="18" y1="21" x2="21" y2="21"></line><line x1="21" y1="17.5" x2="21" y2="17.5"></line></svg>
+                    <span>My QR Code</span>
+                </button>
             </div>
 
             <div class="wa-field-group">
@@ -1795,6 +1819,33 @@
             </div>
 
             <button type="button" id="btn-logout" class="wa-logout-row">Sign Out</button>
+        </div>
+    </div>
+
+    <div id="qr-code-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet" style="max-width:360px;">
+            <div class="sheet-handle"></div>
+            <div class="wa-sheet-header">
+                <button type="button" id="btn-close-qr-sheet" class="wa-header-icon-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="wa-header-title">My QR Code</div>
+                <span style="width:36px;"></span>
+            </div>
+
+            <div class="qr-code-card">
+                <div class="qr-code-canvas-wrap">
+                    <canvas id="qr-code-canvas"></canvas>
+                    <div class="qr-code-avatar-badge" id="qr-code-avatar-badge"></div>
+                </div>
+                <div class="qr-code-name" id="qr-code-display-name">—</div>
+                <div class="qr-code-username" id="qr-code-display-username">@—</div>
+                <p class="wa-note" style="margin-bottom:18px;">Anyone can scan this code to instantly add you on Xoxa.</p>
+                <div class="qr-code-actions">
+                    <button type="button" id="btn-qr-copy-link" class="btn-pill btn-outline">Copy Link</button>
+                    <button type="button" id="btn-qr-share" class="btn-pill btn-primary">Share</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2497,6 +2548,7 @@
     </div>
 
     <script type="module">
+        import QRCode from "https://esm.run/[email protected]";
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
@@ -5875,6 +5927,102 @@
         }
 
         btnProfileNavEls.forEach(btn => btn.addEventListener('click', openProfileSheet));
+
+        // --- My QR Code ---
+        const qrSheetOverlay = document.getElementById('qr-code-sheet-overlay');
+
+        function inviteLinkFor(username) {
+            const base = `${window.location.origin}${window.location.pathname}`;
+            return username ? `${base}?add=${encodeURIComponent(username)}` : base;
+        }
+
+        document.getElementById('btn-show-my-qr').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const myProfile = cachedUsers[user.uid] || {};
+            const username = myProfile.username || '';
+            const displayName = user.displayName || 'You';
+            const initial = displayName.charAt(0).toUpperCase();
+
+            document.getElementById('qr-code-display-name').textContent = displayName;
+            document.getElementById('qr-code-display-username').textContent = username ? '@' + username : '@—';
+
+            const badge = document.getElementById('qr-code-avatar-badge');
+            if (user.photoURL) {
+                badge.style.backgroundImage = `url('${user.photoURL}')`;
+                badge.textContent = "";
+            } else {
+                badge.style.backgroundImage = "none";
+                badge.textContent = initial;
+            }
+
+            const link = inviteLinkFor(username);
+            const canvas = document.getElementById('qr-code-canvas');
+            try {
+                await QRCode.toCanvas(canvas, link, {
+                    width: 220, margin: 1,
+                    color: { dark: '#111111', light: '#FFFFFF' }
+                });
+            } catch (err) {
+                console.error('QR generation failed', err);
+            }
+
+            qrSheetOverlay.dataset.link = link;
+            qrSheetOverlay.classList.add('active');
+        });
+
+        document.getElementById('btn-close-qr-sheet').addEventListener('click', () => {
+            qrSheetOverlay.classList.remove('active');
+        });
+        qrSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === qrSheetOverlay) qrSheetOverlay.classList.remove('active');
+        });
+
+        document.getElementById('btn-qr-copy-link').addEventListener('click', async () => {
+            const link = qrSheetOverlay.dataset.link || inviteLinkFor('');
+            try {
+                await navigator.clipboard.writeText(link);
+                notify("Invite link copied to clipboard!");
+            } catch (err) {
+                showCustomModal("Your Invite Link", link);
+            }
+        });
+
+        document.getElementById('btn-qr-share').addEventListener('click', async () => {
+            const link = qrSheetOverlay.dataset.link || inviteLinkFor('');
+            const uname = document.getElementById('qr-code-display-username').textContent;
+            const shareText = uname && uname !== '@—' ? `Chat with me on Xoxa! Find me at ${uname} — ${link}` : `Chat with me on Xoxa! ${link}`;
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Xoxa', text: shareText }); }
+                catch (err) { /* user cancelled share, ignore */ }
+            } else {
+                try {
+                    await navigator.clipboard.writeText(shareText);
+                    notify("Invite link copied to clipboard!");
+                } catch (err) {
+                    showCustomModal("Your Invite Link", shareText);
+                }
+            }
+        });
+
+        // If someone opens the app via a scanned QR invite link (?add=username),
+        // prefill and open the Add Friend modal for them once signed in.
+        (function handleIncomingInviteLink() {
+            const params = new URLSearchParams(window.location.search);
+            const addUsername = params.get('add');
+            if (!addUsername) return;
+            const tryOpen = () => {
+                if (!auth.currentUser) return;
+                document.getElementById('friend-id-input').value = '@' + addUsername.replace(/^@/, '');
+                document.getElementById('add-friend-modal-overlay').classList.add('active');
+                const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+                window.history.replaceState({}, '', cleanUrl);
+            };
+            if (auth.currentUser) tryOpen();
+            else {
+                const unsub = onAuthStateChanged(auth, (u) => { if (u) { tryOpen(); unsub(); } });
+            }
+        })();
 
         document.getElementById('copy-username-btn').addEventListener('click', () => {
             const uname = document.getElementById('display-username').textContent;

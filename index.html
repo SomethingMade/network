@@ -207,6 +207,30 @@
         .xoxa-glow { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: var(--gradient-brand); filter: blur(32px); opacity: 0; animation: xoxaGlowIn 0.9s ease forwards 1.05s; pointer-events: none; }
         @keyframes xoxaGlowIn { to { opacity: 0.3; } }
 
+        /* spinning ring that encircles the xoxa wordmark: an arc that grows, shrinks and
+           rotates so the "trail" sweeps a different portion of the circle each cycle */
+        .xoxa-ring {
+            position: absolute; width: 128px; height: 128px;
+            opacity: 0; pointer-events: none; transform-origin: center;
+            animation: xoxaRingIn 0.4s ease forwards 1.05s, xoxaRingRotate 2.2s linear infinite 1.05s;
+        }
+        .xoxa-ring-track {
+            fill: none; stroke: var(--border-color); stroke-width: 3; opacity: 0.4;
+        }
+        .xoxa-ring-arc {
+            fill: none; stroke-width: 3; stroke-linecap: round;
+            stroke: url(#xoxaRingGradient);
+            transform-origin: center;
+            animation: xoxaRingDash 1.9s cubic-bezier(0.65, 0, 0.35, 1) infinite 1.05s;
+        }
+        @keyframes xoxaRingIn { to { opacity: 1; } }
+        @keyframes xoxaRingRotate { to { transform: rotate(360deg); } }
+        @keyframes xoxaRingDash {
+            0%   { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+            50%  { stroke-dasharray: 130, 200; stroke-dashoffset: -38; }
+            100% { stroke-dasharray: 130, 200; stroke-dashoffset: -195; }
+        }
+
         .xoxa-letter { position: relative; font-family: var(--font-brand); font-size: 40px; font-weight: 400; letter-spacing: 1px; line-height: 1; background: var(--gradient-brand); -webkit-background-clip: text; background-clip: text; color: transparent; opacity: 0; }
         .xl-1 { animation: xoxaFly1 0.6s cubic-bezier(0.2, 0.85, 0.3, 1.15) forwards 0.05s; }
         .xl-2 { animation: xoxaFly2 0.6s cubic-bezier(0.2, 0.85, 0.3, 1.15) forwards 0.18s; }
@@ -1212,6 +1236,50 @@
         .status-upload-action-btn .spinner-sm { width: 18px; height: 18px; border-width: 2px; }
 
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
+
+        /* On desktop, Profile & Settings opens as a right-hand sidebar instead of a
+           centered bottom sheet — the rest of the app stays visible and usable. */
+        @media (min-width: 1025px) {
+            #profile-bottom-sheet-overlay {
+                background: transparent;
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                align-items: stretch;
+                justify-content: flex-end;
+                pointer-events: none;
+            }
+            #profile-bottom-sheet-overlay .bottom-sheet.wa-profile-sheet {
+                pointer-events: auto;
+                width: 400px;
+                max-width: 400px;
+                height: 100%;
+                max-height: 100%;
+                border-radius: 0;
+                padding: 0 0 32px;
+                box-shadow: -12px 0 40px rgba(0,0,0,0.18);
+                border-left: 1px solid var(--border-color);
+                transform: translateX(100%);
+                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            #profile-bottom-sheet-overlay.active .bottom-sheet.wa-profile-sheet {
+                transform: translateX(0);
+            }
+            #profile-bottom-sheet-overlay .sheet-handle { display: none; }
+            #profile-bottom-sheet-overlay .wa-sheet-header {
+                padding: 20px 28px 16px;
+                position: sticky; top: 0;
+                background: var(--bg-surface);
+                z-index: 1;
+            }
+            #profile-bottom-sheet-overlay .wa-avatar-block,
+            #profile-bottom-sheet-overlay .wa-field-group,
+            #profile-bottom-sheet-overlay .wa-section,
+            #profile-bottom-sheet-overlay .wa-logout-row {
+                padding-left: 28px;
+                padding-right: 28px;
+            }
+        }
+
         @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
@@ -1290,6 +1358,16 @@
         <div class="splash-bg-orb splash-bg-orb-3"></div>
         <div class="xoxa-mark" role="img" aria-label="Xoxa">
             <span class="xoxa-glow"></span>
+            <svg class="xoxa-ring" viewBox="0 0 70 70">
+                <defs>
+                    <linearGradient id="xoxaRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="var(--primary-blue)"/>
+                        <stop offset="100%" stop-color="var(--accent-purple)"/>
+                    </linearGradient>
+                </defs>
+                <circle class="xoxa-ring-track" cx="35" cy="35" r="31.8"/>
+                <circle class="xoxa-ring-arc" cx="35" cy="35" r="31.8"/>
+            </svg>
             <span class="xoxa-letter xl-1">x</span><span class="xoxa-letter xl-2">o</span><span class="xoxa-letter xl-3">x</span><span class="xoxa-letter xl-4">a</span>
         </div>
         <div class="splash-tagline">Connecting you securely...</div>

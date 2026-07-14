@@ -2420,7 +2420,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -3621,6 +3621,52 @@
         let fcmSwRegistration = null;
         let currentFcmToken = null;
 
+        // --- AUTH TOKEN CACHE FOR SW-ONLY NOTIFICATION REPLIES ---
+        // The firebase-messaging-sw.js worker runs with no signed-in user of its own, so to let
+        // someone reply to a message straight from the notification tray (no app launch) we mirror
+        // a fresh ID token + uid into IndexedDB here. The SW reads this same store to authenticate
+        // its own REST write to the Realtime Database. Kept current via onIdTokenChanged below,
+        // which also fires automatically whenever the SDK silently refreshes the token (~hourly).
+        const AUTH_CACHE_DB = 'gozaAuthCache';
+        const AUTH_CACHE_STORE = 'tokens';
+
+        function openAuthCacheDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(AUTH_CACHE_DB, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(AUTH_CACHE_STORE);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function cacheAuthTokenForSW(user) {
+            try {
+                const token = await user.getIdToken();
+                const db = await openAuthCacheDB();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(AUTH_CACHE_STORE, 'readwrite');
+                    tx.objectStore(AUTH_CACHE_STORE).put({ token, uid: user.uid, updatedAt: Date.now() }, 'current');
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+            } catch (err) {
+                console.error('cacheAuthTokenForSW failed', err);
+            }
+        }
+
+        async function clearAuthTokenCache() {
+            try {
+                const db = await openAuthCacheDB();
+                const tx = db.transaction(AUTH_CACHE_STORE, 'readwrite');
+                tx.objectStore(AUTH_CACHE_STORE).delete('current');
+            } catch (err) { /* best-effort */ }
+        }
+
+        onIdTokenChanged(auth, (user) => {
+            if (user) cacheAuthTokenForSW(user);
+            else clearAuthTokenCache();
+        });
+
         async function registerFcmServiceWorker() {
             if (!('serviceWorker' in navigator)) return null;
             if (fcmSwRegistration) return fcmSwRegistration;
@@ -3670,7 +3716,11 @@
                             icon: icon || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
                             badge: "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
                             tag: groupId ? ('group-' + groupId) : (chatUid ? ('chat-' + chatUid) : 'new-message'),
-                            data: { url: url || '/', uid: chatUid, groupId: groupId }
+                            data: { url: url || '/', uid: chatUid, groupId: groupId, senderName: title || 'Someone' },
+                            actions: [
+                                { action: 'reply', title: 'Reply', type: 'text', placeholder: 'Type a message…' },
+                                { action: 'close', title: 'Dismiss' }
+                            ]
                         });
                     });
                 });

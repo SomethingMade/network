@@ -1715,6 +1715,14 @@
                     <span class="setting-item-meta" id="profile-app-version-label">v1.0.0</span>
                     <button type="button" id="btn-profile-update" class="wa-row-btn" style="display:none;">Update</button>
                 </div>
+                <div class="wa-list-row wa-row-clickable" id="setting-install-app">
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Install App</span>
+                        <span class="wa-row-sub" id="profile-install-status">Add Xoxa to your home screen</span>
+                    </div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
             </div>
 
             <button type="button" id="btn-logout" class="wa-logout-row">Sign Out</button>
@@ -3170,10 +3178,36 @@
             btnInstallApp.style.display = 'flex';
         }
 
+        // Unlike the header button, the row in the Profile sheet stays visible at all times —
+        // including once the app is already installed — so people can always find it. Only the
+        // sub-label and tap behavior change depending on install state.
+        const profileInstallRow = document.getElementById('setting-install-app');
+        const profileInstallStatus = document.getElementById('profile-install-status');
+
+        function updateProfileInstallRow() {
+            if (isStandaloneApp()) {
+                profileInstallStatus.textContent = 'Already installed on this device';
+            } else if (isIOS()) {
+                profileInstallStatus.textContent = 'Add to your Home Screen';
+            } else {
+                profileInstallStatus.textContent = 'Add Xoxa to your home screen';
+            }
+        }
+        updateProfileInstallRow();
+
+        profileInstallRow.addEventListener('click', () => {
+            if (isStandaloneApp()) {
+                notify('Xoxa is already installed on this device');
+                return;
+            }
+            btnInstallApp.click();
+        });
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredInstallPrompt = e;
             btnInstallApp.style.display = 'flex';
+            updateProfileInstallRow();
             maybeShowInstallSheet();
         });
 
@@ -3217,6 +3251,7 @@
             btnInstallApp.style.display = 'none';
             deferredInstallPrompt = null;
             hideInstallSheet();
+            updateProfileInstallRow();
             notify('App installed successfully');
         });
 

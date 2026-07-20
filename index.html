@@ -680,6 +680,15 @@
         .group-info-section { text-align: left; margin-bottom: 16px; }
         .group-info-section-label { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
         .btn-add-contact:hover { opacity: 0.9; }
+        .add-friend-tabs { display:flex; gap:4px; background: var(--bg-input); border-radius: 50px; padding:4px; margin-bottom:20px; }
+        .add-friend-tab { flex:1; border:none; background:transparent; padding:9px 4px; border-radius:50px; font-size:12.5px; font-weight:600; color: var(--text-secondary); cursor:pointer; transition:0.2s; }
+        .add-friend-tab.active { background: var(--gradient-brand); color:#fff; }
+        .add-friend-panel p { color:var(--text-secondary); font-size:14px; line-height:1.5; margin: 0 0 16px; }
+        .my-qr-code-box { width:170px; height:170px; margin: 0 auto 18px; background:#fff; border-radius:16px; padding:10px; display:flex; align-items:center; justify-content:center; }
+        .my-qr-code-box img, .my-qr-code-box canvas { border-radius:6px; }
+        .qr-scan-frame { position:relative; width:220px; height:220px; margin:0 auto; border-radius:20px; overflow:hidden; background:#000; }
+        .qr-scan-frame video { width:100%; height:100%; object-fit:cover; display:block; }
+        .qr-scan-corner-box { position:absolute; inset:16px; border:3px solid #fff; border-radius:16px; pointer-events:none; opacity:0.85; }
 
         /* Add Friend Floating Button */
         .fab-add { position: absolute; bottom: 32px; right: 32px; width: 60px; height: 60px; border-radius: 50%; background: var(--primary-blue); color: white; border: none; font-size: 32px; cursor: pointer; box-shadow: 0 10px 25px rgba(37, 211, 102, 0.4); display: none; align-items: center; justify-content: center; transition: 0.2s; z-index: 50; }
@@ -1326,11 +1335,38 @@
     <div id="add-friend-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
             <h3>Add a Friend</h3>
-            <p>Enter your friend's @username or phone number below to add them to your contacts.</p>
-            <input type="text" id="friend-id-input" class="pill-input" placeholder="@username or phone number" style="text-align:center; font-family:monospace; font-weight:600; font-size:16px;">
-            <div class="modal-actions">
-                <button type="button" id="btn-cancel-add-friend" class="btn-pill btn-outline">Cancel</button>
-                <button type="button" id="btn-confirm-add-friend" class="btn-pill btn-primary">Add Friend</button>
+
+            <div class="add-friend-tabs" id="add-friend-tabs">
+                <button type="button" class="add-friend-tab active" data-add-friend-tab="id">Enter ID</button>
+                <button type="button" class="add-friend-tab" data-add-friend-tab="mycode">My Code</button>
+                <button type="button" class="add-friend-tab" data-add-friend-tab="scan">Scan</button>
+            </div>
+
+            <div id="add-friend-panel-id" class="add-friend-panel">
+                <p>Enter your friend's @username or phone number below to add them to your contacts.</p>
+                <input type="text" id="friend-id-input" class="pill-input" placeholder="@username or phone number" style="text-align:center; font-family:monospace; font-weight:600; font-size:16px;">
+                <div class="modal-actions">
+                    <button type="button" id="btn-cancel-add-friend" class="btn-pill btn-outline">Cancel</button>
+                    <button type="button" id="btn-confirm-add-friend" class="btn-pill btn-primary">Add Friend</button>
+                </div>
+            </div>
+
+            <div id="add-friend-panel-mycode" class="add-friend-panel" style="display:none;">
+                <p>Let a friend scan this to add you instantly.</p>
+                <div id="my-qr-code-canvas" class="my-qr-code-box"></div>
+                <p id="my-qr-username-label" style="font-weight:700; font-family:monospace; color:var(--text-primary); margin:0 0 20px;">@username</p>
+                <button type="button" id="btn-cancel-add-friend-mycode" class="btn-pill btn-outline" style="width:100%;">Close</button>
+            </div>
+
+            <div id="add-friend-panel-scan" class="add-friend-panel" style="display:none;">
+                <p>Point your camera at a friend's QR code.</p>
+                <div class="qr-scan-frame">
+                    <video id="qr-scan-video" playsinline muted></video>
+                    <canvas id="qr-scan-canvas" style="display:none;"></canvas>
+                    <div class="qr-scan-corner-box"></div>
+                </div>
+                <p id="qr-scan-status" style="font-size:13px; color:var(--text-secondary); margin:14px 0 20px;">Starting camera…</p>
+                <button type="button" id="btn-cancel-add-friend-scan" class="btn-pill btn-outline" style="width:100%;">Cancel</button>
             </div>
         </div>
     </div>
@@ -2443,6 +2479,8 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -6169,26 +6207,7 @@
             }
         });
 
-        const addFriendModal = document.getElementById('add-friend-modal-overlay');
-        document.getElementById('fab-add-friend').addEventListener('click', () => {
-            document.getElementById('friend-id-input').value = '';
-            addFriendModal.classList.add('active');
-        });
-        document.getElementById('btn-cancel-add-friend').addEventListener('click', () => {
-            addFriendModal.classList.remove('active');
-        });
-
-        // Lets someone jump straight to the composer (which lives at the top of the feed) from
-        // wherever they've scrolled to, instead of hunting for it manually.
-        document.getElementById('fab-new-post').addEventListener('click', () => {
-            const container = document.getElementById('feed-posts-container');
-            const input = document.getElementById('feed-composer-input');
-            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
-            if (input) setTimeout(() => input.focus(), 350);
-        });
-
-        document.getElementById('btn-confirm-add-friend').addEventListener('click', async () => {
-            const rawInput = document.getElementById('friend-id-input').value.trim();
+        async function addFriendByRawInput(rawInput) {
             const user = auth.currentUser;
             if(!rawInput || !user) return;
 
@@ -6227,6 +6246,137 @@
             } catch (err) {
                 showCustomModal("Error", "There was an issue adding this user.");
             } finally { hideLoading(); }
+        }
+
+        document.getElementById('btn-confirm-add-friend').addEventListener('click', () => {
+            addFriendByRawInput(document.getElementById('friend-id-input').value.trim());
+        });
+
+        // --- Add Friend modal: tabs (Enter ID / My Code / Scan) ---
+        const addFriendTabButtons = document.querySelectorAll('.add-friend-tab');
+        const addFriendPanels = {
+            id: document.getElementById('add-friend-panel-id'),
+            mycode: document.getElementById('add-friend-panel-mycode'),
+            scan: document.getElementById('add-friend-panel-scan')
+        };
+        let qrScanStream = null;
+        let qrScanRafId = null;
+
+        function setAddFriendTab(tab) {
+            addFriendTabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.addFriendTab === tab));
+            Object.keys(addFriendPanels).forEach(key => {
+                addFriendPanels[key].style.display = key === tab ? 'block' : 'none';
+            });
+            if (tab === 'mycode') renderMyQrCode();
+            if (tab === 'scan') startQrScanner(); else stopQrScanner();
+        }
+        addFriendTabButtons.forEach(btn => {
+            btn.addEventListener('click', () => setAddFriendTab(btn.dataset.addFriendTab));
+        });
+        document.getElementById('btn-cancel-add-friend-mycode').addEventListener('click', () => {
+            addFriendModal.classList.remove('active');
+        });
+        document.getElementById('btn-cancel-add-friend-scan').addEventListener('click', () => {
+            addFriendModal.classList.remove('active');
+        });
+
+        // Renders the current user's own QR code (encodes their @username, or uid as a
+        // fallback if they haven't set one yet) so a friend can scan it to add them instantly.
+        function renderMyQrCode() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const usernameLabel = document.getElementById('display-username').textContent;
+            const hasUsername = usernameLabel && usernameLabel !== '@—' && usernameLabel !== '@loading';
+            const qrValue = hasUsername ? usernameLabel : user.uid;
+
+            document.getElementById('my-qr-username-label').textContent = hasUsername ? usernameLabel : 'Scan to add me';
+
+            const container = document.getElementById('my-qr-code-canvas');
+            container.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(container, {
+                    text: qrValue,
+                    width: 150,
+                    height: 150,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        }
+
+        // Opens the device camera and scans video frames for a QR code using jsQR. Stops
+        // itself automatically once a code is found, or when the panel/modal is closed.
+        async function startQrScanner() {
+            const statusEl = document.getElementById('qr-scan-status');
+            const videoEl = document.getElementById('qr-scan-video');
+            statusEl.textContent = 'Starting camera…';
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusEl.textContent = 'Camera not available on this device';
+                return;
+            }
+            if (!window.jsQR) {
+                statusEl.textContent = 'Scanner failed to load';
+                return;
+            }
+            try {
+                qrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                videoEl.srcObject = qrScanStream;
+                await videoEl.play();
+                statusEl.textContent = 'Looking for a code…';
+
+                const canvasEl = document.getElementById('qr-scan-canvas');
+                const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+
+                const tick = () => {
+                    if (!qrScanStream) return;
+                    if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+                        canvasEl.width = videoEl.videoWidth;
+                        canvasEl.height = videoEl.videoHeight;
+                        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+                        const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (code && code.data) {
+                            const scannedValue = code.data.trim();
+                            stopQrScanner();
+                            statusEl.textContent = 'Code found — adding…';
+                            addFriendByRawInput(scannedValue);
+                            return;
+                        }
+                    }
+                    qrScanRafId = requestAnimationFrame(tick);
+                };
+                qrScanRafId = requestAnimationFrame(tick);
+            } catch (err) {
+                statusEl.textContent = 'Camera permission denied';
+            }
+        }
+
+        function stopQrScanner() {
+            if (qrScanRafId) { cancelAnimationFrame(qrScanRafId); qrScanRafId = null; }
+            if (qrScanStream) { qrScanStream.getTracks().forEach(t => t.stop()); qrScanStream = null; }
+            const videoEl = document.getElementById('qr-scan-video');
+            if (videoEl) videoEl.srcObject = null;
+        }
+
+        const addFriendModal = document.getElementById('add-friend-modal-overlay');
+        document.getElementById('fab-add-friend').addEventListener('click', () => {
+            document.getElementById('friend-id-input').value = '';
+            setAddFriendTab('id');
+            addFriendModal.classList.add('active');
+        });
+        document.getElementById('btn-cancel-add-friend').addEventListener('click', () => {
+            addFriendModal.classList.remove('active');
+        });
+
+        // Lets someone jump straight to the composer (which lives at the top of the feed) from
+        // wherever they've scrolled to, instead of hunting for it manually.
+        document.getElementById('fab-new-post').addEventListener('click', () => {
+            const container = document.getElementById('feed-posts-container');
+            const input = document.getElementById('feed-composer-input');
+            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+            if (input) setTimeout(() => input.focus(), 350);
         });
 
         // --- GROUPS ---

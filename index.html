@@ -1942,6 +1942,22 @@
                 </div>
             </div>
 
+            <div id="install-sheet-generic" style="display:none;">
+                <p style="color:var(--text-secondary); font-size:14px; line-height:1.5; margin: 0 0 16px;">Add Xoxa to your home screen for a faster, full-screen experience with instant notifications.</p>
+                <div class="ios-install-step">
+                    <div class="ios-install-step-num">1</div>
+                    <div>Open your browser's menu <svg class="ios-icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg> (usually top-right)</div>
+                </div>
+                <div class="ios-install-step">
+                    <div class="ios-install-step-num">2</div>
+                    <div>Look for <strong>Install App</strong> or <strong>Add to Home Screen</strong></div>
+                </div>
+                <div class="ios-install-step">
+                    <div class="ios-install-step-num">3</div>
+                    <div>Confirm to add Xoxa to your device</div>
+                </div>
+            </div>
+
             <p class="toggle-auth" id="btn-install-sheet-dismiss" style="margin-top:16px;"><span>Maybe later</span></p>
         </div>
     </div>
@@ -3132,6 +3148,7 @@
         const installSheetOverlay = document.getElementById('install-prompt-sheet-overlay');
         const installSheetStandard = document.getElementById('install-sheet-standard');
         const installSheetIOS = document.getElementById('install-sheet-ios');
+        const installSheetGeneric = document.getElementById('install-sheet-generic');
         const installSheetDismissText = document.querySelector('#btn-install-sheet-dismiss span');
 
         function isStandaloneApp() {
@@ -3150,21 +3167,23 @@
 
         // Offers the install sheet on the login screen, once per session, only if we can actually
         // do something useful: either we have a captured beforeinstallprompt event (Android/desktop
-        // Chrome/Edge) or we're on iOS (where we show manual instructions instead). Skips entirely
-        // if the person already dismissed it, or is already running the installed app.
+        // Chrome/Edge), we're on iOS (manual instructions), or any other browser (generic manual
+        // instructions). Skips entirely if the person already dismissed it, or is already running
+        // the installed app.
         function maybeShowInstallSheet() {
             if (isStandaloneApp()) return;
             if (sessionStorage.getItem('installSheetDismissed')) return;
             if (document.getElementById('auth-screen').style.display !== 'flex') return;
-            if (!deferredInstallPrompt && !isIOS()) return;
             showInstallSheet();
         }
 
         function showInstallSheet() {
             const iosMode = isIOS() && !deferredInstallPrompt;
-            installSheetStandard.style.display = iosMode ? 'none' : 'block';
+            const genericMode = !iosMode && !deferredInstallPrompt;
+            installSheetStandard.style.display = (!iosMode && !genericMode) ? 'block' : 'none';
             installSheetIOS.style.display = iosMode ? 'block' : 'none';
-            installSheetDismissText.textContent = iosMode ? 'Got it' : 'Maybe later';
+            installSheetGeneric.style.display = genericMode ? 'block' : 'none';
+            installSheetDismissText.textContent = (iosMode || genericMode) ? 'Got it' : 'Maybe later';
             installSheetOverlay.classList.add('active');
         }
 
@@ -3172,9 +3191,10 @@
             installSheetOverlay.classList.remove('active');
         }
 
-        // On iOS there's no beforeinstallprompt to wait for, so surface the header install
-        // button right away (as long as we're not already running as an installed app).
-        if (isIOS() && !isStandaloneApp()) {
+        // Every browser now has somewhere useful to go when tapped — a native prompt on
+        // Chrome/Edge/Android, or manual instructions (iOS-specific or generic) otherwise —
+        // so show the header button everywhere except when already running standalone.
+        if (!isStandaloneApp()) {
             btnInstallApp.style.display = 'flex';
         }
 
@@ -3226,8 +3246,8 @@
 
         btnInstallApp.addEventListener('click', async (e) => {
             e.preventDefault();
-            if (isIOS() && !deferredInstallPrompt) { showInstallSheet(); return; }
-            await runInstallPrompt();
+            if (deferredInstallPrompt) { await runInstallPrompt(); return; }
+            showInstallSheet();
         });
 
         document.getElementById('btn-install-app-sheet').addEventListener('click', async (e) => {

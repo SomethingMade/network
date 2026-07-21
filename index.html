@@ -1177,7 +1177,7 @@
         .story-progress-fill { height: 100%; width: 0%; background: #FFF; }
         
         .story-viewer-header { position: absolute; top: 24px; left: 12px; right: 12px; display: flex; align-items: center; gap: 10px; z-index: 10; }
-        .story-viewer-header .avatar { width: 32px; height: 32px; border: none; }
+        .status-viewer-inner .story-viewer-header .avatar { width: 32px; height: 32px; border: none; }
         .story-viewer-header span { color: white; font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
         
         .story-controls-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
@@ -1193,9 +1193,14 @@
 
         /* Story Like Button, Reply Bar & Floating Hearts */
         .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 16px; pointer-events: none; }
-        .story-like-btn { width: 34px; height: 34px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
+
+        /* TikTok-style vertical action rail: avatar, then reaction, then reshare, stacked bottom-right */
+        .story-action-rail { position: absolute; right: 14px; bottom: 88px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 18px; pointer-events: none; }
+        .story-action-avatar { width: 46px; height: 46px; border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 2px 10px rgba(0,0,0,0.4); cursor: pointer; pointer-events: auto; }
+        .story-like-btn { width: 30px; height: 30px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
         .story-like-btn.liked { fill: var(--danger-red); color: var(--danger-red); }
-        .story-reshare-btn { width: 30px; height: 30px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
+        .story-like-btn:active, .story-action-avatar:active { transform: scale(0.9); }
+        .story-reshare-btn { width: 28px; height: 28px; color: white; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); pointer-events: auto; flex-shrink: 0; }
         .story-reshare-btn:active { transform: scale(0.85); opacity: 0.7; }
         .story-shared-tag { position: absolute; left: 16px; right: 16px; top: 54px; z-index: 9; display: none; align-items: center; gap: 6px; color: rgba(255,255,255,0.9); font-size: 12.5px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
         .story-shared-tag svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -1238,7 +1243,7 @@
         .story-music-chip img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
         .story-music-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .story-music-chip.spinning-note { animation: none; }
-        .story-caption { position: absolute; left: 16px; right: 16px; bottom: 90px; z-index: 9; text-align: center; color: #fff; font-size: 15px; font-weight: 500; line-height: 1.4; text-shadow: 0 1px 6px rgba(0,0,0,0.5); background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 16px; padding: 10px 14px; max-height: 30%; overflow-y: auto; word-break: break-word; display: none; transform: translateZ(0); -webkit-transform: translateZ(0); }
+        .story-caption { position: absolute; left: 16px; right: 74px; bottom: 90px; z-index: 9; text-align: center; color: #fff; font-size: 15px; font-weight: 500; line-height: 1.4; text-shadow: 0 1px 6px rgba(0,0,0,0.5); background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 16px; padding: 10px 14px; max-height: 30%; overflow-y: auto; word-break: break-word; display: none; transform: translateZ(0); -webkit-transform: translateZ(0); }
         .story-caption-input { width: 100%; min-height: 90px; resize: none; border: 1.5px solid var(--border-color); border-radius: 16px; padding: 14px 16px; font-size: 15px; background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; margin-bottom: 8px; }
         .story-caption-counter { text-align: right; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
         .sv-info { display: flex; flex-direction: column; gap: 2px; }
@@ -2441,7 +2446,6 @@
         <div class="story-viewer-inner">
             <div class="story-progress-row" id="story-progress-row"></div>
             <div class="story-viewer-header">
-                <div class="avatar" id="story-viewer-avatar" style="width:32px;height:32px;"></div>
                 <span id="story-viewer-name"></span>
                 <div class="story-controls-right">
                     <svg class="story-viewer-delete story-interactive" id="story-viewer-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -2465,13 +2469,17 @@
             <div class="story-tap-zone left" id="story-tap-left"></div>
             <div class="story-tap-zone right" id="story-tap-right"></div>
             
+            <div class="story-action-rail" id="story-action-rail">
+                <div class="avatar story-action-avatar story-interactive" id="story-viewer-avatar"></div>
+                <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <svg class="story-reshare-btn story-interactive" id="story-reshare-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            </div>
+
             <div class="story-controls-bottom" id="story-controls-bottom">
                 <div class="story-reply-bar story-interactive">
                     <input type="text" id="story-reply-input" class="story-reply-input" placeholder="Reply to story..." autocomplete="off">
                     <svg class="story-reply-send" id="story-reply-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </div>
-                <svg class="story-reshare-btn story-interactive" id="story-reshare-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
-                <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             </div>
 
             <div class="story-views-bar story-interactive" id="story-views-bar" style="display:none;">
@@ -7571,6 +7579,8 @@
 
             document.getElementById('story-viewer-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('story-controls-bottom').style.display = isOwn ? 'none' : 'flex';
+            document.getElementById('story-like-btn').style.display = isOwn ? 'none' : 'block';
+            document.getElementById('story-reshare-btn').style.display = isOwn ? 'none' : 'block';
             const replyInputEl = document.getElementById('story-reply-input');
             replyInputEl.value = '';
             document.getElementById('story-reply-send').style.display = 'none';

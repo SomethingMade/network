@@ -915,8 +915,15 @@
         .msg-media-save-btn:active { transform: scale(0.92); }
         .msg-media-save-btn svg { width: 16px; height: 16px; }
         .msg-media-caption { padding: 8px 4px 2px; font-size: 14px; color: var(--text-primary); word-break: break-word; }
-        .msg-media-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: none; }
+        .msg-media-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: none; opacity: 1; transition: opacity 0.15s ease; }
+        .msg-media-play-hint.hidden { opacity: 0; pointer-events: none; }
         .msg-media-video { pointer-events: auto; }
+        /* Shown on top of a chat video while it's still loading/buffering, in place of the
+           native (blank/black) video frame, so there's always something readable on screen. */
+        .msg-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(20,20,20,0.55); border-radius: inherit; z-index: 1; opacity: 1; transition: opacity 0.2s ease; }
+        .msg-video-loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .msg-video-loading-overlay .spinner-sm { width: 26px; height: 26px; }
+        .msg-video-loading-overlay span { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.9); letter-spacing: 0.2px; }
         .image-viewer-save {
             position: absolute;
             top: 20px;
@@ -1190,6 +1197,12 @@
         
         .story-tap-zone { position: absolute; top: 0; bottom: 0; width: 40%; z-index: 2; }
         .story-tap-zone.left { left: 0; } .story-tap-zone.right { right: 0; }
+        /* Shown over a story/status video while it's loading, buffering, or seeking, so viewers
+           see a clear indicator instead of a frozen/blank native video frame. */
+        .story-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 3; opacity: 1; pointer-events: none; transition: opacity 0.2s ease; background: rgba(0,0,0,0.15); }
+        .story-video-loading-overlay.hidden { opacity: 0; }
+        .story-video-loading-overlay .spinner-sm { width: 32px; height: 32px; border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+        .story-video-loading-overlay span { color: #fff; font-size: 13px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 
         /* Story Like Button, Reply Bar & Floating Hearts */
         .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 16px; pointer-events: none; }
@@ -2459,6 +2472,10 @@
             
             <img class="story-media" id="story-viewer-media" src="" alt="Story">
             <video class="story-media" id="story-viewer-video" muted playsinline style="display:none;"></video>
+            <div class="story-video-loading-overlay hidden" id="story-viewer-loading">
+                <div class="spinner-sm"></div>
+                <span>Loading video…</span>
+            </div>
             <div class="story-bottom-info" id="story-bottom-info">
                 <div class="story-bottom-username" id="story-viewer-name"></div>
                 <div class="story-caption" id="story-viewer-caption"></div>
@@ -2526,6 +2543,10 @@
                 </div>
             </div>
             <video id="status-viewer-video" class="story-media" playsinline></video>
+            <div class="story-video-loading-overlay hidden" id="status-viewer-loading">
+                <div class="spinner-sm"></div>
+                <span>Loading video…</span>
+            </div>
             <div class="story-tap-zone left" id="status-tap-left"></div>
             <div class="story-tap-zone right" id="status-tap-right"></div>
         </div>
@@ -7095,6 +7116,7 @@
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
                             playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(playHint);
+                            attachVideoLoadingOverlay(mediaWrap, vid, playHint);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
                                 const captionEl = document.createElement('div');
@@ -7684,6 +7706,7 @@
             } else {
                 videoEl.style.display = 'none';
                 videoEl.removeAttribute('src');
+                document.getElementById('story-viewer-loading').classList.add('hidden');
                 muteBtn.style.display = hasMusic ? 'flex' : 'none';
                 if (hasMusic) updateMuteIcon();
                 imgEl.style.display = 'block';
@@ -8678,12 +8701,16 @@
                     </div>`;
                 bubble.appendChild(card);
             } else if (item.isVideo) {
+                const mediaWrap = document.createElement('div');
+                mediaWrap.className = 'msg-media-wrap';
                 const vid = document.createElement('video');
                 vid.className = 'msg-media-video';
                 vid.src = item.previewURL;
                 vid.muted = true;
                 vid.playsInline = true;
-                bubble.appendChild(vid);
+                mediaWrap.appendChild(vid);
+                attachVideoLoadingOverlay(mediaWrap, vid);
+                bubble.appendChild(mediaWrap);
             } else {
                 const img = document.createElement('img');
                 img.className = 'msg-media-img';
@@ -9407,6 +9434,7 @@
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
                             playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(playHint);
+                            attachVideoLoadingOverlay(mediaWrap, vid, playHint);
                             bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'audio') {
                             const card = document.createElement('div');
@@ -10350,7 +10378,71 @@
             if (audioEl.paused) toggleVoicePlayback(playBtn, url, bubble);
         }
 
+        // Same idea as attachVideoLoadingOverlay, but for the persistent full-screen story/status
+        // <video> elements (their src changes per-item rather than the element being recreated).
+        function wireStoryVideoLoadingOverlay(videoEl, overlayEl) {
+            const show = () => overlayEl.classList.remove('hidden');
+            const hide = () => overlayEl.classList.add('hidden');
+            videoEl.addEventListener('loadstart', show);
+            videoEl.addEventListener('waiting', show);
+            videoEl.addEventListener('stalled', show);
+            videoEl.addEventListener('seeking', show);
+            videoEl.addEventListener('loadeddata', hide);
+            videoEl.addEventListener('canplay', hide);
+            videoEl.addEventListener('canplaythrough', hide);
+            videoEl.addEventListener('playing', hide);
+            videoEl.addEventListener('seeked', hide);
+            videoEl.addEventListener('error', show);
+        }
+        wireStoryVideoLoadingOverlay(document.getElementById('story-viewer-video'), document.getElementById('story-viewer-loading'));
+        wireStoryVideoLoadingOverlay(document.getElementById('status-viewer-video'), document.getElementById('status-viewer-loading'));
+
         function playIconSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>'; }
+
+        // Builds a spinner+caption overlay for a chat video and wires it to that video's
+        // readiness/buffering state, so viewers see a clear loading indicator instead of the
+        // native blank/black video frame while the file is still loading, seeking, or stalled.
+        function attachVideoLoadingOverlay(mediaWrap, vid, playHint) {
+            const overlay = document.createElement('div');
+            overlay.className = 'msg-video-loading-overlay';
+            overlay.innerHTML = '<div class="spinner-sm"></div><span>Loading video…</span>';
+            mediaWrap.appendChild(overlay);
+            if (playHint) playHint.classList.add('hidden');
+
+            const showLoading = () => {
+                overlay.classList.remove('hidden');
+                if (playHint) playHint.classList.add('hidden');
+            };
+            const hideLoading = () => {
+                overlay.classList.add('hidden');
+                if (playHint) playHint.classList.remove('hidden');
+            };
+
+            // Video not ready to render a frame yet (still fetching/buffering/seeking)
+            vid.addEventListener('waiting', showLoading);
+            vid.addEventListener('stalled', showLoading);
+            vid.addEventListener('seeking', showLoading);
+            vid.addEventListener('loadstart', showLoading);
+
+            // Video has enough data to show/play a frame
+            vid.addEventListener('loadeddata', hideLoading);
+            vid.addEventListener('canplay', hideLoading);
+            vid.addEventListener('canplaythrough', hideLoading);
+            vid.addEventListener('playing', hideLoading);
+            vid.addEventListener('seeked', hideLoading);
+
+            vid.addEventListener('error', () => {
+                overlay.innerHTML = '<span>Video unavailable</span>';
+                overlay.classList.remove('hidden');
+                if (playHint) playHint.classList.add('hidden');
+            });
+
+            // If the video element already has enough data by the time we attach (e.g. cached),
+            // don't leave the overlay stuck on screen.
+            if (vid.readyState >= 3) hideLoading();
+
+            return overlay;
+        }
         function pauseIconSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'; }
 
         function initChatListeners() {

@@ -1305,7 +1305,24 @@
         }
         @keyframes statusShimmer { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
 
-        /* ── FULLSCREEN STATUS VIEWER (story-style playback for grid videos) ── */
+        /* ── DISCOVER TAB (browse other users and add them as contacts) ── */
+        .discover-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; }
+        .discover-section-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; padding: 14px 4px 10px; }
+        .discover-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .discover-card { position: relative; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px 12px 14px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+        .discover-card .avatar.discover-card-avatar { width: 60px; height: 60px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--primary-blue); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; margin-bottom: 8px; flex-shrink: 0; }
+        .discover-card h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 3px; justify-content: center; }
+        .discover-card p { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+        .discover-card-add-btn { width: 100%; padding: 8px 0; border-radius: 50px; border: none; background: var(--gradient-brand); color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .discover-card-add-btn:hover { opacity: 0.9; }
+        .discover-card-add-btn:disabled { opacity: 0.6; cursor: default; }
+        .discover-card-add-btn.added { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .discover-grid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 60px 30px; color: var(--text-secondary); }
+        .discover-grid-empty svg { opacity: 0.4; margin-bottom: 4px; }
+        .discover-grid-empty p { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .discover-grid-empty span { font-size: 13px; }
+
+        /* ── FULLSCREEN STATUS VIEWER (dormant — was reached only from the old Status tab grid, kept intact/unused so nothing else breaks) ── */
         #status-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100004; display: none; align-items: center; justify-content: center; }
         #status-viewer-overlay.active { display: flex; }
         .status-viewer-inner { position: relative; width: 100%; max-width: 460px; height: 100%; max-height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -2119,8 +2136,8 @@
                     <span>Chats</span>
                 </div>
                 <div class="nav-item" data-tab="tab-status">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="3"></rect><polygon points="10 9 15 12 10 15 10 9" fill="currentColor" stroke="none"></polygon></svg>
-                    <span>Status</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 4.5 1.64"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+                    <span>Discover</span>
                 </div>
                 <div class="nav-item" data-tab="tab-groups">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -2236,23 +2253,24 @@
                 <div id="tab-status" class="tab-content">
                     <div class="chat-header-area">
                         <div class="chat-header-top">
-                            <h1>Status</h1>
+                            <h1>Discover</h1>
                             <div class="chat-header-icons">
-                                <svg id="status-upload-btn" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Upload Status" style="cursor:pointer; color:var(--text-primary);"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2.5"></rect><line x1="7" y1="9" x2="7" y2="15"></line><line x1="4" y1="12" x2="10" y2="12"></line></svg>
+                                <svg id="discover-refresh-btn" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Show new suggestions" style="cursor:pointer; color:var(--text-primary);"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
-                    </div>
-                    <input type="file" id="status-upload-file" accept="video/*" style="display:none;">
-                    <div class="status-grid-scroll" id="status-grid-scroll">
-                        <div class="status-masonry-grid" id="status-grid"></div>
-                        <div class="status-loading-more" id="status-loading-more" style="display:none;">
-                            <div class="spinner-sm"></div>
+                        <div class="search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="search-discover" placeholder="Search by name or @username">
                         </div>
-                        <div class="status-grid-empty" id="status-grid-empty" style="display:none;">
-                            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="3"></rect><polygon points="10 9 15 12 10 15 10 9" fill="currentColor" stroke="none"></polygon></svg>
-                            <p>No video updates yet</p>
-                            <span>Videos shared to Moments will show up here</span>
+                    </div>
+                    <div class="discover-grid-scroll" id="discover-grid-scroll">
+                        <p class="discover-section-label" id="discover-section-label">People you may know</p>
+                        <div class="discover-grid" id="discover-grid"></div>
+                        <div class="discover-grid-empty" id="discover-grid-empty" style="display:none;">
+                            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+                            <p id="discover-empty-title">No one new to find right now</p>
+                            <span id="discover-empty-sub">Check back later, or invite friends to join Xoxa</span>
                         </div>
                     </div>
                 </div>
@@ -2552,6 +2570,7 @@
         </div>
     </div>
 
+    <input type="file" id="status-upload-file" accept="video/*" style="display:none;">
     <div id="status-upload-overlay">
         <div class="status-upload-inner">
             <video id="status-upload-preview" muted playsinline loop autoplay></video>
@@ -3168,7 +3187,7 @@
                 const fabNewPost = document.getElementById('fab-new-post');
                 if (fabNewPost) fabNewPost.style.display = (hash === 'tab-feed') ? 'flex' : 'none';
 
-                if (hash === 'tab-status') renderStatusGrid();
+                if (hash === 'tab-status') renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
 
                 updateNavIndicator();
             }
@@ -3853,7 +3872,118 @@
                 : `<div class="avatar ${sizeClass || ''}">${initial}</div>`;
         }
 
-        // --- STATUS TAB (masonry grid of Moments videos + fullscreen story-style playback) ---
+        // --- DISCOVER TAB (browse other Xoxa users and add them as contacts) ---
+        // Lives where the old video-Moments "Status" tab used to be. Reuses the existing
+        // one-directional contacts/{me}/{them}=true add mechanism (same as the Add Friend
+        // modal and Message Requests), just from a browsable grid instead of a typed lookup.
+        let discoverShuffleSeed = 0;
+
+        function getDiscoverableUsers() {
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            return Object.keys(cachedUsers || {}).filter(uid =>
+                uid !== myUid && uid !== AI_UID && !cachedContacts[uid] && !cachedBlocked[uid]
+            );
+        }
+
+        // Keeps card order stable within a render pass but reshuffles when the seed changes
+        // (on explicit refresh), so the grid doesn't jump around on every unrelated re-render.
+        function shuffleWithSeed(arr, seed) {
+            const copy = arr.slice();
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(seededRandom01(seed + '-' + copy[i]) * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
+
+        function renderDiscoverGrid(searchTerm) {
+            const grid = document.getElementById('discover-grid');
+            const emptyState = document.getElementById('discover-grid-empty');
+            const sectionLabel = document.getElementById('discover-section-label');
+            if (!grid) return;
+
+            const term = (searchTerm || '').trim().toLowerCase();
+            let uids = getDiscoverableUsers();
+
+            if (term) {
+                uids = uids.filter(uid => {
+                    const p = cachedUsers[uid] || {};
+                    return (p.name && p.name.toLowerCase().includes(term)) ||
+                           (p.username && p.username.toLowerCase().includes(term));
+                });
+            } else {
+                uids = shuffleWithSeed(uids, 'discover-' + discoverShuffleSeed).slice(0, 60);
+            }
+
+            grid.innerHTML = '';
+
+            if (!uids.length) {
+                if (sectionLabel) sectionLabel.textContent = '';
+                document.getElementById('discover-empty-title').textContent = term ? 'No one found' : 'No one new to find right now';
+                document.getElementById('discover-empty-sub').textContent = term ? 'Try a different name or username' : 'Check back later, or invite friends to join Xoxa';
+                if (emptyState) emptyState.style.display = 'flex';
+                return;
+            }
+            if (emptyState) emptyState.style.display = 'none';
+            if (sectionLabel) sectionLabel.textContent = term ? `Results for "${searchTerm.trim()}"` : 'People you may know';
+
+            uids.forEach(uid => {
+                const profile = cachedUsers[uid] || {};
+                const name = profile.name || 'Xoxa User';
+                const card = document.createElement('div');
+                card.className = 'discover-card';
+                card.dataset.uid = uid;
+                card.innerHTML = `
+                    ${feedAvatarHtml(profile, 'discover-card-avatar')}
+                    <h3>${name}${verifiedBadgeFor(uid, false)}</h3>
+                    <p>${profile.username ? '@' + profile.username : (profile.about || 'On Xoxa')}</p>
+                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Add</button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderDiscoverGridIfActive() {
+            const tab = document.getElementById('tab-status');
+            if (tab && tab.classList.contains('active-tab')) {
+                const searchEl = document.getElementById('search-discover');
+                renderDiscoverGrid(searchEl ? searchEl.value : '');
+            }
+        }
+
+        document.getElementById('discover-grid').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.discover-card-add-btn');
+            if (!btn || btn.disabled) return;
+            const uid = btn.dataset.uid;
+            const user = auth.currentUser;
+            if (!user || !uid) return;
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            try {
+                await set(ref(database, `contacts/${user.uid}/${uid}`), true);
+                btn.textContent = 'Added';
+                btn.classList.add('added');
+                notify('Added to your contacts');
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Add';
+                showCustomModal('Error', 'Could not add this contact.');
+            }
+        });
+
+        const searchDiscoverInput = document.getElementById('search-discover');
+        if (searchDiscoverInput) {
+            searchDiscoverInput.addEventListener('input', () => renderDiscoverGrid(searchDiscoverInput.value));
+        }
+        document.getElementById('discover-refresh-btn')?.addEventListener('click', () => {
+            discoverShuffleSeed++;
+            renderDiscoverGrid(searchDiscoverInput ? searchDiscoverInput.value : '');
+        });
+
+        // --- STATUS TAB (dormant — was the video-only Moments grid; the Status nav item now
+        // opens Discover above. Left intact and unused rather than ripped out, since the video
+        // upload flow it shares is still reachable from the header camera icon.) ---
         const STATUS_SIZE_PATTERN = ['hero', 'reg', 'reg', 'tall', 'reg', 'wide', 'reg', 'tall', 'reg', 'reg'];
         const STATUS_MIN_LOAD_MORE = 6; // keep fetching older pages until this many new videos surface (or we hit the end)
 
@@ -4143,12 +4273,15 @@
             if (fileInput) fileInput.value = '';
         }
 
-        document.getElementById('status-upload-btn').addEventListener('click', () => {
+        // The old Status tab's own upload trigger is gone now that the tab is Discover,
+        // but the underlying video-post flow still works — the header camera icon below
+        // remains the way to post one.
+        document.getElementById('status-upload-btn')?.addEventListener('click', () => {
             document.getElementById('status-upload-file').click();
         });
 
-        // Header camera icon is a shortcut into the same story/status upload flow, so
-        // people don't have to switch to the Status tab first to post one.
+        // Header camera icon is a shortcut into the video-moment upload flow (formerly
+        // reachable from the Status tab too, before that tab became Discover).
         document.getElementById('btn-header-camera').addEventListener('click', () => {
             document.getElementById('status-upload-file').click();
         });
@@ -10461,6 +10594,7 @@
                 renderChatRequests();
                 if (activeChatUid) updateActiveChatStatus();
                 applyChatWallpaperToDOM(currentWallpaperValue());
+                renderDiscoverGridIfActive();
             });
 
             onValue(ref(database, "stories"), (snap) => {
@@ -10510,12 +10644,14 @@
                 cachedContacts = snap.exists() ? snap.val() : {};
                 renderContactsLists();
                 renderChatRequests();
+                renderDiscoverGridIfActive();
             });
 
             onValue(ref(database, `blocks/${user.uid}`), (snap) => {
                 cachedBlocked = snap.exists() ? snap.val() : {};
                 renderContactsLists();
                 updateBlockUI();
+                renderDiscoverGridIfActive();
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {

@@ -3656,9 +3656,17 @@
         const AI_NAME = "Goza AI";
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
-        // Returns the badge markup (or '') for a given uid: purple for Goza AI only.
+        // Same seal shape as VERIFIED_BADGE_SVG but rendered in --success-green. Shown next to the
+        // name of any user who has added more than FRIENDS_BADGE_THRESHOLD friends (see verifiedBadgeFor).
+        const FRIENDS_BADGE_SVG = '<svg class="verified-badge friends-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="10+ Friends"><path fill="#34C759" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
+        const FRIENDS_BADGE_THRESHOLD = 10;
+
+        // Returns the badge markup (or '') for a given uid: purple for Goza AI, otherwise green
+        // once that user has added more than FRIENDS_BADGE_THRESHOLD friends.
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
+            const profile = cachedUsers[uid];
+            if (profile && (profile.friendsCount || 0) > FRIENDS_BADGE_THRESHOLD) return FRIENDS_BADGE_SVG;
             return '';
         }
 
@@ -10659,6 +10667,15 @@
                 renderContactsLists();
                 renderChatRequests();
                 renderDiscoverGridIfActive();
+
+                // Mirror the friend count onto the public profile (users/{uid}/friendsCount) so the
+                // 10+ friends green badge can be shown next to this user's name anywhere in the app,
+                // for anyone viewing it — contacts/{uid} itself is only readable by the owner.
+                const friendsCount = Object.keys(cachedContacts).length;
+                const myCachedProfile = cachedUsers[user.uid];
+                if (!myCachedProfile || (myCachedProfile.friendsCount || 0) !== friendsCount) {
+                    update(ref(database, `users/${user.uid}`), { friendsCount });
+                }
             });
 
             onValue(ref(database, `blocks/${user.uid}`), (snap) => {

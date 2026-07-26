@@ -920,8 +920,11 @@
         .msg-media-play-hint.hidden { opacity: 0; pointer-events: none; }
         .msg-media-video { pointer-events: auto; }
         /* Shown on top of a chat video while it's still loading/buffering, in place of the
-           native (blank/black) video frame, so there's always something readable on screen. */
-        .msg-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(20,20,20,0.55); border-radius: inherit; z-index: 1; opacity: 1; transition: opacity 0.2s ease; }
+           native (blank/black) video frame, so there's always something readable on screen.
+           When a frame has already been captured from this video (see captureVideoFrame),
+           it's set inline as background-image so the overlay reads as a dimmed still of the
+           video itself rather than a flat scrim. */
+        .msg-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background-color: rgba(20,20,20,0.55); background-size: cover; background-position: center; border-radius: inherit; z-index: 1; opacity: 1; transition: opacity 0.2s ease; }
         .msg-video-loading-overlay.hidden { opacity: 0; pointer-events: none; }
         .msg-video-loading-overlay .spinner-sm { width: 26px; height: 26px; }
         .msg-video-loading-overlay span { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.9); letter-spacing: 0.2px; }
@@ -1199,8 +1202,10 @@
         .story-tap-zone { position: absolute; top: 0; bottom: 0; width: 40%; z-index: 2; }
         .story-tap-zone.left { left: 0; } .story-tap-zone.right { right: 0; }
         /* Shown over a story/status video while it's loading, buffering, or seeking, so viewers
-           see a clear indicator instead of a frozen/blank native video frame. */
-        .story-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 3; opacity: 1; pointer-events: none; transition: opacity 0.2s ease; background: rgba(0,0,0,0.15); }
+           see a clear indicator instead of a frozen/blank native video frame. When a frame has
+           already been captured from this video (see captureVideoFrame), it's set inline as
+           background-image so the overlay reads as a dimmed still of the video itself. */
+        .story-video-loading-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 3; opacity: 1; pointer-events: none; transition: opacity 0.2s ease; background-color: rgba(0,0,0,0.15); background-size: cover; background-position: center; }
         .story-video-loading-overlay.hidden { opacity: 0; }
         .story-video-loading-overlay .spinner-sm { width: 32px; height: 32px; border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
         .story-video-loading-overlay span { color: #fff; font-size: 13px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
@@ -10532,16 +10537,53 @@
             if (audioEl.paused) toggleVoicePlayback(playBtn, url, bubble);
         }
 
+        // Captures the video's current frame onto a canvas and hands back a data URL, so a
+        // loading overlay can show that still instead of a flat scrim. Cached per source URL —
+        // once we've grabbed a frame for a given video we reuse it for every later loading state
+        // (buffering, seeking, re-opening the same story) instead of re-capturing. Silently
+        // returns null if the video has no frame yet or the canvas can't be read (e.g. a
+        // cross-origin source without permissive CORS headers taints the canvas).
+        const videoFrameThumbCache = {};
+        function captureVideoFrame(vid) {
+            const src = vid.currentSrc || vid.src;
+            if (!src) return null;
+            if (videoFrameThumbCache[src]) return videoFrameThumbCache[src];
+            if (!vid.videoWidth || !vid.videoHeight) return null;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = vid.videoWidth;
+                canvas.height = vid.videoHeight;
+                canvas.getContext('2d').drawImage(vid, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                videoFrameThumbCache[src] = dataUrl;
+                return dataUrl;
+            } catch (err) {
+                // Tainted canvas (CORS) or transient decode error — just skip the still this time.
+                return null;
+            }
+        }
+
+        // Applies a captured frame (if we have one, cached or freshly grabbed) as the loading
+        // overlay's background, dimmed with a gradient so the spinner/caption stay legible.
+        function applyVideoFrameBackground(overlayEl, vid) {
+            const frame = captureVideoFrame(vid);
+            if (!frame) return;
+            overlayEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${frame})`;
+        }
+
         // Same idea as attachVideoLoadingOverlay, but for the persistent full-screen story/status
         // <video> elements (their src changes per-item rather than the element being recreated).
         function wireStoryVideoLoadingOverlay(videoEl, overlayEl) {
-            const show = () => overlayEl.classList.remove('hidden');
+            const show = () => {
+                applyVideoFrameBackground(overlayEl, videoEl);
+                overlayEl.classList.remove('hidden');
+            };
             const hide = () => overlayEl.classList.add('hidden');
             videoEl.addEventListener('loadstart', show);
             videoEl.addEventListener('waiting', show);
             videoEl.addEventListener('stalled', show);
             videoEl.addEventListener('seeking', show);
-            videoEl.addEventListener('loadeddata', hide);
+            videoEl.addEventListener('loadeddata', () => { applyVideoFrameBackground(overlayEl, videoEl); hide(); });
             videoEl.addEventListener('canplay', hide);
             videoEl.addEventListener('canplaythrough', hide);
             videoEl.addEventListener('playing', hide);
@@ -10563,7 +10605,12 @@
             mediaWrap.appendChild(overlay);
             if (playHint) playHint.classList.add('hidden');
 
+            // Show a cached frame from this video immediately if we already have one (e.g. this
+            // message's video was captured earlier), so the very first paint isn't a flat scrim.
+            applyVideoFrameBackground(overlay, vid);
+
             const showLoading = () => {
+                applyVideoFrameBackground(overlay, vid);
                 overlay.classList.remove('hidden');
                 if (playHint) playHint.classList.add('hidden');
             };
@@ -10578,8 +10625,9 @@
             vid.addEventListener('seeking', showLoading);
             vid.addEventListener('loadstart', showLoading);
 
-            // Video has enough data to show/play a frame
-            vid.addEventListener('loadeddata', hideLoading);
+            // Video has enough data to show/play a frame — grab a still for future loading states
+            // before hiding the overlay.
+            vid.addEventListener('loadeddata', () => { applyVideoFrameBackground(overlay, vid); hideLoading(); });
             vid.addEventListener('canplay', hideLoading);
             vid.addEventListener('canplaythrough', hideLoading);
             vid.addEventListener('playing', hideLoading);

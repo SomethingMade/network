@@ -4003,7 +4003,7 @@
                 card.className = `status-card ${statusSizeClass(postId, i)}`;
                 card.dataset.postId = postId;
                 card.innerHTML = `
-                    <video src="${post.videoUrl}" muted playsinline preload="metadata"></video>
+                    <video src="${post.videoUrl}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=0.1"></video>
                     <div class="status-card-shade"></div>
                     <svg class="status-card-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     <div class="status-card-foot">
@@ -5081,7 +5081,7 @@
             const imageHtml = post.imageUrl ? `<div class="feed-post-image"><img src="${post.imageUrl}" alt=""></div>${musicChipHtml}` : '';
             const videoHtml = post.videoUrl ? `
                 <div class="feed-post-video-wrap">
-                    <video class="feed-post-video" src="${post.videoUrl}" playsinline preload="metadata" muted></video>
+                    <video class="feed-post-video" src="${post.videoUrl}" playsinline preload="metadata" muted onloadedmetadata="this.currentTime=0.1"></video>
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </button>
@@ -7147,6 +7147,7 @@
                             vid.muted = true;
                             vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(vid);
+                            primeVideoPosterFrame(vid);
                             const playHint = document.createElement('div');
                             playHint.className = 'msg-media-play-hint';
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
@@ -8746,6 +8747,7 @@
                 vid.muted = true;
                 vid.playsInline = true;
                 mediaWrap.appendChild(vid);
+                primeVideoPosterFrame(vid);
                 attachVideoLoadingOverlay(mediaWrap, vid);
                 bubble.appendChild(mediaWrap);
             } else {
@@ -9422,7 +9424,7 @@
                             const tag = document.createElement('div');
                             tag.className = 'story-reply-tag';
                             const thumb = msg.replyToStory.type === 'video'
-                                ? `<video src="${msg.replyToStory.mediaURL}" muted preload="metadata"></video>`
+                                ? `<video src="${msg.replyToStory.mediaURL}" muted preload="metadata" onloadedmetadata="this.currentTime=0.1"></video>`
                                 : `<img src="${msg.replyToStory.mediaURL}" alt="Story">`;
                             tag.innerHTML = `${thumb}<span>Replied to story</span>`;
                             bubble.appendChild(tag);
@@ -9467,6 +9469,7 @@
                             vid.muted = true;
                             vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
                             mediaWrap.appendChild(vid);
+                            primeVideoPosterFrame(vid);
                             const playHint = document.createElement('div');
                             playHint.className = 'msg-media-play-hint';
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
@@ -10414,6 +10417,21 @@
             if (!totalDuration) return;
             audioEl.currentTime = ratio * totalDuration;
             if (audioEl.paused) toggleVoicePlayback(playBtn, url, bubble);
+        }
+
+        // Forces the browser to decode and paint an actual frame of the video as soon as
+        // possible (a tiny seek), instead of leaving the element showing a flat background
+        // color until the user taps play. Safe to call multiple times per element/src.
+        function primeVideoPosterFrame(vid) {
+            if (!vid) return;
+            vid._posterPrimed = false;
+            const seekToFrame = () => {
+                if (vid._posterPrimed) return;
+                vid._posterPrimed = true;
+                try { vid.currentTime = Math.min(0.1, (vid.duration || 1) / 2 || 0.1); } catch (err) {}
+            };
+            if (vid.readyState >= 1) seekToFrame();
+            else vid.addEventListener('loadedmetadata', seekToFrame, { once: true });
         }
 
         // Captures the video's current frame onto a canvas and hands back a data URL, so a

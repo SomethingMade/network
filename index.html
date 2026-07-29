@@ -778,6 +778,8 @@
         .group-badge-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 50px; background: rgba(37, 211, 102, 0.1); color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.3px; }
         .group-badge-pill.business { background: rgba(124, 77, 255, 0.12); color: #7C4DFF; }
         .group-badge-pill.gold-business { background: rgba(212, 160, 23, 0.14); color: #B8860B; }
+        .bio-mention-business { color: #0A84FF; font-weight: 600; cursor: pointer; }
+        .bio-mention-business:hover { text-decoration: underline; }
         .business-page-promo { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; text-align: left; }
         .business-page-promo h5 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
         .business-page-promo p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px; }
@@ -5427,6 +5429,27 @@
             return uids;
         }
 
+        // Renders an about/bio string as safe HTML, highlighting any @username mention that
+        // resolves to a Business Account in blue. Clicking it opens that business's profile.
+        function linkifyBioMentions(text) {
+            const escaped = escapeHtmlForPost(text || '');
+            return escaped.replace(/@([a-zA-Z0-9_]{2,20})/g, (match, handle) => {
+                const entry = Object.entries(cachedUsers).find(([, u]) => u && u.username && u.username.toLowerCase() === handle.toLowerCase());
+                if (entry && entry[1].isBusinessAccount) {
+                    const [uid] = entry;
+                    return `<span class="bio-mention-business" data-uid="${uid}" role="link" tabindex="0">${match}</span>`;
+                }
+                return match;
+            });
+        }
+
+        // Clicking (or tapping/pressing enter on) a highlighted business mention opens that
+        // business's profile sheet, from wherever the bio text is rendered.
+        document.addEventListener('click', (e) => {
+            const mentionEl = e.target.closest('.bio-mention-business');
+            if (mentionEl && mentionEl.dataset.uid) openUserProfileSheet(mentionEl.dataset.uid);
+        });
+
         // Wires @-mention autocomplete onto a text input/textarea. Shows matching users as the
         // person types "@" plus a few characters, and inserts "@username " on selection.
         function setupMentionAutocomplete(inputEl, dropdownEl) {
@@ -6940,7 +6963,7 @@
             }
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
-            document.getElementById('user-info-about').textContent = profile.about || 'No about yet.';
+            document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
             const msgBtn = document.getElementById('btn-user-info-message');
             if (msgBtn) {
                 const user = auth.currentUser;
@@ -8841,7 +8864,7 @@
             }
 
             if (otherProfile.about) {
-                aboutBubbleEl.textContent = otherProfile.about;
+                aboutBubbleEl.innerHTML = linkifyBioMentions(otherProfile.about);
                 aboutBubbleEl.style.display = 'inline-block';
             } else {
                 aboutBubbleEl.style.display = 'none';

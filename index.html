@@ -2127,11 +2127,11 @@
 
                     <div class="otp-boxes" id="otp-boxes">
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
-                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
-                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
-                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
-                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
-                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
+                        <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
                     </div>
                     <input type="hidden" id="auth-otp-code">
 
@@ -5888,6 +5888,46 @@
             if (focusFirst) setTimeout(() => otpBoxes[0].focus(), 50);
         }
 
+        // --- WEB OTP AUTOFILL ---
+        // On browsers that support it (mainly Chrome on Android), this listens for the incoming
+        // SMS itself and fills the 6 boxes the moment the code arrives — no more waiting on a
+        // slow SMS then switching apps to copy it in by hand. Safe no-op everywhere else; iOS
+        // Safari gets its own autofill via the autocomplete="one-time-code" attribute on each box.
+        let webOtpAbortController = null;
+
+        function stopWebOtpAutofill() {
+            if (webOtpAbortController) {
+                webOtpAbortController.abort();
+                webOtpAbortController = null;
+            }
+        }
+
+        function fillOtpBoxes(code) {
+            const digits = (code || '').replace(/[^0-9]/g, '').slice(0, otpBoxes.length);
+            if (digits.length < otpBoxes.length) return false;
+            digits.split('').forEach((ch, idx) => {
+                otpBoxes[idx].value = ch;
+                otpBoxes[idx].classList.add('filled');
+            });
+            syncOtpHiddenValue();
+            return true;
+        }
+
+        function startWebOtpAutofill() {
+            if (!('OTPCredential' in window) || !navigator.credentials) return;
+            stopWebOtpAutofill();
+            webOtpAbortController = new AbortController();
+            navigator.credentials.get({
+                otp: { transport: ['sms'] },
+                signal: webOtpAbortController.signal
+            }).then(otp => {
+                if (otp && otp.code && fillOtpBoxes(otp.code)) {
+                    notify('Code auto-filled');
+                    document.getElementById('btn-verify-otp').click();
+                }
+            }).catch(() => { /* dismissed, timed out, or unsupported — ignore silently */ });
+        }
+
         otpBoxes.forEach((box, i) => {
             box.addEventListener('input', (e) => {
                 const digit = e.target.value.replace(/[^0-9]/g, '').slice(-1);
@@ -5928,6 +5968,7 @@
 
         document.getElementById('btn-change-number').addEventListener('click', () => {
             confirmationResult = null;
+            stopWebOtpAutofill();
             clearOtpBoxes();
             showAuthStep('phone');
         });
@@ -5954,6 +5995,7 @@
                 document.getElementById('auth-otp-subtitle').textContent = `Enter the code sent to ${fullNumber}`;
                 clearOtpBoxes(true);
                 showAuthStep('otp');
+                startWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));
                 if (recaptchaVerifier) { try { recaptchaVerifier.clear(); } catch(_) {} recaptchaVerifier = null; }
@@ -5969,6 +6011,7 @@
                 confirmationResult = await signInWithPhoneNumber(auth, pendingPhoneNumber, verifier);
                 notify('Code resent');
                 clearOtpBoxes(true);
+                startWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Couldn't Resend Code", err.message.replace("Firebase: ", ""));
             } finally { hideLoading(); }
@@ -5982,6 +6025,7 @@
             showLoading();
             try {
                 await confirmationResult.confirm(otpCode);
+                stopWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
                 clearOtpBoxes(true);

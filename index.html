@@ -1785,7 +1785,7 @@
                     <input type="text" id="new-username-input" class="pill-input" placeholder="Choose your @username" style="margin-bottom:8px; text-align:center; font-family:monospace;">
                     <button type="button" id="btn-set-username" class="btn-pill btn-outline" style="font-size:13px; padding:10px;">Set Username (one-time)</button>
                 </div>
-                <p id="username-locked-note" class="wa-note" style="display:none;">Your username can only be set once and can't be changed again.</p>
+                <p id="username-locked-note" class="wa-note" style="display:none;">Your username can only be set once and can't be changed again — unless you switch to a Business Account.</p>
 
                 <div class="wa-list-row">
                     <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
@@ -6008,8 +6008,10 @@
                 const myProfile = cachedUsers[user.uid] || {};
                 document.getElementById('display-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
                 document.getElementById('new-username-input').value = '';
-                document.getElementById('username-edit-section').style.display = myProfile.usernameChanged ? 'none' : 'block';
-                document.getElementById('username-locked-note').style.display = myProfile.usernameChanged ? 'block' : 'none';
+                const usernameLocked = myProfile.usernameChanged && !myProfile.isBusinessAccount;
+                document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
+                document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
+                document.getElementById('btn-set-username').textContent = myProfile.isBusinessAccount ? 'Update Username' : 'Set Username (one-time)';
 
                 document.getElementById('profile-about').value = myProfile.about || '';
                 resetPhoneLinkUI(user);
@@ -6035,6 +6037,12 @@
             try {
                 await update(ref(database, `users/${user.uid}`), { isBusinessAccount: isBusiness });
                 notify(isBusiness ? 'Switched to a Business Account' : 'Switched back to a personal account');
+
+                const myProfile = cachedUsers[user.uid] || {};
+                const usernameLocked = myProfile.usernameChanged && !isBusiness;
+                document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
+                document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
+                document.getElementById('btn-set-username').textContent = isBusiness ? 'Update Username' : 'Set Username (one-time)';
             } catch (err) {
                 e.target.checked = !isBusiness;
                 document.getElementById('business-account-pill').style.display = !isBusiness ? 'inline-block' : 'none';
@@ -6059,7 +6067,7 @@
             }
 
             const myProfile = cachedUsers[user.uid] || {};
-            if (myProfile.usernameChanged) return showCustomModal("Already Set", "You've already used your one-time username change.");
+            if (myProfile.usernameChanged && !myProfile.isBusinessAccount) return showCustomModal("Already Set", "You've already used your one-time username change. Switch to a Business Account to change it again.");
 
             const lower = cleaned.toLowerCase();
             const btn = document.getElementById('btn-set-username');
@@ -6085,9 +6093,14 @@
                 }
 
                 document.getElementById('display-username').textContent = '@' + cleaned;
-                document.getElementById('username-edit-section').style.display = 'none';
-                document.getElementById('username-locked-note').style.display = 'block';
-                notify("Username set! This can't be changed again.");
+                if (myProfile.isBusinessAccount) {
+                    document.getElementById('new-username-input').value = '';
+                    notify("Username updated!");
+                } else {
+                    document.getElementById('username-edit-section').style.display = 'none';
+                    document.getElementById('username-locked-note').style.display = 'block';
+                    notify("Username set! This can't be changed again.");
+                }
             } catch (err) {
                 showCustomModal("Error", "Could not set your username. Please try again.");
             } finally {

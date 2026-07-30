@@ -325,7 +325,7 @@
         .mention-suggestion-name { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); }
         .mention-suggestion-username { display: block; font-size: 11.5px; color: var(--text-secondary); }
 
-        #feed-posts-container { padding: 12px 0; }
+        #feed-posts-container { padding: 12px 0 0; }
         .feed-post-card { background: var(--bg-surface); margin: 0 0 10px; padding: 14px 16px; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
         .feed-post-card + .feed-post-card { border-top: none; }
         .feed-post-header { display: flex; align-items: center; gap: 10px; }
@@ -1405,6 +1405,12 @@
         .discover-card-add-btn:hover { opacity: 0.9; }
         .discover-card-add-btn:disabled { opacity: 0.6; cursor: default; }
         .discover-card-add-btn.added { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+
+        /* "Who to follow"-style widget sprinkled between posts in the Discover feed, X-style */
+        .discover-suggest-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; margin: 4px 0 14px; overflow: hidden; }
+        .discover-suggest-card-header { font-size: 14.5px; font-weight: 700; color: var(--text-primary); padding: 13px 14px 2px; }
+        .discover-suggest-card .discover-card { background: transparent; border-bottom: 1px solid var(--border-color); padding: 10px 14px; }
+        .discover-suggest-card .discover-card:last-of-type { border-bottom: none; }
         .discover-grid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 60px 30px; color: var(--text-secondary); }
         .discover-grid-empty svg { opacity: 0.4; margin-bottom: 4px; }
         .discover-grid-empty p { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
@@ -1470,7 +1476,6 @@
             }
             body.glass-theme .nav-indicator { background: var(--gradient-brand); opacity: 0.16; box-shadow: none; }
             .chat-list-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
-            #feed-posts-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
             .discover-grid-scroll { padding-bottom: calc(78px + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
@@ -2221,70 +2226,15 @@
                     <div class="chat-list-container" id="chat-list-container"></div>
                 </div>
 
-                <div id="tab-feed" class="tab-content" style="display:none !important;">
-                    <div class="chat-header-area">
-                        <div class="chat-header-top">
-                            <h1>Moments</h1>
-                            <div style="display:flex; align-items:center; gap:16px;">
-                                <div class="notif-bell-btn js-notif-bell" title="Notifications">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                                    <div class="notif-bell-badge js-notif-bell-badge">0</div>
-                                </div>
-                                <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-                            </div>
-                        </div>
-                        <div class="search-box">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" id="search-feed-posts" placeholder="Search posts by username, caption, or #hashtag">
-                        </div>
-                    </div>
-                    <div class="chat-list-container" id="feed-posts-container">
-                        <div class="feed-composer" id="feed-composer">
-                            <div class="feed-composer-row">
-                                <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
-                                <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1"></textarea>
-                                <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
-                            </div>
-                            <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
-                            <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
-                                <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
-                                <video id="feed-composer-preview-video" src="" muted playsinline style="display:none;"></video>
-                                <div class="feed-composer-preview-remove" id="feed-composer-preview-remove">&times;</div>
-                            </div>
-                            <div class="feed-composer-actions">
-                                <div class="feed-composer-attach-row">
-                                    <label class="feed-composer-attach" for="feed-composer-file">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
-                                        <span>Photo/Video</span>
-                                    </label>
-                                    <button type="button" class="feed-composer-attach feed-composer-tag-btn" id="feed-composer-tag-btn">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"></path><circle cx="7.5" cy="7.5" r="1.25" fill="currentColor" stroke="none"></circle></svg>
-                                        <span id="feed-composer-tag-btn-text">Tag People</span>
-                                    </button>
-                                    <button type="button" class="feed-composer-attach feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-                                        <span id="feed-composer-music-btn-text">Music</span>
-                                        <span class="feed-composer-music-clear" id="feed-composer-music-clear" style="display:none;">&times;</span>
-                                    </button>
-                                </div>
-                                <input type="file" id="feed-composer-file" accept="image/*,video/*" style="display:none;">
-                                <button type="button" id="feed-composer-submit" disabled>Post</button>
-                            </div>
-                        </div>
-                        <div id="feed-posts-list"></div>
-                        <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
-                        <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
-                            <p>No posts yet. Be the first to share something!</p>
-                        </div>
-                        <div class="feed-search-empty" id="feed-search-empty">No posts match your search.</div>
-                    </div>
-                </div>
-
                 <div id="tab-status" class="tab-content">
                     <div class="chat-header-area">
                         <div class="chat-header-top">
                             <h1>Discover</h1>
                             <div class="chat-header-icons">
+                                <div class="notif-bell-btn js-notif-bell" title="Notifications">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                                    <div class="notif-bell-badge js-notif-bell-badge">0</div>
+                                </div>
                                 <svg id="discover-refresh-btn" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Show new suggestions" style="cursor:pointer; color:var(--text-primary);"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
@@ -2298,12 +2248,57 @@
                         <p class="discover-section-label">Status</p>
                         <div class="story-card-scroll" id="stories-scroll-discover"></div>
 
-                        <p class="discover-section-label" id="discover-section-label">People you may know</p>
-                        <div class="discover-grid" id="discover-grid"></div>
-                        <div class="discover-grid-empty" id="discover-grid-empty" style="display:none;">
-                            <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
-                            <p id="discover-empty-title">No one new to find right now</p>
-                            <span id="discover-empty-sub">Check back later, or invite friends to join Xoxa</span>
+                        <!-- People-search results: only shown while the person is actively searching;
+                             otherwise the feed below (with suggestion cards sprinkled through it) is
+                             how people get discovered, X-style. -->
+                        <div id="discover-search-results" style="display:none;">
+                            <p class="discover-section-label" id="discover-section-label">People you may know</p>
+                            <div class="discover-grid" id="discover-grid"></div>
+                            <div class="discover-grid-empty" id="discover-grid-empty" style="display:none;">
+                                <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+                                <p id="discover-empty-title">No one new to find right now</p>
+                                <span id="discover-empty-sub">Check back later, or invite friends to join Xoxa</span>
+                            </div>
+                        </div>
+
+                        <div id="feed-posts-container">
+                            <div class="feed-composer" id="feed-composer">
+                                <div class="feed-composer-row">
+                                    <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
+                                    <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1"></textarea>
+                                    <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
+                                </div>
+                                <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
+                                <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
+                                    <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
+                                    <video id="feed-composer-preview-video" src="" muted playsinline style="display:none;"></video>
+                                    <div class="feed-composer-preview-remove" id="feed-composer-preview-remove">&times;</div>
+                                </div>
+                                <div class="feed-composer-actions">
+                                    <div class="feed-composer-attach-row">
+                                        <label class="feed-composer-attach" for="feed-composer-file">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+                                            <span>Photo/Video</span>
+                                        </label>
+                                        <button type="button" class="feed-composer-attach feed-composer-tag-btn" id="feed-composer-tag-btn">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"></path><circle cx="7.5" cy="7.5" r="1.25" fill="currentColor" stroke="none"></circle></svg>
+                                            <span id="feed-composer-tag-btn-text">Tag People</span>
+                                        </button>
+                                        <button type="button" class="feed-composer-attach feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                                            <span id="feed-composer-music-btn-text">Music</span>
+                                            <span class="feed-composer-music-clear" id="feed-composer-music-clear" style="display:none;">&times;</span>
+                                        </button>
+                                    </div>
+                                    <input type="file" id="feed-composer-file" accept="image/*,video/*" style="display:none;">
+                                    <button type="button" id="feed-composer-submit" disabled>Post</button>
+                                </div>
+                            </div>
+                            <div id="feed-posts-list"></div>
+                            <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
+                            <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
+                                <p>No posts yet. Be the first to share something!</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3267,7 +3262,7 @@
                 if (fabAddFriend) fabAddFriend.style.display = (hash === 'tab-contacts') ? 'flex' : 'none';
 
                 const fabNewPost = document.getElementById('fab-new-post');
-                if (fabNewPost) fabNewPost.style.display = (hash === 'tab-feed') ? 'flex' : 'none';
+                if (fabNewPost) fabNewPost.style.display = (hash === 'tab-status') ? 'flex' : 'none';
 
                 if (hash === 'tab-status') renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
 
@@ -3306,7 +3301,7 @@
             const fabNewPost = document.getElementById('fab-new-post');
             if (fabNewPost) {
                 const currentHash = window.location.hash.replace('#', '');
-                fabNewPost.style.display = (currentHash === 'tab-feed') ? 'flex' : 'none';
+                fabNewPost.style.display = (currentHash === 'tab-status') ? 'flex' : 'none';
             }
             requestAnimationFrame(updateNavIndicator);
         }
@@ -3975,20 +3970,29 @@
             const grid = document.getElementById('discover-grid');
             const emptyState = document.getElementById('discover-grid-empty');
             const sectionLabel = document.getElementById('discover-section-label');
+            const searchResultsWrap = document.getElementById('discover-search-results');
+            const feedContainer = document.getElementById('feed-posts-container');
             if (!grid) return;
 
             const term = (searchTerm || '').trim().toLowerCase();
-            let uids = getDiscoverableUsers();
 
-            if (term) {
-                uids = uids.filter(uid => {
-                    const p = cachedUsers[uid] || {};
-                    return (p.name && p.name.toLowerCase().includes(term)) ||
-                           (p.username && p.username.toLowerCase().includes(term));
-                });
-            } else {
-                uids = shuffleWithSeed(uids, 'discover-' + discoverShuffleSeed).slice(0, 60);
+            // No search term: the feed (with suggestion cards woven through it) is how people
+            // get discovered, so hide the standalone results list and let the feed show.
+            if (!term) {
+                if (searchResultsWrap) searchResultsWrap.style.display = 'none';
+                if (feedContainer) feedContainer.style.display = '';
+                sprinkleSuggestedPeople();
+                return;
             }
+            if (searchResultsWrap) searchResultsWrap.style.display = '';
+            if (feedContainer) feedContainer.style.display = 'none';
+
+            let uids = getDiscoverableUsers();
+            uids = uids.filter(uid => {
+                const p = cachedUsers[uid] || {};
+                return (p.name && p.name.toLowerCase().includes(term)) ||
+                       (p.username && p.username.toLowerCase().includes(term));
+            });
 
             grid.innerHTML = '';
 
@@ -4033,7 +4037,7 @@
             }
         }
 
-        document.getElementById('discover-grid').addEventListener('click', async (e) => {
+        document.getElementById('discover-grid-scroll').addEventListener('click', async (e) => {
             const btn = e.target.closest('.discover-card-add-btn');
             if (!btn || btn.disabled) return;
             const uid = btn.dataset.uid;
@@ -4061,6 +4065,65 @@
             discoverShuffleSeed++;
             renderDiscoverGrid(searchDiscoverInput ? searchDiscoverInput.value : '');
         });
+
+        // Builds one "who to follow"-style card (a handful of suggested people) to weave into
+        // the posts feed — same visual language and Add-button behavior as the search-results
+        // discover-card, just grouped 2-3 at a time inside a rounded widget instead of a flat list.
+        function buildSuggestionCard(uids) {
+            const wrap = document.createElement('div');
+            wrap.className = 'discover-suggest-card';
+            const rows = uids.map(uid => {
+                const profile = cachedUsers[uid] || {};
+                const name = profile.name || 'Xoxa User';
+                const isBusiness = !!profile.isBusinessAccount;
+                return `
+                    <div class="discover-card" data-uid="${uid}">
+                        <div class="discover-card-avatar-wrap${isBusiness ? ' is-business' : ''}">
+                            ${feedAvatarHtml(profile, 'discover-card-avatar')}
+                        </div>
+                        <div class="discover-card-body">
+                            <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
+                            ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
+                        </div>
+                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Add</button>
+                    </div>
+                `;
+            }).join('');
+            wrap.innerHTML = `<div class="discover-suggest-card-header">People you may know</div>${rows}`;
+            return wrap;
+        }
+
+        // Weaves "who to follow" widgets in between post cards at random-ish intervals, X-style,
+        // instead of dumping every suggested person into one long grid up front. Called after
+        // every reorderFeedCards() pass, which always strips old widgets first (see there).
+        function sprinkleSuggestedPeople() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return;
+            list.querySelectorAll('.discover-suggest-card').forEach(el => el.remove());
+
+            const pool = shuffleWithSeed(getDiscoverableUsers(), 'discover-sprinkle-' + discoverShuffleSeed);
+            if (!pool.length) return;
+
+            const postCards = Array.from(list.children).filter(el => el.classList.contains('feed-post-card'));
+            if (!postCards.length) return;
+
+            let poolIndex = 0;
+            let sincePlaced = 0;
+            let nextGap = 4 + Math.floor(seededRandom01('gap-0') * 4); // 4-7 posts before the first widget
+
+            postCards.forEach((card, i) => {
+                sincePlaced++;
+                if (sincePlaced >= nextGap && poolIndex < pool.length) {
+                    const batch = pool.slice(poolIndex, poolIndex + 3);
+                    if (batch.length) {
+                        list.insertBefore(buildSuggestionCard(batch), card.nextSibling);
+                        poolIndex += batch.length;
+                    }
+                    sincePlaced = 0;
+                    nextGap = 4 + Math.floor(seededRandom01('gap-' + i) * 4);
+                }
+            });
+        }
 
         // --- STATUS TAB (dormant — was the video-only Moments grid; the Status nav item now
         // opens Discover above. Left intact and unused rather than ripped out, since the video
@@ -4503,7 +4566,10 @@
         function reorderFeedCards() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return;
-            const container = document.getElementById('feed-posts-container');
+            // Suggestion widgets aren't part of the ranked post set — pull them out before
+            // sorting/anchoring and re-sprinkle fresh ones afterward (see sprinkleSuggestedPeople).
+            list.querySelectorAll('.discover-suggest-card').forEach(el => el.remove());
+            const container = document.getElementById('discover-grid-scroll');
             const anchorCard = findFeedAnchorCard(list, container);
             const anchorOffsetBefore = anchorCard ? anchorCard.getBoundingClientRect().top : null;
 
@@ -4520,6 +4586,8 @@
                 const anchorOffsetAfter = anchorCard.getBoundingClientRect().top;
                 container.scrollTop += (anchorOffsetAfter - anchorOffsetBefore);
             }
+
+            sprinkleSuggestedPeople();
         }
 
         const FEED_PAGE_SIZE = 15;
@@ -4577,7 +4645,7 @@
         }
 
         function initFeedScrollListener() {
-            const container = document.getElementById('feed-posts-container');
+            const container = document.getElementById('discover-grid-scroll');
             if (!container || container.dataset.scrollBound) return;
             container.dataset.scrollBound = 'true';
             container.addEventListener('scroll', () => {
@@ -4825,7 +4893,7 @@
                     // This is the user's own deliberate action, not a background re-rank — unlike
                     // the anchor-preserving reorder, scrolling up here is exactly what they'd want,
                     // so it can freely override wherever they were previously scrolled to.
-                    const feedContainer = document.getElementById('feed-posts-container');
+                    const feedContainer = document.getElementById('discover-grid-scroll');
                     if (feedContainer) feedContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 } catch (e) {
                     notify('Failed to post');
@@ -6621,7 +6689,7 @@
         // Lets someone jump straight to the composer (which lives at the top of the feed) from
         // wherever they've scrolled to, instead of hunting for it manually.
         document.getElementById('fab-new-post').addEventListener('click', () => {
-            const container = document.getElementById('feed-posts-container');
+            const container = document.getElementById('discover-grid-scroll');
             const input = document.getElementById('feed-composer-input');
             if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
             if (input) setTimeout(() => input.focus(), 350);

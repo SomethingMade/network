@@ -345,6 +345,7 @@
         .x-post-content-col { flex: 1; min-width: 0; }
         .x-post-headline { display: flex; align-items: center; gap: 4px; min-width: 0; }
         .x-post-headline .name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+        .x-post-headline .name-badge { flex-shrink: 0; display: inline-flex; align-items: center; }
         .x-post-headline .x-post-dot { color: var(--text-secondary); font-size: 13px; flex-shrink: 0; }
         .x-post-headline .time { font-size: 13.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-post-menu-btn { margin-left: auto; flex-shrink: 0; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 50%; display: flex; align-items: center; transition: background 0.12s ease, color 0.12s ease; }
@@ -3994,6 +3995,34 @@
                 : `<div class="avatar ${sizeClass || ''}">${initial}</div>`;
         }
 
+        // Fills in a feed post card's avatar, name, and verified badge from the live `cachedUsers`
+        // profile for card.dataset.uid (falling back to the name/photo snapshot stored on the post
+        // itself). Called once when the card is built, and again for every visible card whenever
+        // `cachedUsers` updates (see the "users" onValue listener), so a profile picture, display
+        // name, or verified status change shows up on every existing post immediately.
+        function applyLiveProfileToPostCard(card) {
+            const uid = card.dataset.uid;
+            if (!uid) return;
+            const profile = cachedUsers[uid] || {};
+            const displayName = profile.name || card.dataset.fallbackName || 'User';
+            const displayPhoto = profile.photoURL || card.dataset.fallbackPhoto || '';
+            const nameEl = card.querySelector('.x-post-headline .name');
+            if (nameEl) nameEl.textContent = displayName;
+            const badgeEl = card.querySelector('.x-post-headline .name-badge');
+            if (badgeEl) badgeEl.innerHTML = verifiedBadgeFor(uid, uid === AI_UID);
+            const avatarCol = card.querySelector('.x-post-avatar-col');
+            if (avatarCol) avatarCol.innerHTML = feedAvatarHtml({ name: displayName, photoURL: displayPhoto });
+            card.querySelectorAll('.feed-post-tagged-chip').forEach(chip => {
+                const tUid = chip.dataset.taggedUid;
+                const tProfile = cachedUsers[tUid] || {};
+                chip.innerHTML = escapeHtmlForPost(tProfile.name || 'User') + verifiedBadgeFor(tUid, tUid === AI_UID);
+            });
+        }
+
+        function refreshAllFeedPostProfiles() {
+            document.querySelectorAll('#feed-posts-container .feed-post-card[data-uid]').forEach(applyLiveProfileToPostCard);
+        }
+
         // --- DISCOVER TAB (browse other Xoxa users and add them as contacts) ---
         // Lives where the old video-Moments "Status" tab used to be. Reuses the existing
         // one-directional contacts/{me}/{them}=true add mechanism (same as the Add Friend
@@ -5316,8 +5345,12 @@
             const card = document.createElement('div');
             card.className = 'feed-post-card';
             card.dataset.postId = postId;
+            card.dataset.uid = post.uid || '';
+            card.dataset.fallbackName = post.name || 'User';
+            card.dataset.fallbackPhoto = post.photoURL || '';
 
-            const avatarHtml = feedAvatarHtml({ name: post.name, photoURL: post.photoURL });
+            const liveAuthor = cachedUsers[post.uid] || {};
+            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || post.name, photoURL: liveAuthor.photoURL || post.photoURL });
             const musicChipHtml = (post.imageUrl && post.music) ? `
                 <div class="feed-post-music-chip">
                     <img src="${post.music.artworkUrl || ''}" alt="">
@@ -5370,6 +5403,7 @@
                 <div class="x-post-content-col">
                     <div class="x-post-headline">
                         <span class="name"></span>
+                        <span class="name-badge"></span>
                         <span class="x-post-dot">·</span>
                         <span class="time">${formatTime(post.timestamp)}${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
                         ${menuBtnHtml}
@@ -5392,8 +5426,8 @@
                     </div>
                 </div>
             `;
-            // Set text content via textContent to avoid any HTML injection from user-authored fields.
-            card.querySelector('.name').textContent = post.name || 'User';
+            // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
+            applyLiveProfileToPostCard(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
@@ -5402,8 +5436,6 @@
 
             card.querySelectorAll('.feed-post-tagged-chip').forEach(chip => {
                 const uid = chip.dataset.taggedUid;
-                const taggedProfile = cachedUsers[uid] || {};
-                chip.textContent = taggedProfile.name || 'User';
                 chip.addEventListener('click', (e) => {
                     e.stopPropagation();
                     pauseAllFeedMedia();
@@ -5514,10 +5546,13 @@
             const likeCount = Object.keys(reactions).length;
             const likedByMe = !!(user && reactions[user.uid]);
             const isMine = !!(user && comment.uid === user.uid);
-            const replyName = (comment.name || 'User').replace(/"/g, '&quot;');
+            const liveCommenter = cachedUsers[comment.uid] || {};
+            const displayName = liveCommenter.name || comment.name || 'User';
+            const displayPhoto = liveCommenter.photoURL || comment.photoURL;
+            const replyName = displayName.replace(/"/g, '&quot;');
 
             item.innerHTML = `
-                ${feedAvatarHtml({ name: comment.name, photoURL: comment.photoURL })}
+                ${feedAvatarHtml({ name: displayName, photoURL: displayPhoto })}
                 <div class="feed-comment-bubble">
                     ${comment.parentId ? `<span class="feed-comment-reply-tag"></span>` : ''}
                     <span class="name"></span>
@@ -5533,7 +5568,7 @@
                     </div>
                 </div>
             `;
-            item.querySelector('.name').textContent = comment.name || 'User';
+            item.querySelector('.name').innerHTML = escapeHtmlForPost(displayName) + verifiedBadgeFor(comment.uid, comment.uid === AI_UID);
             item.querySelector('.text').textContent = comment.text || '';
             const replyTagEl = item.querySelector('.feed-comment-reply-tag');
             if (replyTagEl && comment.replyToName) replyTagEl.textContent = `↪ Replying to ${comment.replyToName}`;
@@ -11287,6 +11322,7 @@
                 if (activeChatUid) updateActiveChatStatus();
                 applyChatWallpaperToDOM(currentWallpaperValue());
                 renderDiscoverGridIfActive();
+                refreshAllFeedPostProfiles();
             });
 
             onValue(ref(database, "stories"), (snap) => {

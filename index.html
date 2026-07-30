@@ -6061,6 +6061,7 @@
             confirmationResult = null;
             stopWebOtpAutofill();
             clearOtpBoxes();
+            resetRecaptcha();
             showAuthStep('phone');
         });
 
@@ -6072,12 +6073,36 @@
             return recaptchaVerifier;
         }
 
+        // Fully tears down the recaptcha widget AND rebuilds its container element.
+        // This guards against the "reCAPTCHA has already been rendered in this element"
+        // error, which happens whenever recaptchaVerifier.clear() silently fails (or is
+        // skipped) but a widget is still attached to the container div — the next
+        // new RecaptchaVerifier(...) call then errors because that DOM node already
+        // has a rendered widget on it, even though our JS reference was nulled out.
+        function resetRecaptcha() {
+            if (recaptchaVerifier) {
+                try { recaptchaVerifier.clear(); } catch (_) {}
+            }
+            recaptchaVerifier = null;
+            const old = document.getElementById('recaptcha-container');
+            if (old) {
+                const fresh = document.createElement('div');
+                fresh.id = 'recaptcha-container';
+                fresh.style.marginTop = '12px';
+                old.replaceWith(fresh);
+            }
+        }
+
+        let otpSendInFlight = false;
+
         document.getElementById('btn-send-otp').addEventListener('click', async (e) => {
             e.preventDefault();
+            if (otpSendInFlight) return; // guard against double-tap firing two concurrent sends
             const code = document.getElementById('auth-country-code').value;
             const rawNumber = document.getElementById('auth-phone').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
             if (!rawNumber) return showCustomModal("Required", "Please enter your phone number.");
             const fullNumber = code + rawNumber;
+            otpSendInFlight = true;
             showLoading();
             try {
                 const verifier = ensureRecaptcha();
@@ -6089,13 +6114,15 @@
                 startWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));
-                if (recaptchaVerifier) { try { recaptchaVerifier.clear(); } catch(_) {} recaptchaVerifier = null; }
-            } finally { hideLoading(); }
+                resetRecaptcha();
+            } finally { hideLoading(); otpSendInFlight = false; }
         });
 
         document.getElementById('btn-resend-otp').addEventListener('click', async (e) => {
             e.preventDefault();
+            if (otpSendInFlight) return;
             if (!pendingPhoneNumber) return showAuthStep('phone');
+            otpSendInFlight = true;
             showLoading();
             try {
                 const verifier = ensureRecaptcha();
@@ -6105,7 +6132,8 @@
                 startWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Couldn't Resend Code", err.message.replace("Firebase: ", ""));
-            } finally { hideLoading(); }
+                resetRecaptcha();
+            } finally { hideLoading(); otpSendInFlight = false; }
         });
 
         document.getElementById('btn-verify-otp').addEventListener('click', async (e) => {
@@ -6373,7 +6401,15 @@
         }
 
         function clearProfileRecaptcha() {
-            if (profileRecaptchaVerifier) { try { profileRecaptchaVerifier.clear(); } catch(_) {} profileRecaptchaVerifier = null; }
+            if (profileRecaptchaVerifier) { try { profileRecaptchaVerifier.clear(); } catch(_) {} }
+            profileRecaptchaVerifier = null;
+            const old = document.getElementById('profile-recaptcha-container');
+            if (old) {
+                const fresh = document.createElement('div');
+                fresh.id = 'profile-recaptcha-container';
+                fresh.style.marginTop = '8px';
+                old.replaceWith(fresh);
+            }
         }
 
         document.getElementById('btn-show-phone-link').addEventListener('click', () => {

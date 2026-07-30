@@ -2177,6 +2177,9 @@
 
                     <button type="button" id="btn-send-otp" class="btn-pill btn-primary" style="margin-top: 20px;">Continue</button>
                     <div id="recaptcha-container" style="margin-top: 12px;"></div>
+
+                    <div class="auth-divider"><span>OR</span></div>
+                    <button type="button" id="btn-show-email-auth" class="btn-pill btn-outline">Continue with Email</button>
                 </div>
 
                 <!-- ── OTP STEP ── -->
@@ -2196,6 +2199,26 @@
 
                     <button type="button" id="btn-verify-otp" class="btn-pill btn-primary" style="margin-top: 20px;">Verify</button>
                     <p class="toggle-auth"><span id="btn-resend-otp">Resend code</span> &nbsp;·&nbsp; <span id="btn-change-number">Change number</span></p>
+                </div>
+
+                <!-- ── EMAIL STEP (optional alternative to phone) ── -->
+                <div id="auth-step-email" style="display:none;">
+                    <h2 id="auth-email-heading">Sign in</h2>
+                    <p id="auth-email-subtitle">Enter your email and password to continue</p>
+
+                    <div class="input-group">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <input type="email" id="auth-email" class="pill-input" placeholder="Email address" autocomplete="email" style="margin-bottom:0;">
+                    </div>
+                    <div class="input-group" style="margin-top:16px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <input type="password" id="auth-email-password" class="pill-input" placeholder="Password" autocomplete="current-password" style="margin-bottom:0;">
+                    </div>
+
+                    <button type="button" id="btn-email-auth-submit" class="btn-pill btn-primary" style="margin-top: 20px;">Sign In</button>
+
+                    <p class="toggle-auth"><span id="btn-toggle-email-mode">Don't have an account? Sign up</span></p>
+                    <p class="toggle-auth" style="margin-top:8px;"><span id="btn-forgot-password">Forgot password?</span> &nbsp;·&nbsp; <span id="btn-back-to-phone">Use phone instead</span></p>
                 </div>
 
             </div>
@@ -2720,7 +2743,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -5954,13 +5977,15 @@
 
         let isInitialLoad = true;
 
-        // ── PHONE AUTH (only sign-in / sign-up method) ──
+        // ── PHONE AUTH (primary) + EMAIL AUTH (optional alternative) ──
         const stepPhone = document.getElementById('auth-step-phone');
         const stepOtp = document.getElementById('auth-step-otp');
+        const stepEmail = document.getElementById('auth-step-email');
 
         function showAuthStep(step) {
             stepPhone.style.display = step === 'phone' ? 'block' : 'none';
             stepOtp.style.display = step === 'otp' ? 'block' : 'none';
+            stepEmail.style.display = step === 'email' ? 'block' : 'none';
         }
 
         // ── OTP BOXES ── individual per-digit inputs that stay in sync with the hidden
@@ -6148,6 +6173,69 @@
             } catch (err) {
                 showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
                 clearOtpBoxes(true);
+            } finally { hideLoading(); }
+        });
+
+        // ── EMAIL AUTH (optional alternative to phone) ──
+        let emailAuthMode = 'signin'; // 'signin' | 'signup'
+        let emailAuthInFlight = false;
+
+        function setEmailAuthMode(mode) {
+            emailAuthMode = mode;
+            const isSignup = mode === 'signup';
+            document.getElementById('auth-email-heading').textContent = isSignup ? 'Create account' : 'Sign in';
+            document.getElementById('auth-email-subtitle').textContent = isSignup
+                ? 'Enter your email and choose a password'
+                : 'Enter your email and password to continue';
+            document.getElementById('btn-email-auth-submit').textContent = isSignup ? 'Sign Up' : 'Sign In';
+            document.getElementById('btn-toggle-email-mode').textContent = isSignup
+                ? 'Already have an account? Sign in'
+                : "Don't have an account? Sign up";
+            document.getElementById('btn-forgot-password').style.display = isSignup ? 'none' : 'inline';
+        }
+
+        document.getElementById('btn-show-email-auth').addEventListener('click', () => {
+            setEmailAuthMode('signin');
+            showAuthStep('email');
+        });
+
+        document.getElementById('btn-back-to-phone').addEventListener('click', () => {
+            showAuthStep('phone');
+        });
+
+        document.getElementById('btn-toggle-email-mode').addEventListener('click', () => {
+            setEmailAuthMode(emailAuthMode === 'signin' ? 'signup' : 'signin');
+        });
+
+        document.getElementById('btn-email-auth-submit').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (emailAuthInFlight) return;
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-email-password').value;
+            if (!email || !password) return showCustomModal("Required", "Please enter your email and password.");
+            if (password.length < 6) return showCustomModal("Password Too Short", "Your password must be at least 6 characters.");
+            emailAuthInFlight = true;
+            showLoading();
+            try {
+                if (emailAuthMode === 'signup') {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (err) {
+                showCustomModal(emailAuthMode === 'signup' ? "Couldn't Create Account" : "Couldn't Sign In", err.message.replace("Firebase: ", ""));
+            } finally { hideLoading(); emailAuthInFlight = false; }
+        });
+
+        document.getElementById('btn-forgot-password').addEventListener('click', async () => {
+            const email = document.getElementById('auth-email').value.trim();
+            if (!email) return showCustomModal("Enter Your Email", "Type your email address above first, then tap Forgot password? again.");
+            showLoading();
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showCustomModal("Check Your Inbox", `We sent a password reset link to ${email}.`);
+            } catch (err) {
+                showCustomModal("Couldn't Send Reset Link", err.message.replace("Firebase: ", ""));
             } finally { hideLoading(); }
         });
 

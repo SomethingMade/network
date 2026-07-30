@@ -358,8 +358,28 @@
         .feed-post-edit-cancel { background: var(--bg-alt); color: var(--text-primary); }
         .feed-post-edit-save { background: var(--gradient-brand); color: #fff; }
         .feed-post-text { font-size: 15px; color: var(--text-primary); line-height: 1.35; margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
-        .feed-post-image { position: relative; margin-top: 10px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); }
-        .feed-post-image img { width: 100%; max-height: 340px; object-fit: cover; display: block; cursor: pointer; }
+        .x-media-grid { display: grid; gap: 2px; margin-top: 10px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); }
+        .x-media-grid[data-count="1"] { grid-template-columns: 1fr; }
+        .x-media-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
+        .x-media-grid[data-count="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .x-media-grid[data-count="3"] .x-media-grid-item:first-child { grid-row: 1 / 3; }
+        .x-media-grid[data-count="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .x-media-grid-item { position: relative; overflow: hidden; background: var(--bg-alt); }
+        .x-media-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+        .x-media-grid[data-count="1"] .x-media-grid-item { aspect-ratio: 16 / 10; max-height: 340px; }
+        .x-media-grid[data-count="2"] .x-media-grid-item,
+        .x-media-grid[data-count="3"] .x-media-grid-item,
+        .x-media-grid[data-count="4"] .x-media-grid-item { aspect-ratio: 1 / 1; max-height: 220px; }
+        .feed-composer-image-grid { display: grid; gap: 4px; border-radius: 14px; overflow: hidden; }
+        .feed-composer-image-grid[data-count="1"] { grid-template-columns: 1fr; }
+        .feed-composer-image-grid[data-count="2"],
+        .feed-composer-image-grid[data-count="3"],
+        .feed-composer-image-grid[data-count="4"] { grid-template-columns: 1fr 1fr; }
+        .feed-composer-image-thumb { position: relative; aspect-ratio: 1 / 1; }
+        .feed-composer-image-grid[data-count="1"] .feed-composer-image-thumb { aspect-ratio: 16 / 10; }
+        .feed-composer-image-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .feed-composer-image-remove { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; cursor: pointer; }
+        .feed-composer-add-more { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 50px; cursor: pointer; }
         .feed-post-music-chip { margin-top: 8px; display: flex; align-items: center; gap: 8px; background: var(--bg-alt); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; max-width: 100%; }
         .feed-post-music-chip img { width: 26px; height: 26px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .feed-post-music-chip span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
@@ -1374,6 +1394,14 @@
         #image-viewer-overlay img { width: 100%; height: 100%; object-fit: contain; }
         .image-viewer-close { position: absolute; top: 20px; right: 20px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
         .image-viewer-close:hover { opacity: 0.75; }
+        .image-viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.45); border: none; color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 2; transition: background 0.15s ease; }
+        .image-viewer-nav:hover { background: rgba(0,0,0,0.7); }
+        .image-viewer-nav svg { width: 22px; height: 22px; }
+        .image-viewer-nav-prev { left: 14px; }
+        .image-viewer-nav-next { right: 14px; }
+        .image-viewer-nav.visible { display: flex; }
+        .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; }
+        .image-viewer-counter.visible { display: block; }
 
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
@@ -1586,7 +1614,7 @@
                 </div>
                 <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
                 <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
-                    <img id="feed-composer-preview-img" src="" alt="" style="display:none;">
+                    <div class="feed-composer-image-grid" id="feed-composer-image-grid" style="display:none;"></div>
                     <video id="feed-composer-preview-video" src="" muted playsinline style="display:none;"></video>
                     <div class="feed-composer-preview-remove" id="feed-composer-preview-remove">&times;</div>
                 </div>
@@ -1606,7 +1634,7 @@
                             <span class="feed-composer-music-clear" id="feed-composer-music-clear" style="display:none;">&times;</span>
                         </button>
                     </div>
-                    <input type="file" id="feed-composer-file" accept="image/*,video/*" style="display:none;">
+                    <input type="file" id="feed-composer-file" accept="image/*,video/*" multiple style="display:none;">
                 </div>
             </div>
         </div>
@@ -2670,6 +2698,13 @@
         <svg class="image-viewer-save" id="image-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <img id="image-viewer-img" src="" alt="Full image">
+        <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="image-viewer-prev" aria-label="Previous image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button type="button" class="image-viewer-nav image-viewer-nav-next" id="image-viewer-next" aria-label="Next image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+        <div class="image-viewer-counter" id="image-viewer-counter"></div>
     </div>
 
     <div id="video-viewer-overlay">
@@ -2928,8 +2963,25 @@
         }
 
         let currentViewerImageUrl = '';
-        function openImageViewer(url, hideSave) {
+        let currentViewerGallery = null;
+        let currentViewerIndex = 0;
+        // `gallery` (optional) is the full array of image URLs for a multi-image post; `startIndex`
+        // is which one was tapped. When provided (length > 1), prev/next arrows and a counter appear
+        // and clicking them just swaps image-viewer-img's src, no need to reopen the viewer.
+        function openImageViewer(url, hideSave, gallery, startIndex) {
             if (!url) return;
+            const isGallery = Array.isArray(gallery) && gallery.length > 1;
+            currentViewerGallery = isGallery ? gallery : null;
+            currentViewerIndex = isGallery ? Math.max(0, gallery.indexOf(url) !== -1 ? gallery.indexOf(url) : (startIndex || 0)) : 0;
+            renderImageViewerFrame(isGallery ? gallery[currentViewerIndex] : url, hideSave);
+            const overlay = document.getElementById('image-viewer-overlay');
+            document.getElementById('image-viewer-prev').classList.toggle('visible', isGallery);
+            document.getElementById('image-viewer-next').classList.toggle('visible', isGallery);
+            document.getElementById('image-viewer-counter').classList.toggle('visible', isGallery);
+            overlay.classList.add('active');
+            if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
+        }
+        function renderImageViewerFrame(url, hideSave) {
             currentViewerImageUrl = url;
             const imgEl = document.getElementById('image-viewer-img');
             imgEl.src = url;
@@ -2939,14 +2991,25 @@
             const overlay = document.getElementById('image-viewer-overlay');
             overlay.classList.toggle('no-save', !!hideSave);
             overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
-            overlay.classList.add('active');
-            if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
+            if (currentViewerGallery) {
+                document.getElementById('image-viewer-counter').textContent = `${currentViewerIndex + 1} / ${currentViewerGallery.length}`;
+            }
         }
+        function stepImageViewer(delta) {
+            if (!currentViewerGallery) return;
+            const len = currentViewerGallery.length;
+            currentViewerIndex = (currentViewerIndex + delta + len) % len;
+            renderImageViewerFrame(currentViewerGallery[currentViewerIndex]);
+        }
+        document.getElementById('image-viewer-prev').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(-1); });
+        document.getElementById('image-viewer-next').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(1); });
         function closeImageViewer() {
             const overlay = document.getElementById('image-viewer-overlay');
             overlay.classList.remove('active', 'privacy-blur');
             document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
+            currentViewerGallery = null;
+            currentViewerIndex = 0;
         }
         document.getElementById('image-viewer-close').addEventListener('click', () => history.back());
         document.getElementById('image-viewer-save').addEventListener('click', (e) => {
@@ -3972,7 +4035,8 @@
         // --- FEED: POSTS + COMMENTS ---
         let feedListenersAttached = false;
         let cachedPosts = {};
-        let feedComposerMedia = null; // { url, type: 'image' | 'video' }
+        let feedComposerImages = []; // array of uploaded image URLs (max FEED_MAX_IMAGES), mutually exclusive with video
+        let feedComposerVideo = null; // { url } or null, mutually exclusive with images
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null, images only
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
@@ -4776,6 +4840,7 @@
                 const contentUnchanged = oldPost &&
                     oldPost.text === post.text &&
                     oldPost.imageUrl === post.imageUrl &&
+                    JSON.stringify(oldPost.imageUrls || null) === JSON.stringify(post.imageUrls || null) &&
                     oldPost.videoUrl === post.videoUrl &&
                     oldPost.editedAt === post.editedAt;
 
@@ -4808,7 +4873,7 @@
                 if (existingCard) {
                     const vid = existingCard.querySelector('.feed-post-video');
                     if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
-                    const postImg = existingCard.querySelector('.feed-post-image img');
+                    const postImg = existingCard.querySelector('.x-media-grid-item img');
                     if (postImg && feedMusicAutoplayObserver) feedMusicAutoplayObserver.unobserve(postImg);
                     existingCard.remove();
                 }
@@ -4830,7 +4895,7 @@
             const submitBtn = document.getElementById('feed-composer-submit');
             const fileInput = document.getElementById('feed-composer-file');
             const preview = document.getElementById('feed-composer-preview');
-            const previewImg = document.getElementById('feed-composer-preview-img');
+            const previewGrid = document.getElementById('feed-composer-image-grid');
             const previewVideo = document.getElementById('feed-composer-preview-video');
             const previewRemove = document.getElementById('feed-composer-preview-remove');
             const musicBtn = document.getElementById('feed-composer-music-btn');
@@ -4839,7 +4904,7 @@
             setupMentionAutocomplete(input, document.getElementById('feed-composer-mention-dropdown'));
 
             function refreshSubmitState() {
-                const hasContent = (input.value && input.value.trim().length > 0) || !!feedComposerMedia;
+                const hasContent = (input.value && input.value.trim().length > 0) || feedComposerImages.length > 0 || !!feedComposerVideo;
                 submitBtn.disabled = !hasContent;
             }
 
@@ -4855,14 +4920,54 @@
                 }
             }
 
+            function renderComposerPreview() {
+                if (feedComposerVideo) {
+                    previewGrid.style.display = 'none';
+                    previewGrid.innerHTML = '';
+                    previewVideo.src = feedComposerVideo.url;
+                    previewVideo.style.display = 'block';
+                    previewRemove.style.display = 'flex';
+                    musicBtn.style.display = 'none';
+                    preview.style.display = 'block';
+                } else if (feedComposerImages.length) {
+                    previewVideo.style.display = 'none';
+                    previewVideo.pause();
+                    previewVideo.src = '';
+                    previewRemove.style.display = 'none';
+                    previewGrid.style.display = 'grid';
+                    previewGrid.dataset.count = String(Math.min(feedComposerImages.length, FEED_MAX_IMAGES));
+                    previewGrid.innerHTML = feedComposerImages.map((url, idx) => `
+                        <div class="feed-composer-image-thumb">
+                            <img src="${url}" alt="">
+                            <span class="feed-composer-image-remove" data-idx="${idx}">&times;</span>
+                        </div>
+                    `).join('');
+                    previewGrid.querySelectorAll('.feed-composer-image-remove').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const idx = parseInt(btn.dataset.idx, 10);
+                            feedComposerImages.splice(idx, 1);
+                            if (feedComposerImages.length) renderComposerPreview();
+                            else clearComposerMedia();
+                            refreshSubmitState();
+                        });
+                    });
+                    musicBtn.style.display = 'flex';
+                    preview.style.display = 'block';
+                } else {
+                    preview.style.display = 'none';
+                }
+            }
+
             function clearComposerMedia() {
-                feedComposerMedia = null;
+                feedComposerImages = [];
+                feedComposerVideo = null;
                 feedComposerMusic = null;
                 updateComposerMusicChip();
                 musicBtn.style.display = 'none';
                 preview.style.display = 'none';
-                previewImg.style.display = 'none';
-                previewImg.src = '';
+                previewGrid.style.display = 'none';
+                previewGrid.innerHTML = '';
                 previewVideo.style.display = 'none';
                 previewVideo.pause();
                 previewVideo.src = '';
@@ -4876,40 +4981,64 @@
 
             const FEED_MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10MB
             const FEED_MAX_VIDEO_BYTES = 50 * 1024 * 1024;  // 50MB
+            const FEED_MAX_IMAGES = 4;
 
             fileInput.addEventListener('change', async () => {
-                const file = fileInput.files[0];
-                if (!file) return;
-                const isVideo = file.type.startsWith('video/');
-                const maxBytes = isVideo ? FEED_MAX_VIDEO_BYTES : FEED_MAX_IMAGE_BYTES;
-                if (file.size > maxBytes) {
-                    const maxMb = Math.round(maxBytes / (1024 * 1024));
-                    notify(`${isVideo ? 'Videos' : 'Photos'} must be under ${maxMb}MB`, 'error');
+                const files = Array.from(fileInput.files || []);
+                if (!files.length) return;
+
+                const videoFile = files.find(f => f.type.startsWith('video/'));
+                if (videoFile) {
+                    // A video was included — a post can only carry one video, so it takes over and
+                    // any images already staged (or other files in this same selection) are dropped.
+                    if (videoFile.size > FEED_MAX_VIDEO_BYTES) {
+                        notify(`Videos must be under ${Math.round(FEED_MAX_VIDEO_BYTES / (1024 * 1024))}MB`, 'error');
+                        fileInput.value = '';
+                        return;
+                    }
+                    try {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Uploading...';
+                        const { url } = await uploadToCloudinary(videoFile);
+                        feedComposerImages = [];
+                        feedComposerVideo = { url };
+                        feedComposerMusic = null;
+                        updateComposerMusicChip();
+                        renderComposerPreview();
+                    } catch (e) {
+                        notify('Failed to upload media');
+                    } finally {
+                        submitBtn.textContent = 'Post';
+                        fileInput.value = '';
+                        refreshSubmitState();
+                    }
+                    return;
+                }
+
+                // Image mode — up to FEED_MAX_IMAGES total across all selections.
+                const room = FEED_MAX_IMAGES - feedComposerImages.length;
+                if (room <= 0) {
+                    notify(`You can add up to ${FEED_MAX_IMAGES} photos`, 'error');
                     fileInput.value = '';
                     return;
                 }
+                const toUpload = files.slice(0, room);
+                if (files.length > room) notify(`Only added the first ${room} photo${room === 1 ? '' : 's'} (max ${FEED_MAX_IMAGES})`, 'error');
+                const oversized = toUpload.find(f => f.size > FEED_MAX_IMAGE_BYTES);
+                if (oversized) {
+                    notify(`Photos must be under ${Math.round(FEED_MAX_IMAGE_BYTES / (1024 * 1024))}MB`, 'error');
+                    fileInput.value = '';
+                    return;
+                }
+                feedComposerVideo = null;
                 try {
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Uploading...';
-                    const { url, type } = await uploadToCloudinary(file);
-                    feedComposerMedia = { url, type: (type === 'video' || isVideo) ? 'video' : 'image' };
-                    feedComposerMusic = null;
-                    updateComposerMusicChip();
-                    if (feedComposerMedia.type === 'video') {
-                        previewImg.style.display = 'none';
-                        previewImg.src = '';
-                        previewVideo.src = url;
-                        previewVideo.style.display = 'block';
-                        // Videos already carry their own audio, so music is an images-only feature.
-                        musicBtn.style.display = 'none';
-                    } else {
-                        previewVideo.style.display = 'none';
-                        previewVideo.src = '';
-                        previewImg.src = url;
-                        previewImg.style.display = 'block';
-                        musicBtn.style.display = 'flex';
+                    for (const file of toUpload) {
+                        const { url } = await uploadToCloudinary(file);
+                        feedComposerImages.push(url);
                     }
-                    preview.style.display = 'block';
+                    renderComposerPreview();
                 } catch (e) {
                     notify('Failed to upload media');
                 } finally {
@@ -4939,7 +5068,7 @@
 
             submitBtn.addEventListener('click', async () => {
                 const text = input.value.trim();
-                if (!text && !feedComposerMedia) return;
+                if (!text && !feedComposerImages.length && !feedComposerVideo) return;
                 const u = auth.currentUser;
                 if (!u) return;
                 const myProfile = cachedUsers[u.uid] || { name: u.displayName || 'You', photoURL: u.photoURL || '' };
@@ -4956,9 +5085,12 @@
                         name: myProfile.name || u.displayName || 'User',
                         photoURL: myProfile.photoURL || u.photoURL || '',
                         text: text,
-                        imageUrl: (feedComposerMedia && feedComposerMedia.type === 'image') ? feedComposerMedia.url : null,
-                        videoUrl: (feedComposerMedia && feedComposerMedia.type === 'video') ? feedComposerMedia.url : null,
-                        music: (feedComposerMedia && feedComposerMedia.type === 'image' && feedComposerMusic) ? feedComposerMusic : null,
+                        // imageUrl is kept (mirroring the first photo) so anything still reading the
+                        // old single-image field — e.g. legacy posts, previews — keeps working.
+                        imageUrl: feedComposerImages.length ? feedComposerImages[0] : null,
+                        imageUrls: feedComposerImages.length ? feedComposerImages : null,
+                        videoUrl: feedComposerVideo ? feedComposerVideo.url : null,
+                        music: (feedComposerImages.length && feedComposerMusic) ? feedComposerMusic : null,
                         mentions: mentionedUids.size ? mentionsMap : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
@@ -5091,8 +5223,8 @@
             });
             editBox.querySelector('.feed-post-edit-save').addEventListener('click', async () => {
                 const newText = textarea.value.trim();
-                if (!newText && !post.imageUrl) {
-                    notify('A post needs text or an image', 'error');
+                if (!newText && !post.imageUrl && !(post.imageUrls && post.imageUrls.length) && !post.videoUrl) {
+                    notify('A post needs text or media', 'error');
                     return;
                 }
                 await savePostEdit(postId, newText);
@@ -5291,7 +5423,7 @@
             audio.addEventListener('pause', updateIcon);
             updateIcon();
 
-            const postImg = card.querySelector('.feed-post-image img');
+            const postImg = card.querySelector('.x-media-grid-item img');
             if (postImg) {
                 postImg.__pauseTarget = audio;
                 getFeedMusicAutoplayObserver().observe(postImg);
@@ -5351,14 +5483,18 @@
 
             const liveAuthor = cachedUsers[post.uid] || {};
             const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || post.name, photoURL: liveAuthor.photoURL || post.photoURL });
-            const musicChipHtml = (post.imageUrl && post.music) ? `
+            const postImages = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+            const musicChipHtml = (postImages.length && post.music) ? `
                 <div class="feed-post-music-chip">
                     <img src="${post.music.artworkUrl || ''}" alt="">
                     <span></span>
                     <svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                 </div>
                 <audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : '';
-            const imageHtml = post.imageUrl ? `<div class="feed-post-image"><img src="${post.imageUrl}" alt=""></div>${musicChipHtml}` : '';
+            const imageHtml = postImages.length ? `
+                <div class="x-media-grid" data-count="${Math.min(postImages.length, 4)}">
+                    ${postImages.slice(0, 4).map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
+                </div>${musicChipHtml}` : '';
             const videoHtml = post.videoUrl ? `
                 <div class="feed-post-video-wrap">
                     <video class="feed-post-video" src="${post.videoUrl}" playsinline preload="metadata" muted onloadedmetadata="this.currentTime=0.1"></video>
@@ -5457,8 +5593,12 @@
 
             card.querySelector('.feed-like-btn').addEventListener('click', () => toggleLikePost(postId));
             card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(postId));
-            const img = card.querySelector('.feed-post-image img');
-            if (img) img.addEventListener('click', () => openImageViewer(post.imageUrl));
+            card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
+                imgEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10));
+                });
+            });
 
             const videoWrap = card.querySelector('.feed-post-video-wrap');
             if (videoWrap) initFeedVideoPlayer(videoWrap);

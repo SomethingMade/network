@@ -1227,6 +1227,19 @@
         #story-viewer-overlay.active { display: flex; }
         .story-viewer-inner { position: relative; width: 100%; max-width: 460px; height: 100%; max-height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .story-media { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .story-text-slide { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 70px 34px; box-sizing: border-box; }
+        .story-text-slide span { color: #fff; font-size: 30px; font-weight: 700; line-height: 1.35; text-align: center; white-space: pre-wrap; word-break: break-word; text-shadow: 0 2px 14px rgba(0,0,0,0.25); }
+
+        .text-story-composer-overlay { position: fixed; inset: 0; z-index: 100005; display: none; flex-direction: column; background: linear-gradient(135deg, #128C7E, #25D366); }
+        .text-story-composer-overlay.active { display: flex; }
+        .text-story-top-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: max(18px, env(safe-area-inset-top)) 18px 10px; }
+        .text-story-bg-swatches { display: flex; gap: 8px; overflow-x: auto; flex: 1; margin-left: 6px; }
+        .text-story-swatch { width: 28px; height: 28px; min-width: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: 0 0 0 1px rgba(255,255,255,0.5); }
+        .text-story-swatch.active { border-color: #fff; }
+        .text-story-canvas { flex: 1; display: flex; align-items: center; justify-content: center; padding: 30px; }
+        .text-story-textarea { width: 100%; max-width: 480px; max-height: 60vh; background: transparent; border: none; outline: none; resize: none; text-align: center; color: #fff; font-size: 30px; font-weight: 700; line-height: 1.35; text-shadow: 0 2px 14px rgba(0,0,0,0.25); font-family: inherit; }
+        .text-story-textarea::placeholder { color: rgba(255,255,255,0.75); }
+        .text-story-post-btn { position: absolute; right: 20px; bottom: max(28px, env(safe-area-inset-bottom)); background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); color: #fff; border: none; padding: 13px 22px; border-radius: 50px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; }
         #story-viewer-video { transform: translateZ(0); -webkit-transform: translateZ(0); backface-visibility: hidden; }
         .story-progress-row { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 3; }
         .story-progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
@@ -1285,6 +1298,7 @@
         .story-reply-tag { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.3); }
         .msg-bubble.in .story-reply-tag { border-bottom-color: rgba(0,0,0,0.1); }
         .story-reply-tag img, .story-reply-tag video { width: 34px; height: 46px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: rgba(0,0,0,0.05); }
+        .story-reply-text-thumb { width: 34px; height: 46px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 8px; font-weight: 700; line-height: 1.15; text-align: center; padding: 3px; overflow: hidden; }
         .story-reply-tag span { font-size: 12px; opacity: 0.85; }
 
         /* Story Views */
@@ -2453,6 +2467,27 @@
         </div>
     </div>
 
+    <div id="story-type-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 20px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Add to Your Story</div>
+            <div class="wa-list-row" id="story-type-text-option" style="cursor:pointer;">
+                <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Text Story</span>
+                    <span class="wa-row-sub">Write on a colored background</span>
+                </div>
+            </div>
+            <div class="wa-list-row" id="story-type-media-option" style="cursor:pointer;">
+                <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Photo &amp; Video</span>
+                    <span class="wa-row-sub">Upload from your gallery</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="story-caption-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="display: flex; flex-direction: column; padding-bottom: 12px;">
             <div class="sheet-handle"></div>
@@ -2481,6 +2516,20 @@
     </div>
     <audio id="story-music-audio" style="display:none;" preload="none"></audio>
 
+    <div id="text-story-composer-overlay" class="text-story-composer-overlay">
+        <div class="text-story-top-bar">
+            <svg id="text-story-close-btn" class="story-interactive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <div class="text-story-bg-swatches" id="text-story-bg-swatches"></div>
+        </div>
+        <div class="text-story-canvas">
+            <textarea id="text-story-input" class="text-story-textarea" placeholder="Type something..." maxlength="300"></textarea>
+        </div>
+        <button type="button" id="text-story-post-btn" class="text-story-post-btn">
+            Send
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M2 21l21-9L2 3v7l15 2-15 2z"></path></svg>
+        </button>
+    </div>
+
     <input type="file" id="story-file-input" accept="image/jpeg, image/png, image/webp, video/mp4" multiple style="display:none;">
 
     <div id="story-viewer-overlay">
@@ -2498,6 +2547,7 @@
             
             <img class="story-media" id="story-viewer-media" src="" alt="Story">
             <video class="story-media" id="story-viewer-video" muted playsinline preload="metadata" style="display:none;"></video>
+            <div class="story-text-slide" id="story-viewer-text" style="display:none;"><span id="story-viewer-text-content"></span></div>
             <div class="story-video-loading-overlay hidden" id="story-viewer-loading">
                 <div class="spinner-sm"></div>
                 <span>Loading video…</span>
@@ -7469,9 +7519,86 @@
             label.textContent = 'Add Story';
             wrap.appendChild(label);
             
-            wrap.addEventListener('click', () => { document.getElementById('story-file-input').click(); });
+            wrap.addEventListener('click', () => { document.getElementById('story-type-sheet-overlay').classList.add('active'); });
             return wrap;
         }
+
+        // --- TEXT STORIES: write-on-a-background stories, no photo/video upload needed ---
+        const TEXT_STORY_BACKGROUNDS = [
+            'linear-gradient(135deg, #128C7E, #25D366)',
+            'linear-gradient(135deg, #833AB4, #FD1D1D, #FCB045)',
+            'linear-gradient(135deg, #0A84FF, #5E9CFF)',
+            'linear-gradient(135deg, #FF6B6B, #FFD93D)',
+            'linear-gradient(135deg, #2C3E50, #4CA1AF)',
+            'linear-gradient(135deg, #232526, #414345)',
+            '#000000',
+        ];
+        let selectedTextStoryBg = TEXT_STORY_BACKGROUNDS[0];
+
+        function closeStoryTypeSheet() {
+            document.getElementById('story-type-sheet-overlay').classList.remove('active');
+        }
+        document.getElementById('story-type-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'story-type-sheet-overlay') closeStoryTypeSheet();
+        });
+        document.getElementById('story-type-text-option').addEventListener('click', () => {
+            closeStoryTypeSheet();
+            openTextStoryComposer();
+        });
+        document.getElementById('story-type-media-option').addEventListener('click', () => {
+            closeStoryTypeSheet();
+            document.getElementById('story-file-input').click();
+        });
+
+        function renderTextStorySwatches() {
+            const wrap = document.getElementById('text-story-bg-swatches');
+            wrap.innerHTML = '';
+            TEXT_STORY_BACKGROUNDS.forEach(bg => {
+                const sw = document.createElement('div');
+                sw.className = 'text-story-swatch' + (bg === selectedTextStoryBg ? ' active' : '');
+                sw.style.background = bg;
+                sw.addEventListener('click', () => {
+                    selectedTextStoryBg = bg;
+                    document.getElementById('text-story-composer-overlay').style.background = bg;
+                    renderTextStorySwatches();
+                });
+                wrap.appendChild(sw);
+            });
+        }
+
+        function openTextStoryComposer() {
+            selectedTextStoryBg = TEXT_STORY_BACKGROUNDS[0];
+            const input = document.getElementById('text-story-input');
+            input.value = '';
+            renderTextStorySwatches();
+            const overlay = document.getElementById('text-story-composer-overlay');
+            overlay.style.background = selectedTextStoryBg;
+            overlay.classList.add('active');
+            setTimeout(() => input.focus(), 250);
+        }
+
+        document.getElementById('text-story-close-btn').addEventListener('click', () => {
+            document.getElementById('text-story-composer-overlay').classList.remove('active');
+        });
+
+        document.getElementById('text-story-post-btn').addEventListener('click', async () => {
+            const text = document.getElementById('text-story-input').value.trim();
+            if (!text) { notify('Write something first'); return; }
+            const user = auth.currentUser;
+            if (!user) return;
+            const btn = document.getElementById('text-story-post-btn');
+            btn.disabled = true;
+            try {
+                const newRef = push(ref(database, `stories/${user.uid}`));
+                await set(newRef, { type: 'text', text, bgColor: selectedTextStoryBg, createdAt: Date.now() });
+                notify('Story added');
+                document.getElementById('text-story-composer-overlay').classList.remove('active');
+            } catch (err) {
+                notify('Could not post your story', 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
 
         // Builds an Instagram-style segmented ring: one dash per story item.
         // Each dash is colored (unviewed) or greyed out (already viewed by the current user).
@@ -7874,7 +8001,9 @@
                 sharedTag.style.display = 'none';
             }
 
+            const textEl = document.getElementById('story-viewer-text');
             if (current.type === 'video') {
+                textEl.style.display = 'none';
                 imgEl.style.display = 'none';
                 videoEl.style.display = 'block';
                 videoEl.src = current.mediaURL;
@@ -7889,7 +8018,21 @@
                 };
                 if (current.duration) begin(current.duration);
                 else videoEl.onloadedmetadata = () => begin(videoEl.duration);
+            } else if (current.type === 'text') {
+                imgEl.style.display = 'none';
+                imgEl.removeAttribute('src');
+                videoEl.style.display = 'none';
+                videoEl.removeAttribute('src');
+                document.getElementById('story-viewer-loading').classList.add('hidden');
+                muteBtn.style.display = hasMusic ? 'flex' : 'none';
+                if (hasMusic) updateMuteIcon();
+                textEl.style.background = current.bgColor || 'linear-gradient(135deg, #128C7E, #25D366)';
+                document.getElementById('story-viewer-text-content').textContent = current.text || '';
+                textEl.style.display = 'flex';
+                storyState.totalMs = 7000;
+                resumeStory();
             } else {
+                textEl.style.display = 'none';
                 videoEl.style.display = 'none';
                 videoEl.removeAttribute('src');
                 document.getElementById('story-viewer-loading').classList.add('hidden');
@@ -8027,9 +8170,10 @@
 
                 const newRef = push(ref(database, `stories/${user.uid}`));
                 await set(newRef, {
-                    mediaURL: current.mediaURL,
                     type: current.type,
                     createdAt: Date.now(),
+                    ...(current.mediaURL ? { mediaURL: current.mediaURL } : {}),
+                    ...(current.type === 'text' ? { text: current.text || '', bgColor: current.bgColor || TEXT_STORY_BACKGROUNDS[0] } : {}),
                     ...(current.duration ? { duration: current.duration } : {}),
                     ...(current.music ? { music: current.music } : {}),
                     ...(current.caption ? { caption: current.caption } : {}),
@@ -8138,7 +8282,9 @@
                 text: text,
                 senderUid: user.uid,
                 createdAt: Date.now(),
-                replyToStory: { mediaURL: current.mediaURL, type: current.type || 'image' }
+                replyToStory: current.type === 'text'
+                    ? { type: 'text', text: current.text || '', bgColor: current.bgColor || TEXT_STORY_BACKGROUNDS[0] }
+                    : { mediaURL: current.mediaURL, type: current.type || 'image' }
             };
             const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
 
@@ -9569,12 +9715,17 @@
                             bubble.appendChild(fwdTag);
                         }
 
-                        if (msg.replyToStory && msg.replyToStory.mediaURL) {
+                        if (msg.replyToStory && (msg.replyToStory.mediaURL || msg.replyToStory.type === 'text')) {
                             const tag = document.createElement('div');
                             tag.className = 'story-reply-tag';
-                            const thumb = msg.replyToStory.type === 'video'
-                                ? `<video src="${msg.replyToStory.mediaURL}" muted preload="metadata" onloadedmetadata="this.currentTime=0.1"></video>`
-                                : `<img src="${msg.replyToStory.mediaURL}" alt="Story">`;
+                            let thumb;
+                            if (msg.replyToStory.type === 'text') {
+                                thumb = `<div class="story-reply-text-thumb" style="background:${msg.replyToStory.bgColor || TEXT_STORY_BACKGROUNDS[0]}">${escapeHtmlForPost((msg.replyToStory.text || '').slice(0, 40))}</div>`;
+                            } else {
+                                thumb = msg.replyToStory.type === 'video'
+                                    ? `<video src="${msg.replyToStory.mediaURL}" muted preload="metadata" onloadedmetadata="this.currentTime=0.1"></video>`
+                                    : `<img src="${msg.replyToStory.mediaURL}" alt="Story">`;
+                            }
                             tag.innerHTML = `${thumb}<span>Replied to story</span>`;
                             bubble.appendChild(tag);
                         }

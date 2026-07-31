@@ -433,13 +433,14 @@
         .feed-video-progress-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); left: 0%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
         .feed-video-time { color: #fff; font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
-        .feed-post-actions { display: flex; align-items: center; justify-content: flex-start; gap: 0; margin-top: 8px; max-width: 320px; }
+        .feed-post-actions { display: flex; align-items: center; justify-content: flex-start; gap: 0; margin-top: 8px; max-width: 420px; }
         .feed-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; padding: 6px 12px 6px 8px; border-radius: var(--radius-pill); transition: background 0.12s ease, color 0.12s ease; }
         .feed-post-action-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
         .feed-comment-btn:hover { color: var(--primary-blue); background: rgba(37, 211, 102, 0.1); }
         .feed-like-btn:hover { color: var(--danger-red); background: rgba(224, 36, 94, 0.1); }
         .feed-post-action-btn.liked { color: var(--danger-red); }
         .feed-post-action-btn.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
+        .feed-post-view-stat { cursor: default; }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
 
@@ -4951,6 +4952,8 @@
                     if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
                     const postImg = existingCard.querySelector('.x-media-grid-item img');
                     if (postImg && feedMusicAutoplayObserver) feedMusicAutoplayObserver.unobserve(postImg);
+                    if (feedImpressionObserver) feedImpressionObserver.unobserve(existingCard);
+                    if (existingCard.__impressionTimer) clearTimeout(existingCard.__impressionTimer);
                     existingCard.remove();
                 }
                 updateFeedEmptyState();
@@ -5341,6 +5344,36 @@
             return `${m}:${s}`;
         }
 
+        // Counts a post "impression" (view) once it's been meaningfully on-screen, X-style:
+        // not on every scroll pass, once per post per session, and not for the author's own posts.
+        let feedImpressionObserver = null;
+        const impressedPostIds = new Set();
+        function getFeedImpressionObserver() {
+            if (feedImpressionObserver) return feedImpressionObserver;
+            feedImpressionObserver = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    const card = entry.target;
+                    const postId = card.dataset.postId;
+                    if (!postId) return;
+                    if (entry.isIntersecting) {
+                        if (card.__impressionTimer || impressedPostIds.has(postId)) return;
+                        card.__impressionTimer = setTimeout(() => {
+                            card.__impressionTimer = null;
+                            if (impressedPostIds.has(postId)) return;
+                            impressedPostIds.add(postId);
+                            const user = auth.currentUser;
+                            if (!user || card.dataset.uid === user.uid) return;
+                            update(ref(database, `posts/${postId}`), { impressionCount: increment(1) }).catch(() => {});
+                        }, 1000);
+                    } else if (card.__impressionTimer) {
+                        clearTimeout(card.__impressionTimer);
+                        card.__impressionTimer = null;
+                    }
+                });
+            }, { threshold: 0.5 });
+            return feedImpressionObserver;
+        }
+
         // Pauses feed media (video, or a post's background music) whenever it scrolls out of the
         // viewport (or is no longer sufficiently visible), so playback never keeps running behind
         // other cards. Videos are observed directly; a post's music chip is observed instead of the
@@ -5507,6 +5540,13 @@
 
         // Updates just the like/comment counts (and liked state) on an existing card, in place —
         // used for reaction updates so a playing video or open edit box is never disturbed.
+        function formatFeedCount(n) {
+            n = Number(n) || 0;
+            if (n < 1000) return String(n);
+            if (n < 1000000) return (n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0).replace(/\.0$/, '') + 'K';
+            return (n / 1000000).toFixed(n % 1000000 >= 100000 ? 1 : 0).replace(/\.0$/, '') + 'M';
+        }
+
         function patchFeedPostCounts(card, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
@@ -5515,10 +5555,12 @@
             const likeBtn = card.querySelector('.feed-like-btn');
             const likeCountEl = card.querySelector('.feed-like-count');
             const commentCountEl = card.querySelector('.feed-comment-count');
+            const viewCountEl = card.querySelector('.feed-view-count');
 
             if (likeBtn) likeBtn.classList.toggle('liked', likedByMe);
             if (likeCountEl) likeCountEl.textContent = post.likeCount || 0;
             if (commentCountEl) commentCountEl.textContent = post.commentCount || 0;
+            if (viewCountEl) viewCountEl.textContent = formatFeedCount(post.impressionCount || 0);
         }
 
         // --- POST TEXT: escape user content, then highlight #hashtags as clickable spans ---
@@ -5634,11 +5676,16 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
                             <span class="feed-like-count">${post.likeCount || 0}</span>
                         </button>
+                        <div class="feed-post-action-btn feed-post-view-stat" title="Views">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                            <span class="feed-view-count">${formatFeedCount(post.impressionCount || 0)}</span>
+                        </div>
                     </div>
                 </div>
             `;
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);
+            getFeedImpressionObserver().observe(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {

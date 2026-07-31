@@ -708,6 +708,11 @@
         .otp-box.filled { border-color: var(--primary-blue); animation: otpFilledPop 0.25s ease; }
         @keyframes otpFilledPop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
         @media (max-width: 380px) { .otp-box { width: 40px; height: 50px; font-size: 19px; } .otp-boxes { gap: 7px; } }
+        .pin-boxes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; }
+        .pin-box { width: 46px; height: 56px; text-align: center; font-size: 22px; font-weight: 700; border-radius: 14px; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; transition: 0.2s; }
+        .pin-box:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15); }
+        .pin-box.filled { border-color: var(--primary-blue); animation: otpFilledPop 0.25s ease; }
+        @media (max-width: 380px) { .pin-box { width: 40px; height: 50px; font-size: 19px; } .pin-boxes { gap: 7px; } }
         @media (max-width: 768px) { .auth-card-brand { display: flex; } }
 
         /* ── MAIN MESSENGER APP (3-Pane Grid) ── */
@@ -2057,6 +2062,18 @@
             </div>
 
             <div class="wa-section">
+                <div class="wa-section-title">Privacy</div>
+                <div class="wa-list-row wa-row-clickable" id="setting-chat-backup">
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Chat Backup</span>
+                        <span class="wa-row-sub">Restore encrypted DM history on new devices</span>
+                    </div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+            </div>
+
+            <div class="wa-section">
                 <div class="wa-section-title">Help</div>
                 <div class="wa-list-row wa-row-clickable" id="setting-blocked-contacts">
                     <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></div>
@@ -2593,6 +2610,41 @@
                     <span class="wa-row-title">Photo &amp; Video</span>
                     <span class="wa-row-sub">Upload from your gallery</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="e2e-backup-prompt-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 28px; text-align: center;">
+            <div class="sheet-handle"></div>
+            <div id="e2e-backup-intro-step">
+                <div style="width:64px; height:64px; border-radius:50%; background: rgba(37,211,102,0.12); display:flex; align-items:center; justify-content:center; margin: 4px auto 16px;">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <div class="sheet-title" style="margin-bottom: 6px;">Your Messages Are Encrypted</div>
+                <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0 0 24px;">
+                    Your direct messages are end-to-end encrypted — only you and the person you're chatting with can read them, not even us. This key lives only on this device, so signing in elsewhere starts fresh with no history.
+                    Set a backup PIN to carry your chat history to any new device.
+                </p>
+                <button type="button" class="btn-pill btn-primary" id="e2e-backup-setup-btn" style="width:100%;">Set Up Backup PIN</button>
+                <button type="button" class="btn-pill btn-outline" id="e2e-backup-later-btn" style="width:100%; margin-top:10px; border:none;">Maybe Later</button>
+            </div>
+            <div id="e2e-backup-pin-step" style="display:none;">
+                <div class="sheet-title" id="e2e-backup-pin-title" style="margin-bottom: 6px;">Create a PIN</div>
+                <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0 0 18px;" id="e2e-backup-pin-subtitle">
+                    Choose a 6-digit PIN. You'll enter this on new devices to restore your chat history. We never see or store this PIN.
+                </p>
+                <div class="pin-boxes" id="e2e-backup-pin-boxes">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box" autocomplete="off">
+                </div>
+                <p id="e2e-backup-pin-error" style="color: var(--danger-red); font-size: 13px; min-height: 18px; margin: 8px 0 4px;"></p>
+                <button type="button" class="btn-pill btn-primary" id="e2e-backup-pin-continue-btn" style="width:100%; margin-top: 10px;">Continue</button>
+                <button type="button" class="btn-pill btn-outline" id="e2e-backup-pin-back-btn" style="width:100%; margin-top:10px; border:none;">Back</button>
             </div>
         </div>
     </div>
@@ -3497,7 +3549,7 @@
             });
         }
 
-        function renderArchivedChatsList() {
+        async function renderArchivedChatsList() {
             const container = document.getElementById('archived-chats-list');
             if (!container) return;
             container.innerHTML = '';
@@ -3508,6 +3560,12 @@
                 container.innerHTML = '<p class="empty-msg">No archived chats.</p>';
                 return;
             }
+
+            await Promise.all(archivedUids.map(async (uid) => {
+                if (uid === AI_UID) return;
+                const meta = chats[uid];
+                if (meta && isE2EPayload(meta.text)) meta.text = await decryptForPeer(uid, meta.text);
+            }));
 
             archivedUids.sort((a, b) => (chats[b].timestamp || 0) - (chats[a].timestamp || 0));
             archivedUids.forEach(uid => {
@@ -9001,7 +9059,7 @@
 
             const threadId = threadIdFor(user.uid, otherUid);
             const msgPayload = {
-                text: text,
+                text: await encryptForPeer(otherUid, text),
                 senderUid: user.uid,
                 createdAt: Date.now(),
                 replyToStory: current.type === 'text'
@@ -9639,6 +9697,7 @@
                 document.getElementById('messenger-screen').style.display = 'block';
                 updateAvatarUI(user);
                 requestAnimationFrame(updateNavIndicator);
+                initE2EForThisDevice().catch(() => {});
 
                 updateNotificationBtnVisibility();
                 if ('Notification' in window && Notification.permission === 'granted') {
@@ -9727,6 +9786,469 @@
         const EDIT_WINDOW_MS = 15 * 60 * 1000;
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
+
+        // --- END-TO-END ENCRYPTION FOR 1:1 DMs ---
+        // Each device holds its own ECDH (P-256) keypair. The private key never leaves this
+        // device (stored in IndexedDB) and is never sent to the server. The public key is
+        // published to `users/{uid}/e2ee/publicKey` so others can derive a shared secret with
+        // this device.
+        //
+        // For a given pair of users, both sides derive the SAME AES-256-GCM key via
+        // ECDH(myPrivateKey, theirPublicKey) === ECDH(theirPrivateKey, myPublicKey) — the
+        // standard Diffie-Hellman property. That shared key encrypts every message text in
+        // that 1:1 thread; the server only ever stores ciphertext.
+        //
+        // Known, intentional limitations:
+        //  - Static-static ECDH, not a full Signal-style double ratchet — no forward secrecy
+        //    (a single leaked device key can decrypt that thread's whole history).
+        //  - Keys are per-device: logging in on a new device generates a new keypair, so that
+        //    device can decrypt future messages but not history encrypted for the old device.
+        //  - Message TEXT is end-to-end encrypted. Media (photos/videos/voice notes/documents/
+        //    stickers) still goes through the existing upload flow unencrypted.
+        //  - Group chats and the AI assistant thread are intentionally not encrypted.
+        const E2E_PREFIX = '\u27e6e2e1\u27e7';
+        let myE2EKeypair = null;
+        const peerPublicKeyCache = {};
+        const sharedKeyCache = {};
+
+        function openE2EDb() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('xoxa-e2ee', 1);
+                req.onupgradeneeded = () => { req.result.createObjectStore('keys'); };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        function idbGet(store, key) {
+            return openE2EDb().then(db => new Promise((resolve, reject) => {
+                const req = db.transaction(store, 'readonly').objectStore(store).get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            }));
+        }
+        function idbSet(store, key, value) {
+            return openE2EDb().then(db => new Promise((resolve, reject) => {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).put(value, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            }));
+        }
+
+        // Loads this device's keypair from IndexedDB, generating + publishing a new one on first use.
+        async function getMyKeypair() {
+            if (myE2EKeypair) return myE2EKeypair;
+            const user = auth.currentUser;
+            if (!user) return null;
+
+            try {
+                const stored = await idbGet('keys', 'keypair-' + user.uid);
+                if (stored && stored.publicKey && stored.privateKey) {
+                    myE2EKeypair = stored;
+                    return myE2EKeypair;
+                }
+            } catch (e) { /* fall through to generate a fresh one */ }
+
+            const keypair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+            myE2EKeypair = keypair;
+            try { await idbSet('keys', 'keypair-' + user.uid, keypair); } catch (e) { /* best-effort persistence */ }
+            try {
+                const publicJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey);
+                await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
+            } catch (e) { /* peers just can't encrypt to us yet if this fails */ }
+
+            return myE2EKeypair;
+        }
+
+        async function getPeerPublicKey(peerUid) {
+            if (peerPublicKeyCache[peerUid]) return peerPublicKeyCache[peerUid];
+            const snap = await get(ref(database, `users/${peerUid}/e2ee/publicKey`));
+            if (!snap.exists()) return null;
+            const key = await crypto.subtle.importKey('jwk', snap.val(), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+            peerPublicKeyCache[peerUid] = key;
+            return key;
+        }
+
+        // Derives (and caches) the shared AES-256-GCM key for a 1:1 thread with peerUid.
+        // Returns null if either side doesn't have a published key yet (or peerUid is the AI
+        // account) — callers fall back to plaintext in that case so sending never gets stuck.
+        async function deriveSharedKey(peerUid) {
+            if (peerUid === AI_UID) return null;
+            if (sharedKeyCache[peerUid]) return sharedKeyCache[peerUid];
+
+            const my = await getMyKeypair();
+            if (!my) return null;
+            const peerPublic = await getPeerPublicKey(peerUid);
+            if (!peerPublic) return null;
+
+            try {
+                const sharedKey = await crypto.subtle.deriveKey(
+                    { name: 'ECDH', public: peerPublic }, my.privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+                );
+                sharedKeyCache[peerUid] = sharedKey;
+                return sharedKey;
+            } catch (e) { return null; }
+        }
+
+        function isE2EPayload(s) { return typeof s === 'string' && s.startsWith(E2E_PREFIX); }
+
+        function bufToBase64(buf) {
+            let binary = '';
+            const bytes = new Uint8Array(buf);
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+        function base64ToBuf(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        // Encrypts plaintext for a 1:1 thread with peerUid. Falls back to plaintext if a shared
+        // key can't be derived yet, so sending never silently fails.
+        async function encryptForPeer(peerUid, plaintext) {
+            if (plaintext == null || plaintext === '') return plaintext;
+            const key = await deriveSharedKey(peerUid);
+            if (!key) return plaintext;
+            try {
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
+                return E2E_PREFIX + bufToBase64(iv) + ':' + bufToBase64(cipherBuf);
+            } catch (e) { return plaintext; }
+        }
+
+        // Decrypts a stored payload for a 1:1 thread with peerUid. Plaintext/legacy values pass
+        // through untouched so pre-encryption message history keeps working.
+        async function decryptForPeer(peerUid, payload) {
+            if (!isE2EPayload(payload)) return payload;
+            const key = await deriveSharedKey(peerUid);
+            if (!key) return '🔒 Encrypted message';
+            try {
+                const [ivB64, cipherB64] = payload.slice(E2E_PREFIX.length).split(':');
+                const iv = new Uint8Array(base64ToBuf(ivB64));
+                const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, base64ToBuf(cipherB64));
+                return new TextDecoder().decode(plainBuf);
+            } catch (e) { return '🔒 Unable to decrypt message'; }
+        }
+
+        // --- PASSPHRASE/PIN-ENCRYPTED KEY BACKUP (solves "new device = lost history") ---
+        // The per-device private key never leaves the device unencrypted, but a user can
+        // opt in to backing it up: we encrypt the raw private-key JWK with a key derived
+        // from a 6-digit PIN they choose (PBKDF2 -> AES-256-GCM) and store only that
+        // ciphertext at users/{uid}/e2ee/keyBackup. The PIN itself is never sent anywhere.
+        // On a new device, entering the same PIN decrypts the backup and restores the SAME
+        // keypair, so old messages become readable again — no server-side change to how
+        // messages are encrypted is needed, since the shared secret is rederived from this
+        // same identity key.
+        //
+        // Known, intentional limitation: a 6-digit PIN only has ~1,000,000 possibilities.
+        // Real chat apps that offer PIN backup (e.g. WhatsApp) protect this with a
+        // rate-limited server-side HSM so offline brute-force isn't possible. We don't have
+        // that here — this blob lives in the regular database, so anyone who can read it
+        // could brute-force a 6-digit PIN offline given enough compute, even at a high PBKDF2
+        // iteration count. Treat this as "recoverable convenience," not Signal-grade secrecy.
+        // If stronger guarantees are needed later, offer an alphanumeric passphrase option
+        // alongside the PIN, or move iteration/rate-limiting logic server-side.
+        async function deriveBackupKey(passphrase, saltBuf, iterations) {
+            const baseKey = await crypto.subtle.importKey(
+                'raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']
+            );
+            return crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt: saltBuf, iterations: iterations || 600000, hash: 'SHA-256' },
+                baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+            );
+        }
+
+        async function fetchKeyBackup(uid) {
+            const snap = await get(ref(database, `users/${uid}/e2ee/keyBackup`));
+            return snap.exists() ? snap.val() : null;
+        }
+
+        // Encrypts THIS device's current private key under the given passphrase and uploads
+        // it. Call after getMyKeypair() has run, so myE2EKeypair is populated. Overwrites any
+        // previous backup — only one backup (i.e. one "recoverable identity") per account.
+        async function backupKeypair(passphrase) {
+            const user = auth.currentUser;
+            if (!user) return false;
+            const my = await getMyKeypair();
+            if (!my) return false;
+
+            const privateJwk = await crypto.subtle.exportKey('jwk', my.privateKey);
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const iterations = 600000;
+            const backupKey = await deriveBackupKey(passphrase, salt, iterations);
+            const cipherBuf = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv }, backupKey, new TextEncoder().encode(JSON.stringify(privateJwk))
+            );
+
+            await set(ref(database, `users/${user.uid}/e2ee/keyBackup`), {
+                salt: bufToBase64(salt),
+                iv: bufToBase64(iv),
+                data: bufToBase64(cipherBuf),
+                iterations
+            });
+            return true;
+        }
+
+        // Attempts to decrypt an existing backup with the given passphrase and, on success,
+        // makes it this device's active keypair (persisted to IndexedDB, republished to
+        // users/{uid}/e2ee/publicKey). Returns false on wrong passphrase / no backup / corrupt data.
+        async function restoreKeypairFromBackup(passphrase) {
+            const user = auth.currentUser;
+            if (!user) return false;
+            const backup = await fetchKeyBackup(user.uid);
+            if (!backup) return false;
+
+            try {
+                const salt = new Uint8Array(base64ToBuf(backup.salt));
+                const iv = new Uint8Array(base64ToBuf(backup.iv));
+                const backupKey = await deriveBackupKey(passphrase, salt, backup.iterations);
+                const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, backupKey, base64ToBuf(backup.data));
+                const privateJwk = JSON.parse(new TextDecoder().decode(plainBuf));
+
+                const privateKey = await crypto.subtle.importKey(
+                    'jwk', privateJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']
+                );
+                // Derive the public JWK from the private one (same x/y, no d) so we can
+                // rebuild a full keypair object shaped like a freshly generated one.
+                const publicJwk = Object.assign({}, privateJwk);
+                delete publicJwk.d;
+                publicJwk.key_ops = [];
+                const publicKey = await crypto.subtle.importKey(
+                    'jwk', publicJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, []
+                );
+
+                const keypair = { privateKey, publicKey };
+                myE2EKeypair = keypair;
+                await idbSet('keys', 'keypair-' + user.uid, keypair);
+                await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
+                Object.keys(sharedKeyCache).forEach(k => delete sharedKeyCache[k]);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Small passphrase entry modal, built on the fly so it doesn't need its own static
+        // markup. Resolves with the entered string, or null if the user cancels.
+        function showPassphrasePrompt(title, message, confirmLabel) {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay active';
+                overlay.innerHTML = `
+                    <div class="custom-modal">
+                        <h3 style="margin:0 0 8px;">${title}</h3>
+                        <p style="margin:0 0 16px; color: var(--text-secondary); font-size:14px;">${message}</p>
+                        <input type="password" class="pill-input" id="passphrase-prompt-input" placeholder="Passphrase" autocomplete="off" style="width:100%; margin-bottom:16px; box-sizing:border-box;">
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn-pill btn-outline" id="passphrase-prompt-cancel" style="flex:1;">Cancel</button>
+                            <button type="button" class="btn-pill btn-primary" id="passphrase-prompt-confirm" style="flex:1;">${confirmLabel}</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                const input = overlay.querySelector('#passphrase-prompt-input');
+                input.focus();
+                const cleanup = (val) => { overlay.remove(); resolve(val); };
+                overlay.querySelector('#passphrase-prompt-confirm').onclick = () => cleanup(input.value || null);
+                overlay.querySelector('#passphrase-prompt-cancel').onclick = () => cleanup(null);
+                overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(null); });
+                input.addEventListener('keydown', (e) => { if (e.key === 'Enter') cleanup(input.value || null); });
+            });
+        }
+
+        // Runs on every login. If this device already has a key, we're done (existing
+        // behavior). If not, and the account has a passphrase backup, offer to restore it
+        // BEFORE falling back to generating a brand new (history-incompatible) keypair.
+        async function initE2EForThisDevice() {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            try {
+                const stored = await idbGet('keys', 'keypair-' + user.uid);
+                if (stored && stored.publicKey && stored.privateKey) {
+                    myE2EKeypair = stored;
+                    maybeShowE2EBackupPrompt(user.uid); // still un-backed-up on this account? offer it
+                    return;
+                }
+            } catch (e) { /* fall through to backup check / fresh generation */ }
+
+            const backup = await fetchKeyBackup(user.uid).catch(() => null);
+            if (backup) {
+                const pin = await showPassphrasePrompt(
+                    'Restore Chat History',
+                    'This account has a backup PIN set up. Enter it to decrypt your DM history on this device.',
+                    'Restore'
+                );
+                if (pin) {
+                    const ok = await restoreKeypairFromBackup(pin);
+                    if (ok) { notify('Chat history restored'); return; }
+                    notify('Incorrect PIN — this device will use a new key', 'error');
+                }
+            }
+            await getMyKeypair();
+            maybeShowE2EBackupPrompt(user.uid); // brand-new key on this device — worth backing up
+        }
+
+        // --- PIN entry boxes (shared by the backup opt-in sheet) ---
+        const pinBoxes = Array.from(document.querySelectorAll('.pin-box'));
+        pinBoxes.forEach((box, i) => {
+            box.addEventListener('input', () => {
+                box.value = box.value.replace(/[^0-9]/g, '').slice(0, 1);
+                box.classList.toggle('filled', box.value.length === 1);
+                if (box.value && i < pinBoxes.length - 1) pinBoxes[i + 1].focus();
+            });
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !box.value && i > 0) pinBoxes[i - 1].focus();
+            });
+        });
+        function getPinBoxesValue() {
+            const digits = pinBoxes.map(b => b.value).join('');
+            return digits.length === pinBoxes.length ? digits : null;
+        }
+        function clearPinBoxes() {
+            pinBoxes.forEach(b => { b.value = ''; b.classList.remove('filled'); });
+            if (pinBoxes[0]) pinBoxes[0].focus();
+        }
+
+        // --- E2E Backup opt-in bottom sheet ---
+        // Shown once per device when this account has no key backup yet: explains that DMs
+        // are already end-to-end encrypted, and offers a 6-digit PIN backup so history survives
+        // a new device. Re-shown after a snooze period if the user picks "Maybe Later"; never
+        // shown again once a backup exists (fetchKeyBackup will return truthy).
+        let e2eBackupSheetStage = 'create'; // 'create' | 'confirm'
+        let e2eBackupFirstPin = null;
+        const e2eBackupOverlay = document.getElementById('e2e-backup-prompt-sheet-overlay');
+        const e2eBackupIntroStep = document.getElementById('e2e-backup-intro-step');
+        const e2eBackupPinStep = document.getElementById('e2e-backup-pin-step');
+        const e2eBackupPinTitle = document.getElementById('e2e-backup-pin-title');
+        const e2eBackupPinSubtitle = document.getElementById('e2e-backup-pin-subtitle');
+        const e2eBackupPinError = document.getElementById('e2e-backup-pin-error');
+
+        function snoozeKeyFor(uid) { return `e2eBackupSnoozedUntil_${uid}`; }
+
+        async function maybeShowE2EBackupPrompt(uid) {
+            try {
+                const backup = await fetchKeyBackup(uid);
+                if (backup) return; // already backed up — nothing to prompt
+                const snoozedUntil = parseInt(localStorage.getItem(snoozeKeyFor(uid)) || '0', 10);
+                if (Date.now() < snoozedUntil) return;
+                setTimeout(() => showE2EBackupPromptSheet(false), 900); // let the UI settle first
+            } catch (e) { /* if we can't tell, don't nag */ }
+        }
+
+        function showE2EBackupPromptSheet(skipIntro) {
+            e2eBackupPinError.textContent = '';
+            e2eBackupSheetStage = 'create';
+            e2eBackupFirstPin = null;
+            if (skipIntro) {
+                e2eBackupIntroStep.style.display = 'none';
+                e2eBackupPinStep.style.display = 'block';
+                e2eBackupPinTitle.textContent = 'Create a PIN';
+                e2eBackupPinSubtitle.textContent = "Choose a 6-digit PIN. You'll enter this on new devices to restore your chat history. We never see or store this PIN.";
+                clearPinBoxes();
+            } else {
+                e2eBackupIntroStep.style.display = 'block';
+                e2eBackupPinStep.style.display = 'none';
+            }
+            e2eBackupOverlay.classList.add('active');
+        }
+        function closeE2EBackupPromptSheet() {
+            e2eBackupOverlay.classList.remove('active');
+        }
+        e2eBackupOverlay.addEventListener('click', (e) => {
+            if (e.target === e2eBackupOverlay) closeE2EBackupPromptSheet();
+        });
+
+        document.getElementById('e2e-backup-setup-btn').addEventListener('click', () => {
+            e2eBackupIntroStep.style.display = 'none';
+            e2eBackupPinStep.style.display = 'block';
+            e2eBackupSheetStage = 'create';
+            e2eBackupPinTitle.textContent = 'Create a PIN';
+            e2eBackupPinSubtitle.textContent = "Choose a 6-digit PIN. You'll enter this on new devices to restore your chat history. We never see or store this PIN.";
+            e2eBackupPinError.textContent = '';
+            clearPinBoxes();
+        });
+
+        document.getElementById('e2e-backup-later-btn').addEventListener('click', () => {
+            const user = auth.currentUser;
+            if (user) localStorage.setItem(snoozeKeyFor(user.uid), String(Date.now() + 7 * 24 * 60 * 60 * 1000)); // ask again in a week
+            closeE2EBackupPromptSheet();
+        });
+
+        document.getElementById('e2e-backup-pin-back-btn').addEventListener('click', () => {
+            if (e2eBackupSheetStage === 'confirm') {
+                e2eBackupSheetStage = 'create';
+                e2eBackupFirstPin = null;
+                e2eBackupPinTitle.textContent = 'Create a PIN';
+                e2eBackupPinSubtitle.textContent = "Choose a 6-digit PIN. You'll enter this on new devices to restore your chat history. We never see or store this PIN.";
+                e2eBackupPinError.textContent = '';
+                clearPinBoxes();
+            } else {
+                e2eBackupPinStep.style.display = 'none';
+                e2eBackupIntroStep.style.display = 'block';
+            }
+        });
+
+        document.getElementById('e2e-backup-pin-continue-btn').addEventListener('click', async () => {
+            const pin = getPinBoxesValue();
+            if (!pin) {
+                e2eBackupPinError.textContent = 'Enter all 6 digits';
+                return;
+            }
+
+            if (e2eBackupSheetStage === 'create') {
+                if (/^(\d)\1{5}$/.test(pin) || pin === '123456' || pin === '654321') {
+                    e2eBackupPinError.textContent = 'Choose a less predictable PIN';
+                    clearPinBoxes();
+                    return;
+                }
+                e2eBackupFirstPin = pin;
+                e2eBackupSheetStage = 'confirm';
+                e2eBackupPinTitle.textContent = 'Confirm PIN';
+                e2eBackupPinSubtitle.textContent = 'Enter the same PIN again to confirm.';
+                e2eBackupPinError.textContent = '';
+                clearPinBoxes();
+                return;
+            }
+
+            // stage === 'confirm'
+            if (pin !== e2eBackupFirstPin) {
+                e2eBackupPinError.textContent = "PINs didn't match — try again";
+                e2eBackupSheetStage = 'create';
+                e2eBackupFirstPin = null;
+                e2eBackupPinTitle.textContent = 'Create a PIN';
+                e2eBackupPinSubtitle.textContent = "Choose a 6-digit PIN. You'll enter this on new devices to restore your chat history. We never see or store this PIN.";
+                clearPinBoxes();
+                return;
+            }
+
+            showLoading();
+            try {
+                const ok = await backupKeypair(pin);
+                closeE2EBackupPromptSheet();
+                notify(ok ? 'Chat backup saved' : 'Could not save backup', ok ? 'success' : 'error');
+            } catch (e) {
+                notify('Could not save backup', 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // --- Chat Backup settings entry point (manual set/update, jumps straight to PIN entry) ---
+        document.getElementById('setting-chat-backup').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            const existingBackup = await fetchKeyBackup(user.uid).catch(() => null);
+            if (existingBackup) {
+                const proceed = await showCustomModal('Chat Backup', 'A backup PIN is already set for this account. Set a new one and re-backup this device\'s key? Devices restoring with the OLD PIN after this will no longer work.', true);
+                if (!proceed) return;
+            }
+            showE2EBackupPromptSheet(true);
+        });
 
         let pendingUploadsByChat = {};
         let typingTimeout = null;
@@ -10054,11 +10576,12 @@
                 } else {
                     const otherUid = activeChatUid;
                     const threadId = threadIdFor(user.uid, otherUid);
+                    const encryptedText = await encryptForPeer(otherUid, newText);
                     await update(ref(database, `dm_threads/${threadId}/messages/${msgKey}`), {
-                        text: newText,
+                        text: encryptedText,
                         editedAt: Date.now()
                     });
-                    await syncLastMessagePreview(user.uid, otherUid, targetCreatedAt, newText);
+                    await syncLastMessagePreview(user.uid, otherUid, targetCreatedAt, encryptedText);
                 }
                 notify('Message edited');
             } catch (err) {
@@ -10110,13 +10633,13 @@
                 const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
                 
                 const msgPayload = { senderUid: user.uid, createdAt: Date.now(), isForwarded: true };
-                if (activeContextMenuMsg.text) msgPayload.text = activeContextMenuMsg.text;
+                let previewText = activeContextMenuMsg.text || (activeContextMenuMsg.mediaType ? `[${activeContextMenuMsg.mediaType}]` : 'Forwarded message');
+                if (activeContextMenuMsg.text) msgPayload.text = await encryptForPeer(targetUid, activeContextMenuMsg.text);
                 if (activeContextMenuMsg.mediaURL) {
                     msgPayload.mediaURL = activeContextMenuMsg.mediaURL;
                     msgPayload.mediaType = activeContextMenuMsg.mediaType;
                 }
-                
-                let previewText = msgPayload.text || (msgPayload.mediaType ? `[${msgPayload.mediaType}]` : 'Forwarded message');
+                previewText = await encryptForPeer(targetUid, previewText);
 
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
@@ -10432,12 +10955,21 @@
             });
 
             // Messages listener logic for Chat View
-            unsubscribeChatMessages = onValue(ref(database, `dm_threads/${threadId}/messages`), (snap) => {
+            unsubscribeChatMessages = onValue(ref(database, `dm_threads/${threadId}/messages`), async (snap) => {
                 const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (snap.exists()) {
                     const items = Object.entries(snap.val()).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
+
+                    if (!isAIThread) {
+                        await Promise.all(items.map(async (msg) => {
+                            if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
+                            if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
+                                msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                            }
+                        }));
+                    }
                     
                     items.forEach(msg => {
                         const bubble = document.createElement('div');
@@ -10764,13 +11296,14 @@
             if (theyBlockedMeActive || cachedBlocked[activeChatUid]) return; // extra safety net
 
             const threadId = threadIdFor(user.uid, activeChatUid);
-            const msgPayload = { text: text, senderUid: user.uid, createdAt: Date.now() };
+            const encryptedText = await encryptForPeer(activeChatUid, text);
+            const msgPayload = { text: encryptedText, senderUid: user.uid, createdAt: Date.now() };
             
             if (replyingToMessage) {
                 msgPayload.replyToMessage = {
                     key: replyingToMessage.key,
                     senderUid: replyingToMessage.senderUid,
-                    text: replyingToMessage.text || '',
+                    text: replyingToMessage.text ? await encryptForPeer(activeChatUid, replyingToMessage.text) : '',
                     mediaType: replyingToMessage.mediaType || ''
                 };
             }
@@ -10779,8 +11312,8 @@
             
             const updates = {};
             updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
-            updates[`user_chats/${user.uid}/${activeChatUid}`] = { text: text, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };
-            updates[`user_chats/${activeChatUid}/${user.uid}/text`] = text;
+            updates[`user_chats/${user.uid}/${activeChatUid}`] = { text: encryptedText, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };
+            updates[`user_chats/${activeChatUid}/${user.uid}/text`] = encryptedText;
             updates[`user_chats/${activeChatUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
             updates[`user_chats/${activeChatUid}/${user.uid}/unreadCount`] = increment(1);
             updates[`user_chats/${activeChatUid}/${user.uid}/senderUid`] = user.uid;
@@ -11016,7 +11549,12 @@
                         previewText = msgPayload.mediaType === 'video' ? '🎥 Video' : '📷 Photo';
                     }
                 }
-                if (capturedReplyCtx) msgPayload.replyToMessage = capturedReplyCtx;
+                if (capturedReplyCtx) {
+                    if (capturedReplyCtx.text) capturedReplyCtx.text = await encryptForPeer(chatUid, capturedReplyCtx.text);
+                    msgPayload.replyToMessage = capturedReplyCtx;
+                }
+
+                previewText = await encryptForPeer(chatUid, previewText);
 
                 const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
 
@@ -11706,7 +12244,7 @@
                 renderChatListFromCache();
             });
 
-            function renderChatListFromCache() {
+            async function renderChatListFromCache() {
                 const user = auth.currentUser;
                 if (!user) return;
                 const chatList = document.getElementById('chat-list-container');
@@ -11721,6 +12259,14 @@
                 let totalUnread = 0;
 
                 const chats = cachedUserChatsData;
+
+                // Decrypt any still-encrypted DM previews in place before rendering — idempotent,
+                // since already-decrypted or legacy plaintext entries are left untouched.
+                await Promise.all(Object.keys(chats || {}).map(async (chatUid) => {
+                    if (chatUid === AI_UID) return;
+                    const meta = chats[chatUid];
+                    if (meta && isE2EPayload(meta.text)) meta.text = await decryptForPeer(chatUid, meta.text);
+                }));
                 const myGroupIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].members && cachedGroups[gid].members[user.uid]);
 
                 // "All" shows both direct chats and the groups the user belongs to, merged

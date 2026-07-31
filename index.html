@@ -1311,6 +1311,9 @@
         .story-controls-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
         .story-viewer-delete { color: var(--danger-red); cursor: pointer; width: 22px; height: 22px; display: none; transition: 0.2s; pointer-events: auto; flex-shrink: 0; }
         .story-viewer-delete:hover { transform: scale(1.1); }
+        .story-viewer-more { color: white; cursor: pointer; width: 22px; height: 22px; display: none; transition: 0.2s; pointer-events: auto; flex-shrink: 0; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+        .story-viewer-more:hover { transform: scale(1.1); }
+        .msg-option-btn.danger { color: var(--danger-red); }
         .story-viewer-close { color: white; cursor: pointer; width: 24px; height: 24px; transition: 0.2s; }
         .story-viewer-close:hover { opacity: 0.8; }
         .story-mute-btn { color: white; cursor: pointer; width: 22px; height: 22px; transition: 0.2s; pointer-events: auto; flex-shrink: 0; }
@@ -2670,7 +2673,7 @@
                 <svg class="story-like-btn story-interactive" id="story-like-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                 <svg class="story-reshare-btn story-interactive" id="story-reshare-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <svg class="story-mute-btn story-interactive" id="story-mute-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"></svg>
-                <svg class="story-viewer-delete story-interactive" id="story-viewer-delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                <svg class="story-viewer-more story-interactive" id="story-viewer-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
             </div>
 
             <div class="story-controls-bottom" id="story-controls-bottom">
@@ -2692,6 +2695,18 @@
             <div class="sheet-handle"></div>
             <div class="sheet-title">Viewed by</div>
             <div id="story-viewers-list" style="flex:1; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div id="story-options-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 8px;">Story Options</div>
+            <div style="display:flex; flex-direction:column;">
+                <button class="msg-option-btn" id="btn-story-viewers">Viewed By</button>
+                <button class="msg-option-btn" id="btn-story-save">Save to Device</button>
+                <button class="msg-option-btn danger" id="btn-story-delete">Delete Story</button>
+            </div>
         </div>
     </div>
 
@@ -8517,7 +8532,7 @@
                 avatarEl.textContent = name.charAt(0).toUpperCase();
             }
 
-            document.getElementById('story-viewer-delete').style.display = isOwn ? 'block' : 'none';
+            document.getElementById('story-viewer-more').style.display = isOwn ? 'block' : 'none';
             document.getElementById('story-controls-bottom').style.display = isOwn ? 'none' : 'flex';
             document.getElementById('story-like-btn').style.display = isOwn ? 'none' : 'block';
             document.getElementById('story-reshare-btn').style.display = isOwn ? 'none' : 'block';
@@ -8907,13 +8922,46 @@
             } catch (err) { showCustomModal('Error', 'Could not send your reply.'); }
         }
 
-        document.getElementById('story-viewer-delete').addEventListener('click', async (e) => {
+        const storyOptionsSheet = document.getElementById('story-options-sheet-overlay');
+
+        document.getElementById('story-viewer-more').addEventListener('click', (e) => {
             e.stopPropagation();
+            if (!storyState.isOwn) return;
+            pauseStory();
+            const current = storyState.items[storyState.index];
+            document.getElementById('btn-story-save').style.display = (current && current.type !== 'text') ? '' : 'none';
+            storyOptionsSheet.classList.add('active');
+        });
+
+        storyOptionsSheet.addEventListener('click', (e) => {
+            if (e.target === storyOptionsSheet) {
+                storyOptionsSheet.classList.remove('active');
+                resumeStory();
+            }
+        });
+
+        document.getElementById('btn-story-viewers').addEventListener('click', () => {
+            storyOptionsSheet.classList.remove('active');
+            openStoryViewersSheet();
+        });
+
+        document.getElementById('btn-story-save').addEventListener('click', async () => {
+            storyOptionsSheet.classList.remove('active');
+            const current = storyState.items[storyState.index];
+            if (!current || current.type === 'text' || !current.mediaURL) {
+                resumeStory();
+                return;
+            }
+            await downloadMediaFile(current.mediaURL, current.type === 'video' ? 'video' : 'image');
+            resumeStory();
+        });
+
+        document.getElementById('btn-story-delete').addEventListener('click', async () => {
+            storyOptionsSheet.classList.remove('active');
             const current = storyState.items[storyState.index];
             const user = auth.currentUser;
-            if (!current || !current.key || !user || !storyState.isOwn) return;
+            if (!current || !current.key || !user || !storyState.isOwn) { resumeStory(); return; }
 
-            pauseStory();
             const viewer = document.getElementById('story-viewer-overlay');
             viewer.style.opacity = '0';
 

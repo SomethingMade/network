@@ -339,6 +339,8 @@
         .mention-suggestion-username { display: block; font-size: 11.5px; color: var(--text-secondary); }
 
         #feed-posts-container { padding: 0; }
+        #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: block; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
+        #feed-new-posts-pill:active { transform: scale(0.97); }
         .feed-post-card { display: flex; gap: 12px; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
         .feed-post-card:hover { background: var(--bg-hover); }
         .x-post-avatar-col { flex-shrink: 0; }
@@ -2381,6 +2383,7 @@
                         </div>
 
                         <div id="feed-posts-container">
+                            <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
                             <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
                             <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
@@ -4062,6 +4065,7 @@
         let oldestLoadedPostTimestamp = Infinity;
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
+        let pendingNewPosts = {}; // postId -> post, queued live arrivals not yet shown (see "New posts" pill)
 
         // --- NOTIFICATIONS (likes, comments, replies, mentions) ---
         let notifListenersAttached = false;
@@ -4227,6 +4231,7 @@
         document.getElementById('discover-refresh-btn')?.addEventListener('click', () => {
             discoverShuffleSeed++;
             renderDiscoverGrid(searchDiscoverInput ? searchDiscoverInput.value : '');
+            applyPendingNewPosts();
         });
 
         // Builds one "who to follow"-style card (a handful of suggested people) to weave into
@@ -4753,6 +4758,45 @@
             sprinkleSuggestedPeople();
         }
 
+        function updateNewPostsPill() {
+            const pill = document.getElementById('feed-new-posts-pill');
+            if (!pill) return;
+            const count = Object.keys(pendingNewPosts).length;
+            if (count === 0) {
+                pill.style.display = 'none';
+                return;
+            }
+            pill.textContent = count === 1 ? 'New post' : `${count} new posts`;
+            pill.style.display = 'block';
+        }
+
+        // Folds queued live posts into the feed. Only called from explicit user actions (tapping
+        // the New Posts pill, or the manual refresh button) — never automatically.
+        function applyPendingNewPosts() {
+            const entries = Object.entries(pendingNewPosts);
+            pendingNewPosts = {};
+            updateNewPostsPill();
+            if (entries.length === 0) return;
+
+            const list = document.getElementById('feed-posts-list');
+            entries.forEach(([postId, post]) => {
+                cachedPosts[postId] = post;
+                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
+                    oldestLoadedPostTimestamp = post.timestamp;
+                }
+                if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
+                    list.prepend(buildFeedPostCard(postId, post));
+                }
+                if (post.videoUrl) renderStatusGridIfActive();
+            });
+            reorderFeedCards();
+            updateFeedEmptyState();
+            const container = document.getElementById('discover-grid-scroll');
+            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        document.getElementById('feed-new-posts-pill')?.addEventListener('click', applyPendingNewPosts);
+
         const FEED_PAGE_SIZE = 15;
 
         // Fetches an older page of posts (one-time read, not a live listener) and appends them.
@@ -4826,9 +4870,24 @@
 
             const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
 
+            // Firebase fires onChildAdded once for every post already in the initial page as soon
+            // as we attach, then again for genuinely new posts as they're created. We want the
+            // former to render immediately (that's the normal first load) but not the latter —
+            // per-viewer feeds shouldn't jump or re-sort on their own while someone's reading.
+            // A short window after attaching covers that initial burst.
+            let inInitialBurst = true;
+            setTimeout(() => { inInitialBurst = false; }, 800);
+
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
+
+                if (!inInitialBurst && !cachedPosts[postId]) {
+                    pendingNewPosts[postId] = post;
+                    updateNewPostsPill();
+                    return;
+                }
+
                 cachedPosts[postId] = post;
                 if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                     oldestLoadedPostTimestamp = post.timestamp;
@@ -4898,11 +4957,10 @@
                 if (removedPost && removedPost.videoUrl) renderStatusGridIfActive();
             });
 
-            // Re-rank when the contacts graph changes (affects the affinity boost), and on a
-            // slow periodic tick so engagement/recency drift eventually reflects in ordering.
-            // Neither of these fires per-like/per-comment — see reorderFeedCards() comment.
-            onValue(ref(database, `contacts/${user.uid}`), () => reorderFeedCards());
-            setInterval(reorderFeedCards, 45000);
+            // Note: ranking no longer auto-resettles on a timer or on contacts changes — that
+            // caused the feed to silently reshuffle under someone while they were reading it.
+            // Ranking now only resettles on an explicit user refresh (see applyPendingNewPosts
+            // and the discover-refresh-btn handler).
 
             const composerAvatar = document.getElementById('feed-composer-avatar');
             const profile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };

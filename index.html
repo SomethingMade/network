@@ -258,6 +258,16 @@
         
         .toast { position: fixed; bottom: 24px; right: 24px; padding: 16px 24px; border-radius: 50px; color: white; font-weight: 500; box-shadow: var(--shadow-soft); display: none; z-index: 10000; }
 
+        /* In-app "new message" banner — slides down from the top, over any screen */
+        .in-app-msg-banner-wrap { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: center; padding: max(12px, env(safe-area-inset-top)) 12px 0; z-index: 10500; pointer-events: none; }
+        .in-app-msg-banner { pointer-events: auto; width: 100%; max-width: 420px; display: flex; align-items: center; gap: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 12px 14px; box-shadow: var(--shadow-elevated); cursor: pointer; transform: translateY(-140%); opacity: 0; transition: transform 0.35s var(--ease-smooth), opacity 0.35s var(--ease-smooth); }
+        .in-app-msg-banner.visible { transform: translateY(0); opacity: 1; }
+        .in-app-msg-banner .avatar { width: 42px; height: 42px; flex-shrink: 0; background-size: cover; background-position: center; }
+        .in-app-msg-banner-body { flex: 1; min-width: 0; }
+        .in-app-msg-banner-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+        .in-app-msg-banner-text { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+        .in-app-msg-banner-close { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); background: var(--bg-hover); }
+
         /* ── CUSTOM MODALS ── */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100005; opacity: 0; visibility: hidden; transition: 0.2s ease; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
@@ -1656,6 +1666,19 @@
     </div>
     
     <div id="toast-notification" class="toast"></div>
+
+    <div id="in-app-msg-banner-wrap" class="in-app-msg-banner-wrap">
+        <div id="in-app-msg-banner" class="in-app-msg-banner">
+            <div class="avatar" id="in-app-msg-banner-avatar"></div>
+            <div class="in-app-msg-banner-body">
+                <div class="in-app-msg-banner-name" id="in-app-msg-banner-name"></div>
+                <div class="in-app-msg-banner-text" id="in-app-msg-banner-text"></div>
+            </div>
+            <div class="in-app-msg-banner-close" id="in-app-msg-banner-close">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+        </div>
+    </div>
 
     <div id="force-update-overlay" class="modal-overlay">
         <div class="custom-modal">
@@ -3252,6 +3275,92 @@
             toast.style.display = "block";
             setTimeout(() => { toast.style.display = "none"; }, 4000);
         }
+
+        // --- IN-APP "NEW MESSAGE" BANNER (slides down from the top, tap to open the chat) ---
+        let inAppBannerQueue = [];
+        let inAppBannerActive = false;
+        let inAppBannerHideTimer = null;
+
+        function enqueueInAppMessageBanner(data) {
+            // Collapse multiple queued banners from the same chat/group into the latest one
+            inAppBannerQueue = inAppBannerQueue.filter(b => !(data.chatUid && b.chatUid === data.chatUid) && !(data.groupId && b.groupId === data.groupId));
+            inAppBannerQueue.push(data);
+            processInAppBannerQueue();
+        }
+
+        function processInAppBannerQueue() {
+            if (inAppBannerActive || !inAppBannerQueue.length) return;
+            const data = inAppBannerQueue.shift();
+            renderInAppMessageBanner(data);
+        }
+
+        function renderInAppMessageBanner(data) {
+            const banner = document.getElementById('in-app-msg-banner');
+            const avatarEl = document.getElementById('in-app-msg-banner-avatar');
+            const nameEl = document.getElementById('in-app-msg-banner-name');
+            const textEl = document.getElementById('in-app-msg-banner-text');
+
+            nameEl.textContent = data.name || 'New message';
+            textEl.textContent = data.text || '';
+
+            if (data.avatar) {
+                avatarEl.style.backgroundImage = `url('${data.avatar}')`;
+                avatarEl.style.backgroundColor = '';
+                avatarEl.textContent = '';
+            } else {
+                avatarEl.style.backgroundImage = 'none';
+                avatarEl.style.backgroundColor = 'var(--primary-blue)';
+                avatarEl.style.color = '#FFFFFF';
+                avatarEl.style.display = 'flex';
+                avatarEl.style.alignItems = 'center';
+                avatarEl.style.justifyContent = 'center';
+                avatarEl.style.fontWeight = 'bold';
+                avatarEl.textContent = data.name ? data.name.charAt(0).toUpperCase() : '?';
+            }
+
+            banner.onclick = () => {
+                hideInAppMessageBanner();
+                if (typeof data.onOpen === 'function') data.onOpen();
+            };
+
+            inAppBannerActive = true;
+            requestAnimationFrame(() => banner.classList.add('visible'));
+
+            clearTimeout(inAppBannerHideTimer);
+            inAppBannerHideTimer = setTimeout(hideInAppMessageBanner, 5000);
+        }
+
+        function hideInAppMessageBanner() {
+            const banner = document.getElementById('in-app-msg-banner');
+            clearTimeout(inAppBannerHideTimer);
+            banner.classList.remove('visible');
+            inAppBannerActive = false;
+            setTimeout(processInAppBannerQueue, 350);
+        }
+
+        document.getElementById('in-app-msg-banner-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideInAppMessageBanner();
+        });
+
+        // Basic swipe-up-to-dismiss on the banner (touch)
+        (() => {
+            const banner = document.getElementById('in-app-msg-banner');
+            let startY = null;
+            banner.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; }, { passive: true });
+            banner.addEventListener('touchmove', (e) => {
+                if (startY === null) return;
+                const delta = e.touches[0].clientY - startY;
+                if (delta < 0) banner.style.transform = `translateY(${delta}px)`;
+            }, { passive: true });
+            banner.addEventListener('touchend', (e) => {
+                if (startY === null) return;
+                const delta = e.changedTouches[0].clientY - startY;
+                banner.style.transform = '';
+                if (delta < -30) hideInAppMessageBanner();
+                startY = null;
+            });
+        })();
 
         function showCustomModal(title, message, isConfirm = false) {
             return new Promise((resolve) => {
@@ -9961,6 +10070,7 @@
 
         let cachedUserChatsData = {};
         let previousUserChatsData = {};
+        let previousGroupChatsMeta = {};
         let userChatsInitialized = false;
         let chatListenersAttached = false;
 
@@ -13354,6 +13464,7 @@
             });
 
             onValue(ref(database, `user_group_chats/${user.uid}`), (snap) => {
+                const prevGroupChatsMeta = previousGroupChatsMeta;
                 cachedGroupChatsMeta = snap.exists() ? snap.val() : {};
                 if (activeGroupId && cachedGroupChatsMeta[activeGroupId] && cachedGroupChatsMeta[activeGroupId].unreadCount > 0) {
                     update(ref(database, `user_group_chats/${user.uid}/${activeGroupId}`), { unreadCount: 0 });
@@ -13364,9 +13475,38 @@
                     if (meta && meta.unreadCount > 0) totalGroupUnread += meta.unreadCount;
                 });
                 updateGroupsUnreadBadge(totalGroupUnread);
+
+                if (userChatsInitialized) {
+                    Object.keys(cachedGroupChatsMeta).forEach(groupId => {
+                        const newCount = cachedGroupChatsMeta[groupId].unreadCount || 0;
+                        const oldCount = (prevGroupChatsMeta[groupId] && prevGroupChatsMeta[groupId].unreadCount) || 0;
+                        if (newCount > oldCount) maybeShowInAppBannerForGroup(groupId, cachedGroupChatsMeta[groupId]);
+                    });
+                }
+                previousGroupChatsMeta = JSON.parse(JSON.stringify(cachedGroupChatsMeta));
+
                 renderGroupsLists();
                 if (userChatsInitialized) renderChatListFromCache();
             });
+
+            // Shows the sliding top banner for a newly-arrived group message, unless the
+            // user is already looking at that exact group (visible tab + that group open).
+            function maybeShowInAppBannerForGroup(groupId, meta) {
+                const user = auth.currentUser;
+                if (!user || !meta) return;
+                if (meta.senderUid && meta.senderUid === user.uid) return;
+
+                const chatOverlayOpen = document.getElementById('chat-view-overlay').classList.contains('active');
+                if (groupId === activeGroupId && chatOverlayOpen && document.visibilityState === 'visible') return;
+
+                enqueueInAppMessageBanner({
+                    groupId,
+                    name: meta.senderName ? `${meta.senderName} • ${meta.groupName || 'Group'}` : (meta.groupName || 'Group'),
+                    avatar: meta.groupPhotoURL || '',
+                    text: meta.text || '',
+                    onOpen: () => openGroupChatView(groupId)
+                });
+            }
 
             onValue(ref(database, `group_invites/${user.uid}`), (snap) => {
                 cachedGroupInvites = snap.exists() ? snap.val() : {};
@@ -13401,12 +13541,13 @@
                 cachedUserChatsData = snap.exists() ? snap.val() : {};
 
                 if (userChatsInitialized) {
-                    const hasNewIncomingMessage = Object.keys(cachedUserChatsData).some(chatUid => {
+                    const newlyIncoming = Object.keys(cachedUserChatsData).filter(chatUid => {
                         const newCount = cachedUserChatsData[chatUid].unreadCount || 0;
                         const oldCount = (prevUserChatsData[chatUid] && prevUserChatsData[chatUid].unreadCount) || 0;
                         return newCount > oldCount;
                     });
-                    if (hasNewIncomingMessage) playNotificationBlip();
+                    if (newlyIncoming.length) playNotificationBlip();
+                    newlyIncoming.forEach(chatUid => maybeShowInAppBannerForDM(chatUid, cachedUserChatsData[chatUid]));
                 }
 
                 previousUserChatsData = JSON.parse(JSON.stringify(cachedUserChatsData));
@@ -13414,6 +13555,31 @@
 
                 renderChatListFromCache();
             });
+
+            // Shows the sliding top banner for a newly-arrived DM, unless the user is
+            // already looking at that exact chat (visible tab + that chat open).
+            async function maybeShowInAppBannerForDM(chatUid, meta) {
+                const user = auth.currentUser;
+                if (!user || !meta || chatUid === AI_UID) return;
+                if (meta.senderUid && meta.senderUid === user.uid) return;
+
+                const chatOverlayOpen = document.getElementById('chat-view-overlay').classList.contains('active');
+                if (chatUid === activeChatUid && chatOverlayOpen && document.visibilityState === 'visible') return;
+
+                const profile = cachedUsers[chatUid] || {};
+                let text = meta.text || '';
+                if (isE2EPayload(text)) {
+                    try { text = await decryptForPeer(chatUid, text); } catch (err) { text = 'New message'; }
+                }
+
+                enqueueInAppMessageBanner({
+                    chatUid,
+                    name: profile.name || 'New message',
+                    avatar: profile.photoURL || '',
+                    text,
+                    onOpen: () => openChatView(chatUid, profile.name || '', profile.photoURL || '')
+                });
+            }
 
             async function renderChatListFromCache() {
                 const user = auth.currentUser;

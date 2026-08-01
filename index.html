@@ -10685,6 +10685,7 @@
         let myE2EKeypair = null;
         const peerPublicKeyCache = {};
         const sharedKeyCache = {};
+        const peerKeyWatchStarted = {};
 
         function openE2EDb() {
             return new Promise((resolve, reject) => {
@@ -10735,25 +10736,43 @@
             return myE2EKeypair;
         }
 
-        async function getPeerPublicKey(peerUid) {
-            if (peerPublicKeyCache[peerUid]) return peerPublicKeyCache[peerUid];
+        // Watches a peer's published public key for changes (they got a new device, cleared
+        // storage, restored from backup, etc.) and drops our cached copy of it — and the shared
+        // secret derived from it — the moment it changes, so we never keep encrypting/decrypting
+        // against a stale key for the rest of this session. Started once per peer, lazily.
+        function watchPeerPublicKey(peerUid) {
+            if (peerKeyWatchStarted[peerUid]) return;
+            peerKeyWatchStarted[peerUid] = true;
+            let sawFirstValue = false;
+            onValue(ref(database, `users/${peerUid}/e2ee/publicKey`), (snap) => {
+                if (!sawFirstValue) { sawFirstValue = true; return; } // skip the initial fire — we just fetched it ourselves
+                delete peerPublicKeyCache[peerUid];
+                delete sharedKeyCache[peerUid];
+            });
+        }
+
+        async function getPeerPublicKey(peerUid, forceFresh) {
+            if (!forceFresh && peerPublicKeyCache[peerUid]) return peerPublicKeyCache[peerUid];
             const snap = await get(ref(database, `users/${peerUid}/e2ee/publicKey`));
             if (!snap.exists()) return null;
             const key = await crypto.subtle.importKey('jwk', snap.val(), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
             peerPublicKeyCache[peerUid] = key;
+            watchPeerPublicKey(peerUid);
             return key;
         }
 
         // Derives (and caches) the shared AES-256-GCM key for a 1:1 thread with peerUid.
         // Returns null if either side doesn't have a published key yet (or peerUid is the AI
         // account) — callers fall back to plaintext in that case so sending never gets stuck.
-        async function deriveSharedKey(peerUid) {
+        // Pass forceFresh to bypass both caches and re-derive from whatever is currently
+        // published (used to self-heal after a decrypt failure caused by a stale cached key).
+        async function deriveSharedKey(peerUid, forceFresh) {
             if (peerUid === AI_UID) return null;
-            if (sharedKeyCache[peerUid]) return sharedKeyCache[peerUid];
+            if (!forceFresh && sharedKeyCache[peerUid]) return sharedKeyCache[peerUid];
 
             const my = await getMyKeypair();
             if (!my) return null;
-            const peerPublic = await getPeerPublicKey(peerUid);
+            const peerPublic = await getPeerPublicKey(peerUid, forceFresh);
             if (!peerPublic) return null;
 
             try {
@@ -10793,18 +10812,33 @@
             } catch (e) { return plaintext; }
         }
 
+        async function tryDecryptOnce(key, payload) {
+            const [ivB64, cipherB64] = payload.slice(E2E_PREFIX.length).split(':');
+            const iv = new Uint8Array(base64ToBuf(ivB64));
+            const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, base64ToBuf(cipherB64));
+            return new TextDecoder().decode(plainBuf);
+        }
+
         // Decrypts a stored payload for a 1:1 thread with peerUid. Plaintext/legacy values pass
-        // through untouched so pre-encryption message history keeps working.
+        // through untouched so pre-encryption message history keeps working. If decryption fails
+        // with our cached shared key (most commonly because the peer's key rotated after we
+        // cached it), we drop the cache and retry once against whatever is currently published
+        // before giving up — this self-heals the vast majority of "Unable to decrypt" cases.
         async function decryptForPeer(peerUid, payload) {
             if (!isE2EPayload(payload)) return payload;
             const key = await deriveSharedKey(peerUid);
             if (!key) return '🔒 Encrypted message';
             try {
-                const [ivB64, cipherB64] = payload.slice(E2E_PREFIX.length).split(':');
-                const iv = new Uint8Array(base64ToBuf(ivB64));
-                const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, base64ToBuf(cipherB64));
-                return new TextDecoder().decode(plainBuf);
-            } catch (e) { return '🔒 Unable to decrypt message'; }
+                return await tryDecryptOnce(key, payload);
+            } catch (e) {
+                const freshKey = await deriveSharedKey(peerUid, true);
+                if (!freshKey) return '🔒 Unable to decrypt message';
+                try {
+                    return await tryDecryptOnce(freshKey, payload);
+                } catch (e2) {
+                    return '🔒 Unable to decrypt message';
+                }
+            }
         }
 
         // --- PASSPHRASE/PIN-ENCRYPTED KEY BACKUP (solves "new device = lost history") ---

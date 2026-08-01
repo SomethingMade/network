@@ -1170,9 +1170,11 @@
         #cancel-reply-btn { cursor: pointer; color: var(--text-secondary); flex-shrink: 0; padding: 6px; transition: 0.2s; }
         #cancel-reply-btn:hover { color: var(--danger-red); }
 
-        .chat-view-input-row { display: flex; align-items: center; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); position: relative; z-index: 2; box-shadow: 0 -1px 0 rgba(0,0,0,0.02), 0 -4px 12px rgba(0,0,0,0.03); }
-        .chat-view-input-row input { flex: 1; padding: 12px 18px; border-radius: 50px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-size: 14px; min-width: 0; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-        .chat-view-input-row input:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.1); }
+        .chat-view-input-row { display: flex; align-items: flex-end; gap: 10px; padding: 12px 24px; border-top: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); position: relative; z-index: 2; box-shadow: 0 -1px 0 rgba(0,0,0,0.02), 0 -4px 12px rgba(0,0,0,0.03); }
+        .chat-view-input-row input, .chat-view-input-row textarea { flex: 1; padding: 12px 18px; border-radius: 22px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-size: 14px; min-width: 0; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .chat-view-input-row textarea { font-family: inherit; line-height: 1.35; resize: none; overflow-y: hidden; max-height: 120px; box-sizing: border-box; }
+        .chat-view-input-row input:focus, .chat-view-input-row textarea:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.1); }
+        .chat-view-input-row .chat-attach-btn, .chat-view-input-row .chat-view-send { margin-bottom: 3px; }
         .chat-view-send, .chat-attach-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth), background 0.15s ease; }
         .chat-view-send { background: var(--gradient-brand); color: white; box-shadow: 0 3px 10px rgba(18,140,126,0.3); }
         .chat-view-send:hover { transform: scale(1.06); box-shadow: 0 4px 14px rgba(18,140,126,0.4); }
@@ -2681,7 +2683,7 @@
             <button type="button" class="chat-attach-btn" id="chat-sticker-btn" title="Send a sticker">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
             </button>
-            <input type="text" id="chat-view-input" placeholder="Type a message...">
+            <textarea id="chat-view-input" placeholder="Type a message..." rows="1"></textarea>
             <button type="button" class="chat-attach-btn" id="chat-mic-btn" title="Record a voice note">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
             </button>
@@ -8367,6 +8369,7 @@
             const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
             const msgPayload = { text: text, senderUid: user.uid, senderName: senderName, createdAt: Date.now() };
             input.value = '';
+            resizeChatInput();
 
             // Immediately stop showing you as typing
             clearTimeout(typingTimeout);
@@ -11009,7 +11012,17 @@
         let pendingUploadsByChat = {};
         let typingTimeout = null;
 
+        function resizeChatInput() {
+            const el = document.getElementById('chat-view-input');
+            el.style.height = 'auto';
+            const maxHeight = 120;
+            const next = Math.min(el.scrollHeight, maxHeight);
+            el.style.height = next + 'px';
+            el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+        }
+
         document.getElementById('chat-view-input').addEventListener('input', () => {
+            resizeChatInput();
             const user = auth.currentUser;
             if (!user || (!activeChatUid && !activeGroupId)) return;
 
@@ -11156,11 +11169,13 @@
             document.getElementById('edit-preview-bar').style.display = 'flex';
             const input = document.getElementById('chat-view-input');
             input.value = msgData.text || '';
+            resizeChatInput();
             input.focus();
         }
 
         function cancelEditMode() {
             if (editingMessage) document.getElementById('chat-view-input').value = '';
+            resizeChatInput();
             editingMessage = null;
             document.getElementById('edit-preview-bar').style.display = 'none';
         }
@@ -11344,6 +11359,7 @@
                 notify('Could not edit message', 'error');
             } finally {
                 input.value = '';
+                resizeChatInput();
                 editingMessage = null;
                 document.getElementById('edit-preview-bar').style.display = 'none';
             }
@@ -12169,7 +12185,12 @@
             activeGroupId ? sendGroupMessage() : sendChatMessage();
         }
         document.getElementById('chat-view-send').addEventListener('click', (e) => { e.preventDefault(); sendActiveMessage(); });
-        document.getElementById('chat-view-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendActiveMessage(); } });
+        document.getElementById('chat-view-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendActiveMessage();
+            }
+        });
 
         const attachSheetOverlay = document.getElementById('attach-sheet-overlay');
         document.getElementById('chat-attach-btn').addEventListener('click', (e) => {

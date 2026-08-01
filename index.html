@@ -1296,6 +1296,13 @@
         .mic-emoji-btn.emoji-mode .icon-mic { display: none; }
         .mic-emoji-btn.emoji-mode .icon-emoji { display: block; }
 
+        /* ── WORD SUGGESTIONS (predictive text) ── */
+        .word-suggest-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 16px; background: var(--bg-surface); border-top: 1px solid var(--border-color); flex-shrink: 0; scrollbar-width: none; }
+        .word-suggest-bar::-webkit-scrollbar { display: none; }
+        .word-suggest-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 16px; background: var(--bg-hover); border: none; color: var(--text-primary); font-size: 13.5px; cursor: pointer; white-space: nowrap; transition: background 0.15s ease, transform 0.1s ease; }
+        .word-suggest-chip:active { transform: scale(0.94); background: var(--border-color); }
+        .word-suggest-chip b { font-weight: 700; }
+
         .msg-bubble.sticker { background: transparent !important; padding: 0 !important; box-shadow: none !important; }
         .msg-sticker-img { width: 110px; height: 110px; display: block; }
 
@@ -2693,6 +2700,8 @@
             <svg id="cancel-edit-btn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </div>
         
+        <div id="word-suggest-bar" class="word-suggest-bar" style="display:none;"></div>
+
         <div class="chat-view-input-row" id="chat-view-input-row">
             <button type="button" class="chat-attach-btn" id="chat-attach-btn">
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.48-8.48l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
@@ -8465,6 +8474,7 @@
             }
             const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
             const msgPayload = { text: text, senderUid: user.uid, senderName: senderName, createdAt: Date.now() };
+            learnWordsFromText(text);
             input.value = '';
             resizeChatInput();
 
@@ -11187,6 +11197,100 @@
         let pendingUploadsByChat = {};
         let typingTimeout = null;
 
+        // --- WORD SUGGESTIONS (predictive text, like a phone keyboard) ---
+        // A small common-English base dictionary, plus a personal frequency table learned
+        // from words this device has actually sent (persisted in localStorage, so it gets
+        // better at predicting the person's own vocabulary over time — names, slang, etc).
+        const COMMON_WORDS = ['the','be','to','of','and','a','in','that','have','i','it','for','not','on','with','he','as','you','do','at','this','but','his','by','from','they','we','say','her','she','or','an','will','my','one','all','would','there','their','what','so','up','out','if','about','who','get','which','go','me','when','make','can','like','time','no','just','him','know','take','people','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us','is','are','was','were','been','has','had','did','yes','okay','ok','hey','hi','hello','thanks','thank','please','sorry','love','miss','great','awesome','amazing','cool','nice','sure','maybe','definitely','actually','probably','literally','honestly','totally','absolutely','really','very','soon','later','today','tomorrow','tonight','morning','night','weekend','week','month','call','text','message','chat','talk','meet','meeting','home','work','school','office','food','lunch','dinner','breakfast','coffee','money','phone','video','photo','picture','link','check','send','sent','received','busy','free','available','ready','done','finished','started','working','trying','going','coming','leaving','staying','waiting','watching','listening','playing','running','walking','driving','flying','traveling','feeling','feel','felt','happy','sad','tired','excited','worried','stressed','fine','alright','yeah','yep','nope','right','wrong','true','false','agree','disagree','sounds','sound','looks','looking','seems','probably','definitely','literally','basically','obviously','clearly','exactly','totally','completely','absolutely','perfect','beautiful','wonderful','fantastic','excellent','terrible','awful','horrible','interesting','boring','funny','hilarious','crazy','weird','strange','normal','usual','different','similar','same','important','urgent','serious','simple','easy','hard','difficult','possible','impossible','probably','certainly','definitely','obviously','currently','recently','eventually','finally','suddenly','immediately','quickly','slowly','carefully','seriously','honestly','literally','basically','actually','apparently','unfortunately','fortunately','hopefully','clearly','exactly','probably','definitely','birthday','congrats','congratulations','welcome','goodbye','bye','see','later','soon','miss','you','family','friend','friends','brother','sister','mom','dad','baby','kids','wife','husband','partner','boss','team','project','deadline','budget','client','customer','update','updates','issue','problem','solution','question','answer','idea','plan','plans','schedule','appointment','reminder','event','party','trip','vacation','holiday'];
+
+        let personalWordFreq = {};
+        try {
+            const stored = localStorage.getItem('xoxaWordFreq');
+            if (stored) personalWordFreq = JSON.parse(stored);
+        } catch (e) { personalWordFreq = {}; }
+
+        function learnWordsFromText(text) {
+            if (!text) return;
+            const words = text.toLowerCase().match(/[a-z']{2,}/g);
+            if (!words) return;
+            words.forEach(w => { personalWordFreq[w] = (personalWordFreq[w] || 0) + 1; });
+            try { localStorage.setItem('xoxaWordFreq', JSON.stringify(personalWordFreq)); } catch (e) { /* storage full/unavailable — skip persisting */ }
+        }
+
+        // Returns { word, start, end } for the word the cursor is currently inside/after, or null
+        // if the cursor is on whitespace (nothing to suggest for).
+        function getCurrentWordAtCursor(input) {
+            const pos = input.selectionStart;
+            const value = input.value;
+            let start = pos;
+            while (start > 0 && /[a-zA-Z']/.test(value[start - 1])) start--;
+            let end = pos;
+            while (end < value.length && /[a-zA-Z']/.test(value[end])) end++;
+            if (start === end) return null;
+            return { word: value.slice(start, end), start, end };
+        }
+
+        function getWordSuggestions(prefix) {
+            if (!prefix) return [];
+            const lower = prefix.toLowerCase();
+            const seen = new Set();
+            const matches = [];
+
+            // Personal vocabulary first (sorted by how often this device has typed each word).
+            Object.keys(personalWordFreq)
+                .filter(w => w.startsWith(lower) && w !== lower)
+                .sort((a, b) => personalWordFreq[b] - personalWordFreq[a])
+                .forEach(w => { if (!seen.has(w)) { seen.add(w); matches.push(w); } });
+
+            // Then common-English words to fill the rest.
+            COMMON_WORDS.filter(w => w.startsWith(lower) && w !== lower).forEach(w => {
+                if (!seen.has(w)) { seen.add(w); matches.push(w); }
+            });
+
+            return matches.slice(0, 4);
+        }
+
+        function updateWordSuggestions() {
+            const input = document.getElementById('chat-view-input');
+            const bar = document.getElementById('word-suggest-bar');
+            const current = getCurrentWordAtCursor(input);
+
+            if (!current || current.word.length < 1) {
+                bar.style.display = 'none';
+                bar.innerHTML = '';
+                return;
+            }
+
+            const suggestions = getWordSuggestions(current.word);
+            if (suggestions.length === 0) {
+                bar.style.display = 'none';
+                bar.innerHTML = '';
+                return;
+            }
+
+            bar.innerHTML = '';
+            suggestions.forEach(word => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'word-suggest-chip';
+                chip.innerHTML = `<b>${current.word}</b>${word.slice(current.word.length)}`;
+                chip.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus/selection in the textarea
+                chip.addEventListener('click', () => applyWordSuggestion(word, current.start, current.end));
+                bar.appendChild(chip);
+            });
+            bar.style.display = 'flex';
+        }
+
+        function applyWordSuggestion(word, start, end) {
+            const input = document.getElementById('chat-view-input');
+            const needsSpace = !(input.value[end] === ' ');
+            input.value = input.value.slice(0, start) + word + (needsSpace ? ' ' : '') + input.value.slice(end);
+            const newPos = start + word.length + (needsSpace ? 1 : 0);
+            input.focus();
+            input.setSelectionRange(newPos, newPos);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
         function resizeChatInput() {
             const el = document.getElementById('chat-view-input');
             el.style.height = 'auto';
@@ -11195,6 +11299,7 @@
             el.style.height = next + 'px';
             el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
             updateMicEmojiToggle();
+            updateWordSuggestions();
         }
 
         // Swap the mic icon for the emoji icon once the person starts typing or
@@ -11208,6 +11313,7 @@
 
         document.getElementById('chat-view-input').addEventListener('input', () => {
             resizeChatInput();
+            updateWordSuggestions();
             const user = auth.currentUser;
             if (!user || (!activeChatUid && !activeGroupId)) return;
 
@@ -11221,6 +11327,11 @@
                 set(typingRef, false);
             }, 2000);
         });
+        // Moving the cursor with arrow keys / taps also changes which word is "current".
+        document.getElementById('chat-view-input').addEventListener('keyup', (e) => {
+            if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)) updateWordSuggestions();
+        });
+        document.getElementById('chat-view-input').addEventListener('click', updateWordSuggestions);
 
         // Collapse the paperclip & sticker buttons while the input is focused,
         // giving the text field more room to type. They reappear on blur.
@@ -11236,6 +11347,11 @@
             chatAttachBtnEl.classList.remove('icon-collapsed');
             chatStickerBtnEl.classList.remove('icon-collapsed');
             updateMicEmojiToggle();
+            setTimeout(() => {
+                // Delay so a tap on a suggestion chip (which blurs the textarea) still registers
+                // its click before we hide the bar.
+                document.getElementById('word-suggest-bar').style.display = 'none';
+            }, 150);
         });
 
         function renderPendingUploadBubble(item) {
@@ -12271,12 +12387,14 @@
 
             if (activeChatUid === AI_UID) {
                 input.value = '';
+                learnWordsFromText(text);
                 cancelReplyMode(); cancelEditMode();
                 return sendMessageToAI(text, user);
             }
 
             if (theyBlockedMeActive || cachedBlocked[activeChatUid]) return; // extra safety net
 
+            learnWordsFromText(text);
             const threadId = threadIdFor(user.uid, activeChatUid);
             const encryptedText = await encryptForPeer(activeChatUid, text);
             const msgPayload = { text: encryptedText, senderUid: user.uid, createdAt: Date.now() };

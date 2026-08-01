@@ -10206,6 +10206,16 @@
                 if (!snap.exists()) return;
                 const invite = snap.val();
                 if (!invite || !invite.callId) return;
+
+                // Leftover invite from a call that already ended (missed/cancelled/crashed
+                // before cleanup ran) — don't resurrect the call screen for it, just clean it up.
+                const age = invite.createdAt ? (Date.now() - invite.createdAt) : Infinity;
+                if (age > CALL_RING_TIMEOUT_MS + 5000) {
+                    remove(ref(database, `call_invites/${user.uid}`)).catch(() => {});
+                    set(ref(database, `calls/${invite.callId}/status`), 'missed').catch(() => {});
+                    return;
+                }
+
                 if (callId) {
                     // Already on a call (or already ringing another one) — auto-busy this one.
                     if (invite.callId !== callId) {
@@ -10486,6 +10496,15 @@
         }
 
         function teardownCall() {
+            const user = auth.currentUser;
+            // Belt-and-suspenders: whichever side we were, make sure the invite pointer
+            // is gone so it can never come back as a stale "incoming call" on next load.
+            if (callRole === 'caller' && callPeerUid) {
+                remove(ref(database, `call_invites/${callPeerUid}`)).catch(() => {});
+            } else if (callRole === 'callee' && user) {
+                remove(ref(database, `call_invites/${user.uid}`)).catch(() => {});
+            }
+
             clearTimeout(callRingTimeout); callRingTimeout = null;
             if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
             stopRingtone(); stopRingback();

@@ -1279,6 +1279,23 @@
         .sticker-grid-item:active { transform: scale(0.94); }
         .sticker-grid-item img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 
+        /* ── EMOJI PICKER ── */
+        .emoji-cat-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; scrollbar-width: none; }
+        .emoji-cat-tabs::-webkit-scrollbar { display: none; }
+        .emoji-cat-tab { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; border: none; background: transparent; font-size: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
+        .emoji-cat-tab.active { background: var(--bg-hover); }
+        .emoji-picker-scroll { overflow-y: auto; flex: 1; }
+        .emoji-cat-section-title { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin: 14px 2px 8px; }
+        .emoji-cat-section-title:first-child { margin-top: 2px; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .emoji-grid-item { aspect-ratio: 1; border-radius: 10px; background: none; border: none; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease, transform 0.1s ease; line-height: 1; }
+        .emoji-grid-item:hover { background: var(--bg-hover); }
+        .emoji-grid-item:active { transform: scale(0.88); }
+
+        .mic-emoji-btn .icon-emoji { display: none; }
+        .mic-emoji-btn.emoji-mode .icon-mic { display: none; }
+        .mic-emoji-btn.emoji-mode .icon-emoji { display: block; }
+
         .msg-bubble.sticker { background: transparent !important; padding: 0 !important; box-shadow: none !important; }
         .msg-sticker-img { width: 110px; height: 110px; display: block; }
 
@@ -2684,8 +2701,9 @@
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
             </button>
             <textarea id="chat-view-input" placeholder="Type a message..." rows="1"></textarea>
-            <button type="button" class="chat-attach-btn" id="chat-mic-btn" title="Record a voice note">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            <button type="button" class="chat-attach-btn mic-emoji-btn" id="chat-mic-btn" title="Record a voice note">
+                <svg class="icon-mic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                <svg class="icon-emoji" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
             </button>
             <button type="button" class="chat-view-send" id="chat-view-send">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -2785,6 +2803,14 @@
             <div class="sheet-handle"></div>
             <div class="sheet-title">Stickers</div>
             <div id="sticker-grid" class="sticker-grid"></div>
+        </div>
+    </div>
+
+    <div id="emoji-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 60vh; display: flex; flex-direction: column;">
+            <div class="sheet-handle"></div>
+            <div id="emoji-cat-tabs" class="emoji-cat-tabs"></div>
+            <div class="emoji-picker-scroll" id="emoji-picker-scroll"></div>
         </div>
     </div>
 
@@ -4152,6 +4178,77 @@
         }
 
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
+
+        // --- EMOJI PICKER ---
+        const EMOJI_CATALOG = [
+            { tab: '😀', label: 'Smileys', emojis: ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','😎','🤓','🧐','😕','😟','🙁','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬'] },
+            { tab: '🖐️', label: 'Gestures', emojis: ['👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦵','🦶','👂','🦻','👃','🧠','🦷','🦴','👀','👁️','👅','👄'] },
+            { tab: '🐶', label: 'Animals', emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐢','🐍','🦎','🐙','🦑','🦀','🐠','🐟','🐬','🐳','🐋','🦈'] },
+            { tab: '🍔', label: 'Food', emojis: ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🌽','🥕','🥔','🍠','🥐','🍞','🥖','🥨','🧀','🥚','🍳','🥞','🥓','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🌮','🌯','🥗','🍿','🧂','🍱','🍣','🍰','🎂','🍩','🍪','🍫','🍿','🍺','🍷','☕'] },
+            { tab: '⚽', label: 'Activities', emojis: ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥊','🥋','⛳','🏹','🎣','🥌','⛸️','🎿','🛷','🏂','🏋️','🤸','🤼','🤾','⛹️','🤺','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚴','🏆','🥇','🥈','🥉','🎮','🎲','🎯','🎳','🎨','🎭','🎬','🎤','🎧','🎼','🎹','🎸'] },
+            { tab: '🚗', label: 'Travel', emojis: ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🛵','🏍️','🛺','🚲','🛴','✈️','🛩️','🚀','🚁','⛵','🚤','🛳️','⚓','🚧','🚦','🗽','🗼','🏰','🏯','🎡','🎢','🎠','⛰️','🏔️','🌋','🏖️','🏝️','🏕️','🌅','🌇','🌆','🌃','🌉','🌁'] },
+            { tab: '💡', label: 'Objects', emojis: ['⌚','📱','💻','⌨️','🖥️','🖨️','📷','📸','📹','📞','☎️','📺','📻','⏰','⏱️','💡','🔦','🕯️','📔','📖','📚','✏️','✒️','🖊️','📝','💼','📁','📊','📈','📉','📌','📎','✂️','🔒','🔑','🔨','🔧','🔩','⚙️','🧲','⚗️','🔬','🔭','📡','💉','💊','🧬','🦠','🧪'] },
+            { tab: '❤️', label: 'Symbols', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❣️','💕','💞','💓','💗','💖','💘','💝','💟','✨','⭐','🌟','💫','💥','💯','✅','❌','❓','❗','⚠️','🚫','🔥','💧','🎉','🎊','🎈','🎁','🏆','🥇','🔔','📢','💬','💭','🗯️','🕐','♻️','🚻','🚸','📍'] }
+        ];
+
+        let emojiPickerBuilt = false;
+        function buildEmojiPickerOnce() {
+            if (emojiPickerBuilt) return;
+            emojiPickerBuilt = true;
+            const tabsEl = document.getElementById('emoji-cat-tabs');
+            const scrollEl = document.getElementById('emoji-picker-scroll');
+
+            EMOJI_CATALOG.forEach((cat, i) => {
+                const tabBtn = document.createElement('button');
+                tabBtn.type = 'button';
+                tabBtn.className = 'emoji-cat-tab' + (i === 0 ? ' active' : '');
+                tabBtn.textContent = cat.tab;
+                tabBtn.title = cat.label;
+                tabBtn.addEventListener('click', () => {
+                    document.getElementById(`emoji-section-${i}`).scrollIntoView({ block: 'start' });
+                });
+                tabsEl.appendChild(tabBtn);
+
+                const sectionTitle = document.createElement('div');
+                sectionTitle.className = 'emoji-cat-section-title';
+                sectionTitle.id = `emoji-section-${i}`;
+                sectionTitle.textContent = cat.label;
+                scrollEl.appendChild(sectionTitle);
+
+                const grid = document.createElement('div');
+                grid.className = 'emoji-grid';
+                cat.emojis.forEach(ch => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'emoji-grid-item';
+                    btn.textContent = ch;
+                    btn.addEventListener('click', () => insertEmojiAtCursor(ch));
+                    grid.appendChild(btn);
+                });
+                scrollEl.appendChild(grid);
+            });
+
+            // Highlight the tab for whichever section is currently in view.
+            scrollEl.addEventListener('scroll', () => {
+                let activeIdx = 0;
+                EMOJI_CATALOG.forEach((cat, i) => {
+                    const el = document.getElementById(`emoji-section-${i}`);
+                    if (el && el.offsetTop - scrollEl.scrollTop <= 40) activeIdx = i;
+                });
+                tabsEl.querySelectorAll('.emoji-cat-tab').forEach((t, i) => t.classList.toggle('active', i === activeIdx));
+            });
+        }
+
+        function insertEmojiAtCursor(emoji) {
+            const input = document.getElementById('chat-view-input');
+            const start = input.selectionStart ?? input.value.length;
+            const end = input.selectionEnd ?? input.value.length;
+            input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+            const newPos = start + emoji.length;
+            input.focus();
+            input.setSelectionRange(newPos, newPos);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
 
         let recaptchaVerifier = null;
         let confirmationResult = null;
@@ -11019,6 +11116,16 @@
             const next = Math.min(el.scrollHeight, maxHeight);
             el.style.height = next + 'px';
             el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+            updateMicEmojiToggle();
+        }
+
+        // Swap the mic icon for the emoji icon once the person starts typing or
+        // focuses the field; falls back to mic once the field is blurred and empty.
+        function updateMicEmojiToggle() {
+            const btn = document.getElementById('chat-mic-btn');
+            const input = document.getElementById('chat-view-input');
+            const shouldShowEmoji = document.activeElement === input || input.value.length > 0;
+            btn.classList.toggle('emoji-mode', shouldShowEmoji);
         }
 
         document.getElementById('chat-view-input').addEventListener('input', () => {
@@ -11045,10 +11152,12 @@
         chatInputEl.addEventListener('focus', () => {
             chatAttachBtnEl.classList.add('icon-collapsed');
             chatStickerBtnEl.classList.add('icon-collapsed');
+            updateMicEmojiToggle();
         });
         chatInputEl.addEventListener('blur', () => {
             chatAttachBtnEl.classList.remove('icon-collapsed');
             chatStickerBtnEl.classList.remove('icon-collapsed');
+            updateMicEmojiToggle();
         });
 
         function renderPendingUploadBubble(item) {
@@ -12220,6 +12329,15 @@
             if (e.target === stickerSheetOverlay) stickerSheetOverlay.classList.remove('active');
         });
 
+        const emojiSheetOverlay = document.getElementById('emoji-sheet-overlay');
+        function openEmojiPicker() {
+            buildEmojiPickerOnce();
+            emojiSheetOverlay.classList.add('active');
+        }
+        emojiSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === emojiSheetOverlay) emojiSheetOverlay.classList.remove('active');
+        });
+
         async function sendStickerMessage(cp, ch) {
             const user = auth.currentUser;
             if (!user) return;
@@ -12728,7 +12846,11 @@
 
         document.getElementById('chat-mic-btn').addEventListener('click', (e) => {
             e.preventDefault();
-            startVoiceRecording();
+            if (e.currentTarget.classList.contains('emoji-mode')) {
+                openEmojiPicker();
+            } else {
+                startVoiceRecording();
+            }
         });
         document.getElementById('voice-cancel-btn').addEventListener('click', (e) => {
             e.preventDefault();

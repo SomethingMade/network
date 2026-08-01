@@ -11153,8 +11153,33 @@
 
             const existingBackup = await fetchKeyBackup(user.uid).catch(() => null);
             if (existingBackup) {
-                const proceed = await showCustomModal('Chat Backup', 'A backup PIN is already set for this account. Set a new one and re-backup this device\'s key? Devices restoring with the OLD PIN after this will no longer work.', true);
-                if (!proceed) return;
+                const wantsRestore = await showCustomModal(
+                    'Chat Backup',
+                    "A backup PIN is already set for this account. Enter it to restore your encryption key on this device — this fixes messages showing \"Unable to decrypt\" after signing in on a new device.",
+                    true
+                );
+                if (wantsRestore) {
+                    const pin = await showPassphrasePrompt('Restore Chat History', 'Enter your 6-digit backup PIN.', 'Restore');
+                    if (!pin) return;
+                    const ok = await restoreKeypairFromBackup(pin);
+                    if (ok) {
+                        notify('Chat history restored');
+                        // Re-render the open thread (if any) so previously-failed bubbles decrypt now.
+                        if (activeChatUid) {
+                            const p = cachedUsers[activeChatUid] || {};
+                            openChatView(activeChatUid, p.name || '', p.photoURL || '');
+                        }
+                    } else {
+                        notify('Incorrect PIN', 'error');
+                    }
+                    return;
+                }
+                const wantsReset = await showCustomModal(
+                    'Set a New PIN Instead?',
+                    "This replaces your existing backup. Other devices that later try to restore with the OLD PIN will stop working — only do this if you've forgotten it.",
+                    true
+                );
+                if (!wantsReset) return;
             }
             showE2EBackupPromptSheet(true);
         });

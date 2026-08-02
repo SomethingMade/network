@@ -1826,7 +1826,7 @@
 
     <div id="add-friend-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
-            <h3>Add a Friend</h3>
+            <h3>Follow Someone</h3>
 
             <div class="add-friend-tabs" id="add-friend-tabs">
                 <button type="button" class="add-friend-tab active" data-add-friend-tab="id">Enter ID</button>
@@ -1835,23 +1835,23 @@
             </div>
 
             <div id="add-friend-panel-id" class="add-friend-panel">
-                <p>Enter your friend's @username or phone number below to add them to your contacts.</p>
+                <p>Enter their @username or phone number below to follow them.</p>
                 <input type="text" id="friend-id-input" class="pill-input" placeholder="@username or phone number" style="text-align:center; font-family:monospace; font-weight:600; font-size:16px;">
                 <div class="modal-actions">
                     <button type="button" id="btn-cancel-add-friend" class="btn-pill btn-outline">Cancel</button>
-                    <button type="button" id="btn-confirm-add-friend" class="btn-pill btn-primary">Add Friend</button>
+                    <button type="button" id="btn-confirm-add-friend" class="btn-pill btn-primary">Follow</button>
                 </div>
             </div>
 
             <div id="add-friend-panel-mycode" class="add-friend-panel" style="display:none;">
-                <p>Let a friend scan this to add you instantly.</p>
+                <p>Let someone scan this to follow you instantly.</p>
                 <div id="my-qr-code-canvas" class="my-qr-code-box"></div>
                 <p id="my-qr-username-label" style="font-weight:700; font-family:monospace; color:var(--text-primary); margin:0 0 20px;">@username</p>
                 <button type="button" id="btn-cancel-add-friend-mycode" class="btn-pill btn-outline" style="width:100%;">Close</button>
             </div>
 
             <div id="add-friend-panel-scan" class="add-friend-panel" style="display:none;">
-                <p>Point your camera at a friend's QR code.</p>
+                <p>Point your camera at their QR code.</p>
                 <div class="qr-scan-frame">
                     <video id="qr-scan-video" playsinline muted></video>
                     <canvas id="qr-scan-canvas" style="display:none;"></canvas>
@@ -2123,6 +2123,7 @@
             <div style="text-align:center; margin-bottom:22px;">
                 <h3 id="user-info-name" style="font-size:19px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Name</h3>
                 <p id="user-info-username" style="font-size:14px; font-weight:600; color:var(--primary-blue);">@username</p>
+                <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;"><span id="user-info-following-count">0</span> Following &nbsp;·&nbsp; <span id="user-info-followers-count">0</span> Followers</p>
             </div>
 
             <div class="wa-field-group">
@@ -2135,10 +2136,15 @@
                 </div>
             </div>
 
-            <button type="button" id="btn-user-info-message" class="btn-pill btn-primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:4px;">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                <span>Message</span>
-            </button>
+            <div style="display:flex; gap:10px; margin-top:4px;">
+                <button type="button" id="btn-user-info-follow" class="btn-pill btn-primary" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span id="btn-user-info-follow-text">Follow</span>
+                </button>
+                <button type="button" id="btn-user-info-message" class="btn-pill btn-outline" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                    <span>Message</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2162,6 +2168,8 @@
                 </div>
                 <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
             </div>
+
+            <p id="my-profile-follow-stats" style="text-align:center; font-size:13px; color:var(--text-secondary); margin:-8px 0 18px;"><span id="my-profile-following-count">0</span> Following &nbsp;·&nbsp; <span id="my-profile-followers-count">0</span> Followers</p>
 
             <div class="wa-field-group">
                 <div class="wa-field-row">
@@ -2220,7 +2228,7 @@
                 <div id="phone-link-section" class="wa-inline-editor">
                     <div id="phone-link-add-row" style="display:none;">
                         <button type="button" id="btn-show-phone-link" class="btn-pill btn-outline" style="font-size:13px; padding:10px;">Add Phone Number</button>
-                        <p class="wa-note" style="text-align:center;">Link a phone number so friends can find you by number and you can sync device contacts.</p>
+                        <p class="wa-note" style="text-align:center;">Link a phone number so people can find you by number and you can sync device contacts.</p>
                     </div>
                     <div id="phone-link-input-row" style="display:none;">
                         <div class="input-group" style="display:flex; align-items:center; gap:8px;">
@@ -2420,7 +2428,7 @@
             <div class="attach-options" style="flex-direction: column; gap:0; padding:0;">
                 <button class="msg-option-btn" id="btn-chat-item-archive">Archive Chat</button>
                 <button class="msg-option-btn" id="btn-chat-item-delete" style="color: var(--danger-red);">Delete Chat</button>
-                <button class="msg-option-btn" id="btn-chat-item-remove-friend" style="color: var(--danger-red);">Remove Friend</button>
+                <button class="msg-option-btn" id="btn-chat-item-remove-friend" style="color: var(--danger-red);">Unfollow</button>
             </div>
         </div>
     </div>
@@ -2583,7 +2591,7 @@
                 </div>
                 <div class="nav-item" data-tab="tab-contacts">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <span>Contacts</span>
+                    <span>Following</span>
                 </div>
             </nav>
 
@@ -2722,24 +2730,26 @@
 
                 <div id="tab-contacts" class="tab-content">
                     <div class="chat-header-area">
-                        <div class="chat-header-top"><h1>Contacts</h1><div class="chat-header-icons"><div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div></div></div>
+                        <div class="chat-header-top"><h1>Following</h1><div class="chat-header-icons"><div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div></div></div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-contacts" placeholder="Find people...">
                         </div>
                         <div class="segmented-control" id="contacts-sub-tabs">
-                            <button type="button" class="active" data-subtab="all">All Contacts</button>
-                            <button type="button" data-subtab="device">From Phone</button>
+                            <button type="button" class="active" data-subtab="all">Following</button>
+                            <button type="button" data-subtab="followers">Followers</button>
+                            <button type="button" data-subtab="device">Phone</button>
                             <button type="button" data-subtab="blocked">Blocked</button>
                         </div>
                     </div>
                     <div class="chat-list-container" id="contacts-list-container"></div>
+                    <div class="chat-list-container" id="followers-list-container" style="display:none;"></div>
                     <div class="chat-list-container" id="device-contacts-list-container" style="display:none;">
                         <div class="sync-contacts-card" id="btn-sync-device-contacts">
                             <div class="sync-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
                             <div class="sync-text">
                                 <h4 id="sync-contacts-title">Sync Phone Contacts</h4>
-                                <p id="sync-contacts-subtitle">Find friends already on Xoxa</p>
+                                <p id="sync-contacts-subtitle">Find people already on Xoxa</p>
                             </div>
                         </div>
                         <p class="device-contacts-note">We only use your contacts to match phone numbers already on Xoxa. Nothing is uploaded or stored.</p>
@@ -2748,7 +2758,7 @@
                     <div class="chat-list-container" id="blocked-list-container" style="display:none;"></div>
                 </div>
 
-                <button type="button" class="fab-add" id="fab-add-friend" title="Add a Friend">+</button>
+                <button type="button" class="fab-add" id="fab-add-friend" title="Follow Someone">+</button>
                 <button type="button" class="fab-add" id="fab-new-post" title="New Post">+</button>
             </aside>
 
@@ -2758,7 +2768,7 @@
                         <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     </div>
                     <h2>Xoxa</h2>
-                    <p>Select a chat from the list to start messaging, or add a friend to begin a new conversation.</p>
+                    <p>Select a chat from the list to start messaging, or follow someone to begin a new conversation.</p>
                 </div>
             </main>
         </div>
@@ -4570,8 +4580,8 @@
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
         // Same seal shape as VERIFIED_BADGE_SVG but rendered in --success-green. Shown next to the
-        // name of any user who has added more than FRIENDS_BADGE_THRESHOLD friends (see verifiedBadgeFor).
-        const FRIENDS_BADGE_SVG = '<svg class="verified-badge friends-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="10+ Friends"><path fill="#34C759" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
+        // name of any user who has more than FOLLOWERS_BADGE_THRESHOLD followers (see verifiedBadgeFor).
+        const FRIENDS_BADGE_SVG = '<svg class="verified-badge friends-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="10+ Followers"><path fill="#34C759" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
         const FRIENDS_BADGE_THRESHOLD = 10;
 
         // Same seal shape again but rendered in gold. Shown next to the name of any user who has
@@ -4579,12 +4589,12 @@
         const BUSINESS_BADGE_SVG = '<svg class="verified-badge business-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Business Account"><path fill="#D4A017" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
         // Returns the badge markup (or '') for a given uid: purple for Goza AI, gold for a Business
-        // Account, otherwise green once that user has added more than FRIENDS_BADGE_THRESHOLD friends.
+        // Account, otherwise green once that user has more than FRIENDS_BADGE_THRESHOLD followers.
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
             const profile = cachedUsers[uid];
             if (profile && profile.isBusinessAccount) return BUSINESS_BADGE_SVG;
-            if (profile && (profile.friendsCount || 0) > FRIENDS_BADGE_THRESHOLD) return FRIENDS_BADGE_SVG;
+            if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return FRIENDS_BADGE_SVG;
             return '';
         }
 
@@ -4913,10 +4923,10 @@
             document.querySelectorAll('#feed-posts-container .feed-post-card[data-uid]').forEach(applyLiveProfileToPostCard);
         }
 
-        // --- DISCOVER TAB (browse other Xoxa users and add them as contacts) ---
+        // --- DISCOVER TAB (browse other Xoxa users and follow them) ---
         // Lives where the old video-Moments "Status" tab used to be. Reuses the existing
-        // one-directional contacts/{me}/{them}=true add mechanism (same as the Add Friend
-        // modal and Message Requests), just from a browsable grid instead of a typed lookup.
+        // followUser() mechanism (same as the Follow Someone modal and Message Requests),
+        // just from a browsable grid instead of a typed lookup.
         let discoverShuffleSeed = 0;
 
         function getDiscoverableUsers() {
@@ -4995,7 +5005,7 @@
                         ${isBusiness ? `<span class="group-badge-pill gold-business discover-card-business-pill">Business</span>` : ''}
                         <p class="discover-card-bio">${profile.about ? escapeHtmlForPost(profile.about) : 'On Xoxa'}</p>
                     </div>
-                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Add</button>
+                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
                 `;
                 grid.appendChild(card);
             });
@@ -5016,16 +5026,16 @@
             const user = auth.currentUser;
             if (!user || !uid) return;
             btn.disabled = true;
-            btn.textContent = 'Adding...';
+            btn.textContent = 'Following...';
             try {
-                await set(ref(database, `contacts/${user.uid}/${uid}`), true);
-                btn.textContent = 'Added';
+                await followUser(uid);
+                btn.textContent = 'Following';
                 btn.classList.add('added');
-                notify('Added to your contacts');
+                notify('You followed this person');
             } catch (err) {
                 btn.disabled = false;
-                btn.textContent = 'Add';
-                showCustomModal('Error', 'Could not add this contact.');
+                btn.textContent = 'Follow';
+                showCustomModal('Error', 'Could not follow this person.');
             }
         });
 
@@ -5058,7 +5068,7 @@
                             <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
                             ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
                         </div>
-                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Add</button>
+                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
                     </div>
                 `;
             }).join('');
@@ -5097,6 +5107,28 @@
                 }
             });
         }
+
+        // Follow buttons on the "People you may know" widgets woven into the feed (see
+        // sprinkleSuggestedPeople above) — delegated on the list since cards are rebuilt often.
+        document.getElementById('feed-posts-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.discover-card-add-btn');
+            if (!btn || btn.disabled) return;
+            const uid = btn.dataset.uid;
+            const user = auth.currentUser;
+            if (!user || !uid) return;
+            btn.disabled = true;
+            btn.textContent = 'Following...';
+            try {
+                await followUser(uid);
+                btn.textContent = 'Following';
+                btn.classList.add('added');
+                notify('You followed this person');
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Follow';
+                showCustomModal('Error', 'Could not follow this person.');
+            }
+        });
 
         // --- STATUS TAB (dormant — was the video-only Moments grid; the Status nav item now
         // opens Discover above. Left intact and unused rather than ripped out, since the video
@@ -7700,6 +7732,8 @@
                 const myProfile = cachedUsers[user.uid] || {};
                 document.getElementById('display-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
                 document.getElementById('new-username-input').value = '';
+                document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
+                document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
                 const usernameLocked = myProfile.usernameChanged && !myProfile.isBusinessAccount;
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
                 document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
@@ -8014,6 +8048,32 @@
             }
         });
 
+        // --- FOLLOW / UNFOLLOW ---
+        // contacts/{me}/{them}=true is "who I follow" (kept at its original path so every existing
+        // read of cachedContacts/cachedBlocked etc. keeps working unchanged). followers/{them}/{me}=true
+        // is the reverse index — it's what lets us show "who follows me" cheaply instead of scanning
+        // every user's contacts list. The two are always written and removed together.
+        // NOTE: this needs a matching security rule alongside the existing contacts rule, since the
+        // follower write lands under someone else's uid:
+        //   followers/$targetUid/$followerUid { ".write": "auth.uid === $followerUid" }
+        async function followUser(targetUid) {
+            const user = auth.currentUser;
+            if (!user || !targetUid || targetUid === user.uid) return;
+            const updates = {};
+            updates[`contacts/${user.uid}/${targetUid}`] = true;
+            updates[`followers/${targetUid}/${user.uid}`] = true;
+            await update(ref(database), updates);
+        }
+
+        async function unfollowUser(targetUid) {
+            const user = auth.currentUser;
+            if (!user || !targetUid) return;
+            const updates = {};
+            updates[`contacts/${user.uid}/${targetUid}`] = null;
+            updates[`followers/${targetUid}/${user.uid}`] = null;
+            await update(ref(database), updates);
+        }
+
         async function addFriendByRawInput(rawInput) {
             const user = auth.currentUser;
             if(!rawInput || !user) return;
@@ -8042,16 +8102,16 @@
                 }
 
                 if (friendUid === user.uid) {
-                    notify("You can't add yourself", "error");
+                    notify("You can't follow yourself", "error");
                 } else if (friendUid) {
-                    await set(ref(database, `contacts/${user.uid}/${friendUid}`), true);
-                    notify("Friend added successfully!");
+                    await followUser(friendUid);
+                    notify("You're now following them!");
                     addFriendModal.classList.remove('active');
                 } else {
                     notify("Username not found", "error");
                 }
             } catch (err) {
-                showCustomModal("Error", "There was an issue adding this user.");
+                showCustomModal("Error", "There was an issue following this user.");
             } finally { hideLoading(); }
         }
 
@@ -8730,13 +8790,52 @@
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
+            document.getElementById('user-info-following-count').textContent = profile.followingCount || 0;
+            document.getElementById('user-info-followers-count').textContent = profile.followersCount || 0;
             const msgBtn = document.getElementById('btn-user-info-message');
-            if (msgBtn) {
-                const user = auth.currentUser;
-                msgBtn.style.display = (user && uid === user.uid) ? 'none' : 'flex';
+            const followBtn = document.getElementById('btn-user-info-follow');
+            const isMe = auth.currentUser && uid === auth.currentUser.uid;
+            if (msgBtn) msgBtn.style.display = isMe ? 'none' : 'flex';
+            if (followBtn) {
+                followBtn.style.display = isMe ? 'none' : 'flex';
+                updateUserInfoFollowButton(uid);
             }
             userInfoSheet.classList.add('active');
         }
+
+        // Reflects whether I currently follow `uid` onto the profile sheet's toggle button.
+        function updateUserInfoFollowButton(uid) {
+            const followBtn = document.getElementById('btn-user-info-follow');
+            const followBtnText = document.getElementById('btn-user-info-follow-text');
+            if (!followBtn || !followBtnText) return;
+            const following = !!cachedContacts[uid];
+            followBtnText.textContent = following ? 'Following' : 'Follow';
+            followBtn.classList.toggle('btn-primary', !following);
+            followBtn.classList.toggle('btn-outline', following);
+        }
+
+        document.getElementById('btn-user-info-follow').addEventListener('click', async () => {
+            const uid = userInfoSheetUid;
+            if (!uid) return;
+            const followBtn = document.getElementById('btn-user-info-follow');
+            const followBtnText = document.getElementById('btn-user-info-follow-text');
+            const wasFollowing = !!cachedContacts[uid];
+            followBtn.disabled = true;
+            try {
+                if (wasFollowing) {
+                    await unfollowUser(uid);
+                    notify('Unfollowed');
+                } else {
+                    await followUser(uid);
+                    notify("You're now following them!");
+                }
+                updateUserInfoFollowButton(uid);
+            } catch (err) {
+                notify(wasFollowing ? 'Could not unfollow this person' : 'Could not follow this person', 'error');
+            } finally {
+                followBtn.disabled = false;
+            }
+        });
 
         const userInfoMessageBtn = document.getElementById('btn-user-info-message');
         if (userInfoMessageBtn) {
@@ -8749,9 +8848,9 @@
                 pauseAllFeedMedia();
                 try {
                     if (!cachedContacts[uid]) {
-                        await set(ref(database, `contacts/${user.uid}/${uid}`), true);
+                        await followUser(uid);
                     }
-                } catch (err) { /* non-fatal: still open the chat even if contact save fails */ }
+                } catch (err) { /* non-fatal: still open the chat even if the follow write fails */ }
                 openChatView(uid, profile.name, profile.photoURL);
             });
         }
@@ -10199,7 +10298,10 @@
         }
 
         // --- CHAT REQUESTS & CONTACTS ---
+        // cachedContacts = who I follow (contacts/{me}). cachedFollowers = who follows me
+        // (followers/{me}) — the reverse index kept in sync by followUser/unfollowUser.
         let cachedContacts = {};
+        let cachedFollowers = {};
         let cachedBlocked = {};
         
         let theyBlockedMeActive = false;
@@ -10236,7 +10338,8 @@
             }
         }
 
-        function renderContactRow(uid, container, isBlockedView) {
+        // mode: 'following' (people I follow, default) | 'blocked' | 'followers' (people who follow me)
+        function renderContactRow(uid, container, mode) {
             const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
             const displayName = profile.name || 'Unknown User';
 
@@ -10251,33 +10354,55 @@
                 ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>`
                 : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
 
+            let subtitle, actionHtml;
+            if (mode === 'blocked') {
+                subtitle = 'Blocked';
+                actionHtml = `<button type="button" class="contact-action-btn primary" data-action="unblock">Unblock</button>`;
+            } else if (mode === 'followers') {
+                const iFollowThem = !!cachedContacts[uid];
+                subtitle = iFollowThem ? 'Follows you · Following' : 'Follows you';
+                actionHtml = iFollowThem ? '' : `<button type="button" class="contact-action-btn primary" data-action="followback">Follow Back</button>`;
+            } else {
+                subtitle = 'Following';
+                actionHtml = `<button type="button" class="contact-action-btn danger" data-action="block">Block</button>`;
+            }
+
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
                     <h3>${displayName}${verifiedBadgeFor(uid, false)}</h3>
-                    <p>${isBlockedView ? 'Blocked' : 'In your contacts'}</p>
+                    <p>${subtitle}</p>
                 </div>
-                <button type="button" class="contact-action-btn ${isBlockedView ? 'primary' : 'danger'}" data-action="${isBlockedView ? 'unblock' : 'block'}">${isBlockedView ? 'Unblock' : 'Block'}</button>
+                ${actionHtml}
             `;
             container.appendChild(item);
         }
 
         function renderContactsLists() {
             const contactsList = document.getElementById('contacts-list-container');
+            const followersList = document.getElementById('followers-list-container');
             const blockedList = document.getElementById('blocked-list-container');
             contactsList.innerHTML = '';
+            followersList.innerHTML = '';
             blockedList.innerHTML = '';
 
             const visibleContactUids = Object.keys(cachedContacts).filter(uid => uid !== AI_UID && !cachedBlocked[uid]);
             if (visibleContactUids.length > 0) {
-                visibleContactUids.forEach(uid => renderContactRow(uid, contactsList, false));
+                visibleContactUids.forEach(uid => renderContactRow(uid, contactsList, 'following'));
             } else {
-                contactsList.innerHTML = '<p class="empty-msg">Your contact list is empty.</p>';
+                contactsList.innerHTML = '<p class="empty-msg">You aren\'t following anyone yet.</p>';
+            }
+
+            const visibleFollowerUids = Object.keys(cachedFollowers).filter(uid => uid !== AI_UID && !cachedBlocked[uid]);
+            if (visibleFollowerUids.length > 0) {
+                visibleFollowerUids.forEach(uid => renderContactRow(uid, followersList, 'followers'));
+            } else {
+                followersList.innerHTML = '<p class="empty-msg">No one follows you yet.</p>';
             }
 
             const blockedUids = Object.keys(cachedBlocked).filter(uid => uid !== AI_UID);
             if (blockedUids.length > 0) {
-                blockedUids.forEach(uid => renderContactRow(uid, blockedList, true));
+                blockedUids.forEach(uid => renderContactRow(uid, blockedList, 'blocked'));
             } else {
                 blockedList.innerHTML = '<p class="empty-msg">No blocked contacts.</p>';
             }
@@ -10313,6 +10438,13 @@
                 } catch (err) {
                     showCustomModal('Error', 'Could not unblock this contact.');
                 }
+            } else if (action === 'followback') {
+                try {
+                    await followUser(uid);
+                    notify(`You followed ${name} back`);
+                } catch (err) {
+                    showCustomModal('Error', 'Could not follow this person.');
+                }
             }
             return true;
         }
@@ -10324,6 +10456,7 @@
             btn.classList.add('active');
             const subtab = btn.dataset.subtab;
             document.getElementById('contacts-list-container').style.display = subtab === 'all' ? 'block' : 'none';
+            document.getElementById('followers-list-container').style.display = subtab === 'followers' ? 'block' : 'none';
             document.getElementById('device-contacts-list-container').style.display = subtab === 'device' ? 'block' : 'none';
             document.getElementById('blocked-list-container').style.display = subtab === 'blocked' ? 'block' : 'none';
         });
@@ -10352,7 +10485,7 @@
                     : `<div class="avatar" style="background-color: var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
                 metaHtml = `<h3>${displayName}</h3><p>On Xoxa${profile.about ? ' · ' + profile.about : ''}</p>`;
                 const alreadyContact = !!cachedContacts[uid];
-                actionsHtml = `<button type="button" class="chat-btn-small" data-action="device-chat" data-uid="${uid}" data-name="${displayName}" data-avatar="${profile.photoURL || ''}">${alreadyContact ? 'Chat' : 'Add'}</button>`;
+                actionsHtml = `<button type="button" class="chat-btn-small" data-action="device-chat" data-uid="${uid}" data-name="${displayName}" data-avatar="${profile.photoURL || ''}">${alreadyContact ? 'Chat' : 'Follow'}</button>`;
             } else {
                 avatarHtml = `<div class="avatar" style="background-color: var(--bg-hover); color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${(name || '?').charAt(0).toUpperCase()}</div>`;
                 metaHtml = `<h3>${name}</h3><p>Not on Xoxa yet</p>`;
@@ -10372,7 +10505,7 @@
             if (!user) return;
 
             if (!contactPickerSupported) {
-                showCustomModal("Not Supported Here", "Contact syncing works in Chrome on Android. On other browsers, use the + button to add friends by @username or phone number instead.");
+                showCustomModal("Not Supported Here", "Contact syncing works in Chrome on Android. On other browsers, use the + button to follow people by @username or phone number instead.");
                 return;
             }
 
@@ -10459,7 +10592,7 @@
             } finally {
                 card.classList.remove('syncing');
                 title.textContent = originalTitle;
-                subtitle.textContent = 'Find friends already on Xoxa';
+                subtitle.textContent = 'Find people already on Xoxa';
             }
         }
 
@@ -10476,8 +10609,8 @@
                 const avatar = chatBtn.dataset.avatar;
                 try {
                     if (!cachedContacts[uid]) {
-                        await set(ref(database, `contacts/${user.uid}/${uid}`), true);
-                        notify(`${name} added to your contacts`);
+                        await followUser(uid);
+                        notify(`Now following ${name}`);
                     }
                     openChatView(uid, name, avatar);
                 } catch (err) {
@@ -10556,7 +10689,7 @@
                 btn.type = 'button';
                 btn.className = 'btn-add-contact';
                 btn.dataset.uid = uid;
-                btn.textContent = 'Add';
+                btn.textContent = 'Follow Back';
                 row.appendChild(btn);
 
                 container.appendChild(row);
@@ -10573,14 +10706,14 @@
                 const user = auth.currentUser;
                 if (!user || !uid) return;
                 btn.disabled = true;
-                btn.textContent = 'Adding...';
+                btn.textContent = 'Following...';
                 try {
-                    await set(ref(database, `contacts/${user.uid}/${uid}`), true);
-                    notify('Added to contacts');
+                    await followUser(uid);
+                    notify('You followed them back');
                 } catch (err) {
-                    showCustomModal('Error', 'Could not add this contact.');
+                    showCustomModal('Error', 'Could not follow this person.');
                     btn.disabled = false;
-                    btn.textContent = 'Add';
+                    btn.textContent = 'Follow Back';
                 }
             }
         });
@@ -13281,7 +13414,7 @@
             if (card.dataset.uid) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
         });
 
-        // --- LONG PRESS CONTEXT MENU (Delete Chat / Remove Friend) ON CHATS TAB CARDS ---
+        // --- LONG PRESS CONTEXT MENU (Delete Chat / Unfollow) ON CHATS TAB CARDS ---
         let contextMenuChatUid = null;
         let chatItemPressState = { timer: null, uid: null, name: null, triggered: false, startX: 0, startY: 0 };
         const chatItemOptionsSheet = document.getElementById('chat-item-options-sheet-overlay');
@@ -13371,20 +13504,28 @@
             chatItemOptionsSheet.classList.remove('active');
             if (!user || !uid) return;
 
-            const confirmed = await showCustomModal('Remove Friend', `Remove ${name} from your friends? Their chat will also be removed from your list.`, true);
+            const confirmed = await showCustomModal('Unfollow', `Unfollow ${name}? Their chat will also be removed from your list.`, true);
             if (!confirmed) return;
 
             try {
-                await remove(ref(database, `contacts/${user.uid}/${uid}`));
+                await unfollowUser(uid);
                 await remove(ref(database, `user_chats/${user.uid}/${uid}`));
                 if (activeChatUid === uid) { activeChatUid = null; history.back(); }
-                notify(`${name} removed from friends`);
+                notify(`Unfollowed ${name}`);
             } catch (err) {
-                notify('Could not remove this friend', 'error');
+                notify('Could not unfollow this person', 'error');
             }
         });
 
         document.getElementById('contacts-list-container').addEventListener('click', async (e) => {
+            if (await handleContactAction(e)) return;
+            const avatarEl = e.target.closest('.avatar[data-full]');
+            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
+            const card = e.target.closest('.chat-item');
+            if (card) openChatView(card.dataset.uid, card.dataset.name, card.dataset.avatar);
+        });
+
+        document.getElementById('followers-list-container').addEventListener('click', async (e) => {
             if (await handleContactAction(e)) return;
             const avatarEl = e.target.closest('.avatar[data-full]');
             if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
@@ -14290,7 +14431,7 @@
             // onAuthStateChanged can fire more than once for the same signed-in session (e.g. after
             // linking a phone number). Without this guard, every re-fire attaches a fresh, duplicate
             // set of Firebase listeners, and each incoming message or story then re-renders the chat
-            // list once per attached listener, appearing as duplicated friend cards.
+            // list once per attached listener, appearing as duplicated contact cards.
             if (chatListenersAttached) return;
             chatListenersAttached = true;
 
@@ -14385,13 +14526,28 @@
                 renderChatRequests();
                 renderDiscoverGridIfActive();
 
-                // Mirror the friend count onto the public profile (users/{uid}/friendsCount) so the
-                // 10+ friends green badge can be shown next to this user's name anywhere in the app,
-                // for anyone viewing it — contacts/{uid} itself is only readable by the owner.
-                const friendsCount = Object.keys(cachedContacts).length;
+                // Mirror my following count onto the public profile (users/{uid}/followingCount)
+                // so it (and the followers count from the listener below) can be shown next to my
+                // name anywhere in the app, for anyone viewing it — contacts/{uid} itself is only
+                // readable by the owner.
+                const followingCount = Object.keys(cachedContacts).length;
                 const myCachedProfile = cachedUsers[user.uid];
-                if (!myCachedProfile || (myCachedProfile.friendsCount || 0) !== friendsCount) {
-                    update(ref(database, `users/${user.uid}`), { friendsCount });
+                if (!myCachedProfile || (myCachedProfile.followingCount || 0) !== followingCount) {
+                    update(ref(database, `users/${user.uid}`), { followingCount });
+                }
+            });
+
+            // followers/{me} is the reverse index maintained by followUser/unfollowUser — everyone
+            // currently following me. Used for the Followers list/tab and for the followers count
+            // that drives the "10+ Followers" green badge (see verifiedBadgeFor).
+            onValue(ref(database, `followers/${user.uid}`), (snap) => {
+                cachedFollowers = snap.exists() ? snap.val() : {};
+                renderContactsLists();
+
+                const followersCount = Object.keys(cachedFollowers).length;
+                const myCachedProfile = cachedUsers[user.uid];
+                if (!myCachedProfile || (myCachedProfile.followersCount || 0) !== followersCount) {
+                    update(ref(database, `users/${user.uid}`), { followersCount });
                 }
             });
 

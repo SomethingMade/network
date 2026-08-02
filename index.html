@@ -395,6 +395,7 @@
         .feed-composer-image-remove { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; cursor: pointer; }
         .feed-composer-add-more { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 50px; cursor: pointer; }
         .feed-post-music-chip { margin-top: 8px; display: flex; align-items: center; gap: 8px; background: var(--bg-alt); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; max-width: 100%; }
+        .feed-post-video-music-chip { margin-left: 60px; max-width: calc(100% - 76px); cursor: default; }
         .feed-post-music-chip img { width: 26px; height: 26px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .feed-post-music-chip span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
         .feed-post-music-chip svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--primary-blue); }
@@ -3041,6 +3042,7 @@
         <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <video id="video-viewer-vid" src="" controls playsinline preload="metadata"></video>
+        <audio id="video-viewer-music-audio" preload="none" loop style="display:none;"></audio>
     </div>
 
     <div id="status-viewer-overlay">
@@ -3437,10 +3439,11 @@
         });
 
         let currentViewerVideoUrl = '';
-        function openVideoViewer(url, hideSave) {
+        function openVideoViewer(url, hideSave, musicUrl) {
             if (!url) return;
             currentViewerVideoUrl = url;
             const vid = document.getElementById('video-viewer-vid');
+            const musicAudio = document.getElementById('video-viewer-music-audio');
             vid.src = url;
             vid.controlsList = hideSave ? 'nodownload noremoteplayback' : '';
             vid.disablePictureInPicture = !!hideSave;
@@ -3450,13 +3453,34 @@
             overlay.classList.toggle('no-save', !!hideSave);
             overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
             overlay.classList.add('active');
+
+            vid.onplay = null; vid.onpause = null; vid.onseeked = null; vid.ontimeupdate = null;
+            if (musicUrl) {
+                // Same rule as the inline feed player: the clip's own sound stays muted and the
+                // attached song plays instead, kept in sync with play/pause/seek.
+                vid.muted = true;
+                musicAudio.src = musicUrl;
+                musicAudio.currentTime = 0;
+                vid.onplay = () => { musicAudio.currentTime = vid.currentTime; musicAudio.play().catch(() => {}); };
+                vid.onpause = () => { musicAudio.pause(); };
+                vid.onseeked = () => { musicAudio.currentTime = vid.currentTime; };
+                vid.ontimeupdate = () => { if (Math.abs(musicAudio.currentTime - vid.currentTime) > 0.3) musicAudio.currentTime = vid.currentTime; };
+            } else {
+                vid.muted = false;
+                musicAudio.pause();
+                musicAudio.src = '';
+            }
+
             vid.play().catch(() => {});
             if (window.location.hash !== '#video-viewer') window.location.hash = 'video-viewer';
         }
         function closeVideoViewer() {
             const vid = document.getElementById('video-viewer-vid');
+            const musicAudio = document.getElementById('video-viewer-music-audio');
             vid.pause();
             vid.src = '';
+            musicAudio.pause();
+            musicAudio.src = '';
             document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur');
             currentViewerVideoUrl = '';
         }
@@ -4530,7 +4554,7 @@
         let cachedPosts = {};
         let feedComposerImages = []; // array of uploaded image URLs (max FEED_MAX_IMAGES), mutually exclusive with video
         let feedComposerVideo = null; // { url } or null, mutually exclusive with images
-        let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null, images only
+        let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
@@ -5477,7 +5501,7 @@
                     previewVideo.src = feedComposerVideo.url;
                     previewVideo.style.display = 'block';
                     previewRemove.style.display = 'flex';
-                    musicBtn.style.display = 'none';
+                    musicBtn.style.display = 'flex';
                     preview.style.display = 'block';
                 } else if (feedComposerImages.length) {
                     previewVideo.style.display = 'none';
@@ -5604,7 +5628,7 @@
             });
 
             musicBtn.addEventListener('click', () => {
-                openMusicPicker('Add music to your photo', (music) => {
+                openMusicPicker(feedComposerVideo ? 'Add music to your video' : 'Add music to your photo', (music) => {
                     feedComposerMusic = music;
                     updateComposerMusicChip();
                 });
@@ -5640,7 +5664,7 @@
                         imageUrl: feedComposerImages.length ? feedComposerImages[0] : null,
                         imageUrls: feedComposerImages.length ? feedComposerImages : null,
                         videoUrl: feedComposerVideo ? feedComposerVideo.url : null,
-                        music: (feedComposerImages.length && feedComposerMusic) ? feedComposerMusic : null,
+                        music: ((feedComposerImages.length || feedComposerVideo) && feedComposerMusic) ? feedComposerMusic : null,
                         mentions: mentionedUids.size ? mentionsMap : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
@@ -5988,13 +6012,17 @@
             document.querySelectorAll('.feed-post-video-wrap').forEach(wrap => {
                 const video = wrap.querySelector('.feed-post-video');
                 if (!video) return;
-                video.muted = feedVideoMuted;
+                const hasMusic = wrap.dataset.hasMusic === '1';
+                const musicAudio = hasMusic ? wrap.querySelector('.feed-post-video-music-audio') : null;
+                video.muted = hasMusic ? true : feedVideoMuted;
+                if (hasMusic && musicAudio) musicAudio.muted = feedVideoMuted;
                 const muteBtn = wrap.querySelector('.feed-video-mute-btn');
                 if (!muteBtn) return;
                 const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
                 const iconMuted = muteBtn.querySelector('.icon-muted');
-                if (iconUnmuted) iconUnmuted.style.display = video.muted ? 'none' : 'block';
-                if (iconMuted) iconMuted.style.display = video.muted ? 'block' : 'none';
+                const muted = hasMusic ? (musicAudio ? musicAudio.muted : true) : video.muted;
+                if (iconUnmuted) iconUnmuted.style.display = muted ? 'none' : 'block';
+                if (iconMuted) iconMuted.style.display = muted ? 'block' : 'none';
             });
         }
 
@@ -6002,7 +6030,11 @@
         // single feed video, replacing native browser controls entirely.
         function initFeedVideoPlayer(wrap) {
             const video = wrap.querySelector('.feed-post-video');
-            video.muted = feedVideoMuted;
+            const hasMusic = wrap.dataset.hasMusic === '1';
+            const musicAudio = hasMusic ? wrap.querySelector('.feed-post-video-music-audio') : null;
+            // When a song is attached, the original clip's own audio stays muted permanently —
+            // the attached track plays instead, so mute/unmute controls that track, not the video.
+            video.muted = hasMusic ? true : feedVideoMuted;
             video.loop = true;
             const centerBtn = wrap.querySelector('.feed-video-center-btn');
             const playPauseBtn = wrap.querySelector('.feed-video-playpause-btn');
@@ -6023,8 +6055,9 @@
                 iconPause.style.display = paused ? 'none' : 'block';
             }
             function updateMuteUI() {
-                iconUnmuted.style.display = video.muted ? 'none' : 'block';
-                iconMuted.style.display = video.muted ? 'block' : 'none';
+                const muted = hasMusic ? (musicAudio ? musicAudio.muted : true) : video.muted;
+                iconUnmuted.style.display = muted ? 'none' : 'block';
+                iconMuted.style.display = muted ? 'block' : 'none';
             }
             function updateProgressUI() {
                 const dur = video.duration || 0;
@@ -6061,9 +6094,24 @@
             video.addEventListener('timeupdate', updateProgressUI);
             video.addEventListener('ended', updatePlayUI);
 
+            if (hasMusic && musicAudio) {
+                musicAudio.muted = feedVideoMuted;
+                // The music track always mirrors the video's own play/pause/seek — it's not an
+                // independently controllable element, it's standing in for the clip's audio.
+                video.addEventListener('play', () => {
+                    musicAudio.currentTime = video.currentTime;
+                    musicAudio.play().catch(() => {});
+                });
+                video.addEventListener('pause', () => { musicAudio.pause(); });
+                video.addEventListener('seeked', () => { musicAudio.currentTime = video.currentTime; });
+                video.addEventListener('timeupdate', () => {
+                    if (Math.abs(musicAudio.currentTime - video.currentTime) > 0.3) musicAudio.currentTime = video.currentTime;
+                });
+            }
+
             muteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                feedVideoMuted = !video.muted;
+                feedVideoMuted = hasMusic ? (musicAudio ? !musicAudio.muted : false) : !video.muted;
                 applyFeedMuteStateToAllVideoWraps();
             });
             updateMuteUI();
@@ -6211,9 +6259,15 @@
                 <div class="x-media-grid" data-count="${Math.min(postImages.length, 4)}">
                     ${postImages.slice(0, 4).map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
                 </div>${musicChipHtml}` : '';
+            const videoMusicChipHtml = (post.videoUrl && post.music) ? `
+                <div class="feed-post-music-chip feed-post-video-music-chip">
+                    <img src="${post.music.artworkUrl || ''}" alt="">
+                    <span></span>
+                </div>` : '';
             const videoHtml = post.videoUrl ? `
-                <div class="feed-post-video-wrap">
+                <div class="feed-post-video-wrap" data-has-music="${post.music ? '1' : '0'}">
                     <video class="feed-post-video" src="${post.videoUrl}" playsinline preload="metadata" muted loop onloadedmetadata="this.currentTime=0.1"></video>
+                    ${post.music ? `<audio class="feed-post-video-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </button>
@@ -6235,7 +6289,7 @@
                             <svg class="icon-muted" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12l3-3-1-1-3 3-3-3-1 1 3 3-3 3 1 1 3-3 3 3 1-1z"></path></svg>
                         </button>
                     </div>
-                </div>` : '';
+                </div>${videoMusicChipHtml}` : '';
             const textHtml = post.text ? `<p class="feed-post-text"></p>` : '';
             const taggedUids = post.mentions ? Object.keys(post.mentions).filter(uid => uid !== post.uid) : [];
             const taggedHtml = taggedUids.length ? `
@@ -6330,7 +6384,7 @@
                 e.stopPropagation();
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();
-                openVideoViewer(post.videoUrl, true);
+                openVideoViewer(post.videoUrl, true, post.music ? post.music.previewUrl : null);
             });
             initFeedPostMusic(card);
 

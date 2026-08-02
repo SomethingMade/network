@@ -3618,6 +3618,23 @@
         floatingVideoEl.addEventListener('play', updateFloatingPlayUI);
         floatingVideoEl.addEventListener('pause', updateFloatingPlayUI);
 
+        // Keep the floating pop-up player and every other video in the app mutually exclusive:
+        // starting playback anywhere pauses whichever other video was playing. 'play' doesn't
+        // bubble, so this listens on the capture phase to catch it from any <video> in the app.
+        document.addEventListener('play', (e) => {
+            const el = e.target;
+            if (!(el instanceof HTMLVideoElement)) return;
+            if (el === floatingVideoEl) {
+                // The floating player just started playing — pause every other video.
+                document.querySelectorAll('video').forEach(v => {
+                    if (v !== floatingVideoEl && !v.paused) v.pause();
+                });
+            } else if (floatingVideoPlayer.classList.contains('active') && !floatingVideoEl.paused) {
+                // Some other video just started playing while the floating player is active.
+                floatingVideoEl.pause();
+            }
+        }, true);
+
         document.getElementById('floating-video-center-play').addEventListener('click', (e) => {
             e.stopPropagation();
             if (floatingVideoEl.paused) floatingVideoEl.play().catch(() => {}); else floatingVideoEl.pause();

@@ -1034,6 +1034,9 @@
         
         @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .msg-bubble { max-width: 68%; padding: 10px 16px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; }
+        .date-separator { display: flex; justify-content: center; align-self: center; margin: 4px 0 8px; }
+        .date-separator span { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 14px; box-shadow: var(--shadow-bubble); letter-spacing: 0.1px; }
+        body.glass-theme .date-separator span { backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%); }
         .msg-bubble.in { align-self: flex-start; background: var(--msg-in-bg); color: var(--msg-in-text); border-bottom-left-radius: 4px; box-shadow: var(--shadow-bubble); }
         .msg-bubble.out { align-self: flex-end; background: var(--gradient-brand); color: #FFF; border-bottom-right-radius: 4px; box-shadow: var(--shadow-bubble-out); }
         
@@ -3982,6 +3985,35 @@
         function isNearBottom(el, threshold = 120) {
             if (!el) return true;
             return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+        }
+
+        // Returns a day-granularity key (independent of hour/min) so consecutive messages
+        // on the same calendar day can be grouped without a date separator between them.
+        function dayKey(timestamp) {
+            const d = new Date(timestamp);
+            return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+        }
+
+        function formatDateSeparatorLabel(timestamp) {
+            if (!timestamp) return '';
+            const d = new Date(timestamp);
+            const now = new Date();
+            const startOf = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+            const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays > 1 && diffDays < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+            const sameYear = d.getFullYear() === now.getFullYear();
+            return d.toLocaleDateString(undefined, sameYear ? { month: 'long', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+
+        function buildDateSeparator(timestamp) {
+            const sep = document.createElement('div');
+            sep.className = 'date-separator';
+            const label = document.createElement('span');
+            label.textContent = formatDateSeparatorLabel(timestamp);
+            sep.appendChild(label);
+            return sep;
         }
 
         function updateScrollToBottomBtnVisibility() {
@@ -9114,7 +9146,13 @@
                 messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
                 if (snap.exists()) {
                     const items = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })).sort((a, b) => a.createdAt - b.createdAt);
+                    let lastDateKey = null;
                     items.forEach(msg => {
+                        const msgDateKey = dayKey(msg.createdAt);
+                        if (msgDateKey !== lastDateKey) {
+                            messagesEl.appendChild(buildDateSeparator(msg.createdAt));
+                            lastDateKey = msgDateKey;
+                        }
                         const isOwn = msg.senderUid === user.uid;
                         const bubble = document.createElement('div');
                         bubble.className = 'msg-bubble ' + (isOwn ? 'out' : 'in');
@@ -13351,6 +13389,7 @@
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (snap.exists()) {
                     const items = Object.entries(snap.val()).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
+                    let lastDateKey = null;
 
                     if (!isAIThread) {
                         await Promise.all(items.map(async (msg) => {
@@ -13362,6 +13401,11 @@
                     }
                     
                     items.forEach(msg => {
+                        const msgDateKey = dayKey(msg.createdAt);
+                        if (msgDateKey !== lastDateKey) {
+                            messagesEl.appendChild(buildDateSeparator(msg.createdAt));
+                            lastDateKey = msgDateKey;
+                        }
                         const bubble = document.createElement('div');
                         bubble.className = 'msg-bubble ' + (msg.senderUid === user.uid ? 'out' : 'in');
                         

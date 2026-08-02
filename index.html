@@ -1678,6 +1678,33 @@
         .call-action-col { display: flex; flex-direction: column; align-items: center; }
         #call-remote-audio { display: none; }
 
+        /* ── GROUP CALL BANNER (pinned inside a group chat while a call is live) ── */
+        .group-call-banner { display: none; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(52,199,89,0.12); border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .group-call-banner.active { display: flex; }
+        .group-call-banner-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--success-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+        .group-call-banner-icon svg { width: 16px; height: 16px; }
+        .group-call-banner-text { flex: 1; min-width: 0; }
+        .group-call-banner-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+        .group-call-banner-sub { font-size: 12px; color: var(--text-secondary); }
+        .group-call-banner-join { padding: 7px 16px; border-radius: 50px; background: var(--success-green); color: #fff; font-size: 12.5px; font-weight: 700; border: none; flex-shrink: 0; cursor: pointer; }
+
+        /* ── GROUP CALL OVERLAY ── */
+        #group-call-overlay { position: fixed; inset: 0; z-index: 100005; display: none; flex-direction: column; background: linear-gradient(160deg, #0B1F17 0%, #0E2A1F 55%, #0B1F17 100%); color: #fff; padding: 50px 20px 40px; }
+        #group-call-overlay.active { display: flex; }
+        .gc-top { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 20px; flex-shrink: 0; }
+        .gc-title { font-size: 18px; font-weight: 700; }
+        .gc-sub { font-size: 13px; color: rgba(255,255,255,0.65); }
+        .gc-timer { font-size: 13px; color: rgba(255,255,255,0.75); font-variant-numeric: tabular-nums; margin-top: 2px; }
+        .gc-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 20px 12px; align-content: center; overflow-y: auto; padding: 10px 4px; max-width: 480px; margin: 0 auto; width: 100%; }
+        .gc-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .gc-tile-avatar-wrap { position: relative; width: 68px; height: 68px; }
+        .gc-tile-avatar { width: 68px; height: 68px; border-radius: 50%; background-size: cover; background-position: center; background-color: rgba(255,255,255,0.14); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: #fff; }
+        .gc-tile-mute-badge { position: absolute; bottom: -2px; right: -2px; width: 22px; height: 22px; border-radius: 50%; background: var(--danger-red); display: none; align-items: center; justify-content: center; border: 2px solid #0E2A1F; }
+        .gc-tile-mute-badge svg { width: 11px; height: 11px; }
+        .gc-tile.muted .gc-tile-mute-badge { display: flex; }
+        .gc-tile-name { font-size: 12px; color: rgba(255,255,255,0.85); max-width: 78px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+        #gc-remote-audios { display: none; }
+
         /* ── CALL LOG BUBBLE ── */
         .msg-call-card { display: flex; align-items: center; gap: 10px; }
         .msg-call-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(37,211,102,0.14); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -2737,12 +2764,22 @@
                 <div class="about-bubble" id="chat-view-about-bubble" style="display:none;"></div>
             </div>
             <svg id="btn-call-voice" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Voice call"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            <svg id="btn-group-call-voice" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Voice call"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             <svg id="btn-view-once-toggle" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;" title="Send as view once">
                 <circle cx="12" cy="12" r="10"></circle>
                 <text x="12" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">1</text>
             </svg>
             <svg id="btn-group-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Group Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        </div>
+
+        <div id="group-call-active-banner" class="group-call-banner">
+            <div class="group-call-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+            <div class="group-call-banner-text">
+                <div class="group-call-banner-title">Voice call in progress</div>
+                <div class="group-call-banner-sub" id="group-call-banner-sub">0 in call</div>
+            </div>
+            <button type="button" class="group-call-banner-join" id="group-call-banner-join-btn">Join</button>
         </div>
         
         <div class="chat-view-messages" id="chat-view-messages"></div>
@@ -2848,6 +2885,27 @@
             </div>
         </div>
         <audio id="call-remote-audio" autoplay playsinline></audio>
+    </div>
+
+    <div id="group-call-overlay">
+        <div class="gc-top">
+            <div class="gc-title" id="gc-group-name">Group call</div>
+            <div class="gc-sub" id="gc-participant-count">1 in call</div>
+            <div class="gc-timer" id="gc-timer" style="display:none;">0:00</div>
+        </div>
+        <div class="gc-grid" id="gc-grid"></div>
+        <div class="call-controls-row">
+            <button type="button" class="call-btn call-btn-secondary" id="btn-gc-mute" title="Mute">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+            <button type="button" class="call-btn call-btn-end" id="btn-gc-leave" title="Leave call">
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><g transform="rotate(135 12 12)"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></g></svg>
+            </button>
+            <button type="button" class="call-btn call-btn-secondary" id="btn-gc-speaker" title="Speaker">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+            </button>
+        </div>
+        <div id="gc-remote-audios"></div>
     </div>
 
     <div id="attach-sheet-overlay" class="bottom-sheet-overlay">
@@ -8780,10 +8838,12 @@
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
             document.getElementById('btn-call-voice').style.display = 'none';
+            document.getElementById('btn-group-call-voice').style.display = 'flex';
             document.getElementById('chat-mic-btn').style.display = 'none';
             document.getElementById('chat-attach-btn').style.display = 'flex';
             document.getElementById('chat-sticker-btn').style.display = 'flex';
             updateGroupPostingUI(group);
+            watchGroupCallBannerFor(groupId);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
             const avatarEl = document.getElementById('chat-view-avatar');
@@ -8924,6 +8984,19 @@
                                 linkifyIntoElement(captionEl, msg.text);
                                 bubble.appendChild(captionEl);
                             }
+                        } else if (msg.mediaType === 'group_call') {
+                            const card = document.createElement('div');
+                            card.className = 'msg-call-card';
+                            const subText = msg.callStatus === 'ended' ? `Call ended · ${formatVoiceTime(msg.callDuration || 0)}` : 'Voice call started';
+                            card.innerHTML = `
+                                <div class="msg-call-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                </div>
+                                <div class="msg-call-text">
+                                    <span class="msg-call-title">Group voice call</span>
+                                    <span class="msg-call-sub">${subText}</span>
+                                </div>`;
+                            bubble.appendChild(card);
                         } else {
                             const textEl = document.createElement('div');
                             linkifyIntoElement(textEl, msg.text || '');
@@ -10729,7 +10802,7 @@
                     return;
                 }
 
-                if (callId) {
+                if (callId || groupCallId) {
                     // Already on a call (or already ringing another one) — auto-busy this one.
                     if (invite.callId !== callId) {
                         update(ref(database, `calls/${invite.callId}`), { status: 'busy', endedAt: serverTimestamp() }).catch(() => {});
@@ -10792,7 +10865,7 @@
         async function startVoiceCall(otherUid, otherName, otherAvatar) {
             const user = auth.currentUser;
             if (!user || !otherUid || otherUid === AI_UID) return;
-            if (callId) { notify('You are already on a call', 'error'); return; }
+            if (callId || groupCallId) { notify('You are already on a call', 'error'); return; }
 
             try {
                 callLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -11172,6 +11245,344 @@
             const audioEl = document.getElementById('call-remote-audio');
             if (audioEl && typeof audioEl.setSinkId === 'function') {
                 try { await audioEl.setSinkId(callIsSpeaker ? 'default' : ''); } catch (e) {}
+            }
+        });
+
+        // --- GROUP VOICE CALLS (full-mesh WebRTC, signaled over Firebase Realtime Database) ---
+        // Every participant connects directly to every other participant (mesh topology, no
+        // media server). For each pair, the participant with the lexicographically smaller uid
+        // always initiates the offer — deterministic on both sides, so there's never a clash
+        // over who offers and who answers, regardless of join order.
+        let groupCallId = null; // groupId of the call I'm currently in, or null
+        let groupCallLocalStream = null;
+        let groupCallPCs = {}; // uid -> RTCPeerConnection
+        let groupCallRemoteAudios = {}; // uid -> <audio>
+        let groupCallParticipants = {}; // uid -> { name, avatar, muted } (everyone except me)
+        let groupCallParticipantsUnsub = null;
+        let groupCallPairCleanup = {}; // uid -> fn to unsubscribe that pair's signaling listeners
+        let groupCallConnectedAt = null;
+        let groupCallTimerInterval = null;
+        let groupCallIsMuted = false;
+        let groupCallIsSpeaker = false;
+        let groupCallBannerUnsub = null;
+        let groupCallBannerGroupId = null;
+
+        function gcPairKey(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
+
+        // Pins a "voice call in progress" banner inside a group chat while it's open, live-updating
+        // the headcount. Call when opening a group chat; tear down with unwatchGroupCallBanner().
+        function watchGroupCallBannerFor(groupId) {
+            unwatchGroupCallBanner();
+            groupCallBannerGroupId = groupId;
+            const banner = document.getElementById('group-call-active-banner');
+            const subEl = document.getElementById('group-call-banner-sub');
+            groupCallParticipantsRefForBanner = ref(database, `group_calls/${groupId}/participants`);
+            groupCallBannerUnsub = onValue(groupCallParticipantsRefForBanner, (snap) => {
+                const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+                if (count > 0 && groupCallId !== groupId) {
+                    banner.classList.add('active');
+                    subEl.textContent = count === 1 ? '1 person in call' : `${count} people in call`;
+                } else {
+                    banner.classList.remove('active');
+                }
+            });
+        }
+        let groupCallParticipantsRefForBanner = null;
+        function unwatchGroupCallBanner() {
+            if (groupCallBannerUnsub && groupCallParticipantsRefForBanner) off(groupCallParticipantsRefForBanner);
+            groupCallBannerUnsub = null;
+            groupCallBannerGroupId = null;
+            document.getElementById('group-call-active-banner').classList.remove('active');
+        }
+
+        async function startOrJoinGroupCall(groupId) {
+            const user = auth.currentUser;
+            const group = cachedGroups[groupId];
+            if (!user || !group) return;
+            if (groupCallId === groupId) { document.getElementById('group-call-overlay').classList.add('active'); return; }
+            if (groupCallId || callId) { notify('You are already on a call', 'error'); return; }
+
+            try {
+                groupCallLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (err) {
+                notify('Microphone access was denied', 'error');
+                return;
+            }
+
+            groupCallId = groupId;
+            groupCallIsMuted = false;
+            groupCallIsSpeaker = false;
+            groupCallConnectedAt = Date.now();
+            groupCallParticipants = {};
+            const myProfile = cachedUsers[user.uid] || {};
+
+            document.getElementById('gc-group-name').textContent = group.name || 'Group call';
+            document.getElementById('btn-gc-mute').classList.remove('on');
+            document.getElementById('btn-gc-speaker').classList.remove('on');
+            document.getElementById('gc-timer').style.display = 'block';
+            document.getElementById('group-call-overlay').classList.add('active');
+            document.getElementById('group-call-active-banner').classList.remove('active');
+
+            try {
+                const metaRef = ref(database, `group_calls/${groupId}/meta`);
+                const metaSnap = await get(metaRef);
+                if (!metaSnap.exists()) {
+                    await set(metaRef, { status: 'active', startedBy: user.uid, startedByName: myProfile.name || 'Someone', startedAt: serverTimestamp() });
+                    logGroupCallMessage(groupId, 'started', 0);
+                }
+
+                await set(ref(database, `group_calls/${groupId}/participants/${user.uid}`), {
+                    name: myProfile.name || user.displayName || 'Member',
+                    avatar: myProfile.photoURL || '',
+                    joinedAt: serverTimestamp(),
+                    muted: false
+                });
+                onDisconnect(ref(database, `group_calls/${groupId}/participants/${user.uid}`)).remove();
+            } catch (err) {
+                notify("Couldn't start the call", 'error');
+                leaveGroupCall();
+                return;
+            }
+
+            groupCallParticipantsUnsub = onValue(ref(database, `group_calls/${groupId}/participants`), (snap) => {
+                const data = snap.exists() ? snap.val() : {};
+
+                // Tear down peer connections for anyone who's left.
+                Object.keys(groupCallPCs).forEach(uid => { if (!data[uid]) teardownGroupCallPeer(uid); });
+
+                // Set up (or update) everyone currently in the call, besides myself.
+                Object.keys(data).forEach(uid => {
+                    if (uid === user.uid) return;
+                    groupCallParticipants[uid] = data[uid];
+                    if (!groupCallPCs[uid]) ensureGroupCallPeer(groupId, uid);
+                    else updateGroupCallTileMute(uid, !!data[uid].muted);
+                });
+                Object.keys(groupCallParticipants).forEach(uid => { if (!data[uid]) delete groupCallParticipants[uid]; });
+
+                renderGroupCallGrid();
+            });
+
+            groupCallTimerInterval = setInterval(() => {
+                const secs = Math.floor((Date.now() - groupCallConnectedAt) / 1000);
+                const m = Math.floor(secs / 60), s = secs % 60;
+                document.getElementById('gc-timer').textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+            }, 1000);
+
+            renderGroupCallGrid();
+        }
+
+        function ensureGroupCallPeer(groupId, otherUid) {
+            const user = auth.currentUser;
+            if (!user || groupCallPCs[otherUid]) return;
+            const pairKey = gcPairKey(user.uid, otherUid);
+            const iAmInitiator = user.uid < otherUid;
+
+            const pc = new RTCPeerConnection(ICE_SERVERS);
+            groupCallPCs[otherUid] = pc;
+            groupCallLocalStream.getTracks().forEach(track => pc.addTrack(track, groupCallLocalStream));
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate) push(ref(database, `group_calls/${groupId}/rtc/${pairKey}/candidates/${user.uid}`), e.candidate.toJSON()).catch(() => {});
+            };
+            pc.ontrack = (e) => {
+                let audioEl = groupCallRemoteAudios[otherUid];
+                if (!audioEl) {
+                    audioEl = document.createElement('audio');
+                    audioEl.autoplay = true;
+                    audioEl.playsInline = true;
+                    document.getElementById('gc-remote-audios').appendChild(audioEl);
+                    groupCallRemoteAudios[otherUid] = audioEl;
+                }
+                audioEl.srcObject = e.streams[0];
+            };
+
+            const candidatesRef = ref(database, `group_calls/${groupId}/rtc/${pairKey}/candidates/${otherUid}`);
+            onChildAdded(candidatesRef, (snap) => {
+                const cand = snap.val();
+                if (cand && groupCallPCs[otherUid]) groupCallPCs[otherUid].addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+            });
+
+            const offerRef = ref(database, `group_calls/${groupId}/rtc/${pairKey}/offer`);
+            const answerRef = ref(database, `group_calls/${groupId}/rtc/${pairKey}/answer`);
+
+            if (iAmInitiator) {
+                pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+                    return set(offerRef, { type: pc.localDescription.type, sdp: pc.localDescription.sdp, from: user.uid });
+                }).catch(() => {});
+                onValue(answerRef, (snap) => {
+                    const data = snap.val();
+                    if (data && data.from === otherUid && groupCallPCs[otherUid] && !pc.currentRemoteDescription) {
+                        pc.setRemoteDescription(new RTCSessionDescription(data)).catch(() => {});
+                    }
+                });
+            } else {
+                onValue(offerRef, (snap) => {
+                    const data = snap.val();
+                    if (data && data.from === otherUid && groupCallPCs[otherUid] && !pc.currentRemoteDescription) {
+                        pc.setRemoteDescription(new RTCSessionDescription(data))
+                            .then(() => pc.createAnswer())
+                            .then(answer => pc.setLocalDescription(answer))
+                            .then(() => set(answerRef, { type: pc.localDescription.type, sdp: pc.localDescription.sdp, from: user.uid }))
+                            .catch(() => {});
+                    }
+                });
+            }
+
+            groupCallPairCleanup[otherUid] = () => {
+                off(candidatesRef); off(offerRef); off(answerRef);
+            };
+
+            const p = groupCallParticipants[otherUid] || {};
+            updateGroupCallTileMute(otherUid, !!p.muted);
+        }
+
+        function teardownGroupCallPeer(uid) {
+            if (groupCallPairCleanup[uid]) { try { groupCallPairCleanup[uid](); } catch (e) {} delete groupCallPairCleanup[uid]; }
+            if (groupCallPCs[uid]) { try { groupCallPCs[uid].close(); } catch (e) {} delete groupCallPCs[uid]; }
+            if (groupCallRemoteAudios[uid]) { groupCallRemoteAudios[uid].srcObject = null; groupCallRemoteAudios[uid].remove(); delete groupCallRemoteAudios[uid]; }
+            delete groupCallParticipants[uid];
+            renderGroupCallGrid();
+        }
+
+        function renderGroupCallGrid() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const grid = document.getElementById('gc-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const myProfile = cachedUsers[user.uid] || {};
+            grid.appendChild(buildGroupCallTile('You', myProfile.photoURL || '', groupCallIsMuted, null));
+
+            Object.keys(groupCallParticipants).forEach(uid => {
+                const p = groupCallParticipants[uid];
+                grid.appendChild(buildGroupCallTile(p.name || 'Member', p.avatar || '', !!p.muted, uid));
+            });
+
+            const total = 1 + Object.keys(groupCallParticipants).length;
+            document.getElementById('gc-participant-count').textContent = total === 1 ? '1 in call' : `${total} in call`;
+        }
+
+        function buildGroupCallTile(name, avatar, muted, uid) {
+            const tile = document.createElement('div');
+            tile.className = 'gc-tile' + (muted ? ' muted' : '');
+            if (uid) tile.dataset.uid = uid;
+            const avatarWrap = document.createElement('div');
+            avatarWrap.className = 'gc-tile-avatar-wrap';
+            const avatarEl = document.createElement('div');
+            avatarEl.className = 'gc-tile-avatar';
+            if (avatar) avatarEl.style.backgroundImage = `url('${avatar}')`;
+            else avatarEl.textContent = name ? name.charAt(0).toUpperCase() : '?';
+            const badge = document.createElement('div');
+            badge.className = 'gc-tile-mute-badge';
+            badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 5.83 1.06"></path><path d="M19 10v2a7 7 0 0 1-1.16 3.88"></path><path d="M5 10v2a7 7 0 0 0 7 7c.79 0 1.55-.13 2.25-.38"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line><line x1="2" y1="2" x2="22" y2="22"></line></svg>';
+            avatarWrap.appendChild(avatarEl);
+            avatarWrap.appendChild(badge);
+            const nameEl = document.createElement('div');
+            nameEl.className = 'gc-tile-name';
+            nameEl.textContent = name;
+            tile.appendChild(avatarWrap);
+            tile.appendChild(nameEl);
+            return tile;
+        }
+
+        function updateGroupCallTileMute(uid, muted) {
+            const tile = document.querySelector(`.gc-tile[data-uid="${uid}"]`);
+            if (tile) tile.classList.toggle('muted', muted);
+        }
+
+        async function leaveGroupCall() {
+            const user = auth.currentUser;
+            if (!groupCallId) return;
+            const groupId = groupCallId;
+
+            if (user) { try { await remove(ref(database, `group_calls/${groupId}/participants/${user.uid}`)); } catch (e) {} }
+            if (groupCallParticipantsUnsub) { off(ref(database, `group_calls/${groupId}/participants`)); groupCallParticipantsUnsub = null; }
+
+            Object.keys(groupCallPCs).forEach(uid => teardownGroupCallPeer(uid));
+            if (groupCallLocalStream) { groupCallLocalStream.getTracks().forEach(t => t.stop()); groupCallLocalStream = null; }
+            if (groupCallTimerInterval) { clearInterval(groupCallTimerInterval); groupCallTimerInterval = null; }
+
+            document.getElementById('group-call-overlay').classList.remove('active');
+            document.getElementById('gc-timer').style.display = 'none';
+            document.getElementById('gc-grid').innerHTML = '';
+
+            groupCallId = null;
+            groupCallConnectedAt = null;
+            groupCallParticipants = {};
+            groupCallIsMuted = false;
+            groupCallIsSpeaker = false;
+
+            // If I was the last one in the call, close it out for everyone: mark it over and
+            // drop a system message with the total time the call ran.
+            get(ref(database, `group_calls/${groupId}/participants`)).then((snap) => {
+                if (snap.exists() && Object.keys(snap.val()).length > 0) return;
+                get(ref(database, `group_calls/${groupId}/meta`)).then((metaSnap) => {
+                    const meta = metaSnap.val();
+                    const totalDuration = meta && meta.startedAt ? Math.floor((Date.now() - meta.startedAt) / 1000) : 0;
+                    remove(ref(database, `group_calls/${groupId}`)).catch(() => {});
+                    logGroupCallMessage(groupId, 'ended', totalDuration);
+                }).catch(() => {});
+            }).catch(() => {});
+        }
+
+        async function logGroupCallMessage(groupId, kind, durationSec) {
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                const group = cachedGroups[groupId] || {};
+                const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
+                const newMsgKey = push(ref(database, `group_threads/${groupId}/messages`)).key;
+                const msgPayload = { senderUid: user.uid, senderName, createdAt: Date.now(), mediaType: 'group_call', callStatus: kind, callDuration: durationSec || 0 };
+                const previewText = kind === 'started' ? '📞 Voice call started' : `📞 Voice call ended · ${formatVoiceTime(durationSec || 0)}`;
+
+                const updates = {};
+                updates[`group_threads/${groupId}/messages/${newMsgKey}`] = msgPayload;
+                const memberIds = group.members ? Object.keys(group.members) : [];
+                memberIds.forEach(memberUid => {
+                    if (memberUid === user.uid) {
+                        updates[`user_group_chats/${memberUid}/${groupId}`] = {
+                            groupName: group.name || 'Group', groupPhotoURL: group.photoURL || '',
+                            text: previewText, senderUid: user.uid, senderName, timestamp: msgPayload.createdAt, unreadCount: 0
+                        };
+                    } else {
+                        updates[`user_group_chats/${memberUid}/${groupId}/groupName`] = group.name || 'Group';
+                        updates[`user_group_chats/${memberUid}/${groupId}/groupPhotoURL`] = group.photoURL || '';
+                        updates[`user_group_chats/${memberUid}/${groupId}/text`] = previewText;
+                        updates[`user_group_chats/${memberUid}/${groupId}/senderUid`] = user.uid;
+                        updates[`user_group_chats/${memberUid}/${groupId}/senderName`] = senderName;
+                        updates[`user_group_chats/${memberUid}/${groupId}/timestamp`] = msgPayload.createdAt;
+                        updates[`user_group_chats/${memberUid}/${groupId}/unreadCount`] = increment(1);
+                    }
+                });
+                await update(ref(database), updates);
+            } catch (e) {}
+        }
+
+        document.getElementById('btn-group-call-voice').addEventListener('click', () => {
+            if (!activeGroupId) return;
+            startOrJoinGroupCall(activeGroupId);
+        });
+        document.getElementById('group-call-active-banner').addEventListener('click', () => {
+            if (groupCallBannerGroupId) startOrJoinGroupCall(groupCallBannerGroupId);
+        });
+        document.getElementById('btn-gc-leave').addEventListener('click', () => leaveGroupCall());
+        document.getElementById('btn-gc-mute').addEventListener('click', () => {
+            if (!groupCallLocalStream || !groupCallId) return;
+            groupCallIsMuted = !groupCallIsMuted;
+            groupCallLocalStream.getAudioTracks().forEach(t => t.enabled = !groupCallIsMuted);
+            document.getElementById('btn-gc-mute').classList.toggle('on', groupCallIsMuted);
+            const user = auth.currentUser;
+            if (user) update(ref(database, `group_calls/${groupCallId}/participants/${user.uid}`), { muted: groupCallIsMuted }).catch(() => {});
+            renderGroupCallGrid();
+        });
+        document.getElementById('btn-gc-speaker').addEventListener('click', async () => {
+            groupCallIsSpeaker = !groupCallIsSpeaker;
+            document.getElementById('btn-gc-speaker').classList.toggle('on', groupCallIsSpeaker);
+            const sinkId = groupCallIsSpeaker ? 'default' : '';
+            for (const uid in groupCallRemoteAudios) {
+                const audioEl = groupCallRemoteAudios[uid];
+                if (audioEl && typeof audioEl.setSinkId === 'function') { try { await audioEl.setSinkId(sinkId); } catch (e) {} }
             }
         });
 
@@ -12439,6 +12850,8 @@
             const isAIChat = otherUid === AI_UID;
             document.getElementById('btn-user-info').style.display = isAIChat ? 'none' : 'block';
             document.getElementById('btn-call-voice').style.display = isAIChat ? 'none' : 'flex';
+            document.getElementById('btn-group-call-voice').style.display = 'none';
+            unwatchGroupCallBanner();
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-mic-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-sticker-btn').style.display = isAIChat ? 'none' : 'flex';
@@ -12876,6 +13289,7 @@
         document.getElementById('chat-view-back').addEventListener('click', (e) => {
             e.preventDefault();
             activeGroupId = null;
+            unwatchGroupCallBanner();
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             history.back();

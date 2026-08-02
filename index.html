@@ -348,7 +348,7 @@
         .mention-suggestion-name { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); }
         .mention-suggestion-username { display: block; font-size: 11.5px; color: var(--text-secondary); }
 
-        #feed-posts-container { padding: 0; }
+        #feed-posts-container { padding: 0; margin: 0 -14px; }
         #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: block; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
         #feed-new-posts-pill:active { transform: scale(0.97); }
         .feed-post-card { display: flex; gap: 12px; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
@@ -3117,7 +3117,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -5906,7 +5906,8 @@
         }
 
         // Counts a post "impression" (view) once it's been meaningfully on-screen, X-style:
-        // not on every scroll pass, once per post per session, and not for the author's own posts.
+        // not on every scroll pass, and only once ever per user (persisted server-side via
+        // post_views/{postId}/{uid}) — not once per session/reload — and not for the author's own posts.
         let feedImpressionObserver = null;
         const impressedPostIds = new Set();
         function getFeedImpressionObserver() {
@@ -5921,10 +5922,10 @@
                         card.__impressionTimer = setTimeout(() => {
                             card.__impressionTimer = null;
                             if (impressedPostIds.has(postId)) return;
-                            impressedPostIds.add(postId);
+                            impressedPostIds.add(postId); // avoid re-firing the transaction from this client again this session
                             const user = auth.currentUser;
                             if (!user || card.dataset.uid === user.uid) return;
-                            update(ref(database, `posts/${postId}`), { impressionCount: increment(1) }).catch(() => {});
+                            registerPostImpression(postId, user.uid);
                         }, 1000);
                     } else if (card.__impressionTimer) {
                         clearTimeout(card.__impressionTimer);
@@ -5933,6 +5934,21 @@
                 });
             }, { threshold: 0.5 });
             return feedImpressionObserver;
+        }
+
+        // Marks postId as viewed by uid in a separate post_views/{postId}/{uid} path (kept out of
+        // the post node itself so feed reads don't balloon as view counts grow), using a transaction
+        // so a race (e.g. two tabs) can't double-count. Only increments impressionCount the first
+        // time this transaction actually sets the flag for this user.
+        function registerPostImpression(postId, uid) {
+            runTransaction(ref(database, `post_views/${postId}/${uid}`), (current) => {
+                if (current === true) return; // already viewed by this user — abort, no write
+                return true;
+            }).then((result) => {
+                if (result.committed) {
+                    update(ref(database, `posts/${postId}`), { impressionCount: increment(1) }).catch(() => {});
+                }
+            }).catch(() => {});
         }
 
         // Pauses feed media (video, or a post's background music) whenever it scrolls out of the

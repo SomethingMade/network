@@ -351,9 +351,10 @@
         #feed-posts-container { padding: 0; margin: 0 -14px; }
         #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: block; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
         #feed-new-posts-pill:active { transform: scale(0.97); }
-        .feed-post-card { display: flex; gap: 12px; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
+        .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
         .feed-post-card:hover { background: var(--bg-hover); }
-        .x-post-avatar-col { flex-shrink: 0; position: relative; z-index: 2; }
+        .x-post-row { display: flex; gap: 12px; }
+        .x-post-avatar-col { flex-shrink: 0; }
         .x-post-avatar-col .avatar { width: 48px; height: 48px; background-color: var(--primary-blue); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 17px; }
         .x-post-content-col { flex: 1; min-width: 0; }
         .x-post-headline { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -371,7 +372,7 @@
         .feed-post-edit-cancel { background: var(--bg-alt); color: var(--text-primary); }
         .feed-post-edit-save { background: var(--gradient-brand); color: #fff; }
         .feed-post-text { font-size: 15px; color: var(--text-primary); line-height: 1.35; margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
-        .x-media-grid { display: grid; gap: 2px; margin-top: 10px; overflow: hidden; margin-left: -76px; margin-right: -16px; width: calc(100% + 92px); }
+        .x-media-grid { display: grid; gap: 2px; margin-top: 10px; overflow: hidden; margin-left: -16px; margin-right: -16px; width: calc(100% + 32px); }
         .x-media-grid[data-count="1"] { grid-template-columns: 1fr; }
         .x-media-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
         .x-media-grid[data-count="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
@@ -426,7 +427,7 @@
         .tag-people-item.selected .tag-people-item-check::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
         .feed-composer-music-clear { flex-shrink: 0; opacity: 0.85; font-size: 15px; line-height: 1; padding-left: 2px; }
 
-        .feed-post-video-wrap { position: relative; margin-top: 10px; overflow: hidden; background: #000; margin-left: -76px; margin-right: -16px; width: calc(100% + 92px); }
+        .feed-post-video-wrap { position: relative; margin-top: 10px; overflow: hidden; background: #000; margin-left: -16px; margin-right: -16px; width: calc(100% + 32px); }
         .feed-post-video { width: 100%; max-height: 420px; display: block; background: #000; cursor: pointer; }
         .feed-video-center-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%; background: rgba(0,0,0,0.5); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s ease, transform 0.2s ease; }
         .feed-video-center-btn.hidden { opacity: 0; pointer-events: none; transform: translate(-50%, -50%) scale(0.85); }
@@ -443,7 +444,7 @@
         .feed-video-progress-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); left: 0%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
         .feed-video-time { color: #fff; font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
-        .feed-post-actions { display: flex; align-items: center; justify-content: flex-start; gap: 0; margin-top: 8px; max-width: 420px; }
+        .feed-post-actions { display: flex; align-items: center; justify-content: flex-start; gap: 0; margin-top: 8px; margin-left: 60px; max-width: calc(420px + 60px); }
         .feed-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; padding: 6px 12px 6px 8px; border-radius: var(--radius-pill); transition: background 0.12s ease, color 0.12s ease; }
         .feed-post-action-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
         .feed-comment-btn:hover { color: var(--primary-blue); background: rgba(37, 211, 102, 0.1); }
@@ -6227,36 +6228,38 @@
                 </button>`;
 
             card.innerHTML = `
-                <div class="x-post-avatar-col">
-                    ${avatarHtml}
-                </div>
-                <div class="x-post-content-col">
-                    <div class="x-post-headline">
-                        <span class="name"></span>
-                        <span class="name-badge"></span>
-                        <span class="x-post-dot">·</span>
-                        <span class="time">${formatTime(post.timestamp)}${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
-                        ${menuBtnHtml}
+                <div class="x-post-row">
+                    <div class="x-post-avatar-col">
+                        ${avatarHtml}
                     </div>
-                    <div class="feed-post-body">
-                        ${textHtml}
-                        ${taggedHtml}
-                        ${imageHtml}
-                        ${videoHtml}
-                    </div>
-                    <div class="feed-post-actions">
-                        <button type="button" class="feed-post-action-btn feed-comment-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                            <span class="feed-comment-count">${post.commentCount || 0}</span>
-                        </button>
-                        <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
-                            <span class="feed-like-count">${post.likeCount || 0}</span>
-                        </button>
-                        <div class="feed-post-action-btn feed-post-view-stat" title="Views">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
-                            <span class="feed-view-count">${formatFeedCount(post.impressionCount || 0)}</span>
+                    <div class="x-post-content-col">
+                        <div class="x-post-headline">
+                            <span class="name"></span>
+                            <span class="name-badge"></span>
+                            <span class="x-post-dot">·</span>
+                            <span class="time">${formatTime(post.timestamp)}${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
+                            ${menuBtnHtml}
                         </div>
+                        <div class="feed-post-body">
+                            ${textHtml}
+                            ${taggedHtml}
+                        </div>
+                    </div>
+                </div>
+                ${imageHtml}
+                ${videoHtml}
+                <div class="feed-post-actions">
+                    <button type="button" class="feed-post-action-btn feed-comment-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        <span class="feed-comment-count">${post.commentCount || 0}</span>
+                    </button>
+                    <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
+                        <span class="feed-like-count">${post.likeCount || 0}</span>
+                    </button>
+                    <div class="feed-post-action-btn feed-post-view-stat" title="Views">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                        <span class="feed-view-count">${formatFeedCount(post.impressionCount || 0)}</span>
                     </div>
                 </div>
             `;

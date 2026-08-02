@@ -1035,6 +1035,7 @@
         @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .msg-bubble { max-width: 68%; padding: 10px 16px; border-radius: 18px; font-size: 14px; line-height: 1.4; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; }
         .date-separator { display: flex; justify-content: center; align-self: center; margin: 4px 0 8px; }
+        .chat-favourite-star { vertical-align: middle; margin: 0 3px; position: relative; top: -1px; }
         .date-separator span { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 14px; box-shadow: var(--shadow-bubble); letter-spacing: 0.1px; }
         body.glass-theme .date-separator span { backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%); }
         .msg-bubble.in { align-self: flex-start; background: var(--msg-in-bg); color: var(--msg-in-text); border-bottom-left-radius: 4px; box-shadow: var(--shadow-bubble); }
@@ -2446,6 +2447,7 @@
             <div class="sheet-handle"></div>
             <div class="sheet-title" id="chat-item-options-title" style="margin-bottom: 8px;">Chat Options</div>
             <div class="attach-options" style="flex-direction: column; gap:0; padding:0;">
+                <button class="msg-option-btn" id="btn-chat-item-favourite">Add to Favourites</button>
                 <button class="msg-option-btn" id="btn-chat-item-archive">Archive Chat</button>
                 <button class="msg-option-btn" id="btn-chat-item-delete" style="color: var(--danger-red);">Delete Chat</button>
                 <button class="msg-option-btn" id="btn-chat-item-remove-friend" style="color: var(--danger-red);">Unfollow</button>
@@ -4279,7 +4281,8 @@
                     const items = document.querySelectorAll('#chat-list-container .chat-item');
                     items.forEach(item => {
                         const isUnread = !!item.querySelector('.unread-badge');
-                        const show = filter === 'all' || (filter === 'unread' && isUnread) || filter === 'favourites';
+                        const isFavourite = item.dataset.favourite === 'true';
+                        const show = filter === 'all' || (filter === 'unread' && isUnread) || (filter === 'favourites' && isFavourite);
                         item.style.display = show ? '' : 'none';
                     });
                 });
@@ -10896,6 +10899,7 @@
             item.dataset.uid = uid;
             item.dataset.name = displayName;
             item.dataset.avatar = profile.photoURL;
+            item.dataset.favourite = (metaData && metaData.favourite) ? 'true' : 'false';
             
             const initial = displayName.charAt(0).toUpperCase();
             let avatarHtml = isAI
@@ -10927,10 +10931,14 @@
                 snippetHtml = isSelf ? `<p>That's you</p>` : `<p>In your contacts</p>`;
             }
 
+            const favouriteStarHtml = (isChatPane && metaData && metaData.favourite)
+                ? '<svg class="chat-favourite-star" width="13" height="13" viewBox="0 0 24 24" fill="#F5B300" stroke="#F5B300" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'
+                : '';
+
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-preview">
-                    <h3>${displayName}${verifiedBadgeFor(uid, isAI)}</h3>
+                    <h3>${displayName}${favouriteStarHtml}${verifiedBadgeFor(uid, isAI)}</h3>
                     ${snippetHtml}
                 </div>
                 ${metaHtml}
@@ -13622,6 +13630,10 @@
             contextMenuChatUid = uid;
             document.getElementById('chat-item-options-title').textContent = name || 'Chat Options';
             document.getElementById('btn-chat-item-remove-friend').style.display = (uid === AI_UID) ? 'none' : 'block';
+            const favouriteBtn = document.getElementById('btn-chat-item-favourite');
+            favouriteBtn.style.display = (uid === AI_UID) ? 'none' : 'block';
+            const isFavourite = !!(cachedUserChatsData[uid] && cachedUserChatsData[uid].favourite);
+            favouriteBtn.textContent = isFavourite ? 'Remove from Favourites' : 'Add to Favourites';
             chatItemOptionsSheet.classList.add('active');
         }
 
@@ -13658,6 +13670,21 @@
 
         chatItemOptionsSheet.addEventListener('click', (e) => {
             if (e.target === chatItemOptionsSheet) chatItemOptionsSheet.classList.remove('active');
+        });
+
+        document.getElementById('btn-chat-item-favourite').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            const uid = contextMenuChatUid;
+            chatItemOptionsSheet.classList.remove('active');
+            if (!user || !uid) return;
+
+            const isFavourite = !!(cachedUserChatsData[uid] && cachedUserChatsData[uid].favourite);
+            try {
+                await update(ref(database, `user_chats/${user.uid}/${uid}`), { favourite: !isFavourite });
+                notify(isFavourite ? 'Removed from Favourites' : 'Added to Favourites');
+            } catch (err) {
+                notify('Could not update Favourites', 'error');
+            }
         });
 
         document.getElementById('btn-chat-item-archive').addEventListener('click', async () => {

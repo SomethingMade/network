@@ -5980,10 +5980,29 @@
             if (document.hidden) pauseAllFeedMedia();
         });
 
+        // Feed videos share a single mute preference: unmuting one video unmutes all others
+        // (current and future), and muting one mutes all others — like X/TikTok, rather than
+        // each video remembering its own mute state independently.
+        let feedVideoMuted = true;
+        function applyFeedMuteStateToAllVideoWraps() {
+            document.querySelectorAll('.feed-post-video-wrap').forEach(wrap => {
+                const video = wrap.querySelector('.feed-post-video');
+                if (!video) return;
+                video.muted = feedVideoMuted;
+                const muteBtn = wrap.querySelector('.feed-video-mute-btn');
+                if (!muteBtn) return;
+                const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
+                const iconMuted = muteBtn.querySelector('.icon-muted');
+                if (iconUnmuted) iconUnmuted.style.display = video.muted ? 'none' : 'block';
+                if (iconMuted) iconMuted.style.display = video.muted ? 'block' : 'none';
+            });
+        }
+
         // Wires up a fully custom player (play/pause, seekable progress bar, mute, time) for a
         // single feed video, replacing native browser controls entirely.
         function initFeedVideoPlayer(wrap) {
             const video = wrap.querySelector('.feed-post-video');
+            video.muted = feedVideoMuted;
             const centerBtn = wrap.querySelector('.feed-video-center-btn');
             const playPauseBtn = wrap.querySelector('.feed-video-playpause-btn');
             const iconPlay = playPauseBtn.querySelector('.icon-play');
@@ -6043,9 +6062,10 @@
 
             muteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                video.muted = !video.muted;
-                updateMuteUI();
+                feedVideoMuted = !video.muted;
+                applyFeedMuteStateToAllVideoWraps();
             });
+            updateMuteUI();
 
             let isDragging = false;
             track.addEventListener('click', (e) => { e.stopPropagation(); seekFromClientX(e.clientX); });

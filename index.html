@@ -3618,19 +3618,23 @@
         floatingVideoEl.addEventListener('play', updateFloatingPlayUI);
         floatingVideoEl.addEventListener('pause', updateFloatingPlayUI);
 
-        // Keep the floating pop-up player and every other video in the app mutually exclusive:
-        // starting playback anywhere pauses whichever other video was playing. 'play' doesn't
-        // bubble, so this listens on the capture phase to catch it from any <video> in the app.
+        // Keep the floating pop-up player, every other video, and every post's background music
+        // track mutually exclusive: starting playback anywhere pauses whichever other media was
+        // playing. 'play' doesn't bubble, so this listens on the capture phase to catch it from
+        // any <video>/<audio> in the app.
         document.addEventListener('play', (e) => {
             const el = e.target;
-            if (!(el instanceof HTMLVideoElement)) return;
+            const isFeedMusic = el instanceof HTMLAudioElement && el.classList.contains('feed-post-music-audio');
+            if (!(el instanceof HTMLVideoElement) && !isFeedMusic) return;
             if (el === floatingVideoEl) {
-                // The floating player just started playing — pause every other video.
-                document.querySelectorAll('video').forEach(v => {
+                // The floating player just started playing — pause every other video and any
+                // post's playing background music.
+                document.querySelectorAll('video, .feed-post-music-audio').forEach(v => {
                     if (v !== floatingVideoEl && !v.paused) v.pause();
                 });
             } else if (floatingVideoPlayer.classList.contains('active') && !floatingVideoEl.paused) {
-                // Some other video just started playing while the floating player is active.
+                // Some other video, or a post's music, just started playing while the floating
+                // player is active.
                 floatingVideoEl.pause();
             }
         }, true);

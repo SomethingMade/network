@@ -8102,15 +8102,24 @@
         // read of cachedContacts/cachedBlocked etc. keeps working unchanged). followers/{them}/{me}=true
         // is the reverse index — it's what lets us show "who follows me" cheaply instead of scanning
         // every user's contacts list. The two are always written and removed together.
-        // NOTE: this needs a matching security rule alongside the existing contacts rule, since the
-        // follower write lands under someone else's uid:
+        //
+        // followingCount/followersCount on users/{uid} are bumped directly here (via increment())
+        // rather than relying only on the contacts/followers onValue listeners further down, which
+        // only recompute a user's own counts while THEIR OWN client is running. Without this direct
+        // bump, following someone who isn't currently active would leave their followersCount stuck
+        // until they next open the app. The listener-based recompute is kept too, as a self-healing
+        // correction whenever the owner's own client is active — belt and suspenders.
+        // NOTE: needs matching security rules:
         //   followers/$targetUid/$followerUid { ".write": "auth.uid === $followerUid" }
+        //   users/$uid/followersCount { ".write": "auth != null" }  (written by OTHER users on follow/unfollow)
         async function followUser(targetUid) {
             const user = auth.currentUser;
             if (!user || !targetUid || targetUid === user.uid) return;
             const updates = {};
             updates[`contacts/${user.uid}/${targetUid}`] = true;
             updates[`followers/${targetUid}/${user.uid}`] = true;
+            updates[`users/${user.uid}/followingCount`] = increment(1);
+            updates[`users/${targetUid}/followersCount`] = increment(1);
             await update(ref(database), updates);
         }
 
@@ -8120,6 +8129,8 @@
             const updates = {};
             updates[`contacts/${user.uid}/${targetUid}`] = null;
             updates[`followers/${targetUid}/${user.uid}`] = null;
+            updates[`users/${user.uid}/followingCount`] = increment(-1);
+            updates[`users/${targetUid}/followersCount`] = increment(-1);
             await update(ref(database), updates);
         }
 
@@ -8879,6 +8890,11 @@
                     notify("You're now following them!");
                 }
                 updateUserInfoFollowButton(uid);
+                const followersCountEl = document.getElementById('user-info-followers-count');
+                if (followersCountEl) {
+                    const current = parseInt(followersCountEl.textContent, 10) || 0;
+                    followersCountEl.textContent = Math.max(0, current + (wasFollowing ? -1 : 1));
+                }
             } catch (err) {
                 notify(wasFollowing ? 'Could not unfollow this person' : 'Could not follow this person', 'error');
             } finally {

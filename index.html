@@ -437,6 +437,44 @@
         .feed-video-expand-btn { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
         .feed-video-expand-btn:hover { background: rgba(0,0,0,0.75); }
         .feed-video-expand-btn svg { width: 15px; height: 15px; }
+        .feed-video-popout-btn { position: absolute; top: 8px; right: 46px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
+        .feed-video-popout-btn:hover { background: rgba(0,0,0,0.75); }
+        .feed-video-popout-btn svg { width: 14px; height: 14px; }
+
+        /* ── FLOATING / POP-OUT MINI VIDEO PLAYER ── */
+        /* Lives outside every tab pane so it keeps playing on top of the app no matter which
+           tab (Chats/Discover/Groups/Contacts) or chat the user navigates to. Draggable. */
+        .floating-video-player {
+            position: fixed;
+            width: 200px;
+            aspect-ratio: 16 / 9;
+            bottom: 90px;
+            right: 16px;
+            background: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+            z-index: 100007;
+            display: none;
+            touch-action: none;
+            user-select: none;
+        }
+        .floating-video-player.active { display: block; }
+        .floating-video-player.dragging { transition: none; }
+        .floating-video-drag-handle { position: absolute; inset: 0; cursor: grab; }
+        .floating-video-player.dragging .floating-video-drag-handle { cursor: grabbing; }
+        .floating-video-player video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; background: #000; }
+        .floating-video-top-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px; background: linear-gradient(180deg, rgba(0,0,0,0.55), transparent); opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+        .floating-video-player:hover .floating-video-top-bar, .floating-video-player.show-controls .floating-video-top-bar { opacity: 1; pointer-events: auto; }
+        .floating-video-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; }
+        .floating-video-btn svg { width: 12px; height: 12px; }
+        .floating-video-center-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s ease; }
+        .floating-video-player:hover .floating-video-center-play, .floating-video-player.show-controls .floating-video-center-play { opacity: 1; }
+        .floating-video-center-play.hidden { display: none; }
+        .floating-video-center-play svg { width: 16px; height: 16px; margin-left: 1px; }
+        .floating-video-mute-bar { position: absolute; bottom: 6px; left: 6px; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+        .floating-video-player:hover .floating-video-mute-bar, .floating-video-player.show-controls .floating-video-mute-bar { opacity: 1; pointer-events: auto; }
+        @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(78px + env(safe-area-inset-bottom) + 14px); right: 12px; } }
         .feed-video-controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: linear-gradient(transparent, rgba(0,0,0,0.68)); }
         .feed-video-playpause-btn, .feed-video-mute-btn { background: none; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px; flex-shrink: 0; }
         .feed-video-playpause-btn svg, .feed-video-mute-btn svg { width: 18px; height: 18px; }
@@ -3040,10 +3078,35 @@
     </div>
 
     <div id="video-viewer-overlay">
+        <svg class="image-viewer-save" id="video-viewer-popout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="right: 116px;" title="Play floating"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="11" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"></rect></svg>
         <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         <video id="video-viewer-vid" src="" controls playsinline preload="metadata"></video>
         <audio id="video-viewer-music-audio" preload="none" loop style="display:none;"></audio>
+    </div>
+
+    <div id="floating-video-player" class="floating-video-player">
+        <div class="floating-video-drag-handle" id="floating-video-drag-handle">
+            <video id="floating-video-el" playsinline loop muted></video>
+        </div>
+        <button type="button" class="floating-video-center-play" id="floating-video-center-play" aria-label="Play/Pause">
+            <svg class="fv-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+            <svg class="fv-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>
+        </button>
+        <div class="floating-video-top-bar">
+            <button type="button" class="floating-video-btn" id="floating-video-expand-btn" aria-label="Expand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+            </button>
+            <button type="button" class="floating-video-btn" id="floating-video-close-btn" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="floating-video-mute-bar">
+            <button type="button" class="floating-video-btn" id="floating-video-mute-btn" aria-label="Mute/Unmute">
+                <svg class="fv-icon-unmuted" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"></path></svg>
+                <svg class="fv-icon-muted" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12l3-3-1-1-3 3-3-3-1 1 3 3-3 3 1 1 3-3 3 3 1-1z"></path></svg>
+            </button>
+        </div>
     </div>
 
     <div id="status-viewer-overlay">
@@ -3490,9 +3553,157 @@
             e.stopPropagation();
             if (currentViewerVideoUrl) downloadMediaFile(currentViewerVideoUrl, 'video');
         });
+        document.getElementById('video-viewer-popout').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vid = document.getElementById('video-viewer-vid');
+            const musicAudio = document.getElementById('video-viewer-music-audio');
+            if (!currentViewerVideoUrl) return;
+            const startTime = vid.currentTime;
+            const musicUrl = musicAudio.src || null;
+            openFloatingVideoPlayer(currentViewerVideoUrl, { musicUrl, startTime });
+            history.back();
+        });
         document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'video-viewer-overlay') history.back();
         });
+
+        // ── FLOATING / POP-OUT MINI VIDEO PLAYER ──
+        // Lives outside every tab pane (see markup near #status-viewer-overlay), so it keeps
+        // playing on top of the app regardless of which tab or chat the user navigates to.
+        // Only one video can float at a time — popping out a new one replaces the current one.
+        const floatingVideoPlayer = document.getElementById('floating-video-player');
+        const floatingVideoEl = document.getElementById('floating-video-el');
+        let floatingVideoState = { videoUrl: null, musicUrl: null, sourceVideo: null };
+
+        function openFloatingVideoPlayer(videoUrl, opts) {
+            opts = opts || {};
+            if (!videoUrl) return;
+            // Pause whichever feed/native video this was popped out from, so it doesn't
+            // keep playing silently behind the floating one.
+            if (opts.sourceVideo && !opts.sourceVideo.paused) opts.sourceVideo.pause();
+            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
+
+            floatingVideoState = { videoUrl, musicUrl: opts.musicUrl || null, sourceVideo: opts.sourceVideo || null };
+            floatingVideoEl.src = videoUrl;
+            floatingVideoEl.muted = feedVideoMuted;
+            floatingVideoEl.currentTime = opts.startTime || 0;
+            floatingVideoEl.play().catch(() => {});
+            updateFloatingMuteUI();
+            floatingVideoPlayer.classList.add('active');
+            // Reset to the default bottom-right position each time it's (re)opened.
+            floatingVideoPlayer.style.left = '';
+            floatingVideoPlayer.style.top = '';
+            floatingVideoPlayer.style.right = '';
+            floatingVideoPlayer.style.bottom = '';
+        }
+
+        function closeFloatingVideoPlayer() {
+            floatingVideoEl.pause();
+            floatingVideoEl.removeAttribute('src');
+            floatingVideoEl.load();
+            floatingVideoPlayer.classList.remove('active');
+            floatingVideoState = { videoUrl: null, musicUrl: null, sourceVideo: null };
+        }
+
+        function updateFloatingPlayUI() {
+            const paused = floatingVideoEl.paused;
+            floatingVideoPlayer.querySelector('.fv-icon-play').style.display = paused ? 'block' : 'none';
+            floatingVideoPlayer.querySelector('.fv-icon-pause').style.display = paused ? 'none' : 'block';
+        }
+        function updateFloatingMuteUI() {
+            const muted = floatingVideoEl.muted;
+            floatingVideoPlayer.querySelector('.fv-icon-unmuted').style.display = muted ? 'none' : 'block';
+            floatingVideoPlayer.querySelector('.fv-icon-muted').style.display = muted ? 'block' : 'none';
+        }
+        floatingVideoEl.addEventListener('play', updateFloatingPlayUI);
+        floatingVideoEl.addEventListener('pause', updateFloatingPlayUI);
+
+        document.getElementById('floating-video-center-play').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (floatingVideoEl.paused) floatingVideoEl.play().catch(() => {}); else floatingVideoEl.pause();
+        });
+        document.getElementById('floating-video-mute-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            floatingVideoEl.muted = !floatingVideoEl.muted;
+            feedVideoMuted = floatingVideoEl.muted;
+            applyFeedMuteStateToAllVideoWraps();
+            updateFloatingMuteUI();
+        });
+        document.getElementById('floating-video-close-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeFloatingVideoPlayer();
+        });
+        document.getElementById('floating-video-expand-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const { videoUrl, musicUrl } = floatingVideoState;
+            const startTime = floatingVideoEl.currentTime;
+            closeFloatingVideoPlayer();
+            if (videoUrl) {
+                openVideoViewer(videoUrl, true, musicUrl);
+                const fullVid = document.getElementById('video-viewer-vid');
+                fullVid.currentTime = startTime;
+            }
+        });
+
+        // Drag-to-move, constrained to stay fully within the viewport. Works with mouse and touch.
+        (() => {
+            const handle = document.getElementById('floating-video-drag-handle');
+            let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+            function pointFromEvent(e) {
+                return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+            }
+            function onDragStart(e) {
+                const p = pointFromEvent(e);
+                const rect = floatingVideoPlayer.getBoundingClientRect();
+                dragging = true; moved = false;
+                startX = p.x; startY = p.y; startLeft = rect.left; startTop = rect.top;
+                floatingVideoPlayer.classList.add('dragging', 'show-controls');
+            }
+            function onDragMove(e) {
+                if (!dragging) return;
+                const p = pointFromEvent(e);
+                const dx = p.x - startX, dy = p.y - startY;
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+                const rect = floatingVideoPlayer.getBoundingClientRect();
+                let left = startLeft + dx, top = startTop + dy;
+                left = Math.min(Math.max(0, left), window.innerWidth - rect.width);
+                top = Math.min(Math.max(0, top), window.innerHeight - rect.height);
+                floatingVideoPlayer.style.left = left + 'px';
+                floatingVideoPlayer.style.top = top + 'px';
+                floatingVideoPlayer.style.right = 'auto';
+                floatingVideoPlayer.style.bottom = 'auto';
+                if (e.cancelable) e.preventDefault();
+            }
+            function onDragEnd() {
+                if (!dragging) return;
+                dragging = false;
+                floatingVideoPlayer.classList.remove('dragging');
+                setTimeout(() => floatingVideoPlayer.classList.remove('show-controls'), 1500);
+                if (!moved) {
+                    // Treat as a tap: toggle play/pause.
+                    if (floatingVideoEl.paused) floatingVideoEl.play().catch(() => {}); else floatingVideoEl.pause();
+                }
+            }
+            handle.addEventListener('mousedown', onDragStart);
+            window.addEventListener('mousemove', onDragMove);
+            window.addEventListener('mouseup', onDragEnd);
+            handle.addEventListener('touchstart', onDragStart, { passive: true });
+            window.addEventListener('touchmove', onDragMove, { passive: false });
+            window.addEventListener('touchend', onDragEnd);
+
+            // Keep it fully on-screen if the window/viewport is resized (e.g. orientation change).
+            window.addEventListener('resize', () => {
+                if (!floatingVideoPlayer.classList.contains('active')) return;
+                const rect = floatingVideoPlayer.getBoundingClientRect();
+                if (floatingVideoPlayer.style.left) {
+                    const left = Math.min(Math.max(0, rect.left), window.innerWidth - rect.width);
+                    const top = Math.min(Math.max(0, rect.top), window.innerHeight - rect.height);
+                    floatingVideoPlayer.style.left = left + 'px';
+                    floatingVideoPlayer.style.top = top + 'px';
+                }
+            });
+        })();
 
         // Best-effort "screenshot deterrent": blur protected view-once content the instant the
         // tab/window loses focus (app switch, alt-tab, screenshot tools that switch focus, screen
@@ -6275,6 +6486,9 @@
                     <button type="button" class="feed-video-expand-btn" aria-label="Expand">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
                     </button>
+                    <button type="button" class="feed-video-popout-btn" aria-label="Play floating">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="11" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"></rect></svg>
+                    </button>
                     <div class="feed-video-controls">
                         <button type="button" class="feed-video-playpause-btn" aria-label="Play/Pause">
                             <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
@@ -6386,6 +6600,16 @@
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();
                 openVideoViewer(post.videoUrl, true, post.music ? post.music.previewUrl : null);
+            });
+            const popoutBtn = card.querySelector('.feed-video-popout-btn');
+            if (popoutBtn) popoutBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const video = videoWrap.querySelector('.feed-post-video');
+                openFloatingVideoPlayer(post.videoUrl, {
+                    musicUrl: post.music ? post.music.previewUrl : null,
+                    sourceVideo: video,
+                    startTime: video ? video.currentTime : 0
+                });
             });
             initFeedPostMusic(card);
 

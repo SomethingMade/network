@@ -6032,9 +6032,34 @@
                 if (post.videoUrl || (oldPost && oldPost.videoUrl)) renderStatusGridIfActive();
             });
 
-            onChildRemoved(postsQuery, (snap) => {
+            onChildRemoved(postsQuery, async (snap) => {
                 const postId = snap.key;
                 const removedPost = cachedPosts[postId];
+
+                // `postsQuery` is a live limitToLast(FEED_PAGE_SIZE) window, not a one-time
+                // fetch — Firebase fires child_removed both when a post is genuinely deleted
+                // AND whenever a newer post pushes an older one out of the top-N window, even
+                // though that post is still very much alive in the database. Those two cases
+                // look identical in this event, so we have to check the DB before trusting it:
+                // treating every child_removed as a real delete was silently stripping perfectly
+                // good posts (including ones already scrolled to via loadOlderPosts) out of the
+                // feed the moment anyone else posted something new.
+                try {
+                    const stillExistsSnap = await get(ref(database, `posts/${postId}`));
+                    if (stillExistsSnap.exists()) {
+                        // Just fell out of the live window — keep the card, stop tracking it
+                        // as "live" so future child_changed/child_removed for the *next* post
+                        // that falls out don't get confused by stale cachedPosts state.
+                        delete cachedPosts[postId];
+                        return;
+                    }
+                } catch (e) {
+                    // If the existence check itself fails, don't risk removing a post that
+                    // might still exist — leave it in place.
+                    console.warn('Post existence check failed for', postId, e);
+                    return;
+                }
+
                 delete cachedPosts[postId];
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;

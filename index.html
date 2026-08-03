@@ -4287,7 +4287,7 @@
             filterListItems(groupSearchInput, 'discover-pages-list-container');
         });
 
-        window.addEventListener('hashchange', () => {
+        function handleHashChange() {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
             
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
@@ -4371,7 +4371,8 @@
 
                 updateNavIndicator();
             }
-        });
+        }
+        window.addEventListener('hashchange', handleHashChange);
 
         // --- SLIDING NAV INDICATOR ---
         function updateNavIndicator() {
@@ -11155,6 +11156,14 @@
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
                 updateAvatarUI(user);
+                // Sync the tab UI to whatever hash is currently in the URL. This matters on
+                // refresh/reload: the hash can already equal a non-default tab (e.g. #tab-chats)
+                // left over from before the reload, but nothing else runs the sync logic unless
+                // a real hashchange event fires. Without this call, clicking a nav item whose
+                // tab already matches the (invisible, unsynced) current hash is a same-value
+                // hash assignment, which browsers do NOT fire hashchange for — so the tap does
+                // nothing until the user first taps a *different* tab to force a real change.
+                handleHashChange();
                 requestAnimationFrame(updateNavIndicator);
                 initE2EForThisDevice().catch(() => {});
 

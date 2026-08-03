@@ -4149,6 +4149,7 @@
             const viewOnceAudioActive = document.getElementById('view-once-audio-overlay').classList.contains('active');
             const statusViewerActive = document.getElementById('status-viewer-overlay').classList.contains('active');
             const statusUploadActive = document.getElementById('status-upload-overlay').classList.contains('active');
+            const userInfoActive = document.getElementById('user-info-sheet-overlay').classList.contains('active');
 
             if (hash !== 'image-viewer' && imageViewerActive) {
                 closeImageViewer();
@@ -4165,10 +4166,14 @@
             if (hash !== 'status-upload' && statusUploadActive) {
                 closeStatusUploadOverlay();
             }
+            if (hash !== 'user-info' && userInfoActive) {
+                closeUserInfoSheet();
+            }
 
-            // The image/video/audio viewers open on top of chat/story (not a real navigation away from
-            // them), so landing on those hashes should never trigger the chat/story close logic below.
-            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio' || hash === 'status-viewer' || hash === 'status-upload');
+            // The image/video/audio viewers (and the profile sheet) open on top of chat/story (not a
+            // real navigation away from them), so landing on those hashes should never trigger the
+            // chat/story close logic below.
+            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio' || hash === 'status-viewer' || hash === 'status-upload' || hash === 'user-info');
 
             if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -8932,6 +8937,11 @@
                 updateUserInfoFollowButton(uid);
             }
             userInfoSheet.classList.add('active');
+            if (window.location.hash !== '#user-info') window.location.hash = 'user-info';
+        }
+
+        function closeUserInfoSheet() {
+            userInfoSheet.classList.remove('active');
         }
 
         // Reflects whether I currently follow `uid` onto the profile sheet's toggle button.
@@ -9005,10 +9015,10 @@
         });
         document.querySelector('.chat-view-info').style.cursor = 'pointer';
         userInfoSheet.addEventListener('click', (e) => {
-            if (e.target === userInfoSheet) userInfoSheet.classList.remove('active');
+            if (e.target === userInfoSheet) history.back();
         });
         document.getElementById('btn-close-user-info').addEventListener('click', () => {
-            userInfoSheet.classList.remove('active');
+            history.back();
         });
 
         groupAvatarUpload.addEventListener('click', (e) => {

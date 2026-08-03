@@ -279,7 +279,7 @@
         .modal-actions button { flex: 1; }
 
         /* ── BOTTOM SHEET (Profile & Context Menus) ── */
-        .bottom-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: flex-end; justify-content: center; }
+        .bottom-sheet-overlay { position: fixed; inset: 0; bottom: var(--keyboard-inset, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s, bottom 0.15s ease; display: flex; align-items: flex-end; justify-content: center; }
         #story-views-sheet-overlay { z-index: 100010; }
         #story-options-sheet-overlay { z-index: 100010; }
         #force-update-overlay { z-index: 999999; }
@@ -287,7 +287,7 @@
         #force-update-overlay .force-update-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: white; }
         #force-update-overlay .force-update-icon svg { width: 30px; height: 30px; }
         .bottom-sheet-overlay.active { opacity: 1; visibility: visible; }
-        .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: 85vh; overflow-y: auto; color: var(--text-primary); }
+        .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: min(85vh, 100%); overflow-y: auto; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
 
         /* --- FEED --- */
@@ -3102,7 +3102,7 @@
     </div>
 
     <div id="story-music-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="max-height: 80vh; display: flex; flex-direction: column; padding-bottom: 12px;">
+        <div class="bottom-sheet" style="max-height: min(80vh, 100%); display: flex; flex-direction: column; padding-bottom: 12px;">
             <div class="sheet-handle"></div>
             <div class="sheet-title" id="music-picker-sheet-title">Add music to your story</div>
             <div style="position:relative;">
@@ -4547,6 +4547,21 @@
 
         const auth = getAuth(app);
         const database = getDatabase(app);
+
+        // Mobile keyboards resize the visual viewport without resizing the layout viewport (especially
+        // on Android Chrome), so fixed-position bottom sheets can end up pinned below the keyboard until
+        // some other event forces a reflow. Track the keyboard's height here and feed it back as a CSS
+        // var so `.bottom-sheet-overlay` (and anything similar) can shrink to sit above the keyboard.
+        if (window.visualViewport) {
+            const syncKeyboardInset = () => {
+                const vv = window.visualViewport;
+                const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                document.documentElement.style.setProperty('--keyboard-inset', inset + 'px');
+            };
+            window.visualViewport.addEventListener('resize', syncKeyboardInset);
+            window.visualViewport.addEventListener('scroll', syncKeyboardInset);
+            syncKeyboardInset();
+        }
         const firestoreDb = getFirestore(app);
         const storage = getStorage(app);
 

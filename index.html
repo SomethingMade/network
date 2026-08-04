@@ -4369,9 +4369,18 @@
                 if (fabAddFriend) fabAddFriend.style.display = (hash === 'tab-contacts') ? 'flex' : 'none';
 
                 const fabNewPost = document.getElementById('fab-new-post');
-                if (fabNewPost) fabNewPost.style.display = (hash === 'tab-status') ? 'flex' : 'none';
+                if (fabNewPost) {
+                    fabNewPost.style.display = (hash === 'tab-status') ? 'flex' : 'none';
+                    fabNewPost.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
+                }
 
-                if (hash === 'tab-status') renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
+                if (hash === 'tab-status') {
+                    renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
+                    // Land at the top of the feed — browsers can otherwise restore a mid-scroll
+                    // position on refresh, which also confuses the FAB's scroll-direction tracking.
+                    const discoverScroll = document.getElementById('discover-grid-scroll');
+                    if (discoverScroll) discoverScroll.scrollTop = 0;
+                }
 
                 updateNavIndicator();
             }
@@ -4408,7 +4417,7 @@
             }
             const fabNewPost = document.getElementById('fab-new-post');
             if (fabNewPost) {
-                const currentHash = window.location.hash.replace('#', '');
+                const currentHash = window.location.hash.replace('#', '') || 'tab-status';
                 fabNewPost.style.display = (currentHash === 'tab-status') ? 'flex' : 'none';
             }
             requestAnimationFrame(updateNavIndicator);
@@ -8616,7 +8625,7 @@
             const scrollEl = document.getElementById('discover-grid-scroll');
             const fab = document.getElementById('fab-new-post');
             if (!scrollEl || !fab) return;
-            let lastScrollTop = 0;
+            let lastScrollTop = scrollEl.scrollTop; // match actual position, not an assumed 0
             const THRESHOLD = 6; // ignore tiny scroll jitter
             scrollEl.addEventListener('scroll', () => {
                 const current = scrollEl.scrollTop;

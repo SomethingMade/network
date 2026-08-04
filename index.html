@@ -6036,7 +6036,7 @@
             });
         }
 
-        function initFeedListeners() {
+        async function initFeedListeners() {
             const user = auth.currentUser;
             if (!user) return;
             if (feedListenersAttached) return;
@@ -6058,16 +6058,45 @@
             // as we attach, then again for genuinely new posts as they're created. We want the
             // former to render immediately (that's the normal first load) but not the latter —
             // per-viewer feeds shouldn't jump or re-sort on their own while someone's reading.
-            // A short window after attaching covers that initial burst.
-            let inInitialBurst = true;
+            //
+            // This used to be decided with a fixed 800ms timer: anything arriving after the
+            // timer fired was treated as "new". On a slow connection the entire first page
+            // could arrive after that window closed, so every post in it got queued behind the
+            // "New posts" pill instead of rendering — the feed looked empty until you tapped it.
+            // Instead, fetch the initial page's post IDs up front with a one-time read, and use
+            // that known set (not a clock) to decide what counts as "initial" — no race, no
+            // dependence on how fast the network happens to be.
+            let initialPostIds = new Set();
             feedInitialBurstActive = true;
-            setTimeout(() => { inInitialBurst = false; feedInitialBurstActive = false; }, 800);
+            try {
+                const initialSnap = await get(postsQuery);
+                if (initialSnap.exists()) {
+                    initialSnap.forEach((child) => { initialPostIds.add(child.key); return false; });
+                }
+            } catch (e) {
+                console.warn('Initial feed fetch failed:', e);
+            }
+            // The burst flag stays on until every post from that known initial set has actually
+            // streamed in below (or a generous fallback elapses, in case one of them somehow
+            // never fires) — not just until the lookup itself resolves.
+            let remainingInitial = initialPostIds.size;
+            const endInitialBurstIfDone = () => {
+                if (remainingInitial <= 0) feedInitialBurstActive = false;
+            };
+            if (remainingInitial === 0) feedInitialBurstActive = false;
+            setTimeout(() => { feedInitialBurstActive = false; }, 4000);
 
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
 
-                if (!inInitialBurst && !cachedPosts[postId]) {
+                const isInitial = initialPostIds.has(postId);
+                if (isInitial) {
+                    remainingInitial = Math.max(0, remainingInitial - 1);
+                    endInitialBurstIfDone();
+                }
+
+                if (!isInitial && !cachedPosts[postId]) {
                     pendingNewPosts[postId] = post;
                     updateNewPostsPill();
                     return;

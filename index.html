@@ -6059,44 +6059,40 @@
             // former to render immediately (that's the normal first load) but not the latter —
             // per-viewer feeds shouldn't jump or re-sort on their own while someone's reading.
             //
-            // This used to be decided with a fixed 800ms timer: anything arriving after the
-            // timer fired was treated as "new". On a slow connection the entire first page
-            // could arrive after that window closed, so every post in it got queued behind the
-            // "New posts" pill instead of rendering — the feed looked empty until you tapped it.
-            // Instead, fetch the initial page's post IDs up front with a one-time read, and use
-            // that known set (not a clock) to decide what counts as "initial" — no race, no
-            // dependence on how fast the network happens to be.
-            let initialPostIds = new Set();
+            // This used to be decided two different ways, and both could leave the feed looking
+            // empty: first a fixed 800ms timer (too short on a slow connection, so the whole
+            // first page missed the window and got queued behind the pill instead of rendering),
+            // then a one-time get() to pre-fetch the initial page's post IDs so we'd know exactly
+            // which ones counted as "initial". That second approach depended on the get() call
+            // itself succeeding on the first try — on a flaky mobile connection it could fail or
+            // simply not resolve before the listener's own backfill arrived, leaving the known-ID
+            // set empty and every post in the first page misclassified as "new", pill and all.
+            //
+            // Instead, judge it from onChildAdded's own arrival pattern, with no second network
+            // call that has to agree with the first: the initial page streams in as a tight burst
+            // of back-to-back events, so keep treating arrivals as "initial" (render directly) as
+            // long as they keep coming in close succession, and only start queuing once things
+            // go quiet. That adapts to however long the burst actually takes instead of guessing
+            // a fixed duration, and it can't be left empty by a separate fetch failing.
+            const FEED_BURST_QUIET_MS = 700;   // no arrival for this long => burst is over
+            const FEED_BURST_MAX_MS = 6000;    // hard cap so a stuck connection can't wedge this open
+            let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
-            try {
-                const initialSnap = await get(postsQuery);
-                if (initialSnap.exists()) {
-                    initialSnap.forEach((child) => { initialPostIds.add(child.key); return false; });
-                }
-            } catch (e) {
-                console.warn('Initial feed fetch failed:', e);
-            }
-            // The burst flag stays on until every post from that known initial set has actually
-            // streamed in below (or a generous fallback elapses, in case one of them somehow
-            // never fires) — not just until the lookup itself resolves.
-            let remainingInitial = initialPostIds.size;
-            const endInitialBurstIfDone = () => {
-                if (remainingInitial <= 0) feedInitialBurstActive = false;
+            const endFeedInitialBurst = () => { feedInitialBurstActive = false; };
+            const bumpFeedBurstQuiet = () => {
+                clearTimeout(feedBurstQuietTimer);
+                feedBurstQuietTimer = setTimeout(endFeedInitialBurst, FEED_BURST_QUIET_MS);
             };
-            if (remainingInitial === 0) feedInitialBurstActive = false;
-            setTimeout(() => { feedInitialBurstActive = false; }, 4000);
+            bumpFeedBurstQuiet();
+            setTimeout(endFeedInitialBurst, FEED_BURST_MAX_MS);
 
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
 
-                const isInitial = initialPostIds.has(postId);
-                if (isInitial) {
-                    remainingInitial = Math.max(0, remainingInitial - 1);
-                    endInitialBurstIfDone();
-                }
-
-                if (!isInitial && !cachedPosts[postId]) {
+                if (feedInitialBurstActive) {
+                    bumpFeedBurstQuiet();
+                } else if (!cachedPosts[postId]) {
                     pendingNewPosts[postId] = post;
                     updateNewPostsPill();
                     return;

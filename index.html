@@ -6650,6 +6650,25 @@
         }
 
         async function deletePost(postId) {
+            // Optimistically pull the card out of the feed right away — the
+            // onChildRemoved listener also does a DB existence check before it
+            // will remove a card (to avoid stripping posts that just fell out of
+            // the paginated window), so waiting on that round-trip made a real
+            // delete feel delayed. Remove it here immediately instead.
+            delete cachedPosts[postId];
+            const list = document.getElementById('feed-posts-list');
+            const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
+            if (existingCard) {
+                const vid = existingCard.querySelector('.feed-post-video');
+                if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
+                const postImg = existingCard.querySelector('.x-media-grid-item img');
+                if (postImg && feedMusicAutoplayObserver) feedMusicAutoplayObserver.unobserve(postImg);
+                if (feedImpressionObserver) feedImpressionObserver.unobserve(existingCard);
+                if (existingCard.__impressionTimer) clearTimeout(existingCard.__impressionTimer);
+                existingCard.remove();
+            }
+            updateFeedEmptyState();
+
             try {
                 await remove(ref(database, `posts/${postId}`));
                 await remove(ref(database, `postComments/${postId}`));

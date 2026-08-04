@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        // Save whatever hash the URL loaded with, then strip it immediately, before the
+        // browser gets a chance to jump/scroll to the element whose id matches it (e.g.
+        // "#tab-status" auto-scrolling to id="tab-status"). This is native browser fragment
+        // behavior on page load/reload and can't be prevented from later JS once it happens.
+        // The saved hash is restored quietly (no scroll) after the app finishes booting.
+        window.__initialHash = window.location.hash;
+        if (window.location.hash) {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Xoxa.</title>
@@ -11268,7 +11279,10 @@
             if (await checkForForcedUpdate()) return;
 
             if (user) {
-                if (!window.location.hash) history.replaceState(null, '', '#tab-status');
+                if (!window.location.hash) {
+                    const restoreHash = window.__initialHash || '#tab-status';
+                    history.replaceState(null, '', restoreHash.startsWith('#') ? restoreHash : '#' + restoreHash);
+                }
                 
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';

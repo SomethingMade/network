@@ -1555,7 +1555,7 @@
         @keyframes statusShimmer { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
 
         /* ── DISCOVER TAB (browse other users and add them as contacts) ── */
-        .discover-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; overflow-anchor: none; }
+        .discover-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; }
         .discover-section-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; padding: 14px 4px 10px; }
         .discover-grid { display: flex; flex-direction: column; gap: 2px; }
         .discover-card { position: relative; background: var(--bg-alt); border: none; border-bottom: 1px solid var(--border-color); border-radius: 0; padding: 12px 4px; display: flex; flex-direction: row; align-items: center; text-align: left; gap: 12px; box-shadow: none; transition: background 0.15s ease; }
@@ -4291,37 +4291,6 @@
             filterListItems(groupSearchInput, 'discover-pages-list-container');
         });
 
-        // Lands the Home feed at the top on entry and holds it there for a short window.
-        // A single scrollTop=0 assignment isn't enough here: posts stream in asynchronously
-        // from Firebase right after landing on the tab, and that content arriving above/within
-        // the fold shifts layout enough to nudge scroll position away from 0 on some mobile
-        // browsers/WebViews — which looked like "it moved down on refresh". Re-asserting 0 for
-        // ~1.5s covers that settling window, and backs off immediately once the person actually
-        // touches/scrolls the feed themselves.
-        function lockFeedScrollToTop() {
-            const discoverScroll = document.getElementById('discover-grid-scroll');
-            if (!discoverScroll) return;
-            const LOCK_MS = 1500;
-            const start = performance.now();
-            let released = false;
-
-            const release = () => {
-                released = true;
-                discoverScroll.removeEventListener('touchstart', release);
-                discoverScroll.removeEventListener('wheel', release);
-            };
-            discoverScroll.addEventListener('touchstart', release, { once: true, passive: true });
-            discoverScroll.addEventListener('wheel', release, { once: true, passive: true });
-
-            function tick() {
-                if (released) return;
-                if (discoverScroll.scrollTop !== 0) discoverScroll.scrollTop = 0;
-                if (performance.now() - start < LOCK_MS) requestAnimationFrame(tick);
-            }
-            discoverScroll.scrollTop = 0;
-            requestAnimationFrame(tick);
-        }
-
         function handleHashChange() {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
             
@@ -4407,7 +4376,10 @@
 
                 if (hash === 'tab-status') {
                     renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
-                    lockFeedScrollToTop();
+                    // Land at the top of the feed — browsers can otherwise restore a mid-scroll
+                    // position on refresh, which also confuses the FAB's scroll-direction tracking.
+                    const discoverScroll = document.getElementById('discover-grid-scroll');
+                    if (discoverScroll) discoverScroll.scrollTop = 0;
                 }
 
                 updateNavIndicator();

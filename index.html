@@ -359,7 +359,7 @@
         .x-post-content-col { flex: 1; min-width: 0; }
         .x-post-headline { display: flex; align-items: flex-start; gap: 4px; min-width: 0; }
         .x-post-headline-main { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
-        .x-post-headline .name { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+        .x-post-headline .name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
         .x-post-headline .name-badge { flex-shrink: 0; display: inline-flex; align-items: center; }
         .x-post-time-row { margin-top: 1px; }
         .x-post-time-row .time { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1158,35 +1158,6 @@
         }
         .reaction-emoji-btn:hover, .reaction-emoji-btn:active { transform: scale(1.25); background: var(--bg-hover); }
 
-        /* Floating post-reaction picker (long-press on the like button, Facebook-style) */
-        .post-reaction-picker {
-            position: fixed;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            background: var(--bg-surface);
-            padding: 8px 10px;
-            border-radius: 30px;
-            box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-            z-index: 600;
-            opacity: 0;
-            transform: scale(0.85) translateY(8px);
-            transform-origin: bottom left;
-            pointer-events: none;
-            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
-        }
-        .post-reaction-picker.active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
-        .post-reaction-emoji-btn {
-            background: none;
-            border: none;
-            font-size: 26px;
-            line-height: 1;
-            cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
-            transition: transform 0.12s ease, background 0.12s ease;
-        }
-        .post-reaction-emoji-btn:hover, .post-reaction-emoji-btn.hover-active { transform: scale(1.35) translateY(-4px); background: var(--bg-hover); }
         .feed-like-emoji { font-size: 18px; line-height: 1; width: 24px; text-align: center; }
         @media (max-width: 1024px) { .feed-like-emoji { font-size: 16px; width: 21px; } }
 
@@ -2607,17 +2578,6 @@
         </div>
     </div>
 
-    <!-- Floating emoji picker for long-pressing a post's reaction button, Facebook-style.
-         Fixed-position and reused across every post card — positioned above whichever
-         like button triggered it (see openPostReactionPicker). -->
-    <div class="post-reaction-picker" id="post-reaction-picker">
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="❤️">❤️</button>
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="😂">😂</button>
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="😮">😮</button>
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="😢">😢</button>
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="🙏">🙏</button>
-        <button type="button" class="post-reaction-emoji-btn" data-emoji="👍">👍</button>
-    </div>
 
     <div id="forward-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 75vh; display: flex; flex-direction: column; padding-bottom: 0;">
@@ -7107,14 +7067,9 @@
             return card;
         }
 
-        const POST_REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
         const DEFAULT_POST_REACTION = '👍';
 
-        // Sets (or clears, or switches) the current user's reaction on a post.
-        // - Same emoji as already reacted with → removes the reaction (and decrements likeCount).
-        // - No prior reaction → adds this one (and increments likeCount).
-        // - Different prior reaction → just swaps the emoji; likeCount is unchanged since the
-        //   post already counted this user once.
+        // Sets (or clears) the current user's like on a post.
         async function setPostReaction(postId, emoji) {
             const user = auth.currentUser;
             if (!user) return;
@@ -7136,119 +7091,15 @@
             createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
         }
 
-        // Plain tap on the like button: toggles the default (thumbs-up) reaction, matching the old
-        // single-tap "like" behavior. Long-pressing opens the full emoji picker instead — see
-        // bindPostLikeButtonPress.
+        // Tap on the like button: toggles the like on/off.
         function toggleLikePost(postId) {
             return setPostReaction(postId, DEFAULT_POST_REACTION);
         }
 
-        let activeReactionPickerPostId = null;
-        let reactionLongPressTimer = null;
-        let reactionLongPressFired = false;
-        let reactionPickerHoveredBtn = null;
-
-        function positionReactionPicker(anchorBtn) {
-            const picker = document.getElementById('post-reaction-picker');
-            if (!picker || !anchorBtn) return;
-            const rect = anchorBtn.getBoundingClientRect();
-            // Measure while invisible-but-laid-out so we can center it over the button.
-            picker.style.left = '0px';
-            picker.style.top = '0px';
-            picker.classList.add('active');
-            const pickerRect = picker.getBoundingClientRect();
-            let left = rect.left + rect.width / 2 - pickerRect.width / 2;
-            left = Math.max(8, Math.min(left, window.innerWidth - pickerRect.width - 8));
-            let top = rect.top - pickerRect.height - 10;
-            if (top < 8) top = rect.bottom + 10; // flip below if there's no room above
-            picker.style.left = `${left}px`;
-            picker.style.top = `${top}px`;
-        }
-
-        function closeReactionPicker() {
-            const picker = document.getElementById('post-reaction-picker');
-            if (picker) picker.classList.remove('active');
-            if (reactionPickerHoveredBtn) {
-                reactionPickerHoveredBtn.classList.remove('hover-active');
-                reactionPickerHoveredBtn = null;
-            }
-            activeReactionPickerPostId = null;
-        }
-
-        function openReactionPicker(postId, anchorBtn) {
-            activeReactionPickerPostId = postId;
-            positionReactionPicker(anchorBtn);
-        }
-
-        // Long-press = Facebook-style reaction picker. A quick tap still falls through to the
-        // default thumbs-up-like toggle. Uses pointer events so it behaves the same on touch and mouse.
+        // Simple click-to-like — no long-press reaction picker.
         function bindPostLikeButtonPress(likeBtn, postId) {
-            const LONG_PRESS_MS = 380;
-
-            likeBtn.addEventListener('pointerdown', (e) => {
-                if (e.pointerType === 'mouse' && e.button !== 0) return;
-                reactionLongPressFired = false;
-                clearTimeout(reactionLongPressTimer);
-                reactionLongPressTimer = setTimeout(() => {
-                    reactionLongPressFired = true;
-                    openReactionPicker(postId, likeBtn);
-                    if (navigator.vibrate) navigator.vibrate(10);
-                }, LONG_PRESS_MS);
-            });
-
-            const cancelPress = () => clearTimeout(reactionLongPressTimer);
-            likeBtn.addEventListener('pointerleave', cancelPress);
-            likeBtn.addEventListener('pointercancel', cancelPress);
-
-            likeBtn.addEventListener('pointerup', (e) => {
-                clearTimeout(reactionLongPressTimer);
-                if (!reactionLongPressFired) {
-                    // Short tap — default toggle. The 'click' handler bound elsewhere no longer
-                    // fires this (see below), so handle it here directly.
-                    toggleLikePost(postId);
-                    return;
-                }
-                // Long-press picker is open — resolve on release below (document-level pointerup),
-                // which knows the final hovered emoji regardless of where the finger ended up.
-            });
+            likeBtn.addEventListener('click', () => toggleLikePost(postId));
         }
-
-        // Document-level tracking while the picker is open: highlight whichever emoji the
-        // pointer is currently over, and commit that emoji (or close with no change) on release.
-        document.addEventListener('pointermove', (e) => {
-            if (!activeReactionPickerPostId) return;
-            const el = document.elementFromPoint(e.clientX, e.clientY);
-            const btn = el ? el.closest('.post-reaction-emoji-btn') : null;
-            if (btn === reactionPickerHoveredBtn) return;
-            if (reactionPickerHoveredBtn) reactionPickerHoveredBtn.classList.remove('hover-active');
-            reactionPickerHoveredBtn = btn;
-            if (btn) btn.classList.add('hover-active');
-        });
-
-        document.addEventListener('pointerup', (e) => {
-            if (!activeReactionPickerPostId) return;
-            const postId = activeReactionPickerPostId;
-            const chosenBtn = reactionPickerHoveredBtn;
-            closeReactionPicker();
-            if (chosenBtn) {
-                setPostReaction(postId, chosenBtn.dataset.emoji);
-            }
-            // If released with nothing hovered, the picker just closes with no change — matches
-            // "drag off and let go" cancel behavior.
-        });
-
-        // Also let a direct tap/click on an emoji (no drag) work, and close on tapping outside.
-        document.getElementById('post-reaction-picker').addEventListener('click', (e) => {
-            const btn = e.target.closest('.post-reaction-emoji-btn');
-            if (!btn || !activeReactionPickerPostId) return;
-            setPostReaction(activeReactionPickerPostId, btn.dataset.emoji);
-            closeReactionPicker();
-        });
-        document.addEventListener('pointerdown', (e) => {
-            if (!activeReactionPickerPostId) return;
-            if (e.target.closest('#post-reaction-picker') || e.target.closest('.feed-like-btn')) return;
-            closeReactionPicker();
-        });
 
         // saved_posts/{me}/{postId} is private to the saver — a personal bookmark list, not a
         // signal shown to the post's author (unlike likes/comments).

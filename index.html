@@ -524,6 +524,26 @@
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
 
+        /* Shimmer placeholders shown in the feed while loadOlderPosts() fetches the next batch */
+        .feed-post-skeleton { pointer-events: none; }
+        .feed-post-skeleton .feed-skeleton-avatar,
+        .feed-post-skeleton .feed-skeleton-bar { position: relative; overflow: hidden; background: var(--bg-alt); }
+        .feed-post-skeleton .feed-skeleton-avatar::after,
+        .feed-post-skeleton .feed-skeleton-bar::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+            background-size: 200% 100%; animation: statusShimmer 1.4s ease-in-out infinite;
+        }
+        body.dark-theme .feed-post-skeleton .feed-skeleton-avatar::after,
+        body.dark-theme .feed-post-skeleton .feed-skeleton-bar::after { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%); background-size: 200% 100%; }
+        .feed-post-skeleton .feed-skeleton-avatar { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; }
+        .feed-post-skeleton .feed-skeleton-bar { height: 10px; border-radius: 5px; }
+        .feed-post-skeleton .feed-skeleton-name { width: 38%; height: 12px; margin-bottom: 7px; }
+        .feed-post-skeleton .feed-skeleton-time { width: 22%; }
+        .feed-post-skeleton .feed-skeleton-text-line { width: 100%; margin-top: 10px; }
+        .feed-post-skeleton .feed-skeleton-text-line.short { width: 65%; }
+        .feed-post-skeleton .feed-skeleton-media { margin-top: 10px; height: 160px; border-radius: 12px; }
+
         .feed-comment-item { display: flex; gap: 12px; padding: 14px 0; align-items: flex-start; }
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; }
@@ -6101,6 +6121,43 @@
         document.getElementById('feed-new-posts-pill')?.addEventListener('click', applyPendingNewPosts);
 
         const FEED_PAGE_SIZE = 15;
+        const FEED_SKELETON_COUNT = 3;
+
+        function buildFeedPostSkeletonCard(showMedia) {
+            const card = document.createElement('div');
+            card.className = 'feed-post-card feed-post-skeleton';
+            card.innerHTML = `
+                <div class="x-post-row">
+                    <div class="x-post-avatar-col"><div class="feed-skeleton-avatar"></div></div>
+                    <div class="x-post-content-col">
+                        <div class="feed-skeleton-bar feed-skeleton-name"></div>
+                        <div class="feed-skeleton-bar feed-skeleton-time"></div>
+                        <div class="feed-skeleton-bar feed-skeleton-text-line"></div>
+                        <div class="feed-skeleton-bar feed-skeleton-text-line short"></div>
+                        ${showMedia ? '<div class="feed-skeleton-bar feed-skeleton-media"></div>' : ''}
+                    </div>
+                </div>`;
+            return card;
+        }
+
+        // Appends a few shimmering placeholder cards to the bottom of the feed so the loading
+        // state reads as "more posts incoming" rather than a bare spinner/label. Returns the
+        // elements so the caller can remove exactly these once the real batch is in.
+        function showFeedLoadingSkeletons() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return [];
+            const nodes = [];
+            for (let i = 0; i < FEED_SKELETON_COUNT; i++) {
+                const card = buildFeedPostSkeletonCard(i === 0);
+                list.appendChild(card);
+                nodes.push(card);
+            }
+            return nodes;
+        }
+
+        function removeFeedLoadingSkeletons(nodes) {
+            (nodes || []).forEach(node => node.remove());
+        }
 
         // Fetches an older page of posts (one-time read, not a live listener) and appends them.
         // These older cards still get folded into cachedPosts and reorderFeedCards(), so ranking
@@ -6110,8 +6167,7 @@
             if (isLoadingMorePosts || noMoreOlderPosts) return;
             if (!isFinite(oldestLoadedPostTimestamp)) return;
             isLoadingMorePosts = true;
-            const loadingEl = document.getElementById('feed-loading-more');
-            if (loadingEl) loadingEl.style.display = 'block';
+            const skeletonNodes = showFeedLoadingSkeletons();
 
             try {
                 const olderQuery = query(
@@ -6121,6 +6177,7 @@
                     limitToLast(FEED_PAGE_SIZE)
                 );
                 const snap = await get(olderQuery);
+                removeFeedLoadingSkeletons(skeletonNodes);
                 const list = document.getElementById('feed-posts-list');
                 let fetchedCount = 0;
 
@@ -6148,9 +6205,9 @@
                 // scroll tick, and log for our own debugging.
                 console.warn('loadOlderPosts failed:', e);
                 noMoreOlderPosts = true;
+                removeFeedLoadingSkeletons(skeletonNodes);
             } finally {
                 isLoadingMorePosts = false;
-                if (loadingEl) loadingEl.style.display = 'none';
             }
         }
 

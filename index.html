@@ -4067,7 +4067,20 @@
             });
         }
 
+        // Belt-and-braces: whenever a video becomes the active one, forcibly pause every other
+        // reel video. Protects against fast flick-swipes where the observer can briefly report
+        // two items as "intersecting" before the old one finishes scrolling out of view.
+        function pauseAllReelVideosExcept(exceptPostId) {
+            const track = document.getElementById('reel-viewer-track');
+            if (!track) return;
+            track.querySelectorAll('.reel-item').forEach(itemEl => {
+                if (itemEl.dataset.postId === exceptPostId) return;
+                deactivateReelItem(itemEl);
+            });
+        }
+
         function activateReelItem(itemEl, postId) {
+            pauseAllReelVideosExcept(postId);
             const media = itemEl.querySelector('.reel-item-media');
             let video = media.querySelector('video');
             const post = cachedPosts[postId];
@@ -4099,7 +4112,7 @@
 
         function deactivateReelItem(itemEl) {
             const video = itemEl.querySelector('.reel-item-media video');
-            if (video) video.pause();
+            if (video && !video.paused) video.pause();
             const hint = itemEl.querySelector('.reel-item-play-hint');
             if (hint) hint.classList.remove('visible');
         }
@@ -4142,8 +4155,6 @@
                     if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
                         const idx = reelPostIds.indexOf(postId);
                         if (idx !== reelActiveIndex) {
-                            const prevEl = track.children[reelActiveIndex];
-                            if (prevEl) deactivateReelItem(prevEl);
                             reelActiveIndex = idx;
                             activateReelItem(itemEl, postId);
                             reelExtendQueueIfNeeded();

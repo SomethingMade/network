@@ -14,7 +14,7 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Xoxa..</title>
+    <title>Xoxa.</title>
 
     <meta name="theme-color" content="#25D366">
     <link rel="icon" href="https://i.postimg.cc/1zynNKZR/1000062916-removebg-preview.png">
@@ -293,6 +293,9 @@
         .bottom-sheet-overlay { position: fixed; inset: 0; bottom: var(--keyboard-inset, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s, bottom 0.15s ease; display: flex; align-items: flex-end; justify-content: center; }
         #story-views-sheet-overlay { z-index: 100010; }
         #story-options-sheet-overlay { z-index: 100010; }
+        #gif-picker-sheet-overlay { z-index: 100010; }
+        #sticker-sheet-overlay { z-index: 100010; }
+        #emoji-sheet-overlay { z-index: 100010; }
         /* Comments can be opened from the reel viewer (z-index 100007) as well as the normal
            feed, so it needs to sit above that too, not just the default bottom-sheet layer. */
         #post-comments-sheet-overlay { z-index: 100010; }
@@ -1131,6 +1134,8 @@
         /* Per-bubble timestamp, group verified badge, and seen/sent tick marks */
         .msg-meta-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 4px; }
         .msg-bubble.media .msg-meta-wrap, .msg-bubble.sticker .msg-meta-wrap { padding: 4px 10px 6px; margin-top: 0; }
+        #chat-gif-btn { font-weight: 700; color: var(--text-secondary); letter-spacing: 0.5px; font-size: 12px; }
+        #chat-gif-btn:hover { color: var(--primary-blue); }
         .msg-time { font-size: 11px; color: rgba(255,255,255,0.75); }
         .msg-bubble.in .msg-time { color: var(--text-secondary); }
         .msg-meta-badge { display: inline-flex; align-items: center; }
@@ -1319,13 +1324,21 @@
         #cancel-reply-btn { cursor: pointer; color: var(--text-secondary); flex-shrink: 0; padding: 6px; transition: 0.2s; }
         #cancel-reply-btn:hover { color: var(--danger-red); }
 
-        .chat-view-input-row { display: flex; align-items: flex-end; gap: 10px; padding: 12px 24px; border-top: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); position: relative; z-index: 2; box-shadow: 0 -1px 0 rgba(0,0,0,0.02), 0 -4px 12px rgba(0,0,0,0.03); }
-        .chat-view-input-row input, .chat-view-input-row textarea { flex: 1; padding: 12px 18px; border-radius: 22px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-size: 14px; min-width: 0; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-        .chat-view-input-row textarea { font-family: inherit; line-height: 1.35; resize: none; overflow-y: hidden; max-height: 120px; box-sizing: border-box; }
-        .chat-view-input-row input:focus, .chat-view-input-row textarea:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.1); }
-        .chat-view-input-row .chat-attach-btn, .chat-view-input-row .chat-view-send { margin-bottom: 3px; }
+        .chat-view-input-row { display: flex; align-items: flex-end; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); position: relative; z-index: 2; box-shadow: 0 -1px 0 rgba(0,0,0,0.02), 0 -4px 12px rgba(0,0,0,0.03); }
+        .chat-input-wrap { flex: 1; display: flex; align-items: flex-end; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 24px; padding: 6px 6px 6px 14px; transition: border-color 0.2s ease, box-shadow 0.2s ease; min-width: 0; }
+        .chat-input-wrap:focus-within { border-color: var(--primary-blue); box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.1); }
+        .chat-input-wrap textarea { flex: 1; border: none; background: transparent; color: var(--text-primary); outline: none; font-size: 14px; font-family: inherit; line-height: 1.4; resize: none; overflow-y: hidden; max-height: 120px; padding: 6px 4px; min-width: 0; }
+        .chat-input-actions { display: flex; align-items: center; gap: 2px; padding-bottom: 2px; flex-shrink: 0; }
+        .chat-input-action-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.15s; flex-shrink: 0; }
+        .chat-input-action-btn:hover { background: var(--bg-hover); color: var(--primary-blue); }
+        .chat-input-action-btn:active { transform: scale(0.9); }
+        .chat-view-input-row .chat-attach-btn { margin-bottom: 2px; }
         .chat-view-send, .chat-attach-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth), background 0.15s ease; }
-        .chat-view-send { background: var(--gradient-brand); color: white; box-shadow: 0 3px 10px rgba(18,140,126,0.3); }
+        .chat-view-send { background: var(--gradient-brand); color: white; box-shadow: 0 3px 10px rgba(18,140,126,0.3); position: relative; overflow: hidden; }
+        .chat-view-send .mic-icon { display: block; }
+        .chat-view-send .send-icon { display: none; }
+        .chat-view-send.has-text .mic-icon { display: none; }
+        .chat-view-send.has-text .send-icon { display: block; }
         .chat-view-send:hover { transform: scale(1.06); box-shadow: 0 4px 14px rgba(18,140,126,0.4); }
         .chat-view-send:active { transform: scale(0.94); }
         .chat-attach-btn:hover { background: var(--bg-hover); }
@@ -1441,9 +1454,7 @@
         .emoji-grid-item:hover { background: var(--bg-hover); }
         .emoji-grid-item:active { transform: scale(0.88); }
 
-        .mic-emoji-btn .icon-emoji { display: none; }
-        .mic-emoji-btn.emoji-mode .icon-mic { display: none; }
-        .mic-emoji-btn.emoji-mode .icon-emoji { display: block; }
+        
 
         /* ── WORD SUGGESTIONS (predictive text) ── */
         .word-suggest-bar { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 16px; background: var(--bg-surface); border-top: 1px solid var(--border-color); flex-shrink: 0; scrollbar-width: none; }
@@ -3157,18 +3168,22 @@
 
         <div class="chat-view-input-row" id="chat-view-input-row">
             <button type="button" class="chat-attach-btn" id="chat-attach-btn">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.48-8.48l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.48-8.48l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
             </button>
-            <button type="button" class="chat-attach-btn" id="chat-sticker-btn" title="Send a sticker">
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
-            </button>
-            <textarea id="chat-view-input" placeholder="Type a message..." rows="1" autocomplete="off"></textarea>
-            <button type="button" class="chat-attach-btn mic-emoji-btn" id="chat-mic-btn" title="Record a voice note">
-                <svg class="icon-mic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-                <svg class="icon-emoji" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
-            </button>
+            <div class="chat-input-wrap">
+                <textarea id="chat-view-input" placeholder="Type a message..." rows="1" autocomplete="off"></textarea>
+                <div class="chat-input-actions">
+                    <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Send a sticker">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
+                    </button>
+                    <button type="button" class="chat-input-action-btn" id="chat-gif-btn" title="Send a GIF">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 14l3-3 3 3 4-4 2 2"></path><circle cx="10" cy="10" r="1" fill="currentColor" stroke="none"></circle></svg>
+                    </button>
+                </div>
+            </div>
             <button type="button" class="chat-view-send" id="chat-view-send">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                <svg class="send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
             </button>
         </div>
 
@@ -5619,6 +5634,7 @@
         let oldestLoadedPostTimestamp = Infinity;
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
+        let emptyOlderFetchCount = 0;
         let pendingNewPosts = {}; // postId -> post, queued live arrivals not yet shown (see "New posts" pill)
         // True while the initial page of posts is still streaming in from Firebase on first
         // load. reorderFeedCards() checks this to skip its scroll-preserving adjustment during
@@ -6385,7 +6401,7 @@
 
         document.getElementById('feed-new-posts-pill')?.addEventListener('click', applyPendingNewPosts);
 
-        const FEED_PAGE_SIZE = 15;
+        const FEED_PAGE_SIZE = 50;
         const FEED_SKELETON_COUNT = 3;
 
         function buildFeedPostSkeletonCard(showMedia) {
@@ -6451,11 +6467,11 @@
                     snap.forEach((child) => { entries.push([child.key, child.val()]); return false; });
                     fetchedCount = entries.length;
                     entries.forEach(([postId, post]) => {
-                        if (cachedPosts[postId]) return;
-                        cachedPosts[postId] = post;
                         if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                             oldestLoadedPostTimestamp = post.timestamp;
                         }
+                        if (cachedPosts[postId]) return;
+                        cachedPosts[postId] = post;
                         if (list) list.appendChild(buildFeedPostCard(postId, post));
                     });
                     reorderFeedCards();
@@ -6463,27 +6479,48 @@
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
 
-                if (fetchedCount === 0) noMoreOlderPosts = true;
+                if (fetchedCount === 0) {
+                    emptyOlderFetchCount++;
+                    if (emptyOlderFetchCount >= 2) noMoreOlderPosts = true;
+                } else {
+                    emptyOlderFetchCount = 0;
+                }
             } catch (e) {
                 // Pagination hitting the end (or a transient read issue) isn't something the
                 // user needs to see — just stop trying so we don't hammer the DB on every
                 // scroll tick, and log for our own debugging.
                 console.warn('loadOlderPosts failed:', e);
-                noMoreOlderPosts = true;
                 removeFeedLoadingSkeletons(skeletonNodes);
+                // Don't flip noMoreOlderPosts on a transient error
             } finally {
                 isLoadingMorePosts = false;
             }
         }
 
         function initFeedScrollListener() {
-            const container = document.getElementById('discover-grid-scroll');
-            if (!container || container.dataset.scrollBound) return;
-            container.dataset.scrollBound = 'true';
-            container.addEventListener('scroll', () => {
-                const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 400;
-                if (nearBottom) loadOlderPosts();
+            const list = document.getElementById('feed-posts-list');
+            if (!list || list.dataset.ioBound) return;
+            list.dataset.ioBound = 'true';
+
+            // Create a sentinel if it doesn't exist
+            let sentinel = document.getElementById('feed-load-more-sentinel');
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'feed-load-more-sentinel';
+                sentinel.style.height = '1px';
+                list.appendChild(sentinel);
+            }
+
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) loadOlderPosts();
+                });
+            }, {
+                root: list.closest('[data-scrollable]') || list.parentElement,
+                rootMargin: '0px 0px 400px 0px',
+                threshold: 0
             });
+            io.observe(sentinel);
         }
 
         async function initFeedListeners() {
@@ -6524,8 +6561,8 @@
             // long as they keep coming in close succession, and only start queuing once things
             // go quiet. That adapts to however long the burst actually takes instead of guessing
             // a fixed duration, and it can't be left empty by a separate fetch failing.
-            const FEED_BURST_QUIET_MS = 700;   // no arrival for this long => burst is over
-            const FEED_BURST_MAX_MS = 6000;    // hard cap so a stuck connection can't wedge this open
+            const FEED_BURST_QUIET_MS = 1500;  // no arrival for this long => burst is over
+            const FEED_BURST_MAX_MS = 10000;   // hard cap so a stuck connection can't wedge this open
             let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
             const endFeedInitialBurst = () => { feedInitialBurstActive = false; };
@@ -6533,12 +6570,20 @@
                 clearTimeout(feedBurstQuietTimer);
                 feedBurstQuietTimer = setTimeout(endFeedInitialBurst, FEED_BURST_QUIET_MS);
             };
-            bumpFeedBurstQuiet();
+            // Don't start the quiet timer yet — wait for the first post to actually arrive.
+            // On slow connections the preemptive timer could expire before Firebase streams
+            // a single onChildAdded, causing the entire initial page to be mis-queued as "new".
             setTimeout(endFeedInitialBurst, FEED_BURST_MAX_MS);
 
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
+
+                // ALWAYS keep the cursor accurate — even posts that arrive after the
+                // burst ends (and get queued) still affect where pagination starts.
+                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
+                    oldestLoadedPostTimestamp = post.timestamp;
+                }
 
                 if (feedInitialBurstActive) {
                     bumpFeedBurstQuiet();
@@ -6549,9 +6594,6 @@
                 }
 
                 cachedPosts[postId] = post;
-                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
-                    oldestLoadedPostTimestamp = post.timestamp;
-                }
                 const list = document.getElementById('feed-posts-list');
                 if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
                     list.prepend(buildFeedPostCard(postId, post));
@@ -7949,6 +7991,8 @@
         // --- GIF PICKER (comments) ---
         const GIF_API_KEY = '5JwiRyqITDtOhuRPigrrDUjdaSabu7e6';
         let selectedCommentGif = null; // { url, previewUrl } or null
+        let selectedChatGif = null;
+        let gifPickerTarget = 'comment';
         let commentGifSearchDebounce = null;
 
         async function loadGifResults(query) {
@@ -7987,7 +8031,8 @@
             }
         }
 
-        function openGifPickerSheet() {
+        function openGifPickerSheet(target = 'comment') {
+            gifPickerTarget = target;
             document.getElementById('gif-picker-sheet-overlay').classList.add('active');
             document.getElementById('gif-picker-search').value = '';
             document.getElementById('gif-picker-empty').textContent = 'No GIFs found.';
@@ -7999,6 +8044,13 @@
         }
 
         function selectCommentGif(url, previewUrl) {
+            if (gifPickerTarget === 'chat' || gifPickerTarget === 'group') {
+                selectedChatGif = { url, previewUrl };
+                closeGifPickerSheet();
+                sendChatGifMessage();
+                selectedChatGif = null;
+                return;
+            }
             selectedCommentGif = { url, previewUrl };
             document.getElementById('feed-comment-gif-preview-img').src = previewUrl;
             document.getElementById('feed-comment-gif-preview').classList.add('active');
@@ -10376,7 +10428,19 @@
                             return;
                         }
 
-                        if (msg.mediaURL && msg.mediaType === 'sticker') {
+                        if (msg.mediaURL && msg.mediaType === 'gif') {
+                            bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
+                            const img = document.createElement('img');
+                            img.className = 'msg-media-img';
+                            img.src = msg.mediaPreview || msg.mediaURL;
+                            img.alt = 'GIF';
+                            img.style.maxWidth = '240px';
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            mediaWrap.appendChild(img);
+                            bubble.appendChild(mediaWrap);
+                        } else if (msg.mediaURL && msg.mediaType === 'sticker') {
                             bubble.classList.add('sticker');
                             bubble.appendChild(buildStickerMsgElement(msg.mediaURL));
                         } else if (msg.mediaURL && msg.mediaType === 'image') {
@@ -10526,6 +10590,87 @@
                 await update(ref(database), updates);
             } catch (err) {
                 showCustomModal('Message Failed', 'Your message could not be sent.');
+            }
+        }
+
+        async function sendChatGifMessage() {
+            const user = auth.currentUser;
+            if (!user || !selectedChatGif) return;
+
+            const gifUrl = selectedChatGif.url;
+            const previewUrl = selectedChatGif.previewUrl;
+
+            if (activeGroupId) {
+                const group = cachedGroups[activeGroupId] || {};
+                if (!canPostInGroup(group, user.uid)) {
+                    notify('Only the group owner can post in this group', 'error');
+                    return;
+                }
+                const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
+                const msgPayload = {
+                    mediaURL: gifUrl,
+                    mediaPreview: previewUrl,
+                    mediaType: 'gif',
+                    senderUid: user.uid,
+                    senderName: senderName,
+                    createdAt: Date.now()
+                };
+
+                try {
+                    const newMsgKey = push(ref(database, `group_threads/${activeGroupId}/messages`)).key;
+                    const updates = {};
+                    updates[`group_threads/${activeGroupId}/messages/${newMsgKey}`] = msgPayload;
+
+                    const memberIds = group.members ? Object.keys(group.members) : [];
+                    memberIds.forEach(memberUid => {
+                        if (memberUid === user.uid) {
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}`] = {
+                                groupName: group.name || 'Group',
+                                groupPhotoURL: group.photoURL || '',
+                                text: 'GIF',
+                                senderUid: user.uid,
+                                senderName: senderName,
+                                timestamp: msgPayload.createdAt,
+                                unreadCount: 0
+                            };
+                        } else {
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/groupName`] = group.name || 'Group';
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/groupPhotoURL`] = group.photoURL || '';
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/text`] = 'GIF';
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/senderUid`] = user.uid;
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/senderName`] = senderName;
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/timestamp`] = msgPayload.createdAt;
+                            updates[`user_group_chats/${memberUid}/${activeGroupId}/unreadCount`] = increment(1);
+                        }
+                    });
+
+                    await update(ref(database), updates);
+                } catch (err) {
+                    showCustomModal('Message Failed', 'Your GIF could not be sent.');
+                }
+            } else if (activeChatUid) {
+                if (theyBlockedMeActive || cachedBlocked[activeChatUid]) return;
+
+                const threadId = threadIdFor(user.uid, activeChatUid);
+                const msgPayload = {
+                    mediaURL: gifUrl,
+                    mediaPreview: previewUrl,
+                    mediaType: 'gif',
+                    senderUid: user.uid,
+                    createdAt: Date.now()
+                };
+
+                const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                const updates = {};
+                updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+                updates[`user_chats/${user.uid}/${activeChatUid}`] = { text: 'GIF', timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };
+                updates[`user_chats/${activeChatUid}/${user.uid}/text`] = 'GIF';
+                updates[`user_chats/${activeChatUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
+                updates[`user_chats/${activeChatUid}/${user.uid}/unreadCount`] = increment(1);
+                updates[`user_chats/${activeChatUid}/${user.uid}/senderUid`] = user.uid;
+
+                try { await update(ref(database), updates); }
+                catch (err) { showCustomModal('Message Failed', 'Your GIF could not be sent.'); }
             }
         }
 
@@ -12239,6 +12384,7 @@
                 userChatsInitialized = false;
                 feedListenersAttached = false;
                 notifListenersAttached = false;
+                emptyOlderFetchCount = 0;
                 cachedNotifications = {};
                 updateNotifBellUI();
             }
@@ -13814,10 +13960,10 @@
         // Swap the mic icon for the emoji icon once the person starts typing or
         // focuses the field; falls back to mic once the field is blurred and empty.
         function updateMicEmojiToggle() {
-            const btn = document.getElementById('chat-mic-btn');
+            const sendBtn = document.getElementById('chat-view-send');
             const input = document.getElementById('chat-view-input');
-            const shouldShowEmoji = document.activeElement === input || input.value.length > 0;
-            btn.classList.toggle('emoji-mode', shouldShowEmoji);
+            const hasText = input.value.trim().length > 0;
+            sendBtn.classList.toggle('has-text', hasText);
         }
 
         document.getElementById('chat-view-input').addEventListener('input', () => {
@@ -14683,7 +14829,19 @@
                             bubble.appendChild(quoteDiv);
                         }
 
-                        if (msg.mediaURL && msg.mediaType === 'sticker') {
+                        if (msg.mediaURL && msg.mediaType === 'gif') {
+                            bubble.classList.add('media');
+                            const mediaWrap = document.createElement('div');
+                            mediaWrap.className = 'msg-media-wrap';
+                            const img = document.createElement('img');
+                            img.className = 'msg-media-img';
+                            img.src = msg.mediaPreview || msg.mediaURL;
+                            img.alt = 'GIF';
+                            img.style.maxWidth = '240px';
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            mediaWrap.appendChild(img);
+                            bubble.appendChild(mediaWrap);
+                        } else if (msg.mediaURL && msg.mediaType === 'sticker') {
                             bubble.classList.add('sticker');
                             bubble.appendChild(buildStickerMsgElement(msg.mediaURL));
                         } else if (msg.viewOnce && (msg.mediaType === 'image' || msg.mediaType === 'video' || msg.mediaType === 'audio')) {
@@ -15096,7 +15254,15 @@
             if (editingMessage) { saveMessageEdit(); return; }
             activeGroupId ? sendGroupMessage() : sendChatMessage();
         }
-        document.getElementById('chat-view-send').addEventListener('click', (e) => { e.preventDefault(); sendActiveMessage(); });
+        document.getElementById('chat-view-send').addEventListener('click', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-view-input');
+            if (input.value.trim().length > 0 || editingMessage) {
+                sendActiveMessage();
+            } else {
+                startVoiceRecording();
+            }
+        });
         document.getElementById('chat-view-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -15127,6 +15293,11 @@
             e.preventDefault();
             buildStickerGridOnce();
             stickerSheetOverlay.classList.add('active');
+        });
+        document.getElementById('chat-gif-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = activeGroupId ? 'group' : 'chat';
+            openGifPickerSheet(target);
         });
         stickerSheetOverlay.addEventListener('click', (e) => {
             if (e.target === stickerSheetOverlay) stickerSheetOverlay.classList.remove('active');
@@ -15647,14 +15818,7 @@
             }
         }
 
-        document.getElementById('chat-mic-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            if (e.currentTarget.classList.contains('emoji-mode')) {
-                openEmojiPicker();
-            } else {
-                startVoiceRecording();
-            }
-        });
+        
         document.getElementById('voice-cancel-btn').addEventListener('click', (e) => {
             e.preventDefault();
             cancelVoiceRecording();

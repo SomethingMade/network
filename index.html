@@ -5982,6 +5982,7 @@
         }
 
         function computeFeedScore(postId, post) {
+            if (!post) return -Infinity;
             const user = auth.currentUser;
             const myUid = user ? user.uid : 'anon';
             const now = Date.now();
@@ -6123,31 +6124,49 @@
                 const snap = await get(olderQuery);
                 const list = document.getElementById('feed-posts-list');
                 let fetchedCount = 0;
+                let newlyAddedCount = 0;
+                let minReturnedTimestamp = Infinity;
 
                 if (snap.exists()) {
                     const entries = [];
                     snap.forEach((child) => { entries.push([child.key, child.val()]); return false; });
                     fetchedCount = entries.length;
                     entries.forEach(([postId, post]) => {
+                        if (post.timestamp && post.timestamp < minReturnedTimestamp) {
+                            minReturnedTimestamp = post.timestamp;
+                        }
                         if (cachedPosts[postId]) return;
                         cachedPosts[postId] = post;
                         if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                             oldestLoadedPostTimestamp = post.timestamp;
                         }
-                        if (list) list.appendChild(buildFeedPostCard(postId, post));
+                        if (list) {
+                            list.appendChild(buildFeedPostCard(postId, post));
+                            newlyAddedCount++;
+                        }
                     });
+                    // Always advance the cursor to the oldest timestamp in this batch,
+                    // even if every returned post was a duplicate in cache. That prevents
+                    // the same range from being re-fetched forever when the cursor is stale.
+                    if (minReturnedTimestamp !== Infinity && minReturnedTimestamp < oldestLoadedPostTimestamp) {
+                        oldestLoadedPostTimestamp = minReturnedTimestamp;
+                    }
                     reorderFeedCards();
                     const searchInput = document.getElementById('search-feed-posts');
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
 
+                // Only mark end-of-feed when the DB genuinely returned fewer items than we
+                // asked for (meaning nothing older exists). If we got a full page but added
+                // nothing because they were all duplicates, the cursor was already advanced
+                // above so the next scroll will look further back.
                 if (fetchedCount < FEED_PAGE_SIZE) noMoreOlderPosts = true;
             } catch (e) {
-                // Pagination hitting the end (or a transient read issue) isn't something the
-                // user needs to see — just stop trying so we don't hammer the DB on every
-                // scroll tick, and log for our own debugging.
+                // A transient read error shouldn't permanently kill pagination — just log it
+                // and let the next scroll retry. Only mark noMoreOlderPosts if we're certain
+                // the query is invalid (e.g. missing index), not for network hiccups.
                 console.warn('loadOlderPosts failed:', e);
-                noMoreOlderPosts = true;
+                if (e && e.message && e.message.includes('index')) noMoreOlderPosts = true;
             } finally {
                 isLoadingMorePosts = false;
                 if (loadingEl) loadingEl.style.display = 'none';
@@ -6302,6 +6321,16 @@
                         // as "live" so future child_changed/child_removed for the *next* post
                         // that falls out don't get confused by stale cachedPosts state.
                         delete cachedPosts[postId];
+                        // If this was the oldest post we knew about, recalculate the cursor
+                        // from whatever is still in cache so pagination doesn't get stuck.
+                        if (removedPost && removedPost.timestamp && removedPost.timestamp === oldestLoadedPostTimestamp) {
+                            oldestLoadedPostTimestamp = Infinity;
+                            Object.values(cachedPosts).forEach(p => {
+                                if (p && p.timestamp && p.timestamp < oldestLoadedPostTimestamp) {
+                                    oldestLoadedPostTimestamp = p.timestamp;
+                                }
+                            });
+                        }
                         return;
                     }
                 } catch (e) {

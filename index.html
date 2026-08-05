@@ -522,6 +522,11 @@
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; }
         .feed-comment-item.is-reply .avatar { width: 26px; height: 26px; font-size: 11px; }
+        .feed-comment-item.comment-highlight { border-radius: 12px; animation: commentHighlightFlash 2s ease-out; }
+        @keyframes commentHighlightFlash {
+            0% { background: rgba(37, 211, 102, 0.22); }
+            100% { background: transparent; }
+        }
         .feed-comment-body { flex: 1; min-width: 0; }
         .feed-comment-header-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
         .feed-comment-header-row .name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
@@ -7662,7 +7667,13 @@
                     list.appendChild(buildCommentEl(replyId, reply, true));
                 });
             });
-            list.scrollTop = list.scrollHeight;
+            if (pendingScrollToCommentId) {
+                const targetCommentId = pendingScrollToCommentId;
+                pendingScrollToCommentId = null;
+                scrollToAndHighlightComment(targetCommentId);
+            } else {
+                list.scrollTop = list.scrollHeight;
+            }
         }
 
         // Only the post's own author can pin/unpin a comment on it (mirrors Instagram's rule).
@@ -8053,14 +8064,43 @@
             }
         }
 
+        // Set right before opening a post's comments sheet from a notification tap, so
+        // renderPostComments can scroll/highlight the right comment once it's loaded.
+        let pendingScrollToCommentId = null;
+
+        function scrollToAndHighlightComment(commentId) {
+            const list = document.getElementById('post-comments-list');
+            if (!list) return;
+            const el = list.querySelector(`.feed-comment-item[data-comment-id="${commentId}"]`);
+            if (!el) return;
+
+            // Replies start collapsed behind "view replies" — expand them first if the
+            // notification points at one, so the target comment is actually visible.
+            if (el.classList.contains('is-reply') && el.style.display === 'none') {
+                const parentId = el.dataset.parentId;
+                const replyEls = list.querySelectorAll(`.feed-comment-item.is-reply[data-parent-id="${parentId}"]`);
+                replyEls.forEach(r => r.style.display = 'flex');
+                const viewBtn = list.querySelector(`.feed-comment-view-replies[data-parent-id="${parentId}"]`);
+                if (viewBtn) viewBtn.textContent = 'Hide replies';
+            }
+
+            requestAnimationFrame(() => {
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                el.classList.add('comment-highlight');
+                setTimeout(() => el.classList.remove('comment-highlight'), 2000);
+            });
+        }
+
         function openNotificationTarget(notifId, notif) {
             if (!notif.read) {
                 const user = auth.currentUser;
                 if (user) update(ref(database, `notifications/${user.uid}/${notifId}`), { read: true });
             }
             closeNotificationsSheet();
-            // Moments/feed tab has been removed from the app, so post notifications
-            // no longer have anywhere to navigate to.
+            if (notif.postId) {
+                pendingScrollToCommentId = notif.commentId || null;
+                openPostComments(notif.postId);
+            }
         }
 
         function openNotificationsSheet() {

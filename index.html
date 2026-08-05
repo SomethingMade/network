@@ -364,6 +364,11 @@
         #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: block; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
         #feed-new-posts-pill:active { transform: scale(0.97); }
         .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
+        .feed-post-card.post-highlight { animation: postHighlightFlash 2s ease-out; }
+        @keyframes postHighlightFlash {
+            0% { background: rgba(37, 211, 102, 0.16); }
+            100% { background: var(--bg-surface); }
+        }
         .feed-post-card:hover { background: var(--bg-hover); }
         .x-post-row { display: flex; gap: 12px; }
         .x-post-avatar-col { flex-shrink: 0; cursor: pointer; }
@@ -523,11 +528,6 @@
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; }
         .feed-comment-item.is-reply .avatar { width: 26px; height: 26px; font-size: 11px; }
-        .feed-comment-item.comment-highlight { border-radius: 12px; animation: commentHighlightFlash 2s ease-out; }
-        @keyframes commentHighlightFlash {
-            0% { background: rgba(37, 211, 102, 0.22); }
-            100% { background: transparent; }
-        }
         .feed-comment-body { flex: 1; min-width: 0; }
         .feed-comment-header-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
         .feed-comment-header-row .name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
@@ -7668,13 +7668,7 @@
                     list.appendChild(buildCommentEl(replyId, reply, true));
                 });
             });
-            if (pendingScrollToCommentId) {
-                const targetCommentId = pendingScrollToCommentId;
-                pendingScrollToCommentId = null;
-                scrollToAndHighlightComment(targetCommentId);
-            } else {
-                list.scrollTop = list.scrollHeight;
-            }
+            list.scrollTop = list.scrollHeight;
         }
 
         // Only the post's own author can pin/unpin a comment on it (mirrors Instagram's rule).
@@ -8065,31 +8059,22 @@
             }
         }
 
-        // Set right before opening a post's comments sheet from a notification tap, so
-        // renderPostComments can scroll/highlight the right comment once it's loaded.
-        let pendingScrollToCommentId = null;
-
-        function scrollToAndHighlightComment(commentId) {
-            const list = document.getElementById('post-comments-list');
-            if (!list) return;
-            const el = list.querySelector(`.feed-comment-item[data-comment-id="${commentId}"]`);
-            if (!el) return;
-
-            // Replies start collapsed behind "view replies" — expand them first if the
-            // notification points at one, so the target comment is actually visible.
-            if (el.classList.contains('is-reply') && el.style.display === 'none') {
-                const parentId = el.dataset.parentId;
-                const replyEls = list.querySelectorAll(`.feed-comment-item.is-reply[data-parent-id="${parentId}"]`);
-                replyEls.forEach(r => r.style.display = 'flex');
-                const viewBtn = list.querySelector(`.feed-comment-view-replies[data-parent-id="${parentId}"]`);
-                if (viewBtn) viewBtn.textContent = 'Hide replies';
-            }
-
+        function scrollToAndHighlightPost(postId) {
+            const card = document.querySelector(`#feed-posts-list .feed-post-card[data-post-id="${postId}"], #feed-posts-list .feed-post-card[data-content-post-id="${postId}"]`);
+            if (!card) return false;
             requestAnimationFrame(() => {
-                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                el.classList.add('comment-highlight');
-                setTimeout(() => el.classList.remove('comment-highlight'), 2000);
+                card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                card.classList.add('post-highlight');
+                setTimeout(() => card.classList.remove('post-highlight'), 2000);
             });
+            return true;
+        }
+
+        // The feed's live listener may not have the post's card in the DOM yet right after
+        // switching tabs (e.g. fresh load), so retry briefly instead of giving up on the first miss.
+        function goToPostInFeed(postId, attemptsLeft = 10) {
+            if (scrollToAndHighlightPost(postId)) return;
+            if (attemptsLeft > 0) setTimeout(() => goToPostInFeed(postId, attemptsLeft - 1), 150);
         }
 
         function openNotificationTarget(notifId, notif) {
@@ -8099,8 +8084,8 @@
             }
             closeNotificationsSheet();
             if (notif.postId) {
-                pendingScrollToCommentId = notif.commentId || null;
-                openPostComments(notif.postId);
+                window.location.hash = 'tab-status';
+                goToPostInFeed(notif.postId);
             }
         }
 

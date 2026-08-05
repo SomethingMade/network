@@ -2842,14 +2842,10 @@
                 </div>
                 <div class="nav-item" data-tab="tab-chats">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M12 3C6.75 3 2.5 6.7 2.5 11.25c0 2.53 1.32 4.8 3.4 6.32-.12 1.14-.5 2.36-1.28 3.43a.4.4 0 0 0 .43.62c1.66-.42 3.03-1.14 4.06-1.85a11.9 11.9 0 0 0 2.89.35c5.25 0 9.5-3.7 9.5-8.25S17.25 3 12 3z"/>
-                        <circle class="icon-line" cx="8" cy="11.4" r="1.1" fill="currentColor" stroke="none"/>
-                        <circle class="icon-line" cx="12" cy="11.4" r="1.1" fill="currentColor" stroke="none"/>
-                        <circle class="icon-line" cx="16" cy="11.4" r="1.1" fill="currentColor" stroke="none"/>
-                        <path class="icon-fill" d="M12 3C6.75 3 2.5 6.7 2.5 11.25c0 2.53 1.32 4.8 3.4 6.32-.12 1.14-.5 2.36-1.28 3.43a.4.4 0 0 0 .43.62c1.66-.42 3.03-1.14 4.06-1.85a11.9 11.9 0 0 0 2.89.35c5.25 0 9.5-3.7 9.5-8.25S17.25 3 12 3z"/>
-                        <circle class="icon-fill" cx="8" cy="11.4" r="1.15" fill="var(--bg-surface)" stroke="none"/>
-                        <circle class="icon-fill" cx="12" cy="11.4" r="1.15" fill="var(--bg-surface)" stroke="none"/>
-                        <circle class="icon-fill" cx="16" cy="11.4" r="1.15" fill="var(--bg-surface)" stroke="none"/>
+                        <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline class="icon-line" points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/>
+                        <path class="icon-fill" fill-rule="evenodd" d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline class="icon-fill" points="22,6 12,13 2,6" fill="none" stroke="var(--bg-surface)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                     <span>Chats</span>
                 </div>
@@ -4479,6 +4475,10 @@
                 const activeTab = document.getElementById(hash);
                 
                 if(activeNav) activeNav.classList.add('active');
+                // Clear chat unread badge when opening Chats tab
+                if (hash === 'tab-chats') {
+                    updateChatsUnreadBadge(0);
+                }
                 if(activeTab) {
                     activeTab.classList.add('active-tab');
                     // Slide the incoming tab in from whichever side it actually sits on in the nav
@@ -6141,7 +6141,7 @@
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
 
-                if (fetchedCount === 0) noMoreOlderPosts = true;
+                if (fetchedCount < FEED_PAGE_SIZE) noMoreOlderPosts = true;
             } catch (e) {
                 // Pagination hitting the end (or a transient read issue) isn't something the
                 // user needs to see — just stop trying so we don't hammer the DB on every
@@ -11295,6 +11295,10 @@
 
         function updateGroupsUnreadBadge(count) {
             updateNavBadge('tab-groups', count);
+        }
+
+        function updateChatsUnreadBadge(count) {
+            updateNavBadge('tab-chats', count);
         }
 
         // --- CHAT REQUESTS & CONTACTS ---

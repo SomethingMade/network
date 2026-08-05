@@ -5619,6 +5619,7 @@
         let oldestLoadedPostTimestamp = Infinity;
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
+        let emptyOlderFetchCount = 0;
         let pendingNewPosts = {}; // postId -> post, queued live arrivals not yet shown (see "New posts" pill)
         // True while the initial page of posts is still streaming in from Firebase on first
         // load. reorderFeedCards() checks this to skip its scroll-preserving adjustment during
@@ -6463,27 +6464,48 @@
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
 
-                if (fetchedCount === 0) noMoreOlderPosts = true;
+                if (fetchedCount === 0) {
+                    emptyOlderFetchCount++;
+                    if (emptyOlderFetchCount >= 2) noMoreOlderPosts = true;
+                } else {
+                    emptyOlderFetchCount = 0;
+                }
             } catch (e) {
                 // Pagination hitting the end (or a transient read issue) isn't something the
                 // user needs to see — just stop trying so we don't hammer the DB on every
                 // scroll tick, and log for our own debugging.
                 console.warn('loadOlderPosts failed:', e);
-                noMoreOlderPosts = true;
                 removeFeedLoadingSkeletons(skeletonNodes);
+                // Don't flip noMoreOlderPosts on a transient error
             } finally {
                 isLoadingMorePosts = false;
             }
         }
 
         function initFeedScrollListener() {
-            const container = document.getElementById('discover-grid-scroll');
-            if (!container || container.dataset.scrollBound) return;
-            container.dataset.scrollBound = 'true';
-            container.addEventListener('scroll', () => {
-                const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 400;
-                if (nearBottom) loadOlderPosts();
+            const list = document.getElementById('feed-posts-list');
+            if (!list || list.dataset.ioBound) return;
+            list.dataset.ioBound = 'true';
+
+            // Create a sentinel if it doesn't exist
+            let sentinel = document.getElementById('feed-load-more-sentinel');
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'feed-load-more-sentinel';
+                sentinel.style.height = '1px';
+                list.appendChild(sentinel);
+            }
+
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) loadOlderPosts();
+                });
+            }, {
+                root: list.closest('[data-scrollable]') || list.parentElement,
+                rootMargin: '0px 0px 400px 0px',
+                threshold: 0
             });
+            io.observe(sentinel);
         }
 
         async function initFeedListeners() {
@@ -6540,6 +6562,12 @@
                 const postId = snap.key;
                 const post = snap.val();
 
+                // ALWAYS keep the cursor accurate — even posts that arrive after the
+                // burst ends (and get queued) still affect where pagination starts.
+                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
+                    oldestLoadedPostTimestamp = post.timestamp;
+                }
+
                 if (feedInitialBurstActive) {
                     bumpFeedBurstQuiet();
                 } else if (!cachedPosts[postId]) {
@@ -6549,9 +6577,6 @@
                 }
 
                 cachedPosts[postId] = post;
-                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
-                    oldestLoadedPostTimestamp = post.timestamp;
-                }
                 const list = document.getElementById('feed-posts-list');
                 if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
                     list.prepend(buildFeedPostCard(postId, post));
@@ -12239,6 +12264,7 @@
                 userChatsInitialized = false;
                 feedListenersAttached = false;
                 notifListenersAttached = false;
+                emptyOlderFetchCount = 0;
                 cachedNotifications = {};
                 updateNotifBellUI();
             }

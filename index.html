@@ -1593,6 +1593,32 @@
         #video-viewer-overlay.active { opacity: 1; visibility: visible; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
+        /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
+        #reel-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100007; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #reel-viewer-overlay.active { opacity: 1; visibility: visible; }
+        .reel-viewer-topbar { position: absolute; top: 16px; right: 16px; z-index: 4; }
+        .reel-viewer-close { width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: #fff; cursor: pointer; transition: 0.2s; }
+        .reel-viewer-close:hover { opacity: 0.75; }
+        .reel-viewer-track { width: 100%; height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .reel-viewer-track::-webkit-scrollbar { display: none; }
+        .reel-item { position: relative; width: 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
+        .reel-item-media { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .reel-item-media video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        .reel-item-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: reelSpin 0.8s linear infinite; }
+        @keyframes reelSpin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+        .reel-item-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; color: #fff; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+        .reel-item-play-hint.visible { opacity: 1; }
+        .reel-item-play-hint svg { width: 26px; height: 26px; }
+        .reel-item-info { position: absolute; left: 14px; right: 78px; bottom: 22px; color: #fff; z-index: 2; }
+        .reel-item-author { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; margin-bottom: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .reel-item-author .avatar { width: 30px; height: 30px; font-size: 13px; }
+        .reel-item-caption { font-size: 13.5px; line-height: 1.35; opacity: 0.95; text-shadow: 0 1px 6px rgba(0,0,0,0.55); max-height: 4.1em; overflow: hidden; }
+        .reel-item-actions { position: absolute; right: 10px; bottom: 22px; display: flex; flex-direction: column; align-items: center; gap: 20px; z-index: 2; }
+        .reel-item-action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: #fff; cursor: pointer; font-size: 11px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .reel-item-action-btn svg { width: 27px; height: 27px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
+        .reel-item-action-btn.liked { color: var(--danger-red, #ef4444); }
+        .reel-item-action-btn.liked svg { color: var(--danger-red, #ef4444); }
+
         /* ── STATUS TAB (video-only grid, gallery of Moments videos) ── */
         .status-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .status-masonry-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 76px; gap: 6px; padding: 10px; }
@@ -3463,6 +3489,13 @@
         <audio id="video-viewer-music-audio" preload="none" loop style="display:none;"></audio>
     </div>
 
+    <div id="reel-viewer-overlay">
+        <div class="reel-viewer-topbar">
+            <svg class="reel-viewer-close" id="reel-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
+        <div class="reel-viewer-track" id="reel-viewer-track"></div>
+    </div>
+
     <div id="floating-video-player" class="floating-video-player">
         <div class="floating-video-drag-handle" id="floating-video-drag-handle">
             <video id="floating-video-el" playsinline loop muted></video>
@@ -3943,6 +3976,221 @@
         });
         document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'video-viewer-overlay') history.back();
+        });
+
+        // ── REEL VIEWER (full-screen, vertical-swipe, opened from a post's video) ──
+        // Fed by cachedPosts: any post with a videoUrl is fair game. The starting post always
+        // comes first; everything after it is a randomly shuffled pull of other video posts, and
+        // the queue tops itself up (reshuffling if it runs out of fresh ones) as the person nears
+        // the end, so the swipe never dead-ends.
+        let reelPostIds = [];
+        let reelActiveIndex = -1;
+        let reelObserver = null;
+
+        function getShuffledVideoPostIds(excludeIds) {
+            const exclude = excludeIds instanceof Set ? excludeIds : new Set(excludeIds || []);
+            const ids = Object.keys(cachedPosts).filter(id => cachedPosts[id] && cachedPosts[id].videoUrl && !exclude.has(id));
+            for (let i = ids.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [ids[i], ids[j]] = [ids[j], ids[i]];
+            }
+            return ids;
+        }
+
+        function buildReelItemHtml(postId) {
+            const post = cachedPosts[postId];
+            const author = (post && cachedUsers[post.uid]) || {};
+            const name = escapeHtmlForPost(author.name || (post && post.name) || 'User');
+            const caption = post && post.text ? escapeHtmlForPost(post.text) : '';
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const likedByMe = !!(post && post.reactions && myUid && post.reactions[myUid]);
+            return `
+                <div class="reel-item" data-post-id="${postId}">
+                    <div class="reel-item-media">
+                        <div class="reel-item-spinner"></div>
+                    </div>
+                    <div class="reel-item-play-hint">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                    </div>
+                    <div class="reel-item-info">
+                        <div class="reel-item-author">${feedAvatarHtml(author)}<span></span></div>
+                        ${caption ? `<div class="reel-item-caption"></div>` : ''}
+                    </div>
+                    <div class="reel-item-actions">
+                        <button type="button" class="reel-item-action-btn reel-like-btn${likedByMe ? ' liked' : ''}" data-post-id="${postId}">
+                            <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"></path></svg>
+                            <span>${formatFeedCount((post && post.likeCount) || 0)}</span>
+                        </button>
+                        <button type="button" class="reel-item-action-btn reel-comment-btn" data-post-id="${postId}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+                            <span>${formatFeedCount((post && post.commentCount) || 0)}</span>
+                        </button>
+                        <button type="button" class="reel-item-action-btn reel-share-btn" data-post-id="${postId}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line></svg>
+                            <span>Share</span>
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        // Setting textContent for name/caption separately (rather than inline in the template
+        // string above) keeps user-authored text out of innerHTML entirely.
+        function fillReelItemText(itemEl, postId) {
+            const post = cachedPosts[postId];
+            const author = (post && cachedUsers[post.uid]) || {};
+            const nameEl = itemEl.querySelector('.reel-item-author span');
+            if (nameEl) nameEl.textContent = author.name || (post && post.name) || 'User';
+            const captionEl = itemEl.querySelector('.reel-item-caption');
+            if (captionEl) captionEl.textContent = (post && post.text) || '';
+        }
+
+        function reelExtendQueueIfNeeded() {
+            if (reelActiveIndex < reelPostIds.length - 3) return;
+            const used = new Set(reelPostIds);
+            let more = getShuffledVideoPostIds(used);
+            if (more.length === 0 && reelPostIds.length) {
+                // Ran out of fresh videos — recycle the pool so the swipe still keeps going.
+                more = getShuffledVideoPostIds([reelPostIds[reelActiveIndex]]);
+            }
+            const track = document.getElementById('reel-viewer-track');
+            more.slice(0, 8).forEach(id => {
+                reelPostIds.push(id);
+                track.insertAdjacentHTML('beforeend', buildReelItemHtml(id));
+                const itemEl = track.lastElementChild;
+                fillReelItemText(itemEl, id);
+                bindReelItem(itemEl, id);
+                if (reelObserver) reelObserver.observe(itemEl);
+            });
+        }
+
+        function activateReelItem(itemEl, postId) {
+            const media = itemEl.querySelector('.reel-item-media');
+            let video = media.querySelector('video');
+            const post = cachedPosts[postId];
+            if (!video) {
+                media.innerHTML = '';
+                video = document.createElement('video');
+                video.className = 'reel-video';
+                video.playsInline = true;
+                video.loop = true;
+                video.preload = 'auto';
+                video.src = (post && post.videoUrl) || '';
+                media.appendChild(video);
+                video.addEventListener('click', () => toggleReelItemPlayback(itemEl, video));
+            }
+            video.muted = false;
+            video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+        }
+
+        function toggleReelItemPlayback(itemEl, video) {
+            const hint = itemEl.querySelector('.reel-item-play-hint');
+            if (video.paused) {
+                video.play().catch(() => {});
+                if (hint) hint.classList.remove('visible');
+            } else {
+                video.pause();
+                if (hint) hint.classList.add('visible');
+            }
+        }
+
+        function deactivateReelItem(itemEl) {
+            const video = itemEl.querySelector('.reel-item-media video');
+            if (video) video.pause();
+            const hint = itemEl.querySelector('.reel-item-play-hint');
+            if (hint) hint.classList.remove('visible');
+        }
+
+        function bindReelItem(itemEl, postId) {
+            const likeBtn = itemEl.querySelector('.reel-like-btn');
+            if (likeBtn) likeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleLikePost(postId);
+                likeBtn.classList.toggle('liked');
+                const svgEl = likeBtn.querySelector('svg');
+                if (svgEl) svgEl.setAttribute('fill', likeBtn.classList.contains('liked') ? 'currentColor' : 'none');
+            });
+            const commentBtn = itemEl.querySelector('.reel-comment-btn');
+            if (commentBtn) commentBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(postId); });
+            const shareBtn = itemEl.querySelector('.reel-share-btn');
+            if (shareBtn) shareBtn.addEventListener('click', (e) => { e.stopPropagation(); openSharePostSheet(postId); });
+        }
+
+        function openReelViewer(startPostId) {
+            const startPost = cachedPosts[startPostId];
+            if (!startPost || !startPost.videoUrl) return;
+            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
+
+            reelPostIds = [startPostId, ...getShuffledVideoPostIds([startPostId])];
+            reelActiveIndex = -1;
+            const track = document.getElementById('reel-viewer-track');
+            track.innerHTML = reelPostIds.map(buildReelItemHtml).join('');
+            reelPostIds.forEach(id => {
+                const itemEl = track.querySelector(`.reel-item[data-post-id="${id}"]`);
+                if (itemEl) { fillReelItemText(itemEl, id); bindReelItem(itemEl, id); }
+            });
+            track.scrollTop = 0;
+
+            if (reelObserver) reelObserver.disconnect();
+            reelObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const itemEl = entry.target;
+                    const postId = itemEl.dataset.postId;
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                        const idx = reelPostIds.indexOf(postId);
+                        if (idx !== reelActiveIndex) {
+                            const prevEl = track.children[reelActiveIndex];
+                            if (prevEl) deactivateReelItem(prevEl);
+                            reelActiveIndex = idx;
+                            activateReelItem(itemEl, postId);
+                            reelExtendQueueIfNeeded();
+                        }
+                    } else if (!entry.isIntersecting) {
+                        deactivateReelItem(itemEl);
+                    }
+                });
+            }, { root: track, threshold: [0, 0.6] });
+            track.querySelectorAll('.reel-item').forEach(el => reelObserver.observe(el));
+
+            document.getElementById('reel-viewer-overlay').classList.add('active');
+            if (window.location.hash !== '#reel-viewer') window.location.hash = 'reel-viewer';
+        }
+
+        function closeReelViewer() {
+            const track = document.getElementById('reel-viewer-track');
+            track.querySelectorAll('.reel-item-media video').forEach(v => { v.pause(); v.src = ''; });
+            if (reelObserver) { reelObserver.disconnect(); reelObserver = null; }
+            track.innerHTML = '';
+            reelPostIds = [];
+            reelActiveIndex = -1;
+            document.getElementById('reel-viewer-overlay').classList.remove('active');
+        }
+
+        // Keeps a reel item's like count/heart state and comment count in sync if the post
+        // changes elsewhere (e.g. someone else likes it) while the reel viewer is open.
+        function patchReelItemIfPresent(postId, post) {
+            const track = document.getElementById('reel-viewer-track');
+            if (!track) return;
+            const itemEl = track.querySelector(`.reel-item[data-post-id="${postId}"]`);
+            if (!itemEl) return;
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const likedByMe = !!(post.reactions && myUid && post.reactions[myUid]);
+            const likeBtn = itemEl.querySelector('.reel-like-btn');
+            if (likeBtn) {
+                likeBtn.classList.toggle('liked', likedByMe);
+                const svgEl = likeBtn.querySelector('svg');
+                if (svgEl) svgEl.setAttribute('fill', likedByMe ? 'currentColor' : 'none');
+                const countEl = likeBtn.querySelector('span');
+                if (countEl) countEl.textContent = formatFeedCount(post.likeCount || 0);
+            }
+            const commentCountEl = itemEl.querySelector('.reel-comment-btn span');
+            if (commentCountEl) commentCountEl.textContent = formatFeedCount(post.commentCount || 0);
+        }
+
+        document.getElementById('reel-viewer-close').addEventListener('click', () => history.back());
+        document.getElementById('reel-viewer-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'reel-viewer-overlay') history.back();
         });
 
         // ── FLOATING / POP-OUT MINI VIDEO PLAYER ──
@@ -4429,6 +4677,7 @@
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
             const imageViewerActive = document.getElementById('image-viewer-overlay').classList.contains('active');
             const videoViewerActive = document.getElementById('video-viewer-overlay').classList.contains('active');
+            const reelViewerActive = document.getElementById('reel-viewer-overlay').classList.contains('active');
             const viewOnceAudioActive = document.getElementById('view-once-audio-overlay').classList.contains('active');
             const statusViewerActive = document.getElementById('status-viewer-overlay').classList.contains('active');
             const statusUploadActive = document.getElementById('status-upload-overlay').classList.contains('active');
@@ -4439,6 +4688,9 @@
             }
             if (hash !== 'video-viewer' && videoViewerActive) {
                 closeVideoViewer();
+            }
+            if (hash !== 'reel-viewer' && reelViewerActive) {
+                closeReelViewer();
             }
             if (hash !== 'view-once-audio' && viewOnceAudioActive) {
                 closeViewOnceAudio();
@@ -4456,7 +4708,7 @@
             // The image/video/audio viewers (and the profile sheet) open on top of chat/story (not a
             // real navigation away from them), so landing on those hashes should never trigger the
             // chat/story close logic below.
-            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'view-once-audio' || hash === 'status-viewer' || hash === 'status-upload' || hash === 'user-info');
+            const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'reel-viewer' || hash === 'view-once-audio' || hash === 'status-viewer' || hash === 'status-upload' || hash === 'user-info');
 
             if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -6302,6 +6554,7 @@
                 const post = snap.val();
                 const oldPost = cachedPosts[postId];
                 cachedPosts[postId] = post;
+                patchReelItemIfPresent(postId, post);
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
 
@@ -7503,7 +7756,7 @@
                 e.stopPropagation();
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();
-                openVideoViewer(post.videoUrl, true, post.music ? post.music.previewUrl : null);
+                openReelViewer(originalId);
             });
             const popoutBtn = card.querySelector('.feed-video-popout-btn');
             if (popoutBtn) popoutBtn.addEventListener('click', (e) => {

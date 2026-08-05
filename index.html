@@ -6549,8 +6549,8 @@
             // long as they keep coming in close succession, and only start queuing once things
             // go quiet. That adapts to however long the burst actually takes instead of guessing
             // a fixed duration, and it can't be left empty by a separate fetch failing.
-            const FEED_BURST_QUIET_MS = 700;   // no arrival for this long => burst is over
-            const FEED_BURST_MAX_MS = 6000;    // hard cap so a stuck connection can't wedge this open
+            const FEED_BURST_QUIET_MS = 1500;  // no arrival for this long => burst is over
+            const FEED_BURST_MAX_MS = 10000;   // hard cap so a stuck connection can't wedge this open
             let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
             const endFeedInitialBurst = () => { feedInitialBurstActive = false; };
@@ -6558,7 +6558,9 @@
                 clearTimeout(feedBurstQuietTimer);
                 feedBurstQuietTimer = setTimeout(endFeedInitialBurst, FEED_BURST_QUIET_MS);
             };
-            bumpFeedBurstQuiet();
+            // Don't start the quiet timer yet — wait for the first post to actually arrive.
+            // On slow connections the preemptive timer could expire before Firebase streams
+            // a single onChildAdded, causing the entire initial page to be mis-queued as "new".
             setTimeout(endFeedInitialBurst, FEED_BURST_MAX_MS);
 
             onChildAdded(postsQuery, (snap) => {

@@ -509,6 +509,11 @@
         .feed-save-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
         .feed-save-btn.saved { color: var(--text-primary); }
         .feed-save-btn.saved svg { fill: var(--text-primary); stroke: var(--text-primary); }
+        .feed-repost-btn:hover { color: var(--success-green); background: rgba(52,199,89,0.1); }
+        .feed-repost-btn.reposted { color: var(--success-green); }
+        .feed-repost-banner { display:flex; align-items:center; gap:8px; padding: 12px 16px 0; font-size:12.5px; font-weight:600; color: var(--text-secondary); cursor:pointer; }
+        .feed-repost-banner svg { width:15px; height:15px; flex-shrink:0; }
+        .feed-repost-banner:hover { color: var(--text-primary); }
         .feed-post-view-stat { cursor: default; }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
@@ -6220,8 +6225,13 @@
 
                 if (existingCard && contentUnchanged) {
                     patchFeedPostCounts(existingCard, post);
+                    patchDuplicateContentCards(list, postId, post, existingCard);
                     return;
                 }
+                // Even if this exact card doesn't exist yet (or its content changed), other
+                // cards elsewhere in the feed may be showing this same post via a repost — keep
+                // their like/comment/repost counts in sync either way.
+                if (!existingCard || !contentUnchanged) patchDuplicateContentCards(list, postId, post, existingCard);
 
                 // Actual content edit (or a card we don't have yet) — safe to rebuild, but still
                 // don't yank it out from under someone actively editing it.
@@ -6616,10 +6626,13 @@
             activePostOptions = { postId, post, card };
             const user = auth.currentUser;
             const isOwn = !!(user && post.uid === user.uid);
+            const isRepost = !!post.repostOf;
             document.getElementById('btn-post-message').style.display = isOwn ? 'none' : 'block';
-            document.getElementById('btn-post-edit').style.display = isOwn ? 'block' : 'none';
+            // A repost wrapper has no text of its own, so there's nothing to edit.
+            document.getElementById('btn-post-edit').style.display = (isOwn && !isRepost) ? 'block' : 'none';
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
+            document.getElementById('btn-post-delete').textContent = isRepost ? 'Undo Repost' : 'Delete Post';
             document.getElementById('post-options-sheet-overlay').classList.add('active');
         }
 
@@ -6763,6 +6776,10 @@
         }
 
         async function deletePost(postId) {
+            // Grab this before it's wiped below — if it's a repost wrapper, we still need to
+            // know which original post to un-mark and decrement the repost count on.
+            const deletedPost = cachedPosts[postId];
+
             // Optimistically pull the card out of the feed right away — the
             // onChildRemoved listener also does a DB existence check before it
             // will remove a card (to avoid stripping posts that just fell out of
@@ -6785,7 +6802,18 @@
             try {
                 await remove(ref(database, `posts/${postId}`));
                 await remove(ref(database, `postComments/${postId}`));
-                notify('Post deleted');
+                if (deletedPost && deletedPost.repostOf) {
+                    const user = auth.currentUser;
+                    if (user) {
+                        await update(ref(database, `posts/${deletedPost.repostOf}`), {
+                            [`reposts/${user.uid}`]: null,
+                            repostCount: increment(-1)
+                        });
+                    }
+                    notify('Repost removed');
+                } else {
+                    notify('Post deleted');
+                }
             } catch (e) {
                 notify('Could not delete post', 'error');
             }
@@ -7087,6 +7115,22 @@
             if (likeCountEl) likeCountEl.textContent = post.likeCount || 0;
             if (commentCountEl) commentCountEl.textContent = post.commentCount || 0;
             if (viewCountEl) viewCountEl.textContent = formatFeedCount(post.impressionCount || 0);
+
+            const repostBtn = card.querySelector('.feed-repost-btn');
+            const repostCountEl = card.querySelector('.feed-repost-count');
+            if (repostCountEl) repostCountEl.textContent = formatFeedCount(post.repostCount || 0);
+            if (repostBtn) repostBtn.classList.toggle('reposted', !!(post.reposts && myUid && post.reposts[myUid]));
+        }
+
+        // A repost-wrapper card renders another post's content, so more than one card in the
+        // feed can share the same content post (its own direct card, plus one per repost of
+        // it). When that content post's counts change, patch every card showing it, not just
+        // whichever one happens to have that id as its own postId.
+        function patchDuplicateContentCards(list, contentPostId, post, skipCard) {
+            if (!list) return;
+            list.querySelectorAll(`[data-content-post-id="${contentPostId}"]`).forEach(card => {
+                if (card !== skipCard) patchFeedPostCounts(card, post);
+            });
         }
 
         // --- POST TEXT: escape user content, then highlight #hashtags as clickable spans ---
@@ -7112,16 +7156,76 @@
             });
         }
 
+        // Small "reposted by" banner shown above a repost-wrapper card, built from the
+        // wrapper post itself (the reposter), not the original content.
+        function repostArrowsSvg() {
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>';
+        }
+        function buildRepostBannerHtml(wrapperPost) {
+            const liveReposter = cachedUsers[wrapperPost.uid] || {};
+            const reposterName = escapeHtmlForPost(liveReposter.name || wrapperPost.name || 'Someone');
+            return `<div class="feed-repost-banner" data-reposter-uid="${wrapperPost.uid || ''}">${repostArrowsSvg()}<span>${reposterName} reposted</span></div>`;
+        }
+        function bindRepostBannerClick(card) {
+            const banner = card.querySelector('.feed-repost-banner');
+            if (banner) banner.addEventListener('click', (e) => {
+                e.stopPropagation();
+                pauseAllFeedMedia();
+                openUserProfileSheet(banner.dataset.reposterUid);
+            });
+        }
+        // The original post wasn't loaded yet (e.g. it fell outside the paginated window) —
+        // fetch it once, cache it, then swap the placeholder card for the real thing.
+        async function hydrateRepostCard(card, wrapperPostId, wrapperPost, originalId) {
+            try {
+                const snap = await get(ref(database, `posts/${originalId}`));
+                if (!snap.exists()) {
+                    card.innerHTML = buildRepostBannerHtml(wrapperPost) + `<p class="empty-msg" style="margin:16px 0 20px;">This post is no longer available.</p>`;
+                    bindRepostBannerClick(card);
+                    return;
+                }
+                cachedPosts[originalId] = snap.val();
+                if (card.isConnected) card.replaceWith(buildFeedPostCard(wrapperPostId, wrapperPost));
+            } catch (e) {
+                card.innerHTML = buildRepostBannerHtml(wrapperPost) + `<p class="empty-msg" style="margin:16px 0 20px;">Couldn't load this post.</p>`;
+                bindRepostBannerClick(card);
+            }
+        }
+
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
-            const isOwn = !!(myUid && post.uid === myUid);
-            const myReactionEmoji = (post.reactions && myUid) ? post.reactions[myUid] : null;
-            const likedByMe = !!myReactionEmoji;
-            const savedByMe = !!cachedSavedPosts[postId];
+
+            // A repost is a lightweight wrapper post (no text/media of its own, see
+            // toggleRepostPost) that just points at the original via repostOf. It's rendered
+            // using the ORIGINAL post's full content/id — likes, comments, saves, and further
+            // reposts all target the original — with a small "reposted by" banner (built from
+            // the wrapper itself) on top. The wrapper's own id/object are kept as postId/
+            // wrapperPost purely for card lifecycle and for edit/delete (deleting a repost just
+            // undoes the repost, see deletePost).
+            const wrapperPost = post;
+            const isRepost = !!wrapperPost.repostOf;
+            const originalId = isRepost ? wrapperPost.repostOf : postId;
+
             const card = document.createElement('div');
             card.className = 'feed-post-card';
             card.dataset.postId = postId;
+            card.dataset.contentPostId = originalId;
+
+            if (isRepost) {
+                post = cachedPosts[originalId];
+                if (!post) {
+                    card.innerHTML = buildRepostBannerHtml(wrapperPost) + `<p class="empty-msg" style="margin:16px 0 20px;">Loading post…</p>`;
+                    hydrateRepostCard(card, postId, wrapperPost, originalId);
+                    return card;
+                }
+            }
+
+            const isOwn = !!(myUid && post.uid === myUid);
+            const myReactionEmoji = (post.reactions && myUid) ? post.reactions[myUid] : null;
+            const likedByMe = !!myReactionEmoji;
+            const savedByMe = !!cachedSavedPosts[originalId];
+            const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
             card.dataset.uid = post.uid || '';
             card.dataset.fallbackName = post.name || 'User';
             card.dataset.fallbackPhoto = post.photoURL || '';
@@ -7187,6 +7291,7 @@
                 </button>`;
 
             card.innerHTML = `
+                ${isRepost ? buildRepostBannerHtml(wrapperPost) : ''}
                 <div class="x-post-row">
                     <div class="x-post-avatar-col">
                         ${avatarHtml}
@@ -7219,6 +7324,10 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                         <span class="feed-comment-count">${post.commentCount || 0}</span>
                     </button>
+                    <button type="button" class="feed-post-action-btn feed-repost-btn ${repostedByMe ? 'reposted' : ''}" title="Repost">
+                        ${repostArrowsSvg()}
+                        <span class="feed-repost-count">${formatFeedCount(post.repostCount || 0)}</span>
+                    </button>
                     <button type="button" class="feed-post-action-btn feed-share-btn" title="Share">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     </button>
@@ -7235,6 +7344,7 @@
             `;
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);
+            if (isRepost) bindRepostBannerClick(card);
             getFeedImpressionObserver().observe(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
@@ -7272,10 +7382,16 @@
                 });
             });
 
-            bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), postId);
-            card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(postId));
-            card.querySelector('.feed-share-btn').addEventListener('click', (e) => { e.stopPropagation(); openSharePostSheet(postId); });
-            card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(postId); });
+            bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), originalId);
+            card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(originalId));
+            card.querySelector('.feed-share-btn').addEventListener('click', (e) => { e.stopPropagation(); openSharePostSheet(originalId); });
+            card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(originalId); });
+            const repostBtn = card.querySelector('.feed-repost-btn');
+            if (repostBtn) repostBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                repostBtn.disabled = true;
+                try { await toggleRepostPost(originalId); } finally { repostBtn.disabled = false; }
+            });
             card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
                 imgEl.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -7305,7 +7421,7 @@
             initFeedPostMusic(card);
 
             const menuBtn = card.querySelector('.feed-post-menu-btn');
-            if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, post, card));
+            if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, wrapperPost, card));
 
             return card;
         }
@@ -7337,6 +7453,63 @@
         // Tap on the like button: toggles the like on/off.
         function toggleLikePost(postId) {
             return setPostReaction(postId, DEFAULT_POST_REACTION);
+        }
+
+        // Reposting shares someone else's post into your own followers' feeds as a new,
+        // separate post entry (posts/{newKey}) that just points back at the original via
+        // repostOf — see buildFeedPostCard for how that's rendered. originalId here is always
+        // already resolved to the true original (reposting a repost re-shares the original,
+        // never chains — buildFeedPostCard resolves this once when binding the button).
+        async function toggleRepostPost(originalId) {
+            const user = auth.currentUser;
+            if (!user || !originalId) return;
+
+            let originalPost = cachedPosts[originalId];
+            if (!originalPost) {
+                try {
+                    const snap = await get(ref(database, `posts/${originalId}`));
+                    originalPost = snap.exists() ? snap.val() : null;
+                } catch (e) { originalPost = null; }
+            }
+            if (!originalPost) { notify('Post not found', 'error'); return; }
+
+            const myExistingRepostKey = (originalPost.reposts && originalPost.reposts[user.uid]) || null;
+
+            if (myExistingRepostKey) {
+                try {
+                    await remove(ref(database, `posts/${myExistingRepostKey}`));
+                    await remove(ref(database, `postComments/${myExistingRepostKey}`));
+                } catch (e) {}
+                await update(ref(database, `posts/${originalId}`), {
+                    [`reposts/${user.uid}`]: null,
+                    repostCount: increment(-1)
+                });
+                notify('Repost removed');
+                return;
+            }
+
+            if (originalPost.uid === user.uid) {
+                notify("You can't repost your own post", 'error');
+                return;
+            }
+
+            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+            const newRepostRef = push(ref(database, 'posts'));
+            await set(newRepostRef, {
+                uid: user.uid,
+                name: myProfile.name || user.displayName || 'User',
+                photoURL: myProfile.photoURL || user.photoURL || '',
+                repostOf: originalId,
+                timestamp: serverTimestamp(),
+                likeCount: 0,
+                commentCount: 0
+            });
+            await update(ref(database, `posts/${originalId}`), {
+                [`reposts/${user.uid}`]: newRepostRef.key,
+                repostCount: increment(1)
+            });
+            createNotification(originalPost.uid, { type: 'repost', postId: originalId, text: originalPost.text || '' });
+            notify('Reposted');
         }
 
         // Simple click-to-like — no long-press reaction picker.
@@ -7797,6 +7970,7 @@
         function notifSentenceFor(notif) {
             const name = notif.fromName || 'Someone';
             if (notif.type === 'like') return `<b>${name}</b> liked your post`;
+            if (notif.type === 'repost') return `<b>${name}</b> reposted your post`;
             if (notif.type === 'comment') return `<b>${name}</b> commented: ${notif.text || ''}`;
             if (notif.type === 'reply') return `<b>${name}</b> replied: ${notif.text || ''}`;
             if (notif.type === 'mention') return `<b>${name}</b> tagged you: ${notif.text || ''}`;

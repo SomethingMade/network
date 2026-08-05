@@ -2857,7 +2857,7 @@
                         </div>
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="text" id="search-chats" placeholder="Ask Goza AI or Search" autocomplete="off">
+                            <input type="text" id="search-chats" placeholder="Search" autocomplete="off">
                         </div>
                         <div class="wa-filter-row" id="wa-filter-row">
                             <button type="button" class="wa-chip active" data-filter="all">
@@ -11771,19 +11771,11 @@
                     document.getElementById('display-username').textContent = '@' + username;
                 } catch (err) { console.error('Username assignment failed', err); }
 
+                // Goza AI assistant feature removed — clean up any chat entry left over from
+                // when it used to auto-seed a welcome message for every new user.
                 try {
-                    const aiChatSnap = await get(ref(database, `user_chats/${user.uid}/${AI_UID}`));
-                    if (!aiChatSnap.exists()) {
-                        const welcomeText = "Hi! I'm Goza AI 👋 Ask me anything.";
-                        const welcomeTime = Date.now();
-                        const threadId = threadIdFor(user.uid, AI_UID);
-                        const welcomeKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
-                        const seedUpdates = {};
-                        seedUpdates[`dm_threads/${threadId}/messages/${welcomeKey}`] = { text: welcomeText, senderUid: AI_UID, createdAt: welcomeTime };
-                        seedUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: welcomeText, timestamp: welcomeTime, unreadCount: 0 };
-                        await update(ref(database), seedUpdates);
-                    }
-                } catch (err) { console.error('Goza AI seed failed', err); }
+                    await update(ref(database), { [`user_chats/${user.uid}/${AI_UID}`]: null });
+                } catch (err) { console.error('Failed to remove leftover Goza AI chat', err); }
 
                 const connectedRef = ref(database, '.info/connected');
                 onValue(connectedRef, (snap) => {

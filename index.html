@@ -650,6 +650,16 @@
 
         .wa-avatar-block { display: flex; justify-content: center; margin-bottom: 22px; }
 
+        /* Cover photo banner shown above the avatar on profile sheets */
+        .wa-cover-photo-block { position: relative; height: 130px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
+        .sheet-cover-upload { cursor: pointer; }
+        .sheet-cover-upload .sheet-upload-spinner { border-radius: 0; }
+        .sheet-cover-upload.uploading .sheet-upload-spinner { display: flex; }
+        .cover-camera-badge { position: absolute; bottom: 10px; right: 16px; width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.85); color: #fff; }
+        .cover-camera-badge svg { width: 15px; height: 15px; }
+        /* Pulls the avatar up so it overlaps the bottom edge of the cover photo, banner-style */
+        .wa-avatar-block-overlap { margin-top: -48px; position: relative; z-index: 1; }
+
         .wa-field-group { background: var(--bg-alt); border-radius: 18px; padding: 4px 16px; margin-bottom: 22px; }
         .wa-field-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
         .wa-field-row:last-child { border-bottom: none; }
@@ -1808,6 +1818,8 @@
             .sheet-avatar-upload { width: 80px; height: 80px; }
             .sheet-avatar-upload .avatar-circle, .wa-avatar-block .avatar-circle { width: 80px; height: 80px; }
             .sheet-avatar-upload .camera-badge { width: 28px; height: 28px; }
+            .wa-cover-photo-block { height: 110px; margin: 0 -18px; }
+            .wa-avatar-block-overlap { margin-top: -40px; }
             .chat-view-avatar { width: 36px; height: 36px; }
 
             /* Header / nav / profile buttons */
@@ -2422,7 +2434,9 @@
                 </button>
             </div>
 
-            <div class="wa-avatar-block">
+            <div class="wa-cover-photo-block" id="user-info-cover-photo"></div>
+
+            <div class="wa-avatar-block wa-avatar-block-overlap">
                 <div class="avatar-circle" id="user-info-avatar"></div>
             </div>
 
@@ -2466,7 +2480,13 @@
                 <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
             </div>
 
-            <div class="wa-avatar-block">
+            <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
+                <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+            </div>
+            <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+
+            <div class="wa-avatar-block wa-avatar-block-overlap">
                 <div class="sheet-avatar-upload" id="sheet-avatar-upload">
                     <div class="avatar-circle" id="profile-avatar-preview"></div>
                     <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
@@ -9026,6 +9046,7 @@
         const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
         let pendingPhotoURL = null;
+        let pendingCoverURL = null;
 
         function updateAvatarUI(user) {
             if (!user) return;
@@ -9057,6 +9078,8 @@
                 }
 
                 const myProfile = cachedUsers[user.uid] || {};
+                pendingCoverURL = myProfile.coverPhotoURL || null;
+                document.getElementById('sheet-cover-upload').style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
                 document.getElementById('display-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
                 document.getElementById('new-username-input').value = '';
                 document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
@@ -9316,6 +9339,29 @@
             }
         });
 
+        document.getElementById('sheet-cover-upload').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('profile-cover-input').click();
+        });
+
+        document.getElementById('profile-cover-input').addEventListener('change', async (e) => {
+            e.preventDefault();
+            const file = e.target.files[0];
+            if (!file) return;
+            const wrapper = document.getElementById('sheet-cover-upload');
+            wrapper.classList.add('uploading');
+            try {
+                const { url } = await uploadToCloudinary(file);
+                pendingCoverURL = url;
+                wrapper.style.backgroundImage = `url('${url}')`;
+            } catch (err) {
+                showCustomModal("Upload Failed", "We couldn't upload that image.");
+            } finally {
+                wrapper.classList.remove('uploading');
+                e.target.value = "";
+            }
+        });
+
         profileSheetOverlay.addEventListener('click', (e) => {
             if (e.target === profileSheetOverlay) profileSheetOverlay.classList.remove('active');
         });
@@ -9332,6 +9378,8 @@
             const newName = document.getElementById('profile-name').value.trim();
             const newAbout = document.getElementById('profile-about').value.trim();
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
+            const existingProfile = cachedUsers[user.uid] || {};
+            const finalCover = pendingCoverURL !== null ? pendingCoverURL : (existingProfile.coverPhotoURL || "");
             const saveBtn = document.getElementById('btn-save-profile');
             const originalLabel = saveBtn.textContent;
 
@@ -9343,6 +9391,7 @@
                 await update(ref(database, 'users/' + user.uid), {
                     name: newName || (user.email ? user.email.split('@')[0] : "User"),
                     photoURL: finalPhoto,
+                    coverPhotoURL: finalCover,
                     about: newAbout,
                     email: user.email || ""
                 });
@@ -10134,6 +10183,8 @@
             if (!uid || uid === AI_UID) return;
             const profile = cachedUsers[uid] || {};
             userInfoSheetUid = uid;
+            const coverEl = document.getElementById('user-info-cover-photo');
+            if (coverEl) coverEl.style.backgroundImage = profile.coverPhotoURL ? `url('${profile.coverPhotoURL}')` : 'none';
             const avatarEl = document.getElementById('user-info-avatar');
             if (profile.photoURL) {
                 avatarEl.style.backgroundImage = `url('${profile.photoURL}')`;

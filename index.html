@@ -1032,7 +1032,7 @@
         .invite-btn:active { transform: scale(0.96); }
         .chat-btn-small { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid var(--primary-blue); background: transparent; color: var(--primary-blue); cursor: pointer; transition: 0.2s; }
         .chat-btn-small:hover { background: rgba(37, 211, 102, 0.1); }
-        .group-member-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--text-primary); }
+        .group-member-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--text-primary); cursor: pointer; }
         .group-member-row .avatar { width: 38px; height: 38px; }
         .group-member-row h4 { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .group-info-section { text-align: left; margin-bottom: 16px; }
@@ -1673,7 +1673,7 @@
         .discover-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; overflow-anchor: none; }
         .discover-section-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; padding: 14px 4px 10px; }
         .discover-grid { display: flex; flex-direction: column; gap: 2px; }
-        .discover-card { position: relative; background: var(--bg-alt); border: none; border-bottom: 1px solid var(--border-color); border-radius: 0; padding: 12px 4px; display: flex; flex-direction: row; align-items: center; text-align: left; gap: 12px; box-shadow: none; transition: background 0.15s ease; }
+        .discover-card { position: relative; background: var(--bg-alt); border: none; border-bottom: 1px solid var(--border-color); border-radius: 0; padding: 12px 4px; display: flex; flex-direction: row; align-items: center; text-align: left; gap: 12px; box-shadow: none; transition: background 0.15s ease; cursor: pointer; }
         .discover-card:active { transform: none; background: var(--bg-hover); }
         .discover-card-avatar-wrap { position: relative; width: 54px; height: 54px; border-radius: 50%; padding: 2.5px; margin-bottom: 0; background: var(--border-color); flex-shrink: 0; }
         .discover-card-avatar-wrap.is-business { background: linear-gradient(135deg, #D4A017, #F5C542); }
@@ -5801,7 +5801,12 @@
 
         document.getElementById('discover-grid-scroll').addEventListener('click', async (e) => {
             const btn = e.target.closest('.discover-card-add-btn');
-            if (!btn || btn.disabled) return;
+            if (!btn) {
+                const card = e.target.closest('.discover-card');
+                if (card && card.dataset.uid) openUserProfileSheet(card.dataset.uid);
+                return;
+            }
+            if (btn.disabled) return;
             const uid = btn.dataset.uid;
             const user = auth.currentUser;
             if (!user || !uid) return;
@@ -5892,7 +5897,12 @@
         // sprinkleSuggestedPeople above) — delegated on the list since cards are rebuilt often.
         document.getElementById('feed-posts-list').addEventListener('click', async (e) => {
             const btn = e.target.closest('.discover-card-add-btn');
-            if (!btn || btn.disabled) return;
+            if (!btn) {
+                const card = e.target.closest('.discover-card');
+                if (card && card.dataset.uid) openUserProfileSheet(card.dataset.uid);
+                return;
+            }
+            if (btn.disabled) return;
             const uid = btn.dataset.uid;
             const user = auth.currentUser;
             if (!user || !uid) return;
@@ -10123,11 +10133,16 @@
                 const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
                 const row = document.createElement('div');
                 row.className = 'group-member-row';
+                row.dataset.uid = uid;
                 const initial = (profile.name || '?').charAt(0).toUpperCase();
                 const avatarHtml = profile.photoURL
                     ? `<div class="avatar" style="background-image: url('${profile.photoURL}'); border:none;"></div>`
                     : `<div class="avatar" style="background-color:var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">${initial}</div>`;
                 row.innerHTML = `${avatarHtml}<h4>${profile.name}${verifiedBadgeFor(uid, false)}${uid === group.ownerUid ? ' · Owner' : ''}</h4>`;
+                row.addEventListener('click', () => {
+                    groupInfoSheet.classList.remove('active');
+                    openUserProfileSheet(uid);
+                });
                 membersList.appendChild(row);
             });
 

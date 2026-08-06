@@ -1996,9 +1996,11 @@
 
         /* Floating "messages are end-to-end encrypted" pill, shown just under the chat header
            for DM threads (DMs are the only chats that are actually E2E encrypted). */
-        .dm-e2e-banner-row { display: none; justify-content: center; padding: 10px 16px 0; flex-shrink: 0; }
-        .dm-e2e-banner-row.active { display: flex; }
-        .dm-e2e-banner-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 92%; padding: 7px 14px; border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; line-height: 1.35; text-align: center; box-shadow: var(--shadow-elevated); border: 1px solid var(--border-color); }
+        /* Rendered as the first item inside the scrolling message list (like WhatsApp's
+           "messages are end-to-end encrypted" note) so it's pinned to the top of the
+           conversation history itself, rather than floating above it. */
+        .dm-e2e-banner-row { display: flex; justify-content: center; align-self: center; margin: 0 0 8px; max-width: 100%; }
+        .dm-e2e-banner-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; line-height: 1.35; text-align: center; box-shadow: var(--shadow-bubble); border: 1px solid var(--border-color); }
         .dm-e2e-banner-pill svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.85; }
         body.glass-theme .dm-e2e-banner-pill { background: var(--bg-surface) !important; backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); }
         .group-call-banner.active { display: flex; }
@@ -3244,13 +3246,6 @@
             <button type="button" class="group-call-banner-join" id="group-call-banner-join-btn">Join</button>
         </div>
         
-        <div id="dm-e2e-banner-row" class="dm-e2e-banner-row">
-            <div class="dm-e2e-banner-pill">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span>Messages are end-to-end encrypted. No one outside this chat can read them.</span>
-            </div>
-        </div>
-
         <div class="chat-view-messages" id="chat-view-messages"></div>
         <button type="button" class="scroll-to-bottom-btn" id="scroll-to-bottom-btn" title="Scroll to latest">
             <span class="unread-dot"></span>
@@ -4658,6 +4653,20 @@
             label.textContent = formatDateSeparatorLabel(timestamp);
             sep.appendChild(label);
             return sep;
+        }
+
+        // WhatsApp-style "messages are end-to-end encrypted" note. Built as the first item
+        // inside the scrolling message list itself (like buildDateSeparator above), so it's
+        // pinned to the very top of the conversation history — it scrolls with the thread and
+        // is always the first thing you see when you scroll all the way up, on every DM.
+        function buildE2EBanner() {
+            const row = document.createElement('div');
+            row.className = 'dm-e2e-banner-row';
+            row.innerHTML = `<div class="dm-e2e-banner-pill">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span>Messages are end-to-end encrypted. No one outside this chat can read them.</span>
+            </div>`;
+            return row;
         }
 
         function updateScrollToBottomBtnVisibility() {
@@ -10497,7 +10506,6 @@
             isActiveThreadInitialLoad = true;
             disarmViewOnce();
             document.getElementById('btn-view-once-toggle').style.display = 'none';
-            document.getElementById('dm-e2e-banner-row').classList.remove('active');
             cancelReplyMode(); cancelEditMode();
             
             // Unbind active Chat block checks if any
@@ -15213,7 +15221,6 @@
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('chat-sticker-btn').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('btn-view-once-toggle').style.display = isAIChat ? 'none' : 'block';
-            document.getElementById('dm-e2e-banner-row').classList.toggle('active', !isAIChat);
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode(); cancelEditMode();
             
@@ -15309,6 +15316,7 @@
                 const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
+                if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
                 if (snap.exists()) {
                     const items = Object.entries(snap.val()).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
                     let lastDateKey = null;

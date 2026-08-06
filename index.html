@@ -4786,6 +4786,11 @@
             const statusUploadActive = document.getElementById('status-upload-overlay').classList.contains('active');
             const userInfoActive = document.getElementById('user-info-sheet-overlay').classList.contains('active');
 
+            // The image/video/audio viewers can be opened from on top of the Contact Info sheet
+            // (e.g. tapping a thumbnail in its Media grid) — landing on one of those hashes is
+            // not a real navigation away from that sheet, so it should stay open underneath.
+            const isMediaViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'reel-viewer' || hash === 'view-once-audio');
+
             if (hash !== 'image-viewer' && imageViewerActive) {
                 closeImageViewer();
             }
@@ -4804,7 +4809,7 @@
             if (hash !== 'status-upload' && statusUploadActive) {
                 closeStatusUploadOverlay();
             }
-            if (hash !== 'user-info' && userInfoActive) {
+            if (hash !== 'user-info' && userInfoActive && !isMediaViewerHash) {
                 closeUserInfoSheet();
             }
 
@@ -4812,6 +4817,7 @@
             // real navigation away from them), so landing on those hashes should never trigger the
             // chat/story close logic below.
             const isNestedViewerHash = (hash === 'image-viewer' || hash === 'video-viewer' || hash === 'reel-viewer' || hash === 'view-once-audio' || hash === 'status-viewer' || hash === 'status-upload' || hash === 'user-info');
+
 
             if (hash !== 'chat' && chatActive && !isNestedViewerHash) {
                 document.getElementById('chat-view-overlay').classList.remove('active');
@@ -10305,11 +10311,16 @@
 
             gridEl.innerHTML = items.map(([postId, post]) => {
                 const isVideo = !post.imageUrl && !!post.videoUrl;
-                const thumbSrc = post.imageUrl || post.videoUrl;
-                const mediaTag = isVideo
-                    ? `<video src="${thumbSrc}" muted playsinline preload="metadata"></video>`
-                    : `<img src="${thumbSrc}" alt="" loading="lazy">`;
                 const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
+                let mediaTag;
+                if (isVideo) {
+                    const thumb = post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1);
+                    mediaTag = thumb
+                        ? `<img src="${thumb}" alt="" loading="lazy">`
+                        : `<video src="${post.videoUrl}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=Math.min(this.duration*0.3,2)"></video>`;
+                } else {
+                    mediaTag = `<img src="${post.imageUrl}" alt="" loading="lazy">`;
+                }
                 return `<div class="profile-media-grid-item" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
             }).join('');
 

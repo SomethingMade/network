@@ -347,6 +347,13 @@
         .header-groups-btn svg { width: 21px; height: 21px; }
         .header-groups-badge { position: absolute; top: 3px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger-red); border: 2px solid var(--bg-surface); display: none; }
         .header-groups-badge.show { display: block; }
+        /* ── CALLS TAB: date separators + long-press selection mode ── */
+        .call-item-checkbox { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; display: none; align-items: center; justify-content: center; }
+        .chat-item.calls-selection-mode .call-item-checkbox { display: flex; }
+        .call-item-checkbox.checked { background: var(--danger-red); border-color: var(--danger-red); }
+        .call-item-checkbox.checked::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+        .chat-item.call-selected { background: rgba(255, 69, 58, 0.1); border-radius: 12px; }
+        .chat-item.calls-selection-mode .call-again-btn { display: none; }
         .notif-sheet-header { padding: 0 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-sheet-header svg { flex-shrink: 0; }
         .notif-sheet-header svg:active { opacity: 0.6; }
@@ -3117,7 +3124,7 @@
 
                 <div id="tab-calls" class="tab-content">
                     <div class="chat-header-area">
-                        <div class="chat-header-top">
+                        <div class="chat-header-top" id="calls-header-default">
                             <h1>Calls</h1>
                             <div class="chat-header-icons">
                                 <div class="notif-bell-btn js-notif-bell" title="Notifications">
@@ -3129,6 +3136,16 @@
                                     <div class="header-chats-badge js-header-chats-badge"></div>
                                 </div>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            </div>
+                        </div>
+                        <div class="chat-header-top" id="calls-header-selection" style="display:none;">
+                            <div style="display:flex; align-items:center; gap:14px;">
+                                <svg id="btn-cancel-calls-selection" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Cancel"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                <span id="calls-selection-count" style="font-size:14.5px; font-weight:600;">1 selected</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:16px;">
+                                <svg id="btn-select-all-calls" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Select all"><path d="M9 6h11"></path><path d="M9 12h11"></path><path d="M9 18h11"></path><path d="M4 6l1.3 1.3L7.5 5"></path><path d="M4 12l1.3 1.3L7.5 11"></path><path d="M4 18l1.3 1.3L7.5 17"></path></svg>
+                                <svg id="btn-delete-selected-calls" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;" title="Delete selected"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
                             </div>
                         </div>
                         <div class="search-box">
@@ -12553,6 +12570,18 @@
             return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
         }
 
+        // Day-level label used for the sticky-feeling date separators between groups of calls
+        // (Today / Yesterday / "12 March"), same idea as the chat-view date-separator pill.
+        function callDateSeparatorLabel(ts) {
+            const d = new Date(ts);
+            const now = new Date();
+            if (d.toDateString() === now.toDateString()) return 'Today';
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+            return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+        }
+
         // Small diagonal arrow showing call direction, colored red for a missed call the
         // same way WhatsApp does it, green otherwise.
         function callDirectionIconSvg(direction, status) {
@@ -12562,23 +12591,38 @@
                 : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="7" x2="7" y2="17"></line><polyline points="17 17 7 17 7 7"></polyline></svg>`;
         }
 
+        function callHistoryAvatarHtml(name, photoURL) {
+            const initial = (name || '?').charAt(0).toUpperCase();
+            return photoURL
+                ? `<div class="avatar" style="background-image: url('${photoURL}'); border: none;"></div>`
+                : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+        }
+
+        // Long-press a call row to start selecting, then delete the selected ones (or all of
+        // them) straight out of the database — same interaction as the notifications sheet.
+        let callsSelectionMode = false;
+        let selectedCallIds = new Set();
+        let callsPressState = { timer: null, callId: null, startX: 0, startY: 0 };
+
         function renderCallItem(entry, container) {
             const isGroup = entry.type === 'group';
+            const isSelected = selectedCallIds.has(entry.id);
             const item = document.createElement('div');
-            item.className = 'chat-item';
+            item.className = 'chat-item' + (callsSelectionMode ? ' calls-selection-mode' : '') + (isSelected ? ' call-selected' : '');
+            item.dataset.callId = entry.id;
 
             let displayName, avatarHtml, iconHtml, subLabel, callAgainUid = '', callAgainGroupId = '';
 
             if (isGroup) {
                 displayName = entry.groupName || 'Group';
-                avatarHtml = callAvatarHtml(displayName, entry.groupPhotoURL);
+                avatarHtml = callHistoryAvatarHtml(displayName, entry.groupPhotoURL);
                 subLabel = `Group call · ${formatVoiceTime(entry.duration || 0)}`;
                 iconHtml = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
                 callAgainGroupId = entry.groupId;
             } else {
                 const profile = cachedUsers[entry.peerUid] || { name: 'Unknown User', photoURL: '' };
                 displayName = profile.name || 'Unknown User';
-                avatarHtml = callAvatarHtml(displayName, profile.photoURL);
+                avatarHtml = callHistoryAvatarHtml(displayName, profile.photoURL);
                 const statusLabel = entry.status === 'missed' ? 'Missed voice call'
                     : entry.status === 'declined' ? (entry.direction === 'outgoing' ? 'Voice call declined' : 'Declined voice call')
                     : 'Voice call';
@@ -12588,6 +12632,7 @@
             }
 
             item.innerHTML = `
+                <div class="call-item-checkbox${isSelected ? ' checked' : ''}"></div>
                 ${avatarHtml}
                 <div class="chat-preview">
                     <h3>${displayName}</h3>
@@ -12606,10 +12651,98 @@
             if (!entries.length) {
                 container.innerHTML = '<p class="empty-msg">No calls yet. Your call history will show up here.</p>';
             } else {
-                entries.forEach(entry => renderCallItem(entry, container));
+                // Entries arrive newest-first; drop a date-separator pill each time the day changes.
+                let lastDateKey = null;
+                entries.forEach(entry => {
+                    const dateKey = new Date(entry.timestamp).toDateString();
+                    if (dateKey !== lastDateKey) {
+                        const sep = document.createElement('div');
+                        sep.className = 'date-separator';
+                        sep.dataset.dateKey = dateKey;
+                        sep.innerHTML = `<span>${callDateSeparatorLabel(entry.timestamp)}</span>`;
+                        container.appendChild(sep);
+                        lastDateKey = dateKey;
+                    }
+                    renderCallItem(entry, container);
+                });
             }
             const searchCallsInput = document.getElementById('search-calls');
-            if (searchCallsInput && searchCallsInput.value) filterListItems(searchCallsInput, 'calls-list-container');
+            if (searchCallsInput && searchCallsInput.value) filterCallsList(searchCallsInput);
+        }
+
+        // Custom filter (rather than the generic filterListItems) so a date separator hides
+        // itself too once every call under it has been filtered out.
+        function filterCallsList(inputElement) {
+            const query = inputElement.value.toLowerCase();
+            const container = document.getElementById('calls-list-container');
+            if (!container) return;
+            let currentSeparator = null;
+            let groupHasVisible = false;
+            Array.from(container.children).forEach(el => {
+                if (el.classList.contains('date-separator')) {
+                    if (currentSeparator) currentSeparator.style.display = groupHasVisible ? 'flex' : 'none';
+                    currentSeparator = el;
+                    groupHasVisible = false;
+                    return;
+                }
+                if (el.classList.contains('chat-item')) {
+                    const nameEl = el.querySelector('.chat-preview h3');
+                    const match = nameEl ? nameEl.textContent.toLowerCase().includes(query) : false;
+                    el.style.display = match ? 'flex' : 'none';
+                    if (match) groupHasVisible = true;
+                }
+            });
+            if (currentSeparator) currentSeparator.style.display = groupHasVisible ? 'flex' : 'none';
+        }
+
+        function updateCallsSelectionHeader() {
+            const count = selectedCallIds.size;
+            document.getElementById('calls-header-default').style.display = callsSelectionMode ? 'none' : 'flex';
+            document.getElementById('calls-header-selection').style.display = callsSelectionMode ? 'flex' : 'none';
+            if (callsSelectionMode) {
+                document.getElementById('calls-selection-count').textContent = `${count} selected`;
+            }
+        }
+
+        function enterCallsSelectionMode(callId) {
+            callsSelectionMode = true;
+            selectedCallIds = new Set(callId ? [callId] : []);
+            updateCallsSelectionHeader();
+            renderCallList(cachedCallLogEntries);
+        }
+
+        function exitCallsSelectionMode() {
+            callsSelectionMode = false;
+            selectedCallIds = new Set();
+            updateCallsSelectionHeader();
+            renderCallList(cachedCallLogEntries);
+        }
+
+        function toggleCallSelected(callId) {
+            if (selectedCallIds.has(callId)) selectedCallIds.delete(callId);
+            else selectedCallIds.add(callId);
+            if (selectedCallIds.size === 0) { exitCallsSelectionMode(); return; }
+            updateCallsSelectionHeader();
+            const item = document.querySelector(`#calls-list-container .chat-item[data-call-id="${callId}"]`);
+            if (item) {
+                item.classList.toggle('call-selected', selectedCallIds.has(callId));
+                const box = item.querySelector('.call-item-checkbox');
+                if (box) box.classList.toggle('checked', selectedCallIds.has(callId));
+            }
+        }
+
+        // Deleting only ever touches the current user's own call_log — same as deleting a chat,
+        // it clears the entry from your history without reaching into the other person's.
+        async function deleteCallLogEntries(callIds) {
+            const user = auth.currentUser;
+            if (!user || !callIds.length) return;
+            const updates = {};
+            callIds.forEach(id => { updates[`call_log/${user.uid}/${id}`] = null; });
+            try {
+                await update(ref(database), updates);
+            } catch (err) {
+                notify('Could not delete calls', 'error');
+            }
         }
 
         let cachedCallLogEntries = [];
@@ -12624,11 +12757,75 @@
                 snap.forEach(child => { entries.push({ id: child.key, ...child.val() }); });
                 entries.sort((a, b) => b.timestamp - a.timestamp);
                 cachedCallLogEntries = entries;
+                // A live update mid-selection could otherwise resurrect ids that no longer
+                // exist — keep only still-present ids selected.
+                if (callsSelectionMode) {
+                    const stillThere = new Set(entries.map(e => e.id));
+                    selectedCallIds.forEach(id => { if (!stillThere.has(id)) selectedCallIds.delete(id); });
+                    if (selectedCallIds.size === 0) { callsSelectionMode = false; updateCallsSelectionHeader(); }
+                }
                 renderCallList(entries);
             });
         }
 
-        document.getElementById('calls-list-container').addEventListener('click', (e) => {
+        document.getElementById('btn-cancel-calls-selection').addEventListener('click', exitCallsSelectionMode);
+
+        document.getElementById('btn-select-all-calls').addEventListener('click', () => {
+            selectedCallIds = new Set(cachedCallLogEntries.map(e => e.id));
+            updateCallsSelectionHeader();
+            renderCallList(cachedCallLogEntries);
+        });
+
+        document.getElementById('btn-delete-selected-calls').addEventListener('click', async () => {
+            const ids = Array.from(selectedCallIds);
+            if (!ids.length) return;
+            const confirmed = await showCustomModal(
+                'Delete Calls?',
+                `This will remove ${ids.length === 1 ? 'this call' : ids.length + ' calls'} from your call history. This cannot be undone.`,
+                true
+            );
+            if (!confirmed) return;
+            await deleteCallLogEntries(ids);
+            exitCallsSelectionMode();
+        });
+
+        // Tap opens/starts a call as normal. Long-press (or a held click on desktop) starts
+        // selection mode on that call so several can be picked and deleted from the log.
+        const callsListEl = document.getElementById('calls-list-container');
+        callsListEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.target.closest('.call-again-btn')) return;
+            const item = e.target.closest('.chat-item');
+            if (!item) return;
+            callsPressState.callId = item.dataset.callId;
+            callsPressState.startX = e.clientX;
+            callsPressState.startY = e.clientY;
+            callsPressState.timer = setTimeout(() => {
+                callsPressState.timer = null;
+                if (navigator.vibrate) navigator.vibrate(15);
+                enterCallsSelectionMode(callsPressState.callId);
+            }, 500);
+        });
+        callsListEl.addEventListener('pointermove', (e) => {
+            if (!callsPressState.timer) return;
+            if (Math.abs(e.clientX - callsPressState.startX) > 10 || Math.abs(e.clientY - callsPressState.startY) > 10) {
+                clearTimeout(callsPressState.timer);
+                callsPressState.timer = null;
+            }
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(evtName => {
+            callsListEl.addEventListener(evtName, () => {
+                if (callsPressState.timer) { clearTimeout(callsPressState.timer); callsPressState.timer = null; }
+            });
+        });
+        callsListEl.addEventListener('click', (e) => {
+            const item = e.target.closest('.chat-item');
+            if (!item) return;
+            const callId = item.dataset.callId;
+            if (callsSelectionMode) {
+                toggleCallSelected(callId);
+                return;
+            }
             const btn = e.target.closest('.call-again-btn');
             if (!btn) return;
             const peerUid = btn.getAttribute('data-uid');
@@ -12643,7 +12840,7 @@
 
         const searchCallsInputEl = document.getElementById('search-calls');
         if (searchCallsInputEl) {
-            searchCallsInputEl.addEventListener('input', () => filterListItems(searchCallsInputEl, 'calls-list-container'));
+            searchCallsInputEl.addEventListener('input', () => filterCallsList(searchCallsInputEl));
         }
 
         // Updates just the online/offline dot on each visible chat card in place — called whenever

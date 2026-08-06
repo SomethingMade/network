@@ -4720,7 +4720,7 @@
         const TAB_ORDER = ['tab-status', 'tab-chats', 'tab-groups', 'tab-contacts'];
         let previousActiveTabHash = null;
 
-        function handleHashChange() {
+        function handleHashChange(isInitialSync) {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
             
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
@@ -4796,8 +4796,13 @@
                 const activeTab = document.getElementById(hash);
                 
                 if(activeNav) activeNav.classList.add('active');
-                // Clear chat unread badge when opening Chats tab
-                if (hash === 'tab-chats') {
+                // Clear the chats unread badge only when the tab is genuinely being opened right
+                // now (a real user tap → real hashchange event). At boot, the URL hash can already
+                // be "tab-chats" just because that's where the app was left last session — that's
+                // not the user looking at their messages just now, so don't clear on that pass
+                // (isInitialSync === true), or the badge for messages that arrived since the app
+                // was last open gets wiped before the person ever sees it.
+                if (hash === 'tab-chats' && isInitialSync !== true) {
                     updateChatsUnreadBadge(0);
                 }
                 if(activeTab) {
@@ -12400,7 +12405,7 @@
                 // tab already matches the (invisible, unsynced) current hash is a same-value
                 // hash assignment, which browsers do NOT fire hashchange for — so the tap does
                 // nothing until the user first taps a *different* tab to force a real change.
-                handleHashChange();
+                handleHashChange(true);
                 requestAnimationFrame(updateNavIndicator);
                 initE2EForThisDevice().catch(() => {});
 

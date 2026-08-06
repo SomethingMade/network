@@ -8827,7 +8827,13 @@
         function clearOtpBoxes(focusFirst = false) {
             otpBoxes.forEach(b => { b.value = ''; b.classList.remove('filled'); });
             syncOtpHiddenValue();
-            if (focusFirst) setTimeout(() => otpBoxes[0].focus(), 50);
+            // No setTimeout here on purpose: focusing synchronously (right after the box becomes
+            // visible) keeps it inside the same user-activation window as the tap that triggered
+            // sending the code. Mobile browsers only auto-pop the keyboard / one-time-code
+            // suggestion for a focus() call that's still "close enough" to a real user gesture —
+            // deferring it (even by 50ms, and especially after an awaited network call) often
+            // falls outside that window, silently degrading to "tap the box yourself first".
+            if (focusFirst) otpBoxes[0].focus();
         }
 
         // --- WEB OTP AUTOFILL ---
@@ -8960,8 +8966,8 @@
                 confirmationResult = await signInWithPhoneNumber(auth, fullNumber, verifier);
                 pendingPhoneNumber = fullNumber;
                 document.getElementById('auth-otp-subtitle').textContent = `Enter the code sent to ${fullNumber}`;
-                clearOtpBoxes(true);
                 showAuthStep('otp');
+                clearOtpBoxes(true);
                 startWebOtpAutofill();
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));

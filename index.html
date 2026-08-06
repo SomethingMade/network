@@ -4043,6 +4043,7 @@
         let currentViewerVideoUrl = '';
         function openVideoViewer(url, hideSave, musicUrl) {
             if (!url) return;
+            pauseAllAppMedia();
             currentViewerVideoUrl = url;
             const vid = document.getElementById('video-viewer-vid');
             const musicAudio = document.getElementById('video-viewer-music-audio');
@@ -4259,7 +4260,7 @@
         function openReelViewer(startPostId) {
             const startPost = cachedPosts[startPostId];
             if (!startPost || !startPost.videoUrl) return;
-            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
+            pauseAllAppMedia();
 
             reelPostIds = [startPostId, ...getShuffledVideoPostIds([startPostId])];
             reelActiveIndex = -1;
@@ -4353,7 +4354,7 @@
             // Pause whichever feed/native video this was popped out from, so it doesn't
             // keep playing silently behind the floating one.
             if (opts.sourceVideo && !opts.sourceVideo.paused) opts.sourceVideo.pause();
-            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
+            pauseAllAppMedia();
 
             floatingVideoState = { videoUrl, musicUrl: opts.musicUrl || null, sourceVideo: opts.sourceVideo || null };
             floatingVideoEl.src = videoUrl;
@@ -11484,7 +11485,33 @@
             });
         }
 
+        // Only one thing should ever be making sound at once. Whenever a new playback surface
+        // opens (a story, the full-screen video viewer, the reel feed, the floating popout
+        // player, or a voice note), this stops every other source first — otherwise, e.g., a
+        // feed post's background music keeps playing underneath a story's own music.
+        function pauseAllAppMedia() {
+            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (!v.paused) v.pause(); });
+            const viewerVid = document.getElementById('video-viewer-vid');
+            const viewerMusic = document.getElementById('video-viewer-music-audio');
+            if (viewerVid && !viewerVid.paused) viewerVid.pause();
+            if (viewerMusic && !viewerMusic.paused) viewerMusic.pause();
+            if (floatingVideoEl && !floatingVideoEl.paused) floatingVideoEl.pause();
+            const reelTrack = document.getElementById('reel-viewer-track');
+            if (reelTrack) reelTrack.querySelectorAll('.reel-item-media video').forEach(v => { if (!v.paused) v.pause(); });
+            if (currentlyPlayingVoice) {
+                currentlyPlayingVoice.pause();
+                const prevWaveform = currentlyPlayingVoice._bubbleEl && currentlyPlayingVoice._bubbleEl.querySelector('.msg-voice-waveform');
+                if (prevWaveform) prevWaveform.classList.remove('playing');
+                currentlyPlayingVoice = null;
+            }
+            const storyVid = document.getElementById('story-viewer-video');
+            const storyMusic = document.getElementById('story-music-audio');
+            if (storyVid && !storyVid.paused) storyVid.pause();
+            if (storyMusic && !storyMusic.paused) storyMusic.pause();
+        }
+
         function openStoryViewer(uid, name, photoURL, items, isOwn) {
+            pauseAllAppMedia();
             storyState.items = items.slice().sort((a, b) => a.createdAt - b.createdAt);
             storyState.index = 0;
             storyState.isOwn = isOwn;
@@ -16452,11 +16479,7 @@
             }
 
             if (audioEl.paused) {
-                if (currentlyPlayingVoice && currentlyPlayingVoice !== audioEl) {
-                    currentlyPlayingVoice.pause();
-                    const prevWaveform = currentlyPlayingVoice._bubbleEl && currentlyPlayingVoice._bubbleEl.querySelector('.msg-voice-waveform');
-                    if (prevWaveform) prevWaveform.classList.remove('playing');
-                }
+                pauseAllAppMedia();
                 audioEl._bubbleEl = bubble;
                 audioEl.play();
                 currentlyPlayingVoice = audioEl;

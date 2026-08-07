@@ -5348,13 +5348,16 @@
             document.getElementById('chat-view-menu-info').addEventListener('click', () => {
                 closeMenu();
                 const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
-                document.getElementById(isGroup ? 'btn-group-info' : 'btn-user-info').click();
+                if (isGroup) {
+                    document.getElementById('btn-group-info').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                } else if (typeof activeChatUid !== 'undefined' && activeChatUid) {
+                    openUserProfileSheet(activeChatUid);
+                }
             });
 
             document.getElementById('chat-view-menu-viewonce').addEventListener('click', () => {
-                const viewOnceBtn = document.getElementById('btn-view-once-toggle');
-                viewOnceBtn.click();
-                const isArmed = viewOnceBtn.classList.contains('active');
+                toggleViewOnceArmed();
+                const isArmed = document.getElementById('btn-view-once-toggle').classList.contains('active');
                 const item = document.getElementById('chat-view-menu-viewonce');
                 item.classList.toggle('viewonce-active', isArmed);
                 document.getElementById('chat-view-menu-viewonce-label').textContent = isArmed ? 'View once is on' : 'Send as view once';

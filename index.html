@@ -305,7 +305,12 @@
         .in-app-msg-banner-close { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); background: var(--bg-hover); }
 
         /* ── CUSTOM MODALS ── */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100005; opacity: 0; visibility: hidden; transition: 0.2s ease; }
+        /* z-index 100011: showCustomModal() (Sign Out, Delete Comment, Delete Post, etc.) can be
+           triggered from inside an already-open bottom sheet — e.g. "Log Out" lives inside the
+           profile sheet, "Delete" lives inside the comments sheet — both of which sit at 100010
+           (see below). The confirm dialog needs to sit above whatever sheet opened it, so it's one
+           tier above the highest bottom-sheet z-index rather than the bottom-sheet-overlay default. */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100011; opacity: 0; visibility: hidden; transition: 0.2s ease; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
         .custom-modal { background: var(--bg-surface); width: 100%; max-width: 400px; border-radius: 24px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); transform: translateY(20px); transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); text-align: center; }
         .modal-overlay.active .custom-modal { transform: translateY(0); }
@@ -909,8 +914,9 @@
         .otp-hint-bubble {
             position: absolute; bottom: 100%; left: 50%;
             margin-bottom: 12px; padding: 7px 14px;
+            max-width: 200px;
             background: var(--text-primary); color: var(--bg-surface);
-            font-size: 12.5px; font-weight: 600; white-space: nowrap;
+            font-size: 12.5px; font-weight: 600; line-height: 1.35; text-align: center;
             border-radius: 14px; box-shadow: var(--shadow-elevated);
             pointer-events: none; z-index: 5;
             opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94);
@@ -2974,7 +2980,7 @@
                     <p id="auth-otp-subtitle">Enter the code we sent you</p>
 
                     <div class="otp-boxes" id="otp-boxes">
-                        <div class="otp-hint-bubble" id="otp-hint-bubble" aria-hidden="true">Tap a box to enter the code</div>
+                        <div class="otp-hint-bubble" id="otp-hint-bubble" aria-hidden="true">Tap in to see your code on the keyboard</div>
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
@@ -8938,22 +8944,18 @@
         // ── OTP HINT BUBBLE ── a small coach-mark that floats above the boxes the moment the
         // OTP step appears, since first-time users often don't realize the boxes are tappable
         // inputs (auto-focus on box 1 isn't always visually obvious, especially when the mobile
-        // keyboard is already up from the phone-number step). Dismisses itself the instant the
-        // user focuses any box, on successful WebOTP autofill, or after a timeout as a fallback.
+        // keyboard is already up from the phone-number step). Dismisses only on genuine user
+        // interaction with a box (tap/focus, typing, or paste) — no timeout, no auto-dismiss.
         const otpHintBubble = document.getElementById('otp-hint-bubble');
-        let otpHintTimeout = null;
 
         function showOtpHint() {
             if (!otpHintBubble) return;
-            clearTimeout(otpHintTimeout);
             otpHintBubble.classList.remove('otp-hint-visible');
             void otpHintBubble.offsetWidth; // force reflow so the pop-in animation replays every time
             otpHintBubble.classList.add('otp-hint-visible');
-            otpHintTimeout = setTimeout(hideOtpHint, 6000);
         }
 
         function hideOtpHint() {
-            clearTimeout(otpHintTimeout);
             if (otpHintBubble) otpHintBubble.classList.remove('otp-hint-visible');
         }
 
@@ -8991,7 +8993,6 @@
                 signal: webOtpAbortController.signal
             }).then(otp => {
                 if (otp && otp.code && fillOtpBoxes(otp.code)) {
-                    hideOtpHint();
                     notify('Code auto-filled');
                     document.getElementById('btn-verify-otp').click();
                 }
@@ -9004,6 +9005,7 @@
                 box.value = digit;
                 box.classList.toggle('filled', !!digit);
                 syncOtpHiddenValue();
+                hideOtpHint();
                 if (digit && i < otpBoxes.length - 1) otpBoxes[i + 1].focus();
                 if (digit && i === otpBoxes.length - 1) document.getElementById('btn-verify-otp').focus();
             });
@@ -9023,6 +9025,7 @@
 
             box.addEventListener('paste', (e) => {
                 e.preventDefault();
+                hideOtpHint();
                 const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').slice(0, otpBoxes.length);
                 if (!pasted) return;
                 pasted.split('').forEach((ch, idx) => {
@@ -9040,7 +9043,6 @@
             confirmationResult = null;
             stopWebOtpAutofill();
             clearOtpBoxes();
-            hideOtpHint();
             resetRecaptcha();
             showAuthStep('phone');
         });

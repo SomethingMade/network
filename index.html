@@ -9776,6 +9776,32 @@
             return `<div class="avatar${nebulaClass}" style="${bg} color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${groupInitials(group.name)}</div>`;
         }
 
+        // Applies a group/page's photo (or the initials/nebula fallback) onto a target avatar
+        // element — shared by the chat-view header and anywhere else that needs to reflect a
+        // live change to a group's photo, so they never fall out of sync with each other.
+        function applyGroupAvatarToElement(el, group) {
+            if (!el || !group) return;
+            if (group.photoURL) {
+                el.classList.remove('ai-avatar-nebula');
+                el.style.backgroundImage = `url('${group.photoURL}')`;
+                el.style.backgroundColor = "";
+                el.style.color = "";
+                el.style.display = "block";
+                el.style.fontWeight = "";
+                el.textContent = "";
+            } else {
+                el.classList.toggle('ai-avatar-nebula', !!group.isBusinessPage);
+                el.style.backgroundImage = "none";
+                el.style.backgroundColor = group.isBusinessPage ? "" : "var(--accent-purple)";
+                el.style.color = "#FFFFFF";
+                el.style.display = "flex";
+                el.style.alignItems = "center";
+                el.style.justifyContent = "center";
+                el.style.fontWeight = "bold";
+                el.textContent = groupInitials(group.name);
+            }
+        }
+
         // Returns the verified badge markup for a group name if it's a Business Page.
         function groupVerifiedBadge(group) {
             return (group && group.isBusinessPage) ? VERIFIED_BADGE_SVG : '';
@@ -9932,6 +9958,7 @@
 
             if (activeGroupId && cachedGroups[activeGroupId]) {
                 document.getElementById('chat-view-name').innerHTML = groupNameLabel(cachedGroups[activeGroupId]);
+                applyGroupAvatarToElement(document.getElementById('chat-view-avatar'), cachedGroups[activeGroupId]);
                 updateGroupPostingUI(cachedGroups[activeGroupId]);
             }
         }
@@ -10535,15 +10562,7 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
             const avatarEl = document.getElementById('chat-view-avatar');
-            avatarEl.classList.toggle('ai-avatar-nebula', !!group.isBusinessPage);
-            avatarEl.style.backgroundImage = "none";
-            avatarEl.style.backgroundColor = group.isBusinessPage ? "" : "var(--accent-purple)";
-            avatarEl.style.color = "#FFFFFF";
-            avatarEl.style.display = "flex";
-            avatarEl.style.alignItems = "center";
-            avatarEl.style.justifyContent = "center";
-            avatarEl.style.fontWeight = "bold";
-            avatarEl.textContent = groupInitials(group.name);
+            applyGroupAvatarToElement(avatarEl, group);
 
             const messagesEl = document.getElementById('chat-view-messages');
             messagesEl.innerHTML = '';

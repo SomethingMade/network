@@ -5619,6 +5619,18 @@
         // private, e.g. set the extension's Collection Path to:  ai_discussions/{uid}/messages
         const AI_UID = "goza-ai-assistant";
         const AI_NAME = "Goza AI";
+
+        // Fallback profile picture used whenever a user hasn't uploaded their own — a plain
+        // person silhouette on a neutral circle, inlined as a data URI so it never depends on
+        // an external host. Everywhere in the app that already does
+        // `photoURL ? <img/bg with photoURL> : <initials>` will show this instead of initials
+        // once photoURL is defaulted to it (see onAuthStateChanged), so this one constant is
+        // the single source of truth for the "no photo" look across the whole app.
+        const DEFAULT_AVATAR_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='48' cy='48' r='48' fill='%23DDDDDD'/%3E%3Ccircle cx='48' cy='38' r='18' fill='%23FFFFFF'/%3E%3Cpath d='M48 60c-19 0-30 10.5-30 22v2a48 48 0 0 0 60 0v-2c0-11.5-11-22-30-22z' fill='%23FFFFFF'/%3E%3C/svg%3E";
+
+        // Default "About" text given to every new account until they set their own, matching
+        // the placeholder already shown in the profile-editing field.
+        const DEFAULT_ABOUT = "Hey there! I'm using Xoxa";
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
         // Same seal shape as VERIFIED_BADGE_SVG but rendered in --success-green. Shown next to the
@@ -9443,15 +9455,9 @@
 
         function updateAvatarUI(user) {
             if (!user) return;
-            const initial = user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : "?");
             btnProfileNavEls.forEach(btnProfileImg => {
-                if (user.photoURL) {
-                    btnProfileImg.style.backgroundImage = `url('${user.photoURL}')`;
-                    btnProfileImg.textContent = "";
-                } else {
-                    btnProfileImg.style.backgroundImage = "none";
-                    btnProfileImg.textContent = initial;
-                }
+                btnProfileImg.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
+                btnProfileImg.textContent = "";
             });
         }
 
@@ -9462,13 +9468,8 @@
                 document.getElementById('profile-name').value = user.displayName || "";
                 pendingPhotoURL = user.photoURL || null;
                 const preview = document.getElementById('profile-avatar-preview');
-                if (user.photoURL) {
-                    preview.style.backgroundImage = `url('${user.photoURL}')`;
-                    preview.textContent = "";
-                } else {
-                    preview.style.backgroundImage = "none";
-                    preview.textContent = user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : (user.phoneNumber ? user.phoneNumber.replace(/[^0-9]/g, '').slice(-1) : "?"));
-                }
+                preview.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
+                preview.textContent = "";
 
                 const myProfile = cachedUsers[user.uid] || {};
                 pendingCoverURL = myProfile.coverPhotoURL || null;
@@ -13274,11 +13275,21 @@
                     }
                 }
                 
+                // Fetch the existing profile first so we only fill in an "about" default when
+                // the user genuinely hasn't set one yet (rather than clobbering it on every
+                // login), and so a real uploaded photo always wins over the placeholder.
+                let existingProfileData = {};
+                try {
+                    const existingProfileSnap = await get(ref(database, 'users/' + user.uid));
+                    if (existingProfileSnap.exists()) existingProfileData = existingProfileSnap.val();
+                } catch (err) { console.error('Failed to read existing profile before defaulting', err); }
+
                 await update(ref(database, 'users/' + user.uid), {
                     name: user.displayName || (user.email ? user.email.split('@')[0] : (user.phoneNumber || "User")),
-                    photoURL: user.photoURL || "",
+                    photoURL: user.photoURL || existingProfileData.photoURL || DEFAULT_AVATAR_URL,
                     email: user.email || "",
-                    phoneNumber: user.phoneNumber || ""
+                    phoneNumber: user.phoneNumber || "",
+                    about: existingProfileData.about || DEFAULT_ABOUT
                 });
 
                 try {

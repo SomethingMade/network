@@ -1162,6 +1162,12 @@
         .chat-view-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 468px; background: var(--bg-base); z-index: 500; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); display: flex; flex-direction: column; border-left: 1px solid var(--border-color); }
         .chat-view-overlay.active { transform: translateX(0); }
         .chat-view-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); color: var(--text-primary); position: relative; z-index: 2; box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.03); }
+        .chat-view-menu-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+        .chat-view-menu-dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 190px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-elevated); padding: 6px; z-index: 40; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
+        .chat-view-menu-dropdown.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        .chats-menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; background: none; border: none; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--text-primary); cursor: pointer; text-align: left; }
+        .chats-menu-item:hover { background: var(--bg-hover); }
+        .chats-menu-item svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-secondary); }
         .chat-view-back { width: 22px; height: 22px; cursor: pointer; color: var(--text-primary); flex-shrink: 0; }
         .chat-view-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; flex-shrink: 0; }
         .chat-view-info { flex: 1; min-width: 0; }
@@ -3319,6 +3325,19 @@
             </svg>
             <svg id="btn-group-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Group Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <div class="chat-view-menu-wrap">
+                <svg id="btn-chat-view-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                <div class="chat-view-menu-dropdown" id="chat-view-menu-dropdown">
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-info">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span id="chat-view-menu-info-label">View contact</span>
+                    </button>
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-wallpaper">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <span>Wallpaper</span>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div id="group-call-active-banner" class="group-call-banner">
@@ -5286,6 +5305,37 @@
             }
             window.location.reload();
         }
+
+        // --- DM/group chat header three-dot menu ---
+        (function setupChatViewMenu() {
+            const menuBtn = document.getElementById('btn-chat-view-menu');
+            const dropdown = document.getElementById('chat-view-menu-dropdown');
+            if (!menuBtn || !dropdown) return;
+
+            const closeMenu = () => dropdown.classList.remove('open');
+
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('chat-view-menu-info-label').textContent =
+                    typeof activeGroupId !== 'undefined' && activeGroupId ? 'Group info' : 'View contact';
+                dropdown.classList.toggle('open');
+            });
+            document.addEventListener('click', (e) => {
+                if (dropdown.classList.contains('open') && !dropdown.contains(e.target) && e.target !== menuBtn) {
+                    closeMenu();
+                }
+            });
+
+            document.getElementById('chat-view-menu-info').addEventListener('click', () => {
+                closeMenu();
+                document.getElementById('btn-user-info').click();
+            });
+
+            document.getElementById('chat-view-menu-wallpaper').addEventListener('click', () => {
+                closeMenu();
+                document.getElementById('setting-chat-wallpaper').click();
+            });
+        })();
 
         document.getElementById('btn-header-menu').addEventListener('click', async () => {
             const confirmed = await showCustomModal(

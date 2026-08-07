@@ -895,12 +895,43 @@
         .toggle-auth span { color: var(--primary-blue); font-weight: 600; cursor: pointer; transition: opacity 0.15s ease; }
         .toggle-auth span:hover { text-decoration: underline; }
         .toggle-auth span:active { opacity: 0.6; }
-        .otp-boxes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; }
+        .otp-boxes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; position: relative; }
         .otp-box { width: 46px; height: 56px; text-align: center; font-size: 22px; font-weight: 700; border-radius: 14px; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; transition: 0.2s; }
         .otp-box:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15); }
         .otp-box.filled { border-color: var(--primary-blue); animation: otpFilledPop 0.25s ease; }
         @keyframes otpFilledPop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
         @media (max-width: 380px) { .otp-box { width: 40px; height: 50px; font-size: 19px; } .otp-boxes { gap: 7px; } }
+
+        /* Coach-mark bubble guiding first-time users to tap into the OTP boxes. Lives inside
+           .otp-boxes (a flex row) but is taken out of flow via absolute positioning, so it floats
+           centered above the row without disturbing the 6-box layout. Hidden by default; JS
+           toggles .otp-hint-visible when the OTP step appears and removes it on first interaction. */
+        .otp-hint-bubble {
+            position: absolute; bottom: 100%; left: 50%;
+            margin-bottom: 12px; padding: 7px 14px;
+            background: var(--text-primary); color: var(--bg-surface);
+            font-size: 12.5px; font-weight: 600; white-space: nowrap;
+            border-radius: 14px; box-shadow: var(--shadow-elevated);
+            pointer-events: none; z-index: 5;
+            opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .otp-hint-bubble::after {
+            content: ''; position: absolute; top: 100%; left: 50%;
+            width: 9px; height: 9px; margin-top: -5px;
+            background: var(--text-primary); border-radius: 2px;
+            transform: translateX(-50%) rotate(45deg);
+        }
+        .otp-hint-bubble.otp-hint-visible {
+            opacity: 1; animation: otpHintPop 0.4s cubic-bezier(0.16,1,0.3,1) both;
+        }
+        @keyframes otpHintPop {
+            from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .otp-hint-bubble.otp-hint-visible { animation: none; opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+        }
         .pin-boxes { display: flex; gap: 10px; justify-content: center; margin: 4px 0 8px; }
         .pin-box { width: 46px; height: 56px; text-align: center; font-size: 22px; font-weight: 700; border-radius: 14px; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); outline: none; font-family: inherit; transition: 0.2s; }
         .pin-box:focus { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15); }
@@ -2943,6 +2974,7 @@
                     <p id="auth-otp-subtitle">Enter the code we sent you</p>
 
                     <div class="otp-boxes" id="otp-boxes">
+                        <div class="otp-hint-bubble" id="otp-hint-bubble" aria-hidden="true">Tap a box to enter the code</div>
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
                         <input type="tel" inputmode="numeric" maxlength="1" class="otp-box" autocomplete="one-time-code">
@@ -8903,6 +8935,28 @@
             if (focusFirst) otpBoxes[0].focus();
         }
 
+        // ── OTP HINT BUBBLE ── a small coach-mark that floats above the boxes the moment the
+        // OTP step appears, since first-time users often don't realize the boxes are tappable
+        // inputs (auto-focus on box 1 isn't always visually obvious, especially when the mobile
+        // keyboard is already up from the phone-number step). Dismisses itself the instant the
+        // user focuses any box, on successful WebOTP autofill, or after a timeout as a fallback.
+        const otpHintBubble = document.getElementById('otp-hint-bubble');
+        let otpHintTimeout = null;
+
+        function showOtpHint() {
+            if (!otpHintBubble) return;
+            clearTimeout(otpHintTimeout);
+            otpHintBubble.classList.remove('otp-hint-visible');
+            void otpHintBubble.offsetWidth; // force reflow so the pop-in animation replays every time
+            otpHintBubble.classList.add('otp-hint-visible');
+            otpHintTimeout = setTimeout(hideOtpHint, 6000);
+        }
+
+        function hideOtpHint() {
+            clearTimeout(otpHintTimeout);
+            if (otpHintBubble) otpHintBubble.classList.remove('otp-hint-visible');
+        }
+
         // --- WEB OTP AUTOFILL ---
         // On browsers that support it (mainly Chrome on Android), this listens for the incoming
         // SMS itself and fills the 6 boxes the moment the code arrives — no more waiting on a
@@ -8937,6 +8991,7 @@
                 signal: webOtpAbortController.signal
             }).then(otp => {
                 if (otp && otp.code && fillOtpBoxes(otp.code)) {
+                    hideOtpHint();
                     notify('Code auto-filled');
                     document.getElementById('btn-verify-otp').click();
                 }
@@ -8978,13 +9033,14 @@
                 (nextEmpty === -1 ? otpBoxes[otpBoxes.length - 1] : otpBoxes[nextEmpty]).focus();
             });
 
-            box.addEventListener('focus', () => box.select());
+            box.addEventListener('focus', () => { box.select(); hideOtpHint(); });
         });
 
         document.getElementById('btn-change-number').addEventListener('click', () => {
             confirmationResult = null;
             stopWebOtpAutofill();
             clearOtpBoxes();
+            hideOtpHint();
             resetRecaptcha();
             showAuthStep('phone');
         });
@@ -9036,6 +9092,7 @@
                 showAuthStep('otp');
                 clearOtpBoxes(true);
                 startWebOtpAutofill();
+                showOtpHint();
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));
                 resetRecaptcha();
@@ -9054,6 +9111,7 @@
                 notify('Code resent');
                 clearOtpBoxes(true);
                 startWebOtpAutofill();
+                showOtpHint();
             } catch (err) {
                 showCustomModal("Couldn't Resend Code", err.message.replace("Firebase: ", ""));
                 resetRecaptcha();

@@ -303,9 +303,12 @@
         /* Comments can be opened from the reel viewer (z-index 100007) as well as the normal
            feed, so it needs to sit above that too, not just the default bottom-sheet layer. */
         #post-comments-sheet-overlay { z-index: 100010; }
-        /* Same reasoning: the reel viewer's topbar now has its own avatar trigger, so this
+        /* Same reasoning: the reel viewer's header has its own avatar trigger, so this
            needs to clear the reel viewer's z-index too, not just the default bottom-sheet layer. */
         #profile-bottom-sheet-overlay { z-index: 100010; }
+        /* Same reasoning again: the reel viewer's header camera icon opens this, so it needs
+           to clear the reel viewer's z-index too, not just its own default (100005). */
+        #status-upload-overlay { z-index: 100010; }
         #force-update-overlay { z-index: 999999; }
         #force-update-overlay .custom-modal { text-align: center; }
         #force-update-overlay .force-update-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: white; }
@@ -1647,12 +1650,16 @@
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
-        #reel-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100007; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #reel-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100007; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; display: flex; flex-direction: column; }
         #reel-viewer-overlay.active { opacity: 1; visibility: visible; }
+        /* .reel-viewer-topbar / .reel-viewer-close are no longer used now that the reel viewer
+           has a real chat-header-area (see #reel-viewer-overlay HTML) — leaving the rules here
+           rather than deleting them, same as this file's other retired-but-kept UI pieces. */
         .reel-viewer-topbar { position: absolute; top: 16px; right: 16px; z-index: 4; display: flex; align-items: center; gap: 10px; }
         .reel-viewer-close { width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: #fff; cursor: pointer; transition: 0.2s; }
         .reel-viewer-close:hover { opacity: 0.75; }
-        .reel-viewer-track { width: 100%; height: 100%; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .reel-viewer-header h1, .reel-viewer-header svg { color: var(--text-primary); }
+        .reel-viewer-track { width: 100%; flex: 1; min-height: 0; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .reel-viewer-track::-webkit-scrollbar { display: none; }
         .reel-item { position: relative; width: 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; align-items: center; justify-content: center; background: #000; overflow: hidden; }
         .reel-item-media { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -3620,9 +3627,14 @@
     </div>
 
     <div id="reel-viewer-overlay">
-        <div class="reel-viewer-topbar">
-            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-            <svg class="reel-viewer-close" id="reel-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <div class="chat-header-area reel-viewer-header">
+            <div class="chat-header-top">
+                <h1>Reels</h1>
+                <div class="chat-header-icons">
+                    <svg id="btn-header-camera" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="New reel"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                </div>
+            </div>
         </div>
         <div class="reel-viewer-track" id="reel-viewer-track"></div>
     </div>
@@ -4339,7 +4351,9 @@
             if (commentCountEl) commentCountEl.textContent = formatFeedCount(post.commentCount || 0);
         }
 
-        document.getElementById('reel-viewer-close').addEventListener('click', () => history.back());
+        // reel-viewer-close was replaced by the reel viewer's own header (see #reel-viewer-overlay
+        // HTML) — leaving this listener guarded rather than deleting it, same as btn-header-camera below.
+        document.getElementById('reel-viewer-close')?.addEventListener('click', () => history.back());
         document.getElementById('reel-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'reel-viewer-overlay') history.back();
         });
@@ -6305,8 +6319,8 @@
             document.getElementById('status-upload-file').click();
         });
 
-        // Header camera icon was removed from the Chats tab; this listener is now guarded
-        // since there's no longer a header trigger for the video-moment upload flow.
+        // Moved from the Chats tab header to the reel viewer's header — still the same
+        // video-moment upload flow, just triggered from Reels now. Left guarded regardless.
         document.getElementById('btn-header-camera')?.addEventListener('click', () => {
             document.getElementById('status-upload-file').click();
         });

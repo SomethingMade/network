@@ -486,6 +486,7 @@
         .feed-post-tagged-chip:active { transform: scale(0.96); }
         .feed-hashtag { color: var(--primary-blue); font-weight: 600; cursor: pointer; }
         .feed-hashtag:hover { text-decoration: underline; }
+        .feed-link { color: var(--primary-blue); font-weight: 600; text-decoration: underline; word-break: break-all; }
         .feed-search-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px 20px; display: none; }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
@@ -7717,11 +7718,41 @@
             return matches ? matches.map(h => h.slice(1).toLowerCase()) : [];
         }
 
+        const FEED_TEXT_TOKEN_REGEX = /(#[A-Za-z0-9_]+)|(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|co\.za|ca|uk|co\.uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?:\/[^\s<]*)?\b)/g;
+
         function linkifyHashtags(text) {
-            const escaped = escapeHtmlForPost(text || '');
-            return escaped.replace(/(^|[\s])#([A-Za-z0-9_]+)/g, (match, prefix, tag) => {
-                return `${prefix}<span class="feed-hashtag" data-hashtag="${tag.toLowerCase()}">#${tag}</span>`;
-            });
+            if (!text) return '';
+            FEED_TEXT_TOKEN_REGEX.lastIndex = 0;
+            let result = '';
+            let lastIndex = 0;
+            let match;
+            while ((match = FEED_TEXT_TOKEN_REGEX.exec(text)) !== null) {
+                const raw = match[0];
+                result += escapeHtmlForPost(text.slice(lastIndex, match.index));
+
+                if (raw[0] === '#') {
+                    const precededOk = match.index === 0 || /\s/.test(text[match.index - 1]);
+                    if (!precededOk) {
+                        result += escapeHtmlForPost(raw);
+                    } else {
+                        const tag = raw.slice(1);
+                        result += `<span class="feed-hashtag" data-hashtag="${tag.toLowerCase()}">#${escapeHtmlForPost(tag)}</span>`;
+                    }
+                } else {
+                    // URL — trim trailing sentence punctuation out of the link
+                    const cleaned = raw.replace(/[.,!?;:'")\]]+$/, '');
+                    const trailing = raw.slice(cleaned.length);
+                    if (!cleaned) {
+                        result += escapeHtmlForPost(raw);
+                    } else {
+                        const href = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+                        result += `<a href="${escapeHtmlForPost(href)}" target="_blank" rel="noopener noreferrer" class="feed-link" onclick="event.stopPropagation()">${escapeHtmlForPost(cleaned)}</a>${escapeHtmlForPost(trailing)}`;
+                    }
+                }
+                lastIndex = match.index + raw.length;
+            }
+            result += escapeHtmlForPost(text.slice(lastIndex));
+            return result;
         }
 
         // Small "reposted by" banner shown above a repost-wrapper card, built from the

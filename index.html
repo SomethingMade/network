@@ -8315,21 +8315,26 @@
             }).catch(() => {});
         }
 
-        // Pauses feed media (video, or a post's background music) whenever it scrolls out of the
-        // viewport (or is no longer sufficiently visible), so playback never keeps running behind
-        // other cards. Videos are observed directly; a post's music chip is observed instead of the
-        // (hidden, zero-size) audio element, with the audio element stashed on it via __pauseTarget.
+        // Auto-plays a feed video the moment it's sufficiently visible in the viewport, and
+        // pauses it the moment it scrolls back out — so playback follows what's on screen
+        // without the user needing to tap play. Only one feed media element (video or post
+        // music) plays at a time, matching the manual play behavior in initFeedVideoPlayer.
         let feedMediaObserver = null;
         function getFeedMediaObserver() {
             if (feedMediaObserver) return feedMediaObserver;
             feedMediaObserver = new IntersectionObserver((entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) return;
-                    const target = entry.target;
-                    const mediaEl = (target.tagName === 'VIDEO' || target.tagName === 'AUDIO') ? target : target.__pauseTarget;
-                    if (mediaEl && !mediaEl.paused) mediaEl.pause();
+                    const video = entry.target;
+                    if (entry.isIntersecting) {
+                        if (video.paused) {
+                            document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (v !== video && !v.paused) v.pause(); });
+                            video.play().catch(() => {});
+                        }
+                    } else if (!video.paused) {
+                        video.pause();
+                    }
                 });
-            }, { threshold: 0.35 });
+            }, { threshold: 0.5 });
             return feedMediaObserver;
         }
 

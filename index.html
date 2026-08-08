@@ -365,6 +365,10 @@
         /* Same reasoning: the reel viewer's header has its own avatar trigger, so this
            needs to clear the reel viewer's z-index too, not just the default bottom-sheet layer. */
         #profile-bottom-sheet-overlay { z-index: 100010; }
+        /* Settings is opened from inside the profile sheet, so it needs to sit at the same
+           top tier — it's placed after profile-bottom-sheet-overlay in the DOM, so equal
+           z-index still paints it above when both are open. */
+        #settings-bottom-sheet-overlay { z-index: 100010; }
         /* Same reasoning again: the reel viewer's header camera icon opens this, so it needs
            to clear the reel viewer's z-index too, not just its own default (100005). */
         #status-upload-overlay { z-index: 100010; }
@@ -2779,9 +2783,14 @@
             <div class="sheet-handle"></div>
 
             <div class="wa-sheet-header">
-                <button type="button" id="btn-close-profile" class="wa-header-icon-btn" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" id="btn-close-profile" class="wa-header-icon-btn" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <button type="button" id="btn-open-settings" class="wa-header-icon-btn" aria-label="Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                </div>
                 <div class="wa-header-title">Profile</div>
                 <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
             </div>
@@ -2825,6 +2834,20 @@
                         <input type="text" id="profile-website" class="wa-field-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
                     </div>
                 </div>
+            </div>
+
+        </div>
+    </div>
+    <div id="settings-bottom-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+
+            <div class="wa-sheet-header">
+                <button type="button" id="btn-close-settings" class="wa-header-icon-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="wa-header-title">Settings</div>
+                <div style="width:38px; flex-shrink:0;"></div>
             </div>
 
             <div class="wa-section">
@@ -3027,6 +3050,7 @@
             <button type="button" id="btn-logout" class="wa-logout-row">Sign Out</button>
         </div>
     </div>
+
 
     <div id="msg-options-sheet-overlay" class="bottom-sheet-overlay">
         <div style="display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:420px;">
@@ -5547,6 +5571,7 @@
 
         // --- Blocked Contacts Settings Shortcut ---
         document.getElementById('setting-blocked-contacts').addEventListener('click', () => {
+            settingsSheetOverlay.classList.remove('active');
             profileSheetOverlay.classList.remove('active');
             window.location.hash = 'tab-contacts';
             const blockedSubtabBtn = document.querySelector('#contacts-sub-tabs button[data-subtab="blocked"]');
@@ -10381,6 +10406,18 @@
             profileSheetOverlay.classList.remove('active');
         });
 
+        // --- Settings sheet (moved out of Profile: Content & Copyright through Sign Out) ---
+        const settingsSheetOverlay = document.getElementById('settings-bottom-sheet-overlay');
+        document.getElementById('btn-open-settings').addEventListener('click', () => {
+            settingsSheetOverlay.classList.add('active');
+        });
+        document.getElementById('btn-close-settings').addEventListener('click', () => {
+            settingsSheetOverlay.classList.remove('active');
+        });
+        settingsSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === settingsSheetOverlay) settingsSheetOverlay.classList.remove('active');
+        });
+
         document.getElementById('btn-save-profile').addEventListener('click', async (e) => {
             e.preventDefault();
             const user = auth.currentUser;
@@ -10425,6 +10462,7 @@
             const confirmOut = await showCustomModal("Sign Out", "Are you sure you want to log out of the messenger?", true);
             if(confirmOut) {
                 profileSheetOverlay.classList.remove('active');
+                settingsSheetOverlay.classList.remove('active');
                 showLoading();
                 try {
                     await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);

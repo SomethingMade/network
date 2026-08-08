@@ -812,6 +812,10 @@
         .wa-field-row > svg { width: 19px; height: 19px; color: var(--primary-blue); flex-shrink: 0; }
         .wa-field-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
         .wa-field-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+        .profile-website-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: 20px; background: rgba(37, 211, 102, 0.12); color: var(--primary-blue); font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 0.15s ease; }
+        .profile-website-chip:hover { background: rgba(37, 211, 102, 0.2); }
+        .profile-website-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .profile-website-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .wa-field-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; font-weight: 500; padding: 0; }
         .wa-field-input::placeholder { color: var(--text-secondary); font-weight: 400; }
 
@@ -2735,6 +2739,10 @@
                 <h3 id="user-info-name" style="font-size:19px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Name</h3>
                 <p id="user-info-username" style="font-size:14px; font-weight:600; color:var(--primary-blue);">@username</p>
                 <p style="font-size:13px; color:var(--text-secondary); margin-top:8px;"><span id="user-info-following-count">0</span> Following &nbsp;·&nbsp; <span id="user-info-followers-count">0</span> Followers</p>
+                <a href="#" id="user-info-website" class="profile-website-chip" target="_blank" rel="noopener noreferrer" style="display:none; margin-top:12px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    <span id="user-info-website-text"></span>
+                </a>
             </div>
 
             <div class="wa-field-group">
@@ -2806,6 +2814,13 @@
                     <div class="wa-field-body">
                         <span class="wa-field-label">About</span>
                         <input type="text" id="profile-about" class="wa-field-input" maxlength="80" placeholder="Hey there! I'm using Xoxa" autocomplete="off">
+                    </div>
+                </div>
+                <div class="wa-field-row">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    <div class="wa-field-body">
+                        <span class="wa-field-label">Website</span>
+                        <input type="text" id="profile-website" class="wa-field-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
                     </div>
                 </div>
             </div>
@@ -8415,6 +8430,18 @@
             return matches ? matches.map(h => h.slice(1).toLowerCase()) : [];
         }
 
+        // Normalizes a user-entered profile website into a safe {href, label} pair.
+        // Adds https:// when no protocol was typed, and strips it back off again for the
+        // display label so the chip reads as "example.com" rather than the full URL.
+        function normalizeProfileWebsite(raw) {
+            const trimmed = (raw || '').trim();
+            if (!trimmed) return null;
+            const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+            const label = trimmed.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+            if (!label) return null;
+            return { href, label };
+        }
+
         const FEED_TEXT_TOKEN_REGEX = /(#[A-Za-z0-9_]+)|(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.(?:com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|co\.za|ca|uk|co\.uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?:\/[^\s<]*)?\b)/g;
 
         function linkifyHashtags(text) {
@@ -10071,6 +10098,7 @@
                 document.getElementById('btn-set-username').textContent = myProfile.isBusinessAccount ? 'Update Username' : 'Set Username (one-time)';
 
                 document.getElementById('profile-about').value = myProfile.about || '';
+                document.getElementById('profile-website').value = myProfile.website || '';
                 resetPhoneLinkUI(user);
 
                 const businessToggle = document.getElementById('business-account-toggle');
@@ -10358,6 +10386,7 @@
             
             const newName = document.getElementById('profile-name').value.trim();
             const newAbout = document.getElementById('profile-about').value.trim();
+            const newWebsite = document.getElementById('profile-website').value.trim();
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
             const existingProfile = cachedUsers[user.uid] || {};
             const finalCover = pendingCoverURL !== null ? pendingCoverURL : (existingProfile.coverPhotoURL || "");
@@ -10374,6 +10403,7 @@
                     photoURL: finalPhoto,
                     coverPhotoURL: finalCover,
                     about: newAbout,
+                    website: newWebsite,
                     email: user.email || ""
                 });
                 updateAvatarUI(user);
@@ -11266,6 +11296,17 @@
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
+            const websiteEl = document.getElementById('user-info-website');
+            const websiteInfo = normalizeProfileWebsite(profile.website);
+            if (websiteEl) {
+                if (websiteInfo) {
+                    websiteEl.href = websiteInfo.href;
+                    document.getElementById('user-info-website-text').textContent = websiteInfo.label;
+                    websiteEl.style.display = 'inline-flex';
+                } else {
+                    websiteEl.style.display = 'none';
+                }
+            }
             document.getElementById('user-info-following-count').textContent = profile.followingCount || 0;
             document.getElementById('user-info-followers-count').textContent = profile.followersCount || 0;
             const msgBtn = document.getElementById('btn-user-info-message');

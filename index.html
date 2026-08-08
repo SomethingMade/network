@@ -820,6 +820,14 @@
         .profile-website-chip:hover { background: rgba(37, 211, 102, 0.2); }
         .profile-website-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
         .profile-website-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .wa-suggested-section { margin-bottom: 22px; }
+        .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+        .profile-suggested-scroll::-webkit-scrollbar { display: none; }
+        .profile-suggested-card { flex: 0 0 116px; background: var(--bg-alt); border-radius: 16px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .profile-suggested-card .avatar { width: 54px; height: 54px; font-size: 19px; margin-bottom: 8px; }
+        .profile-suggested-card h4 { font-size: 13px; font-weight: 700; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 2px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+        .profile-suggested-username { font-size: 11.5px; color: var(--text-secondary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 10px; }
+        .profile-suggested-card .discover-card-add-btn { width: 100%; padding: 7px 0; font-size: 12px; }
         .wa-field-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; font-weight: 500; padding: 0; }
         .wa-field-input::placeholder { color: var(--text-secondary); font-weight: 400; }
 
@@ -2834,6 +2842,11 @@
                         <input type="text" id="profile-website" class="wa-field-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
                     </div>
                 </div>
+            </div>
+
+            <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
+                <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
+                <div class="profile-suggested-scroll" id="profile-suggested-scroll"></div>
             </div>
 
         </div>
@@ -10102,6 +10115,54 @@
             });
         }
 
+        // Builds the horizontally-scrollable "Suggested Friends" row shown on the Profile sheet.
+        // Reuses the same discoverable-users pool and Follow button styling as the Discover tab.
+        function renderProfileSuggestedFriends() {
+            const section = document.getElementById('profile-suggested-section');
+            const scroll = document.getElementById('profile-suggested-scroll');
+            if (!section || !scroll) return;
+
+            const uids = shuffleWithSeed(getDiscoverableUsers(), 'profile-suggested').slice(0, 12);
+            if (!uids.length) {
+                section.style.display = 'none';
+                scroll.innerHTML = '';
+                return;
+            }
+            section.style.display = 'block';
+            scroll.innerHTML = uids.map(uid => {
+                const profile = cachedUsers[uid] || {};
+                const name = profile.name || 'Xoxa User';
+                return `
+                    <div class="profile-suggested-card" data-uid="${uid}">
+                        ${feedAvatarHtml(profile)}
+                        <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                        ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Xoxa</span>'}
+                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('profile-suggested-scroll').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.discover-card-add-btn');
+            if (!btn || btn.disabled) return;
+            const uid = btn.dataset.uid;
+            const user = auth.currentUser;
+            if (!user || !uid) return;
+            btn.disabled = true;
+            btn.textContent = 'Following...';
+            try {
+                await followUser(uid);
+                btn.textContent = 'Following';
+                btn.classList.add('added');
+                notify('You followed this person');
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Follow';
+                showCustomModal('Error', 'Could not follow this person.');
+            }
+        });
+
         function openProfileSheet(e) {
             e.preventDefault();
             const user = auth.currentUser;
@@ -10132,6 +10193,7 @@
                 businessToggle.checked = !!myProfile.isBusinessAccount;
                 document.getElementById('business-account-pill').style.display = myProfile.isBusinessAccount ? 'inline-block' : 'none';
 
+                renderProfileSuggestedFriends();
                 profileSheetOverlay.classList.add('active');
             }
         }

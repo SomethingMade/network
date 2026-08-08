@@ -142,7 +142,8 @@
         body.glass-theme .modal-overlay .custom-modal,
         body.glass-theme .settings-panel,
         body.glass-theme .workspace-pane,
-        body.glass-theme #loading-overlay {
+        body.glass-theme #loading-overlay,
+        body.glass-theme #page-shimmer-overlay {
             background: var(--bg-surface) !important;
             backdrop-filter: blur(24px) saturate(160%);
             -webkit-backdrop-filter: blur(24px) saturate(160%);
@@ -253,6 +254,37 @@
             overflow: hidden;
         }
         #loading-overlay.active { opacity: 1; visibility: visible; }
+
+        /* Whole-page shimmer skeleton. Takes over from the branded splash once auth
+           resolves and stays up for PAGE_SHIMMER_MIN_MS (see JS) while the first Firebase
+           snapshots (chats/status/feed) are still streaming in, so cold opens get a
+           skeleton of the app shell instead of a blank/half-populated flash. Sits one
+           z-index below #loading-overlay so the two cross-fade into each other. */
+        #page-shimmer-overlay {
+            position: fixed; inset: 0; background: var(--bg-base); z-index: 99999;
+            display: flex; flex-direction: column; opacity: 0; visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s; overflow: hidden;
+            padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); box-sizing: border-box;
+        }
+        #page-shimmer-overlay.active { opacity: 1; visibility: visible; }
+        #page-shimmer-overlay .pshim-block { position: relative; overflow: hidden; background: var(--bg-alt); border-radius: 10px; }
+        #page-shimmer-overlay .pshim-block::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+            background-size: 200% 100%; animation: statusShimmer 1.4s ease-in-out infinite;
+        }
+        body.dark-theme #page-shimmer-overlay .pshim-block::after {
+            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+            background-size: 200% 100%;
+        }
+        #page-shimmer-overlay .pshim-topbar { display: flex; align-items: center; gap: 12px; height: 34px; margin-bottom: 24px; flex-shrink: 0; }
+        #page-shimmer-overlay .pshim-topbar .pshim-block:nth-child(1) { width: 34px; height: 34px; border-radius: 50%; }
+        #page-shimmer-overlay .pshim-topbar .pshim-block:nth-child(2) { flex: 1; height: 15px; max-width: 130px; }
+        #page-shimmer-overlay .pshim-topbar .pshim-block:nth-child(3) { width: 26px; height: 26px; border-radius: 8px; margin-left: auto; }
+        #page-shimmer-overlay .pshim-stories { display: flex; gap: 14px; margin-bottom: 26px; flex-shrink: 0; }
+        #page-shimmer-overlay .pshim-stories .pshim-block { width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; }
+        #page-shimmer-overlay .pshim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; align-content: start; }
+        #page-shimmer-overlay .pshim-grid .pshim-block { height: 30vw; max-height: 148px; }
 
         .splash-bg-orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.32; animation: splashOrbFloat 12s ease-in-out infinite; pointer-events: none; }
         .splash-bg-orb-1 { width: 300px; height: 300px; background: var(--primary-blue); top: -80px; left: -70px; animation-duration: 13s; }
@@ -2165,6 +2197,33 @@
         <div class="splash-tagline">Connecting you securely...</div>
         <div class="splash-dots"><span></span><span></span><span></span></div>
     </div>
+
+    <div id="page-shimmer-overlay" aria-hidden="true">
+        <div class="pshim-topbar">
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+        </div>
+        <div class="pshim-stories">
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+        </div>
+        <div class="pshim-grid">
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+            <div class="pshim-block"></div>
+        </div>
+    </div>
     
     <div id="toast-notification" class="toast"></div>
 
@@ -4053,6 +4112,14 @@
 
         function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
         function hideLoading() { document.getElementById("loading-overlay").classList.remove("active"); }
+
+        // Whole-page shimmer shown only on a fresh app open (guarded by isInitialLoad in
+        // onAuthStateChanged below) — not on every auth refire. 2000ms is the default floor;
+        // bump it if slower connections need more cover, or wire it to real data-ready events
+        // instead of a flat timer if that becomes worth the extra bookkeeping.
+        const PAGE_SHIMMER_MIN_MS = 2000;
+        function showPageShimmer() { document.getElementById("page-shimmer-overlay").classList.add("active"); }
+        function hidePageShimmer() { document.getElementById("page-shimmer-overlay").classList.remove("active"); }
 
         function notify(message, type = "success") {
             const toast = document.getElementById("toast-notification");
@@ -13338,6 +13405,10 @@
                 
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
+                // Still hidden behind the branded splash at this point (higher z-index) — this
+                // just gets it ready underneath so hideLoading() below reveals shimmer, not a
+                // blank/half-populated screen, on a fresh open.
+                if (isInitialLoad) showPageShimmer();
                 updateAvatarUI(user);
                 // Sync the tab UI to whatever hash is currently in the URL. This matters on
                 // refresh/reload: the hash can already equal a non-default tab (e.g. #tab-chats)
@@ -13426,7 +13497,14 @@
                 if (callLogUnsub) { callLogUnsub(); callLogUnsub = null; }
                 cachedCallLogEntries = [];
             }
-            if (isInitialLoad) { setTimeout(() => { hideLoading(); }, 800); isInitialLoad = false; }
+            if (isInitialLoad) {
+                // Branded splash hides on its existing 800ms timing, unchanged. If we showed
+                // the page shimmer (logged-in path only), let it stay up for its own full
+                // PAGE_SHIMMER_MIN_MS after taking over from the splash, then reveal real content.
+                setTimeout(() => { hideLoading(); }, 800);
+                if (user) setTimeout(() => { hidePageShimmer(); }, 800 + PAGE_SHIMMER_MIN_MS);
+                isInitialLoad = false;
+            }
         });
 
         let activeChatUid = null;

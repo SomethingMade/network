@@ -710,6 +710,12 @@
         .feed-video-progress-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); left: 0%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
         .feed-video-time { color: #fff; font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
+        .feed-post-reactors { display: flex; align-items: center; gap: 6px; margin-top: 8px; margin-left: 60px; }
+        .feed-post-reactors-avatars { display: flex; }
+        .feed-post-reactors-avatars .avatar { width: 20px; height: 20px; font-size: 9px; font-weight: 700; border: 2px solid var(--bg-surface); border-radius: 50%; margin-left: -7px; flex-shrink: 0; }
+        .feed-post-reactors-avatars .avatar:first-child { margin-left: 0; }
+        .feed-post-reactors-label { font-size: 12px; color: var(--text-secondary); }
+
         .feed-post-actions { display: flex; align-items: center; justify-content: flex-start; gap: 0; margin-top: 8px; margin-left: 60px; max-width: calc(420px + 60px); }
         .feed-post-actions-left { display: flex; align-items: center; gap: 0; justify-content: space-between; width: 190px; flex-shrink: 0; }
         .feed-post-actions-right { display: flex; align-items: center; gap: 0; margin-left: auto; }
@@ -8554,6 +8560,28 @@
             if (repostBtn) repostBtn.classList.toggle('reposted', !!(post.reposts && myUid && post.reposts[myUid]));
 
             if (post.poll) patchPollUI(card, post);
+            renderPostReactors(card, post);
+        }
+
+        // Renders up to 3 overlapping avatars of people who reacted to a post — bottom-left of
+        // the card, below the action row. Called both when a card is first built and whenever
+        // patchFeedPostCounts refreshes an existing card in place (so it updates live too).
+        function renderPostReactors(card, post) {
+            const row = card.querySelector('.feed-post-reactors');
+            if (!row) return;
+            const avatarsEl = row.querySelector('.feed-post-reactors-avatars');
+            const labelEl = row.querySelector('.feed-post-reactors-label');
+            const reactorUids = post.reactions ? Object.keys(post.reactions) : [];
+            if (!reactorUids.length) {
+                row.style.display = 'none';
+                return;
+            }
+            row.style.display = 'flex';
+            const shown = reactorUids.slice(0, 3);
+            avatarsEl.innerHTML = shown.map(uid => feedAvatarHtml(cachedUsers[uid] || {})).join('');
+            const total = post.likeCount || reactorUids.length;
+            const remaining = total - shown.length;
+            labelEl.textContent = remaining > 0 ? `+${formatFeedCount(remaining)}` : '';
         }
 
         // A repost-wrapper card renders another post's content, so more than one card in the
@@ -8886,9 +8914,14 @@
                         </button>
                     </div>
                 </div>
+                <div class="feed-post-reactors" style="display:none;">
+                    <div class="feed-post-reactors-avatars"></div>
+                    <span class="feed-post-reactors-label"></span>
+                </div>
             `;
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);
+            renderPostReactors(card, post);
             if (isRepost) bindRepostBannerClick(card);
             getFeedImpressionObserver().observe(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);

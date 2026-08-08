@@ -8186,7 +8186,7 @@
                 editBox.remove();
                 if (originalTextEl) originalTextEl.style.display = '';
             });
-            editBox.querySelector('.feed-post-edit-save').addEventListener('click', async () => {
+            editBox.querySelector('.feed-post-edit-save').addEventListener('click', async function () {
                 const newText = textarea.value.trim();
                 if (newText.length > 500) {
                     notify('Posts are limited to 500 characters', 'error');
@@ -8196,8 +8196,19 @@
                     notify('A post needs text or media', 'error');
                     return;
                 }
-                await savePostEdit(postId, newText);
-                editBox.remove();
+                this.disabled = true;
+                const ok = await savePostEdit(postId, newText);
+                this.disabled = false;
+                if (!ok) return; // error already surfaced by savePostEdit — keep the edit box open so the edit isn't lost
+
+                // Reflect the edit on screen right away instead of waiting on the async
+                // onChildChanged listener: that listener can fire while this card's edit box
+                // is still open and bail out (see its guard), leaving stale text visible until
+                // some unrelated update happens to touch this post.
+                const updatedPost = { ...post, text: newText, editedAt: Date.now() };
+                cachedPosts[postId] = updatedPost;
+                const newCard = buildFeedPostCard(postId, updatedPost);
+                card.replaceWith(newCard);
             });
         }
 
@@ -8208,8 +8219,10 @@
                     editedAt: serverTimestamp()
                 });
                 notify('Post updated');
+                return true;
             } catch (e) {
                 notify('Could not update post', 'error');
+                return false;
             }
         }
 

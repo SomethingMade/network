@@ -1016,13 +1016,18 @@
         .stories-scroll { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; transition: opacity 0.2s ease; width: 100%; white-space: nowrap; }
         .stories-scroll::-webkit-scrollbar { display: none; }
         .stories-scroll.uploading { opacity: 0.5; pointer-events: none; }
-        .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; }
+        .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; position: relative; }
         .story-ring { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; }
         .story-ring.has-story { background: none; }
         .story-ring-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
         .story-ring-inner { width: 46px; height: 46px; border-radius: 50%; background: var(--bg-surface); padding: 2px; position: relative; z-index: 1; }
         .story-avatar-img { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; background-color: #E5E7EB; display:flex; align-items:center; justify-content:center; font-weight:700; color: #128C7E; font-size: 16px; position: relative; }
         .story-label { font-size: 11px; color: var(--text-secondary); max-width: 58px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Nudge bubble shown above the "Add Story" avatar until the user posts their first
+           (still-active) story — points down at the avatar, like a speech-bubble callout. */
+        .add-story-nudge { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); background: var(--bg-alt); color: var(--text-primary); font-size: 11.5px; font-weight: 600; line-height: 1.25; padding: 7px 10px; border-radius: 12px; white-space: normal; width: max-content; max-width: 92px; text-align: center; box-shadow: var(--shadow-elevated); pointer-events: none; }
+        .add-story-nudge::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--bg-alt); }
+
 
         /* --- Discover tab: WhatsApp-style tall status CARDS instead of circular rings --- */
         .story-card-scroll { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; width: 100%; transition: opacity 0.2s ease; }
@@ -11366,15 +11371,15 @@
             container.innerHTML = "";
             const now = Date.now();
 
-            container.appendChild(buildAddStoryItem());
-
             const ownRaw = [];
             if (storiesData && storiesData[user.uid]) {
                 Object.entries(storiesData[user.uid]).forEach(([key, val]) => ownRaw.push({ ...val, key }));
             }
             const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
             const ownProfile = (usersData && usersData[user.uid]) || {};
-            
+
+            container.appendChild(buildAddStoryItem(ownItems.length === 0));
+
             if (ownItems.length > 0) {
                 container.appendChild(buildStoryItem(
                     user.uid,
@@ -11397,9 +11402,17 @@
             });
         }
 
-        function buildAddStoryItem() {
+        function buildAddStoryItem(showNudge) {
             const wrap = document.createElement('div');
             wrap.className = 'story-item';
+
+            if (showNudge) {
+                const nudge = document.createElement('div');
+                nudge.className = 'add-story-nudge';
+                nudge.textContent = 'Tap to share a story!';
+                wrap.appendChild(nudge);
+            }
+
             const ring = document.createElement('div');
             ring.className = 'story-ring';
             ring.style.border = '2px dashed var(--border-color)';

@@ -4741,13 +4741,15 @@
                 </div>`;
         }
 
-        // Setting textContent for name/caption separately (rather than inline in the template
-        // string above) keeps user-authored text out of innerHTML entirely.
+        // Caption stays on textContent (plain user text, no markup needed). The name goes through
+        // innerHTML so the verified badge can sit next to it — same escape-then-append pattern as
+        // every other name render (see verifiedBadgeFor), so user-authored text still can't inject markup.
         function fillReelItemText(itemEl, postId) {
             const post = cachedPosts[postId];
-            const author = (post && cachedUsers[post.uid]) || {};
+            const uid = post && post.uid;
+            const author = (post && cachedUsers[uid]) || {};
             const nameEl = itemEl.querySelector('.reel-item-author span');
-            if (nameEl) nameEl.textContent = author.name || (post && post.name) || 'User';
+            if (nameEl) nameEl.innerHTML = escapeHtmlForPost(author.name || (post && post.name) || 'User') + verifiedBadgeFor(uid, uid === AI_UID);
             const captionEl = itemEl.querySelector('.reel-item-caption');
             if (captionEl) captionEl.textContent = (post && post.text) || '';
         }
@@ -9972,7 +9974,7 @@
                     </div>
                     <div class="tag-people-item-check"></div>
                 `;
-                item.querySelector('.tag-people-item-name').textContent = u.name || 'User';
+                item.querySelector('.tag-people-item-name').innerHTML = escapeHtmlForPost(u.name || 'User') + verifiedBadgeFor(uid, uid === AI_UID);
                 item.querySelector('.tag-people-item-username').textContent = u.username ? '@' + u.username : '';
                 item.addEventListener('click', () => {
                     if (composerTaggedUids.has(uid)) composerTaggedUids.delete(uid);
@@ -12252,7 +12254,7 @@
                             senderName.style.fontWeight = '700';
                             senderName.style.color = 'var(--primary-blue)';
                             senderName.style.marginBottom = '2px';
-                            senderName.textContent = cachedUsers[msg.senderUid]?.name || 'Member';
+                            senderName.innerHTML = escapeHtmlForPost(cachedUsers[msg.senderUid]?.name || 'Member') + verifiedBadgeFor(msg.senderUid, msg.senderUid === AI_UID);
                             bubble.appendChild(senderName);
                         }
 

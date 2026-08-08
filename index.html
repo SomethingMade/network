@@ -491,8 +491,15 @@
         .mention-suggestion-username { display: block; font-size: 11.5px; color: var(--text-secondary); }
 
         #feed-posts-container { padding: 0; margin: 0 -14px; }
-        #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: block; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
+        #feed-new-posts-pill { position: sticky; top: 10px; z-index: 5; display: none; align-items: center; gap: 8px; margin: 0 auto 10px; background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 7px 18px 7px 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
         #feed-new-posts-pill:active { transform: scale(0.97); }
+        .feed-new-posts-pill-icon { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .feed-new-posts-pill-icon svg { width: 13px; height: 13px; }
+        .feed-new-posts-pill-avatars { display: flex; align-items: center; flex-shrink: 0; }
+        .feed-new-posts-pill-avatars .avatar { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--primary-blue); background-color: #999; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; margin-left: -8px; box-sizing: border-box; }
+        .feed-new-posts-pill-avatars .avatar:first-child { margin-left: 0; }
+        .feed-new-posts-pill-avatars .feed-new-posts-avatar-extra { background: rgba(255,255,255,0.9); color: var(--primary-blue); font-size: 10.5px; }
+        .feed-new-posts-pill-text { white-space: nowrap; }
         .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
         .feed-post-card.post-highlight { animation: postHighlightFlash 2s ease-out; }
         @keyframes postHighlightFlash {
@@ -6941,13 +6948,41 @@
         function updateNewPostsPill() {
             const pill = document.getElementById('feed-new-posts-pill');
             if (!pill) return;
-            const count = Object.keys(pendingNewPosts).length;
+            const entries = Object.values(pendingNewPosts);
+            const count = entries.length;
             if (count === 0) {
                 pill.style.display = 'none';
+                pill.innerHTML = '';
                 return;
             }
-            pill.textContent = count === 1 ? 'New post' : `${count} new posts`;
-            pill.style.display = 'block';
+
+            // Show up to 3 distinct authors' avatars (most recently arrived first), with a
+            // "+N" bubble folding in anyone beyond that — mirrors the stacked-avatar treatment
+            // used for "who's online"/"who posted" indicators elsewhere in the app.
+            const seenUids = new Set();
+            const authors = [];
+            entries.slice().reverse().forEach(post => {
+                if (post.uid && !seenUids.has(post.uid)) {
+                    seenUids.add(post.uid);
+                    authors.push(post);
+                }
+            });
+            const shownAuthors = authors.slice(0, 3);
+            const extraAuthorCount = Math.max(0, authors.length - shownAuthors.length);
+            const avatarsHtml = shownAuthors.map(post => {
+                const live = (post.uid && cachedUsers[post.uid]) || {};
+                return feedAvatarHtml({ name: live.name || post.name, photoURL: live.photoURL || post.photoURL });
+            }).join('');
+            const extraHtml = extraAuthorCount > 0 ? `<div class="avatar feed-new-posts-avatar-extra">+${extraAuthorCount}</div>` : '';
+
+            pill.innerHTML = `
+                <span class="feed-new-posts-pill-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"></path><path d="M5 12l7-7 7 7"></path></svg>
+                </span>
+                <span class="feed-new-posts-pill-avatars">${avatarsHtml}${extraHtml}</span>
+                <span class="feed-new-posts-pill-text">${count === 1 ? 'posted' : `${count} posted`}</span>
+            `;
+            pill.style.display = 'flex';
         }
 
         // Folds queued live posts into the feed. Only called from explicit user actions (tapping

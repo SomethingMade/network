@@ -410,6 +410,35 @@
         .post-composer-overlay .feed-composer-attach span:not(.feed-composer-music-clear) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
         .post-composer-overlay .feed-composer-music-btn.has-music { background: rgba(37, 211, 102, 0.12); }
         .post-composer-overlay .feed-composer-music-clear { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--text-secondary); color: var(--bg-surface); display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
+        .post-composer-overlay .feed-composer-attach.disabled { opacity: 0.35; pointer-events: none; }
+        .post-composer-overlay .feed-composer-poll-btn.active { background: rgba(37, 211, 102, 0.16); color: var(--primary-blue); }
+
+        /* --- Poll builder panel inside the post composer --- */
+        .feed-composer-poll { margin-top: 14px; border: 1.5px solid var(--border-color); border-radius: 16px; padding: 14px; }
+        .feed-composer-poll-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .feed-composer-poll-header span { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+        .feed-composer-poll-remove { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--bg-alt); color: var(--text-secondary); font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .feed-composer-poll-question { width: 100%; border: none; background: var(--bg-input); border-radius: 12px; padding: 10px 14px; font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px; }
+        .feed-composer-poll-question:focus { outline: 2px solid var(--primary-blue); outline-offset: -2px; }
+        .feed-composer-poll-options { display: flex; flex-direction: column; gap: 8px; }
+        .feed-composer-poll-option-row { display: flex; align-items: center; gap: 8px; }
+        .feed-composer-poll-option-input { flex: 1; min-width: 0; border: none; background: var(--bg-input); border-radius: 12px; padding: 9px 14px; font-size: 14px; color: var(--text-primary); }
+        .feed-composer-poll-option-input:focus { outline: 2px solid var(--primary-blue); outline-offset: -2px; }
+        .feed-composer-poll-option-remove { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--bg-alt); color: var(--text-secondary); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .feed-composer-poll-add-option { margin-top: 10px; border: 1.5px dashed var(--border-color); background: none; border-radius: 12px; padding: 8px 14px; font-size: 13.5px; font-weight: 600; color: var(--primary-blue); cursor: pointer; width: 100%; }
+        .feed-composer-poll-add-option:disabled { opacity: 0.4; pointer-events: none; }
+
+        /* --- Poll display on a feed post --- */
+        .feed-post-poll { margin-top: 10px; }
+        .feed-post-poll-question { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0 0 10px; }
+        .feed-post-poll-options { display: flex; flex-direction: column; gap: 8px; }
+        .feed-post-poll-option { position: relative; display: flex; align-items: center; width: 100%; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 10px 14px; background: var(--bg-alt); overflow: hidden; cursor: pointer; text-align: left; }
+        .feed-post-poll-option-fill { position: absolute; inset: 0; width: 0%; background: rgba(37, 211, 102, 0.16); transition: width 0.35s var(--ease-smooth); z-index: 0; }
+        .feed-post-poll-option-label { position: relative; z-index: 1; flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--text-primary); overflow-wrap: break-word; }
+        .feed-post-poll-option-pct { position: relative; z-index: 1; font-size: 13px; font-weight: 700; color: var(--text-secondary); margin-left: 10px; flex-shrink: 0; }
+        .feed-post-poll-option.voted { border-color: var(--primary-blue); }
+        .feed-post-poll-option.voted .feed-post-poll-option-pct { color: var(--primary-blue); }
+        .feed-post-poll-total { display: block; margin-top: 8px; font-size: 12.5px; color: var(--text-secondary); }
 
         /* ── NOTIFICATIONS BELL + PANEL ── */
         .notif-bell-btn { position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); flex-shrink: 0; }
@@ -2297,6 +2326,15 @@
                     </div>
                     <div class="feed-composer-thumb-strip" id="feed-composer-thumb-strip" style="display:none;"></div>
                 </div>
+                <div class="feed-composer-poll" id="feed-composer-poll" style="display:none;">
+                    <div class="feed-composer-poll-header">
+                        <span>Poll</span>
+                        <button type="button" class="feed-composer-poll-remove" id="feed-composer-poll-remove" title="Remove poll">&times;</button>
+                    </div>
+                    <input type="text" id="feed-composer-poll-question" class="feed-composer-poll-question" placeholder="Ask a question" maxlength="140" autocomplete="off">
+                    <div class="feed-composer-poll-options" id="feed-composer-poll-options"></div>
+                    <button type="button" class="feed-composer-poll-add-option" id="feed-composer-poll-add-option">+ Add option</button>
+                </div>
                 <div class="feed-composer-actions">
                     <div class="feed-composer-attach-row">
                         <label class="feed-composer-attach" for="feed-composer-file" title="Photo/Video">
@@ -2310,6 +2348,10 @@
                         <button type="button" class="feed-composer-attach feed-composer-gif-btn" id="feed-composer-gif-btn" title="GIF">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="12" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect><text x="12" y="15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="currentColor" stroke="none">GIF</text></svg>
                             <span>GIF</span>
+                        </button>
+                        <button type="button" class="feed-composer-attach feed-composer-poll-btn" id="feed-composer-poll-btn" title="Poll">
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                            <span>Poll</span>
                         </button>
                         <button type="button" class="feed-composer-attach feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;" title="Music">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
@@ -6152,6 +6194,7 @@
         let feedComposerImages = []; // array of uploaded image URLs (max FEED_MAX_IMAGES), mutually exclusive with video
         let feedComposerVideo = null; // { url } or null, mutually exclusive with images
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
+        let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
@@ -7242,13 +7285,105 @@
             const musicBtn = document.getElementById('feed-composer-music-btn');
             const musicBtnText = document.getElementById('feed-composer-music-btn-text');
             const musicClearBtn = document.getElementById('feed-composer-music-clear');
+            const attachLabel = document.querySelector('label.feed-composer-attach[for="feed-composer-file"]');
+            const gifBtn = document.getElementById('feed-composer-gif-btn');
+            const pollBtn = document.getElementById('feed-composer-poll-btn');
+            const pollPanel = document.getElementById('feed-composer-poll');
+            const pollQuestionInput = document.getElementById('feed-composer-poll-question');
+            const pollOptionsContainer = document.getElementById('feed-composer-poll-options');
+            const pollAddOptionBtn = document.getElementById('feed-composer-poll-add-option');
+            const pollRemoveBtn = document.getElementById('feed-composer-poll-remove');
+            const FEED_POLL_MAX_OPTIONS = 4;
             let feedComposerActiveIdx = 0;
             setupMentionAutocomplete(input, document.getElementById('feed-composer-mention-dropdown'));
 
+            function getPollOptionValues() {
+                return Array.from(pollOptionsContainer.querySelectorAll('.feed-composer-poll-option-input')).map(i => i.value.trim());
+            }
+
+            function pollIsValid() {
+                if (!feedComposerPollActive) return false;
+                const question = pollQuestionInput.value.trim();
+                const filledOptions = getPollOptionValues().filter(Boolean);
+                return question.length > 0 && filledOptions.length >= 2;
+            }
+
             function refreshSubmitState() {
+                if (feedComposerPollActive) {
+                    submitBtn.disabled = !pollIsValid();
+                    return;
+                }
                 const hasContent = (input.value && input.value.trim().length > 0) || feedComposerImages.length > 0 || !!feedComposerVideo;
                 submitBtn.disabled = !hasContent;
             }
+
+            function refreshPollOptionRemoveButtons() {
+                const rows = pollOptionsContainer.querySelectorAll('.feed-composer-poll-option-row');
+                rows.forEach(row => {
+                    const removeBtn = row.querySelector('.feed-composer-poll-option-remove');
+                    if (removeBtn) removeBtn.style.visibility = rows.length > 2 ? 'visible' : 'hidden';
+                });
+                pollAddOptionBtn.disabled = rows.length >= FEED_POLL_MAX_OPTIONS;
+            }
+
+            function addPollOptionRow(prefill = '') {
+                const rows = pollOptionsContainer.querySelectorAll('.feed-composer-poll-option-row');
+                if (rows.length >= FEED_POLL_MAX_OPTIONS) return;
+                const row = document.createElement('div');
+                row.className = 'feed-composer-poll-option-row';
+                row.innerHTML = `
+                    <input type="text" class="feed-composer-poll-option-input" placeholder="Option ${rows.length + 1}" maxlength="60" autocomplete="off" value="${prefill.replace(/"/g, '&quot;')}">
+                    <button type="button" class="feed-composer-poll-option-remove" title="Remove option">&times;</button>`;
+                pollOptionsContainer.appendChild(row);
+                row.querySelector('.feed-composer-poll-option-input').addEventListener('input', refreshSubmitState);
+                row.querySelector('.feed-composer-poll-option-remove').addEventListener('click', () => {
+                    if (pollOptionsContainer.querySelectorAll('.feed-composer-poll-option-row').length <= 2) return;
+                    row.remove();
+                    refreshPollOptionRemoveButtons();
+                    refreshSubmitState();
+                });
+                refreshPollOptionRemoveButtons();
+            }
+
+            function setMediaControlsDisabled(disabled) {
+                if (attachLabel) attachLabel.classList.toggle('disabled', disabled);
+                if (gifBtn) gifBtn.classList.toggle('disabled', disabled);
+            }
+
+            function openPollPanel() {
+                if (feedComposerImages.length || feedComposerVideo) {
+                    clearComposerMedia();
+                    notify('Removed photo/video to add a poll', 'error');
+                }
+                feedComposerPollActive = true;
+                pollPanel.style.display = 'block';
+                pollBtn.classList.add('active');
+                setMediaControlsDisabled(true);
+                if (!pollOptionsContainer.querySelector('.feed-composer-poll-option-row')) {
+                    addPollOptionRow();
+                    addPollOptionRow();
+                }
+                refreshSubmitState();
+                setTimeout(() => pollQuestionInput.focus(), 50);
+            }
+
+            function closePollPanel() {
+                feedComposerPollActive = false;
+                pollPanel.style.display = 'none';
+                pollBtn.classList.remove('active');
+                setMediaControlsDisabled(false);
+                pollQuestionInput.value = '';
+                pollOptionsContainer.innerHTML = '';
+                refreshSubmitState();
+            }
+
+            pollBtn.addEventListener('click', () => {
+                if (feedComposerPollActive) closePollPanel();
+                else openPollPanel();
+            });
+            pollRemoveBtn.addEventListener('click', closePollPanel);
+            pollQuestionInput.addEventListener('input', refreshSubmitState);
+            pollAddOptionBtn.addEventListener('click', () => addPollOptionRow());
 
             function updateComposerMusicChip() {
                 if (feedComposerMusic) {
@@ -7352,6 +7487,7 @@
             // Bridge for the shared GIF picker sheet (defined outside this closure) to hand a
             // chosen GIF back to the post composer.
             window.addEventListener('composer-gif-selected', (e) => {
+                if (feedComposerPollActive) return;
                 const url = e.detail && e.detail.url;
                 if (!url) return;
                 feedComposerVideo = null;
@@ -7366,6 +7502,7 @@
             });
 
             fileInput.addEventListener('change', async () => {
+                if (feedComposerPollActive) { fileInput.value = ''; return; }
                 const files = Array.from(fileInput.files || []);
                 if (!files.length) return;
 
@@ -7451,7 +7588,14 @@
 
             submitBtn.addEventListener('click', async () => {
                 const text = input.value.trim();
-                if (!text && !feedComposerImages.length && !feedComposerVideo) return;
+                let pollData = null;
+                if (feedComposerPollActive) {
+                    const question = pollQuestionInput.value.trim();
+                    const options = getPollOptionValues().filter(Boolean);
+                    if (!question || options.length < 2) return;
+                    pollData = { question, options };
+                }
+                if (!text && !feedComposerImages.length && !feedComposerVideo && !pollData) return;
                 const u = auth.currentUser;
                 if (!u) return;
                 const myProfile = cachedUsers[u.uid] || { name: u.displayName || 'You', photoURL: u.photoURL || '' };
@@ -7475,6 +7619,7 @@
                         videoUrl: feedComposerVideo ? feedComposerVideo.url : null,
                         videoThumbnail: feedComposerVideo ? cloudinaryVideoThumbnail(feedComposerVideo.url, 1) : null,
                         music: ((feedComposerImages.length || feedComposerVideo) && feedComposerMusic) ? feedComposerMusic : null,
+                        poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         mentions: mentionedUids.size ? mentionsMap : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
@@ -7488,6 +7633,7 @@
                     input.value = '';
                     input.style.height = 'auto';
                     clearComposerMedia();
+                    closePollPanel();
                     closePostComposer();
                     // This is the user's own deliberate action, not a background re-rank — unlike
                     // the anchor-preserving reorder, scrolling up here is exactly what they'd want,
@@ -7500,6 +7646,7 @@
                     refreshSubmitState();
                 }
             });
+
 
             document.getElementById('comments-sheet-handle').addEventListener('click', closePostComments);
             document.getElementById('btn-share-from-comments').addEventListener('click', () => {
@@ -8102,6 +8249,8 @@
             const repostCountEl = card.querySelector('.feed-repost-count');
             if (repostCountEl) repostCountEl.textContent = formatFeedCount(post.repostCount || 0);
             if (repostBtn) repostBtn.classList.toggle('reposted', !!(post.reposts && myUid && post.reposts[myUid]));
+
+            if (post.poll) patchPollUI(card, post);
         }
 
         // A repost-wrapper card renders another post's content, so more than one card in the
@@ -8204,6 +8353,75 @@
             }
         }
 
+        // Builds the poll block for a feed post card. Options are rendered as clickable bars —
+        // percentage fill and label text are re-applied after innerHTML is set (same pattern
+        // as the music chip) so option text is never interpolated raw into the HTML string.
+        function buildFeedPollHtml(poll, myUid) {
+            const votes = poll.votes || {};
+            const options = poll.options || [];
+            const total = Object.keys(votes).length;
+            const myVote = (myUid && votes[myUid] !== undefined && votes[myUid] !== null) ? votes[myUid] : null;
+            const optionsHtml = options.map((_, idx) => {
+                const count = Object.values(votes).filter(v => v === idx).length;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                const isMine = myVote === idx;
+                return `
+                    <button type="button" class="feed-post-poll-option${isMine ? ' voted' : ''}" data-poll-option="${idx}">
+                        <span class="feed-post-poll-option-fill" style="width:${pct}%"></span>
+                        <span class="feed-post-poll-option-label"></span>
+                        <span class="feed-post-poll-option-pct">${total > 0 ? pct + '%' : ''}</span>
+                    </button>`;
+            }).join('');
+            return `
+                <div class="feed-post-poll">
+                    <p class="feed-post-poll-question"></p>
+                    <div class="feed-post-poll-options">${optionsHtml}</div>
+                    <span class="feed-post-poll-total">${total} vote${total === 1 ? '' : 's'}</span>
+                </div>`;
+        }
+
+        // Tapping an option casts (or changes) that vote; tapping the option you already picked
+        // removes it. Each voter only ever writes their own key, so concurrent votes from
+        // different people never race each other.
+        async function voteOnPoll(postId, optionIdx) {
+            const user = auth.currentUser;
+            if (!user) return;
+            const post = cachedPosts[postId];
+            if (!post || !post.poll) return;
+            const votes = post.poll.votes || {};
+            const currentVote = votes[user.uid];
+            const newVote = currentVote === optionIdx ? null : optionIdx;
+            try {
+                await set(ref(database, `posts/${postId}/poll/votes/${user.uid}`), newVote);
+            } catch (e) {
+                notify('Failed to vote');
+            }
+        }
+
+        // Patches an already-rendered poll's bars/percentages/total in place — called whenever
+        // a post update leaves other content unchanged (see patchFeedPostCounts), so voting
+        // never rebuilds the card or interrupts anything else on screen.
+        function patchPollUI(card, post) {
+            if (!post.poll) return;
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const votes = post.poll.votes || {};
+            const total = Object.keys(votes).length;
+            const myVote = (myUid && votes[myUid] !== undefined && votes[myUid] !== null) ? votes[myUid] : null;
+            card.querySelectorAll('.feed-post-poll-option').forEach(btn => {
+                const idx = parseInt(btn.dataset.pollOption, 10);
+                const count = Object.values(votes).filter(v => v === idx).length;
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                btn.classList.toggle('voted', myVote === idx);
+                const fillEl = btn.querySelector('.feed-post-poll-option-fill');
+                if (fillEl) fillEl.style.width = pct + '%';
+                const pctEl = btn.querySelector('.feed-post-poll-option-pct');
+                if (pctEl) pctEl.textContent = total > 0 ? pct + '%' : '';
+            });
+            const totalEl = card.querySelector('.feed-post-poll-total');
+            if (totalEl) totalEl.textContent = `${total} vote${total === 1 ? '' : 's'}`;
+        }
+
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
@@ -8291,6 +8509,7 @@
                     </div>
                 </div>${videoMusicChipHtml}` : '';
             const textHtml = post.text ? `<p class="feed-post-text"></p>` : '';
+            const pollHtml = post.poll ? buildFeedPollHtml(post.poll, myUid) : '';
             const taggedUids = post.mentions ? Object.keys(post.mentions).filter(uid => uid !== post.uid) : [];
             const taggedHtml = taggedUids.length ? `
                 <div class="feed-post-tagged-row">
@@ -8322,6 +8541,7 @@
                 <div class="feed-post-body">
                     ${textHtml}
                     ${taggedHtml}
+                    ${pollHtml}
                 </div>
                 ${imageHtml}
                 ${videoHtml}
@@ -8359,6 +8579,21 @@
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
                 musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+            }
+
+            if (post.poll) {
+                const pollQuestionEl = card.querySelector('.feed-post-poll-question');
+                if (pollQuestionEl) pollQuestionEl.textContent = post.poll.question;
+                card.querySelectorAll('.feed-post-poll-option-label').forEach((el, idx) => {
+                    el.textContent = (post.poll.options && post.poll.options[idx]) || '';
+                });
+                card.querySelectorAll('.feed-post-poll-option').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const idx = parseInt(btn.dataset.pollOption, 10);
+                        voteOnPoll(originalId, idx);
+                    });
+                });
             }
 
             card.querySelectorAll('.feed-post-tagged-chip').forEach(chip => {

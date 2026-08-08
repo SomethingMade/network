@@ -544,8 +544,10 @@
         /* ── PROFILE MEDIA GRID (shown in a user's profile sheet: their posted photos/videos) ── */
         .wa-profile-media-section { margin: 4px 0 20px; }
         .wa-profile-media-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; padding: 0 4px 10px; }
-        .profile-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+        .profile-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; gap: 3px; }
         .profile-media-grid-item { position: relative; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; background: var(--bg-alt); cursor: pointer; }
+        .profile-media-grid-item.size-large { grid-column: span 2; grid-row: span 2; aspect-ratio: 1 / 1; }
+        .profile-media-grid-item.size-wide { grid-column: span 2; aspect-ratio: 2 / 1; }
         .profile-media-grid-item img, .profile-media-grid-item video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
         .profile-media-grid-item .profile-media-play-badge { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item:active { opacity: 0.85; }
@@ -11175,7 +11177,7 @@
 
             const imageGallery = items.filter(([, post]) => post.imageUrl).map(([, post]) => post.imageUrl);
 
-            gridEl.innerHTML = items.map(([postId, post]) => {
+            gridEl.innerHTML = items.map(([postId, post], idx) => {
                 const isVideo = !post.imageUrl && !!post.videoUrl;
                 const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
                 let mediaTag;
@@ -11187,7 +11189,11 @@
                 } else {
                     mediaTag = `<img src="${post.imageUrl}" alt="" loading="lazy">`;
                 }
-                return `<div class="profile-media-grid-item" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
+                // Mosaic layout: vary tile sizes on a repeating pattern so the grid
+                // isn't a flat uniform 3-col wall (large 2x2 tile every 7, wide 2x1 every 7).
+                const posInPattern = idx % 7;
+                const sizeClass = posInPattern === 0 ? ' size-large' : (posInPattern === 4 ? ' size-wide' : '');
+                return `<div class="profile-media-grid-item${sizeClass}" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
             }).join('');
 
             gridEl.querySelectorAll('.profile-media-grid-item').forEach(item => {

@@ -1046,6 +1046,12 @@
 
         /* ── STORIES (Horizontal Layout) ── */
         .stories-scroll { display: flex; gap: 16px; overflow-x: auto; padding: 4px 0 4px; scrollbar-width: none; transition: opacity 0.2s ease; width: 100%; white-space: nowrap; }
+        /* overflow-x:auto above implicitly forces overflow-y to compute as auto too (per spec,
+           an axis left at "visible" gets coerced to "auto" when the other axis isn't visible),
+           which clips the .add-story-nudge bubble poking above the row via negative offset.
+           Only add the headroom the bubble needs when it's actually showing, so the row's
+           position doesn't permanently shift for users who already have an active story. */
+        .stories-scroll.has-nudge { padding-top: 52px; }
         .stories-scroll::-webkit-scrollbar { display: none; }
         .stories-scroll.uploading { opacity: 0.5; pointer-events: none; }
         .story-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; cursor: pointer; width: 58px; position: relative; }
@@ -11445,7 +11451,9 @@
             const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
             const ownProfile = (usersData && usersData[user.uid]) || {};
 
-            container.appendChild(buildAddStoryItem(ownItems.length === 0));
+            const showNudge = ownItems.length === 0;
+            container.classList.toggle('has-nudge', showNudge);
+            container.appendChild(buildAddStoryItem(showNudge));
 
             if (ownItems.length > 0) {
                 container.appendChild(buildStoryItem(

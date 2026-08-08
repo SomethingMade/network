@@ -382,6 +382,9 @@
         .feed-composer-row .avatar { background-color: var(--primary-blue); background-size: cover; background-position: center; border-radius: 50%; }
         #feed-composer-input { flex: 1; resize: none; border: none; background: transparent; outline: none; font-family: inherit; font-size: 14.5px; color: var(--text-primary); padding-top: 8px; max-height: 120px; }
         #feed-composer-input::placeholder { color: var(--text-secondary); }
+        .feed-composer-charcount { text-align: right; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-top: 4px; }
+        .feed-composer-charcount.warn { color: #FF9F0A; }
+        .feed-composer-charcount.limit { color: var(--danger-red); }
         .feed-composer-preview { position: relative; margin-top: 10px; }
         .feed-composer-preview-main { position: relative; border-radius: 14px; overflow: hidden; background: #000; height: min(58vh, 480px); display: flex; align-items: center; justify-content: center; }
         .feed-composer-preview-main img,
@@ -2314,9 +2317,10 @@
             <div class="feed-composer" id="feed-composer">
                 <div class="feed-composer-row">
                     <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
-                    <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1" autocomplete="off"></textarea>
+                    <textarea id="feed-composer-input" placeholder="What's on your mind? Type @ to tag someone" rows="1" maxlength="500" autocomplete="off"></textarea>
                     <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
                 </div>
+                <div class="feed-composer-charcount" id="feed-composer-charcount" style="display:none;"></div>
                 <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
                 <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
                     <div class="feed-composer-preview-main" id="feed-composer-preview-main">
@@ -7293,9 +7297,24 @@
             const pollOptionsContainer = document.getElementById('feed-composer-poll-options');
             const pollAddOptionBtn = document.getElementById('feed-composer-poll-add-option');
             const pollRemoveBtn = document.getElementById('feed-composer-poll-remove');
+            const charCount = document.getElementById('feed-composer-charcount');
             const FEED_POLL_MAX_OPTIONS = 4;
+            const FEED_POST_MAX_CHARS = parseInt(input.getAttribute('maxlength'), 10) || 500;
             let feedComposerActiveIdx = 0;
             setupMentionAutocomplete(input, document.getElementById('feed-composer-mention-dropdown'));
+
+            function updateCharCount() {
+                const len = input.value.length;
+                const remaining = FEED_POST_MAX_CHARS - len;
+                if (remaining > 60) {
+                    charCount.style.display = 'none';
+                    return;
+                }
+                charCount.style.display = 'block';
+                charCount.textContent = `${remaining}`;
+                charCount.classList.toggle('limit', remaining <= 0);
+                charCount.classList.toggle('warn', remaining > 0 && remaining <= 30);
+            }
 
             function getPollOptionValues() {
                 return Array.from(pollOptionsContainer.querySelectorAll('.feed-composer-poll-option-input')).map(i => i.value.trim());
@@ -7309,6 +7328,10 @@
             }
 
             function refreshSubmitState() {
+                if (input.value.length > FEED_POST_MAX_CHARS) {
+                    submitBtn.disabled = true;
+                    return;
+                }
                 if (feedComposerPollActive) {
                     submitBtn.disabled = !pollIsValid();
                     return;
@@ -7477,6 +7500,7 @@
             input.addEventListener('input', () => {
                 input.style.height = 'auto';
                 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+                updateCharCount();
                 refreshSubmitState();
             });
 
@@ -7588,6 +7612,10 @@
 
             submitBtn.addEventListener('click', async () => {
                 const text = input.value.trim();
+                if (text.length > FEED_POST_MAX_CHARS) {
+                    notify(`Posts are limited to ${FEED_POST_MAX_CHARS} characters`, 'error');
+                    return;
+                }
                 let pollData = null;
                 if (feedComposerPollActive) {
                     const question = pollQuestionInput.value.trim();
@@ -7632,6 +7660,7 @@
                     updateComposerTagsUI();
                     input.value = '';
                     input.style.height = 'auto';
+                    updateCharCount();
                     clearComposerMedia();
                     closePollPanel();
                     closePostComposer();
@@ -7860,7 +7889,7 @@
             const editBox = document.createElement('div');
             editBox.className = 'feed-post-edit-box';
             editBox.innerHTML = `
-                <textarea autocomplete="off"></textarea>
+                <textarea autocomplete="off" maxlength="500"></textarea>
                 <div class="feed-post-edit-actions">
                     <button type="button" class="feed-post-edit-cancel">Cancel</button>
                     <button type="button" class="feed-post-edit-save">Save</button>
@@ -7883,6 +7912,10 @@
             });
             editBox.querySelector('.feed-post-edit-save').addEventListener('click', async () => {
                 const newText = textarea.value.trim();
+                if (newText.length > 500) {
+                    notify('Posts are limited to 500 characters', 'error');
+                    return;
+                }
                 if (!newText && !post.imageUrl && !(post.imageUrls && post.imageUrls.length) && !post.videoUrl) {
                     notify('A post needs text or media', 'error');
                     return;

@@ -1746,11 +1746,25 @@
         }
 
         /* ── STICKERS ── */
-        .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; overflow-y: auto; padding: 4px 2px 8px; }
+        .sticker-search-wrap { padding: 0 2px 10px; flex-shrink: 0; }
+        .sticker-quick-cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; flex-shrink: 0; scrollbar-width: none; }
+        .sticker-quick-cats::-webkit-scrollbar { display: none; }
+        .sticker-quick-cat-chip { flex-shrink: 0; padding: 7px 14px; border-radius: 16px; background: var(--bg-hover); border: none; color: var(--text-primary); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.15s ease, transform 0.1s ease; }
+        .sticker-quick-cat-chip:active { transform: scale(0.94); }
+        .sticker-quick-cat-chip.active { background: var(--gradient-brand); color: #fff; }
+        .sticker-cat-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; scrollbar-width: none; }
+        .sticker-cat-tabs::-webkit-scrollbar { display: none; }
+        .sticker-cat-tab { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; border: none; background: transparent; font-size: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
+        .sticker-cat-tab.active { background: var(--bg-hover); }
+        .sticker-pack-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin: 2px 2px 8px; display: flex; align-items: center; gap: 6px; }
+        .sticker-pack-label svg { width: 13px; height: 13px; }
+        .sticker-grid-scroll { overflow-y: auto; flex: 1; }
+        .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 4px 2px 8px; }
         .sticker-grid-item { aspect-ratio: 1; border-radius: 16px; background: var(--bg-hover); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.15s ease; border: none; padding: 6px; }
         .sticker-grid-item:hover { background: var(--border-color); transform: scale(1.06); }
         .sticker-grid-item:active { transform: scale(0.94); }
         .sticker-grid-item img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .sticker-grid-loading, .sticker-grid-empty { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 30px 0; grid-column: 1 / -1; }
 
         /* ── EMOJI PICKER ── */
         .emoji-cat-tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; scrollbar-width: none; }
@@ -3878,10 +3892,18 @@
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
 
     <div id="sticker-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="max-height: 65vh; display: flex; flex-direction: column;">
+        <div class="bottom-sheet" style="max-height: 68vh; display: flex; flex-direction: column;">
             <div class="sheet-handle"></div>
             <div class="sheet-title">Stickers</div>
-            <div id="sticker-grid" class="sticker-grid"></div>
+            <div class="sticker-search-wrap">
+                <div class="search-box" style="margin-bottom:0;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="sticker-search-input" placeholder="Search stickers" autocomplete="off">
+                </div>
+            </div>
+            <div id="sticker-quick-cats" class="sticker-quick-cats"></div>
+            <div id="sticker-cat-tabs" class="sticker-cat-tabs"></div>
+            <div class="sticker-grid-scroll"><div id="sticker-grid" class="sticker-grid"></div></div>
         </div>
     </div>
 
@@ -6117,14 +6139,24 @@
 
         // --- STICKERS (open-source animated emoji from Google's Noto Emoji project, Apache 2.0) ---
         // Each sticker is served as an animated GIF from Google's public CDN: fonts.gstatic.com
+        // Grouped into categories, switchable via tabs at the top of the sticker sheet.
         const STICKER_CATALOG = [
-            { cp: '1f600', ch: '😀' }, { cp: '1f602', ch: '😂' }, { cp: '1f60d', ch: '😍' }, { cp: '1f970', ch: '🥰' },
-            { cp: '1f60e', ch: '😎' }, { cp: '1f973', ch: '🥳' }, { cp: '1f622', ch: '😢' }, { cp: '1f62d', ch: '😭' },
-            { cp: '1f621', ch: '😡' }, { cp: '1f631', ch: '😱' }, { cp: '1f914', ch: '🤔' }, { cp: '1f609', ch: '😉' },
-            { cp: '1f929', ch: '🤩' }, { cp: '1f917', ch: '🤗' }, { cp: '1f92f', ch: '🤯' }, { cp: '1f97a', ch: '🥺' },
-            { cp: '1f634', ch: '😴' }, { cp: '1f44d', ch: '👍' }, { cp: '1f44e', ch: '👎' }, { cp: '1f44f', ch: '👏' },
-            { cp: '1f64f', ch: '🙏' }, { cp: '1f496', ch: '💖' }, { cp: '1f525', ch: '🔥' }, { cp: '1f389', ch: '🎉' },
-            { cp: '1f4af', ch: '💯' }, { cp: '1f64c', ch: '🙌' }, { cp: '1f680', ch: '🚀' }, { cp: '1f91d', ch: '🤝' }
+            { tab: '😀', label: 'Happy', stickers: [
+                { cp: '1f600', ch: '😀' }, { cp: '1f602', ch: '😂' }, { cp: '1f60d', ch: '😍' }, { cp: '1f970', ch: '🥰' },
+                { cp: '1f60e', ch: '😎' }, { cp: '1f973', ch: '🥳' }, { cp: '1f929', ch: '🤩' }, { cp: '1f917', ch: '🤗' }
+            ] },
+            { tab: '😢', label: 'Moody', stickers: [
+                { cp: '1f622', ch: '😢' }, { cp: '1f62d', ch: '😭' }, { cp: '1f621', ch: '😡' }, { cp: '1f631', ch: '😱' },
+                { cp: '1f914', ch: '🤔' }, { cp: '1f92f', ch: '🤯' }, { cp: '1f97a', ch: '🥺' }, { cp: '1f634', ch: '😴' }
+            ] },
+            { tab: '👍', label: 'Gestures', stickers: [
+                { cp: '1f609', ch: '😉' }, { cp: '1f44d', ch: '👍' }, { cp: '1f44e', ch: '👎' }, { cp: '1f44f', ch: '👏' },
+                { cp: '1f64f', ch: '🙏' }, { cp: '1f64c', ch: '🙌' }, { cp: '1f91d', ch: '🤝' }
+            ] },
+            { tab: '🔥', label: 'Hype', stickers: [
+                { cp: '1f496', ch: '💖' }, { cp: '1f525', ch: '🔥' }, { cp: '1f389', ch: '🎉' }, { cp: '1f4af', ch: '💯' },
+                { cp: '1f680', ch: '🚀' }
+            ] }
         ];
         function stickerUrlFor(cp) { return `https://fonts.gstatic.com/s/e/notoemoji/latest/${cp}/512.gif`; }
         function buildStickerMsgElement(url) {
@@ -6180,11 +6212,11 @@
         }
 
         let stickerGridBuilt = false;
-        function buildStickerGridOnce() {
-            if (stickerGridBuilt) return;
-            stickerGridBuilt = true;
+        let activeStickerCatIndex = 0;
+        function renderStickerCategory(idx) {
             const grid = document.getElementById('sticker-grid');
-            STICKER_CATALOG.forEach(sticker => {
+            grid.innerHTML = '';
+            STICKER_CATALOG[idx].stickers.forEach(sticker => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'sticker-grid-item';
@@ -6200,6 +6232,106 @@
                 });
                 grid.appendChild(btn);
             });
+        }
+        function buildStickerGridOnce() {
+            if (stickerGridBuilt) return;
+            stickerGridBuilt = true;
+            const tabsEl = document.getElementById('sticker-cat-tabs');
+            STICKER_CATALOG.forEach((cat, i) => {
+                const tabBtn = document.createElement('button');
+                tabBtn.type = 'button';
+                tabBtn.className = 'sticker-cat-tab' + (i === 0 ? ' active' : '');
+                tabBtn.textContent = cat.tab;
+                tabBtn.title = cat.label;
+                tabBtn.addEventListener('click', () => {
+                    if (activeStickerCatIndex === i) return;
+                    activeStickerCatIndex = i;
+                    tabsEl.querySelectorAll('.sticker-cat-tab').forEach((t, ti) => t.classList.toggle('active', ti === i));
+                    renderStickerCategory(i);
+                    const scrollEl = document.querySelector('#sticker-sheet-overlay .sticker-grid-scroll');
+                    if (scrollEl) scrollEl.scrollTop = 0;
+                });
+                tabsEl.appendChild(tabBtn);
+            });
+            renderStickerCategory(0);
+            buildStickerQuickCatsOnce();
+        }
+
+        // --- STICKERS (live, via GIPHY Stickers API — real animated sticker content,
+        // searchable, alongside the local Noto pack above. Reuses the same GIPHY key
+        // already wired in for GIFs.) ---
+        const STICKER_QUICK_CATS = ['Love', 'LOL', 'Yes', 'No', 'Hi', 'Bye', 'Wow', 'Dance', 'Congrats'];
+        let stickerQuickCatsBuilt = false;
+        let stickerApiSearchDebounce = null;
+        let stickerApiModeActive = false;
+
+        function buildStickerQuickCatsOnce() {
+            if (stickerQuickCatsBuilt) return;
+            stickerQuickCatsBuilt = true;
+            const wrap = document.getElementById('sticker-quick-cats');
+            STICKER_QUICK_CATS.forEach(label => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'sticker-quick-cat-chip';
+                chip.textContent = label;
+                chip.addEventListener('click', () => {
+                    wrap.querySelectorAll('.sticker-quick-cat-chip').forEach(c => c.classList.toggle('active', c === chip));
+                    document.getElementById('sticker-search-input').value = label;
+                    loadStickerApiResults(label);
+                });
+                wrap.appendChild(chip);
+            });
+        }
+
+        async function loadStickerApiResults(query) {
+            stickerApiModeActive = true;
+            document.getElementById('sticker-cat-tabs').style.display = 'none';
+            const grid = document.getElementById('sticker-grid');
+            grid.innerHTML = '<p class="sticker-grid-loading">Loading stickers…</p>';
+            try {
+                const endpoint = query
+                    ? `https://api.giphy.com/v1/stickers/search?api_key=${GIF_API_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13`
+                    : `https://api.giphy.com/v1/stickers/trending?api_key=${GIF_API_KEY}&limit=24&rating=pg-13`;
+                const res = await fetch(endpoint);
+                const data = await res.json();
+                grid.innerHTML = '';
+                const stickers = data.data || [];
+                if (!stickers.length) { grid.innerHTML = '<p class="sticker-grid-empty">No stickers found.</p>'; return; }
+                stickers.forEach(s => {
+                    const images = s.images || {};
+                    const previewUrl = (images.fixed_width_small || images.fixed_width || images.original || {}).url;
+                    const fullUrl = (images.original || images.fixed_width || {}).url;
+                    if (!previewUrl || !fullUrl) return;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'sticker-grid-item';
+                    const img = document.createElement('img');
+                    img.src = previewUrl;
+                    img.alt = 'Sticker';
+                    img.loading = 'lazy';
+                    btn.appendChild(img);
+                    btn.addEventListener('click', () => {
+                        document.getElementById('sticker-sheet-overlay').classList.remove('active');
+                        sendStickerMessage(null, null, fullUrl);
+                    });
+                    grid.appendChild(btn);
+                });
+            } catch (err) {
+                console.error('Sticker search failed', err);
+                grid.innerHTML = '<p class="sticker-grid-empty">Couldn\'t load stickers. Check your connection.</p>';
+            }
+        }
+
+        function exitStickerApiMode() {
+            stickerApiModeActive = false;
+            document.getElementById('sticker-quick-cats').querySelectorAll('.sticker-quick-cat-chip').forEach(c => c.classList.remove('active'));
+            document.getElementById('sticker-cat-tabs').style.display = 'flex';
+            renderStickerCategory(activeStickerCatIndex);
+        }
+
+        function resetStickerSheetToDefault() {
+            document.getElementById('sticker-search-input').value = '';
+            if (stickerApiModeActive) exitStickerApiMode();
         }
 
         const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
@@ -17429,7 +17561,15 @@
         document.getElementById('chat-sticker-btn').addEventListener('click', (e) => {
             e.preventDefault();
             buildStickerGridOnce();
+            resetStickerSheetToDefault();
             stickerSheetOverlay.classList.add('active');
+        });
+        document.getElementById('sticker-search-input').addEventListener('input', (e) => {
+            const q = e.target.value.trim();
+            document.getElementById('sticker-quick-cats').querySelectorAll('.sticker-quick-cat-chip').forEach(c => c.classList.remove('active'));
+            clearTimeout(stickerApiSearchDebounce);
+            if (!q) { exitStickerApiMode(); return; }
+            stickerApiSearchDebounce = setTimeout(() => loadStickerApiResults(q), 350);
         });
         document.getElementById('chat-gif-btn').addEventListener('click', (e) => {
             e.preventDefault();
@@ -17449,11 +17589,11 @@
             if (e.target === emojiSheetOverlay) emojiSheetOverlay.classList.remove('active');
         });
 
-        async function sendStickerMessage(cp, ch) {
+        async function sendStickerMessage(cp, ch, urlOverride) {
             const user = auth.currentUser;
             if (!user) return;
-            const stickerURL = stickerUrlFor(cp);
-            const previewText = `${ch} Sticker`;
+            const stickerURL = urlOverride || stickerUrlFor(cp);
+            const previewText = ch ? `${ch} Sticker` : 'Sticker';
 
             if (activeGroupId) {
                 const groupId = activeGroupId;

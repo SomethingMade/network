@@ -1990,6 +1990,7 @@
         .discover-suggest-card-header { font-size: 14.5px; font-weight: 700; color: var(--text-primary); padding: 13px 14px 2px; }
         .discover-suggest-card .discover-card { background: transparent; border-bottom: 1px solid var(--border-color); padding: 10px 14px; }
         .discover-suggest-card .discover-card:last-of-type { border-bottom: none; }
+        .discover-suggest-card .profile-suggested-scroll { padding: 4px 14px 14px; }
         .discover-grid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 60px 30px; color: var(--text-secondary); }
         .discover-grid-empty svg { opacity: 0.4; margin-bottom: 4px; }
         .discover-grid-empty p { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
@@ -6611,29 +6612,24 @@
             searchDiscoverInput.addEventListener('input', () => renderDiscoverGrid(searchDiscoverInput.value));
         }
         // Builds one "who to follow"-style card (a handful of suggested people) to weave into
-        // the posts feed — same visual language and Add-button behavior as the search-results
-        // discover-card, just grouped 2-3 at a time inside a rounded widget instead of a flat list.
+        // the posts feed — horizontally scrollable, same card/button styling as the Suggested
+        // Friends row on the Profile sheet (see renderProfileSuggestedFriends).
         function buildSuggestionCard(uids) {
             const wrap = document.createElement('div');
             wrap.className = 'discover-suggest-card';
-            const rows = uids.map(uid => {
+            const cards = uids.map(uid => {
                 const profile = cachedUsers[uid] || {};
                 const name = profile.name || 'Xoxa User';
-                const isBusiness = !!profile.isBusinessAccount;
                 return `
-                    <div class="discover-card" data-uid="${uid}">
-                        <div class="discover-card-avatar-wrap${isBusiness ? ' is-business' : ''}">
-                            ${feedAvatarHtml(profile, 'discover-card-avatar')}
-                        </div>
-                        <div class="discover-card-body">
-                            <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
-                            ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
-                        </div>
+                    <div class="profile-suggested-card" data-uid="${uid}">
+                        ${feedAvatarHtml(profile)}
+                        <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                        ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Xoxa</span>'}
                         <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
                     </div>
                 `;
             }).join('');
-            wrap.innerHTML = `<div class="discover-suggest-card-header">People you may know</div>${rows}`;
+            wrap.innerHTML = `<div class="discover-suggest-card-header">People you may know</div><div class="profile-suggested-scroll">${cards}</div>`;
             return wrap;
         }
 
@@ -6658,7 +6654,7 @@
             postCards.forEach((card, i) => {
                 sincePlaced++;
                 if (sincePlaced >= nextGap && poolIndex < pool.length) {
-                    const batch = pool.slice(poolIndex, poolIndex + 3);
+                    const batch = pool.slice(poolIndex, poolIndex + 8);
                     if (batch.length) {
                         list.insertBefore(buildSuggestionCard(batch), card.nextSibling);
                         poolIndex += batch.length;
@@ -6674,7 +6670,7 @@
         document.getElementById('feed-posts-list').addEventListener('click', async (e) => {
             const btn = e.target.closest('.discover-card-add-btn');
             if (!btn) {
-                const card = e.target.closest('.discover-card');
+                const card = e.target.closest('.profile-suggested-card');
                 if (card && card.dataset.uid) openUserProfileSheet(card.dataset.uid);
                 return;
             }

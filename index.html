@@ -3412,7 +3412,6 @@
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-chats" placeholder="Search" autocomplete="off">
-                            <div class="chat-search-dropdown" id="chat-search-dropdown"></div>
                         </div>
                         <div class="wa-filter-row" id="wa-filter-row">
                             <button type="button" class="wa-chip active" data-filter="all">
@@ -3484,6 +3483,7 @@
                         <div class="search-box">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-discover" placeholder="Search by name or @username" autocomplete="off">
+                            <div class="chat-search-dropdown" id="discover-search-dropdown"></div>
                         </div>
                     </div>
                     <div class="discover-grid-scroll" id="discover-grid-scroll">
@@ -5349,243 +5349,7 @@
 
         const chatSearchInput = document.getElementById('search-chats');
         const contactSearchInput = document.getElementById('search-contacts');
-
-        // --- Chats-tab search: recent-history + live autosuggest dropdown ---
-        const CHAT_SEARCH_HISTORY_KEY = 'xoxaChatSearchHistory';
-        const CHAT_SEARCH_HISTORY_MAX = 8;
-        const chatSearchDropdownEl = document.getElementById('chat-search-dropdown');
-
-        function getChatSearchHistory() {
-            try {
-                const arr = JSON.parse(localStorage.getItem(CHAT_SEARCH_HISTORY_KEY) || '[]');
-                return Array.isArray(arr) ? arr : [];
-            } catch (e) { return []; }
-        }
-        function saveChatSearchHistory(arr) {
-            try { localStorage.setItem(CHAT_SEARCH_HISTORY_KEY, JSON.stringify(arr.slice(0, CHAT_SEARCH_HISTORY_MAX))); } catch (e) { /* storage unavailable */ }
-        }
-        function addChatSearchHistory(term) {
-            const clean = (term || '').trim();
-            if (!clean) return;
-            const history = getChatSearchHistory().filter(t => t.toLowerCase() !== clean.toLowerCase());
-            history.unshift(clean);
-            saveChatSearchHistory(history);
-        }
-        function removeChatSearchHistory(term) {
-            saveChatSearchHistory(getChatSearchHistory().filter(t => t.toLowerCase() !== term.toLowerCase()));
-        }
-        function escapeHtmlForSearch(str) {
-            const div = document.createElement('div');
-            div.textContent = str || '';
-            return div.innerHTML;
-        }
-        function highlightSearchMatch(name, query) {
-            const safe = escapeHtmlForSearch(name);
-            const idx = name.toLowerCase().indexOf(query.toLowerCase());
-            if (idx === -1) return safe;
-            const before = escapeHtmlForSearch(name.slice(0, idx));
-            const match = escapeHtmlForSearch(name.slice(idx, idx + query.length));
-            const after = escapeHtmlForSearch(name.slice(idx + query.length));
-            return `${before}<mark>${match}</mark>${after}`;
-        }
-        // Trims long text down to a window centered on the match, so post-caption results
-        // in the dropdown read as a snippet rather than the full caption.
-        function truncateAroundMatch(text, query, radius = 36) {
-            const idx = text.toLowerCase().indexOf(query.toLowerCase());
-            if (idx === -1) return text.length > 90 ? text.slice(0, 90) + '…' : text;
-            const start = Math.max(0, idx - radius);
-            const end = Math.min(text.length, idx + query.length + radius);
-            let snippet = text.slice(start, end);
-            if (start > 0) snippet = '…' + snippet;
-            if (end < text.length) snippet += '…';
-            return snippet;
-        }
-        function buildSearchDropdownAvatar(name, avatarUrl) {
-            if (avatarUrl) return `<div class="search-dropdown-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-            const initial = (name || '?').charAt(0).toUpperCase();
-            return `<div class="search-dropdown-avatar" style="background:var(--primary-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600;">${initial}</div>`;
-        }
-        // Global search across: existing chats/groups (rendered list), the full user directory
-        // (cachedUsers — everyone on Xoxa, not just people already messaged), and post captions
-        // (cachedPosts). Each source is capped so no single category can crowd out the others.
-        function getGlobalSearchResults(query) {
-            const q = query.trim().toLowerCase();
-            if (!q) return { chats: [], people: [], posts: [] };
-            const myUid = auth.currentUser && auth.currentUser.uid;
-            const startsWithSort = (arr, keyFn) => arr.sort((a, b) => {
-                const aStarts = keyFn(a).toLowerCase().startsWith(q) ? 0 : 1;
-                const bStarts = keyFn(b).toLowerCase().startsWith(q) ? 0 : 1;
-                return aStarts - bStarts;
-            });
-
-            const chats = [];
-            const seenUids = new Set();
-            document.querySelectorAll('#chat-list-container .chat-item').forEach(item => {
-                const h3 = item.querySelector('.chat-preview h3');
-                if (!h3) return;
-                const name = h3.textContent.trim();
-                if (!name.toLowerCase().includes(q)) return;
-                const groupId = item.dataset.groupId || '';
-                const uid = item.dataset.uid || '';
-                let avatarUrl = '';
-                if (uid) { avatarUrl = item.dataset.avatar || ''; seenUids.add(uid); }
-                else if (groupId && cachedGroups[groupId]) avatarUrl = cachedGroups[groupId].photoURL || '';
-                chats.push({ name, uid, groupId, avatarUrl });
-            });
-            startsWithSort(chats, c => c.name);
-
-            const people = [];
-            Object.keys(cachedUsers || {}).forEach(uid => {
-                if (uid === myUid || uid === AI_UID || seenUids.has(uid)) return;
-                const u = cachedUsers[uid] || {};
-                const name = u.name || '';
-                const username = u.username || '';
-                if (!name.toLowerCase().includes(q) && !username.toLowerCase().includes(q)) return;
-                people.push({ uid, name: name || (username ? '@' + username : 'Unknown User'), username, avatarUrl: u.photoURL || '' });
-            });
-            startsWithSort(people, p => p.name);
-
-            const posts = [];
-            Object.keys(cachedPosts || {}).forEach(postId => {
-                const post = cachedPosts[postId];
-                if (!post || !post.text || !post.text.toLowerCase().includes(q)) return;
-                const author = cachedUsers[post.uid] || {};
-                posts.push({ postId, caption: post.text, authorName: author.name || post.name || 'Someone', avatarUrl: author.photoURL || '' });
-            });
-
-            return { chats: chats.slice(0, 4), people: people.slice(0, 4), posts: posts.slice(0, 4) };
-        }
-        function hideChatSearchDropdown() {
-            chatSearchDropdownEl.classList.remove('active');
-        }
-        function renderChatSearchDropdown() {
-            const query = chatSearchInput.value.trim();
-
-            if (!query) {
-                const history = getChatSearchHistory();
-                if (!history.length) { hideChatSearchDropdown(); return; }
-                chatSearchDropdownEl.innerHTML = `
-                    <div class="chat-search-dropdown-label">
-                        <span>Recent searches</span>
-                        <span class="clear-history-btn" data-action="clear-history">Clear all</span>
-                    </div>
-                    ${history.map(term => `
-                        <div class="search-dropdown-item" data-action="history" data-term="${escapeHtmlForSearch(term)}">
-                            <div class="search-dropdown-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg></div>
-                            <div class="search-dropdown-text">${escapeHtmlForSearch(term)}</div>
-                            <div class="search-dropdown-remove" data-action="remove-history" data-term="${escapeHtmlForSearch(term)}">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </div>
-                        </div>
-                    `).join('')}
-                `;
-                chatSearchDropdownEl.classList.add('active');
-                return;
-            }
-
-            const { chats, people, posts } = getGlobalSearchResults(query);
-            if (!chats.length && !people.length && !posts.length) {
-                chatSearchDropdownEl.innerHTML = `<div class="chat-search-dropdown-empty">No results for "${escapeHtmlForSearch(query)}"</div>`;
-                chatSearchDropdownEl.classList.add('active');
-                return;
-            }
-
-            const section = (label, items, renderItem) => !items.length ? '' : `
-                <div class="chat-search-dropdown-label"><span>${label}</span></div>
-                ${items.map(renderItem).join('')}
-            `;
-
-            chatSearchDropdownEl.innerHTML =
-                section('Chats', chats, s => `
-                    <div class="search-dropdown-item" data-action="chat" data-uid="${s.uid}" data-group-id="${s.groupId}" data-name="${escapeHtmlForSearch(s.name)}" data-avatar="${s.avatarUrl}">
-                        ${buildSearchDropdownAvatar(s.name, s.avatarUrl)}
-                        <div class="search-dropdown-text">${highlightSearchMatch(s.name, query)}</div>
-                    </div>
-                `) +
-                section('People', people, p => `
-                    <div class="search-dropdown-item" data-action="person" data-uid="${p.uid}" data-name="${escapeHtmlForSearch(p.name)}" data-avatar="${p.avatarUrl}">
-                        ${buildSearchDropdownAvatar(p.name, p.avatarUrl)}
-                        <div class="search-dropdown-text">${highlightSearchMatch(p.name, query)}${p.username ? ` <span style="color:var(--text-secondary);">@${escapeHtmlForSearch(p.username)}</span>` : ''}</div>
-                    </div>
-                `) +
-                section('Posts', posts, ps => `
-                    <div class="search-dropdown-item" data-action="post" data-post-id="${ps.postId}">
-                        ${buildSearchDropdownAvatar(ps.authorName, ps.avatarUrl)}
-                        <div class="search-dropdown-text"><b>${escapeHtmlForSearch(ps.authorName)}</b>: ${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
-                    </div>
-                `);
-            chatSearchDropdownEl.classList.add('active');
-        }
-
-        chatSearchDropdownEl.addEventListener('click', (e) => {
-            const clearBtn = e.target.closest('[data-action="clear-history"]');
-            if (clearBtn) { saveChatSearchHistory([]); renderChatSearchDropdown(); return; }
-
-            const removeBtn = e.target.closest('[data-action="remove-history"]');
-            if (removeBtn) { e.stopPropagation(); removeChatSearchHistory(removeBtn.dataset.term); renderChatSearchDropdown(); return; }
-
-            const historyItem = e.target.closest('[data-action="history"]');
-            if (historyItem) {
-                chatSearchInput.value = historyItem.dataset.term;
-                filterListItems(chatSearchInput, 'chat-list-container');
-                addChatSearchHistory(historyItem.dataset.term);
-                hideChatSearchDropdown();
-                return;
-            }
-
-            const resetSearchBox = () => {
-                hideChatSearchDropdown();
-                chatSearchInput.value = '';
-                filterListItems(chatSearchInput, 'chat-list-container');
-                chatSearchInput.blur();
-            };
-
-            const chatItem = e.target.closest('[data-action="chat"]');
-            if (chatItem) {
-                addChatSearchHistory(chatItem.dataset.name);
-                resetSearchBox();
-                if (chatItem.dataset.groupId) openGroupChatView(chatItem.dataset.groupId);
-                else if (chatItem.dataset.uid) openChatView(chatItem.dataset.uid, chatItem.dataset.name, chatItem.dataset.avatar);
-                return;
-            }
-
-            const personItem = e.target.closest('[data-action="person"]');
-            if (personItem) {
-                addChatSearchHistory(personItem.dataset.name);
-                resetSearchBox();
-                openChatView(personItem.dataset.uid, personItem.dataset.name, personItem.dataset.avatar);
-                return;
-            }
-
-            const postItem = e.target.closest('[data-action="post"]');
-            if (postItem) {
-                addChatSearchHistory(chatSearchInput.value.trim());
-                resetSearchBox();
-                window.location.hash = 'tab-status';
-                goToPostInFeed(postItem.dataset.postId);
-            }
-        });
-
-        chatSearchInput.addEventListener('focus', renderChatSearchDropdown);
-        chatSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && chatSearchInput.value.trim()) {
-                addChatSearchHistory(chatSearchInput.value.trim());
-                hideChatSearchDropdown();
-                chatSearchInput.blur();
-            } else if (e.key === 'Escape') {
-                hideChatSearchDropdown();
-                chatSearchInput.blur();
-            }
-        });
-        document.addEventListener('pointerdown', (e) => {
-            if (!chatSearchDropdownEl.classList.contains('active')) return;
-            if (!e.target.closest('#search-chats') && !e.target.closest('#chat-search-dropdown')) hideChatSearchDropdown();
-        });
-
-        chatSearchInput.addEventListener('input', () => {
-            filterListItems(chatSearchInput, 'chat-list-container');
-            renderChatSearchDropdown();
-        });
+        chatSearchInput.addEventListener('input', () => filterListItems(chatSearchInput, 'chat-list-container'));
         contactSearchInput.addEventListener('input', () => filterListItems(contactSearchInput, 'contacts-list-container'));
         const groupSearchInput = document.getElementById('search-groups');
         groupSearchInput.addEventListener('input', () => {
@@ -6869,6 +6633,210 @@
         if (searchDiscoverInput) {
             searchDiscoverInput.addEventListener('input', () => renderDiscoverGrid(searchDiscoverInput.value));
         }
+
+        // --- Home/Discover-tab search: recent-history + global autosuggest dropdown ---
+        // Covers people (the full user directory, not just existing chats) and post captions,
+        // on top of the name/@username grid that renderDiscoverGrid already renders below.
+        const DISCOVER_SEARCH_HISTORY_KEY = 'xoxaDiscoverSearchHistory';
+        const DISCOVER_SEARCH_HISTORY_MAX = 8;
+        const discoverSearchDropdownEl = document.getElementById('discover-search-dropdown');
+
+        function getDiscoverSearchHistory() {
+            try {
+                const arr = JSON.parse(localStorage.getItem(DISCOVER_SEARCH_HISTORY_KEY) || '[]');
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) { return []; }
+        }
+        function saveDiscoverSearchHistory(arr) {
+            try { localStorage.setItem(DISCOVER_SEARCH_HISTORY_KEY, JSON.stringify(arr.slice(0, DISCOVER_SEARCH_HISTORY_MAX))); } catch (e) { /* storage unavailable */ }
+        }
+        function addDiscoverSearchHistory(term) {
+            const clean = (term || '').trim();
+            if (!clean) return;
+            const history = getDiscoverSearchHistory().filter(t => t.toLowerCase() !== clean.toLowerCase());
+            history.unshift(clean);
+            saveDiscoverSearchHistory(history);
+        }
+        function removeDiscoverSearchHistory(term) {
+            saveDiscoverSearchHistory(getDiscoverSearchHistory().filter(t => t.toLowerCase() !== term.toLowerCase()));
+        }
+        function escapeHtmlForSearch(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+        function highlightSearchMatch(name, query) {
+            const safe = escapeHtmlForSearch(name);
+            const idx = name.toLowerCase().indexOf(query.toLowerCase());
+            if (idx === -1) return safe;
+            const before = escapeHtmlForSearch(name.slice(0, idx));
+            const match = escapeHtmlForSearch(name.slice(idx, idx + query.length));
+            const after = escapeHtmlForSearch(name.slice(idx + query.length));
+            return `${before}<mark>${match}</mark>${after}`;
+        }
+        // Trims long text down to a window centered on the match, so post-caption results
+        // in the dropdown read as a snippet rather than the full caption.
+        function truncateAroundMatch(text, query, radius = 36) {
+            const idx = text.toLowerCase().indexOf(query.toLowerCase());
+            if (idx === -1) return text.length > 90 ? text.slice(0, 90) + '…' : text;
+            const start = Math.max(0, idx - radius);
+            const end = Math.min(text.length, idx + query.length + radius);
+            let snippet = text.slice(start, end);
+            if (start > 0) snippet = '…' + snippet;
+            if (end < text.length) snippet += '…';
+            return snippet;
+        }
+        function buildSearchDropdownAvatar(name, avatarUrl) {
+            if (avatarUrl) return `<div class="search-dropdown-avatar" style="background-image:url('${avatarUrl}')"></div>`;
+            const initial = (name || '?').charAt(0).toUpperCase();
+            return `<div class="search-dropdown-avatar" style="background:var(--primary-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600;">${initial}</div>`;
+        }
+        // Global search across: the full user directory (cachedUsers — everyone on Xoxa, not
+        // just people already messaged) and post captions (cachedPosts). Each source is capped
+        // so no single category can crowd out the other.
+        function getGlobalSearchResults(query) {
+            const q = query.trim().toLowerCase();
+            if (!q) return { people: [], posts: [] };
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            const startsWithSort = (arr, keyFn) => arr.sort((a, b) => {
+                const aStarts = keyFn(a).toLowerCase().startsWith(q) ? 0 : 1;
+                const bStarts = keyFn(b).toLowerCase().startsWith(q) ? 0 : 1;
+                return aStarts - bStarts;
+            });
+
+            const people = [];
+            Object.keys(cachedUsers || {}).forEach(uid => {
+                if (uid === myUid || uid === AI_UID) return;
+                const u = cachedUsers[uid] || {};
+                const name = u.name || '';
+                const username = u.username || '';
+                if (!name.toLowerCase().includes(q) && !username.toLowerCase().includes(q)) return;
+                people.push({ uid, name: name || (username ? '@' + username : 'Unknown User'), username, avatarUrl: u.photoURL || '' });
+            });
+            startsWithSort(people, p => p.name);
+
+            const posts = [];
+            Object.keys(cachedPosts || {}).forEach(postId => {
+                const post = cachedPosts[postId];
+                if (!post || !post.text || !post.text.toLowerCase().includes(q)) return;
+                const author = cachedUsers[post.uid] || {};
+                posts.push({ postId, caption: post.text, authorName: author.name || post.name || 'Someone', avatarUrl: author.photoURL || '' });
+            });
+
+            return { people: people.slice(0, 6), posts: posts.slice(0, 6) };
+        }
+        function hideDiscoverSearchDropdown() {
+            discoverSearchDropdownEl.classList.remove('active');
+        }
+        function renderDiscoverSearchDropdown() {
+            const query = searchDiscoverInput.value.trim();
+
+            if (!query) {
+                const history = getDiscoverSearchHistory();
+                if (!history.length) { hideDiscoverSearchDropdown(); return; }
+                discoverSearchDropdownEl.innerHTML = `
+                    <div class="chat-search-dropdown-label">
+                        <span>Recent searches</span>
+                        <span class="clear-history-btn" data-action="clear-history">Clear all</span>
+                    </div>
+                    ${history.map(term => `
+                        <div class="search-dropdown-item" data-action="history" data-term="${escapeHtmlForSearch(term)}">
+                            <div class="search-dropdown-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg></div>
+                            <div class="search-dropdown-text">${escapeHtmlForSearch(term)}</div>
+                            <div class="search-dropdown-remove" data-action="remove-history" data-term="${escapeHtmlForSearch(term)}">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+                discoverSearchDropdownEl.classList.add('active');
+                return;
+            }
+
+            const { people, posts } = getGlobalSearchResults(query);
+            if (!people.length && !posts.length) {
+                discoverSearchDropdownEl.innerHTML = `<div class="chat-search-dropdown-empty">No results for "${escapeHtmlForSearch(query)}"</div>`;
+                discoverSearchDropdownEl.classList.add('active');
+                return;
+            }
+
+            const section = (label, items, renderItem) => !items.length ? '' : `
+                <div class="chat-search-dropdown-label"><span>${label}</span></div>
+                ${items.map(renderItem).join('')}
+            `;
+
+            discoverSearchDropdownEl.innerHTML =
+                section('People', people, p => `
+                    <div class="search-dropdown-item" data-action="person" data-uid="${p.uid}" data-name="${escapeHtmlForSearch(p.name)}" data-avatar="${p.avatarUrl}">
+                        ${buildSearchDropdownAvatar(p.name, p.avatarUrl)}
+                        <div class="search-dropdown-text">${highlightSearchMatch(p.name, query)}${p.username ? ` <span style="color:var(--text-secondary);">@${escapeHtmlForSearch(p.username)}</span>` : ''}</div>
+                    </div>
+                `) +
+                section('Posts', posts, ps => `
+                    <div class="search-dropdown-item" data-action="post" data-post-id="${ps.postId}">
+                        ${buildSearchDropdownAvatar(ps.authorName, ps.avatarUrl)}
+                        <div class="search-dropdown-text"><b>${escapeHtmlForSearch(ps.authorName)}</b>: ${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
+                    </div>
+                `);
+            discoverSearchDropdownEl.classList.add('active');
+        }
+
+        discoverSearchDropdownEl.addEventListener('click', (e) => {
+            const clearBtn = e.target.closest('[data-action="clear-history"]');
+            if (clearBtn) { saveDiscoverSearchHistory([]); renderDiscoverSearchDropdown(); return; }
+
+            const removeBtn = e.target.closest('[data-action="remove-history"]');
+            if (removeBtn) { e.stopPropagation(); removeDiscoverSearchHistory(removeBtn.dataset.term); renderDiscoverSearchDropdown(); return; }
+
+            const historyItem = e.target.closest('[data-action="history"]');
+            if (historyItem) {
+                searchDiscoverInput.value = historyItem.dataset.term;
+                renderDiscoverGrid(historyItem.dataset.term);
+                addDiscoverSearchHistory(historyItem.dataset.term);
+                hideDiscoverSearchDropdown();
+                return;
+            }
+
+            const resetSearchBox = () => {
+                hideDiscoverSearchDropdown();
+                searchDiscoverInput.value = '';
+                renderDiscoverGrid('');
+                searchDiscoverInput.blur();
+            };
+
+            const personItem = e.target.closest('[data-action="person"]');
+            if (personItem) {
+                addDiscoverSearchHistory(personItem.dataset.name);
+                resetSearchBox();
+                openUserProfileSheet(personItem.dataset.uid);
+                return;
+            }
+
+            const postItem = e.target.closest('[data-action="post"]');
+            if (postItem) {
+                addDiscoverSearchHistory(searchDiscoverInput.value.trim());
+                resetSearchBox();
+                goToPostInFeed(postItem.dataset.postId);
+            }
+        });
+
+        searchDiscoverInput.addEventListener('focus', renderDiscoverSearchDropdown);
+        searchDiscoverInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && searchDiscoverInput.value.trim()) {
+                addDiscoverSearchHistory(searchDiscoverInput.value.trim());
+                hideDiscoverSearchDropdown();
+                searchDiscoverInput.blur();
+            } else if (e.key === 'Escape') {
+                hideDiscoverSearchDropdown();
+                searchDiscoverInput.blur();
+            }
+        });
+        document.addEventListener('pointerdown', (e) => {
+            if (!discoverSearchDropdownEl.classList.contains('active')) return;
+            if (!e.target.closest('#search-discover') && !e.target.closest('#discover-search-dropdown')) hideDiscoverSearchDropdown();
+        });
+        searchDiscoverInput.addEventListener('input', renderDiscoverSearchDropdown);
+
         // Builds one "who to follow"-style card (a handful of suggested people) to weave into
         // the posts feed — horizontally scrollable, same card/button styling as the Suggested
         // Friends row on the Profile sheet (see renderProfileSuggestedFriends).

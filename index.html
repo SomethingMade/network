@@ -2450,6 +2450,7 @@
             <div class="sheet-title" style="margin-bottom: 8px;">Post Options</div>
             <div style="display:flex; flex-direction:column;">
                 <button class="msg-option-btn" id="btn-post-message">Message</button>
+                <button class="msg-option-btn" id="btn-post-unfollow">Unfollow</button>
                 <button class="msg-option-btn" id="btn-post-edit">Edit Post</button>
                 <button class="msg-option-btn" id="btn-post-report">Report Post</button>
                 <button class="msg-option-btn" id="btn-post-delete" style="color: var(--danger-red); border-bottom:none;">Delete Post</button>
@@ -7794,6 +7795,19 @@
                     openChatView(post.uid, post.name, post.photoURL);
                 }
             });
+            document.getElementById('btn-post-unfollow').addEventListener('click', async () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                if (!activePostOptions) return;
+                const { post } = activePostOptions;
+                if (!post.uid) return;
+                const authorName = (cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'this user';
+                try {
+                    await unfollowUser(post.uid);
+                    notify(`Unfollowed ${authorName}`);
+                } catch (e) {
+                    notify('Failed to unfollow', 'error');
+                }
+            });
             document.getElementById('btn-post-edit').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active');
                 if (activePostOptions) enterPostEditMode(activePostOptions.postId, activePostOptions.post, activePostOptions.card);
@@ -7820,7 +7834,9 @@
             const user = auth.currentUser;
             const isOwn = !!(user && post.uid === user.uid);
             const isRepost = !!post.repostOf;
+            const isFollowingAuthor = !!(post.uid && cachedContacts[post.uid]);
             document.getElementById('btn-post-message').style.display = isOwn ? 'none' : 'block';
+            document.getElementById('btn-post-unfollow').style.display = (!isOwn && isFollowingAuthor) ? 'block' : 'none';
             // A repost wrapper has no text of its own, so there's nothing to edit.
             document.getElementById('btn-post-edit').style.display = (isOwn && !isRepost) ? 'block' : 'none';
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';

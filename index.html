@@ -974,6 +974,9 @@
         .profile-btn { width: 36px; height: 36px; border-radius: 50%; background-color: rgba(37, 211, 102, 0.1); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid transparent; color: var(--primary-blue); font-weight: bold; font-size: 14px; transition: 0.2s; }
         .header-profile-btn { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; }
         .header-profile-btn:hover { border-color: var(--primary-blue); transform: scale(1.05); }
+        /* Red ring shown around the header avatar while there are unread chat messages,
+           on every tab (mirrors the small red dot already shown on the Chats icon). */
+        .header-profile-btn.has-unread-messages { box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4.5px var(--danger-red); }
 
         /* Middle Pane: Chat List & Tabs */
         .chat-pane { display: flex; flex-direction: column; border-right: 1px solid var(--border-color); background: var(--bg-base); position: relative; overflow: hidden; }
@@ -12459,9 +12462,14 @@
 
         // Chats no longer lives in the bottom nav — its unread dot now lives on the header
         // icon (present on all three tab headers), so this toggles every instance at once.
+        // Also rings the header avatar itself (all five tab headers, via [data-profile-trigger])
+        // so unread messages are visible even from tabs that don't show the chats icon.
         function updateHeaderChatsBadge(count) {
             document.querySelectorAll('.js-header-chats-badge').forEach(badge => {
                 badge.classList.toggle('show', count > 0);
+            });
+            document.querySelectorAll('[data-profile-trigger]').forEach(avatar => {
+                avatar.classList.toggle('has-unread-messages', count > 0);
             });
         }
 

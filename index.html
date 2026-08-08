@@ -1857,6 +1857,9 @@
         .reel-item-action-btn svg { width: 27px; height: 27px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
         .reel-item-action-btn.liked { color: var(--danger-red, #ef4444); }
         .reel-item-action-btn.liked svg { color: var(--danger-red, #ef4444); }
+        .reel-item-action-btn.reposted { color: var(--success-green, #34C759); }
+        .reel-item-action-btn.reposted svg { color: var(--success-green, #34C759); }
+        .reel-item-view-stat { cursor: default; }
 
         /* ── STATUS TAB (video-only grid, gallery of Moments videos) ── */
         .status-grid-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -4472,6 +4475,7 @@
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
             const likedByMe = !!(post && post.reactions && myUid && post.reactions[myUid]);
+            const repostedByMe = !!(post && post.reposts && myUid && post.reposts[myUid]);
             return `
                 <div class="reel-item" data-post-id="${postId}">
                     <div class="reel-item-media">
@@ -4493,10 +4497,14 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
                             <span>${formatFeedCount((post && post.commentCount) || 0)}</span>
                         </button>
-                        <button type="button" class="reel-item-action-btn reel-share-btn" data-post-id="${postId}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                            <span>Share</span>
+                        <button type="button" class="reel-item-action-btn reel-repost-btn${repostedByMe ? ' reposted' : ''}" data-post-id="${postId}" title="Repost">
+                            ${repostArrowsSvg()}
+                            <span>${formatFeedCount((post && post.repostCount) || 0)}</span>
                         </button>
+                        <div class="reel-item-action-btn reel-item-view-stat" title="Views">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                            <span>${formatFeedCount((post && post.impressionCount) || 0)}</span>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -4561,6 +4569,12 @@
             }
             video.muted = false;
             video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+
+            const user = auth.currentUser;
+            if (user && post && post.uid !== user.uid && !itemEl.__impressed) {
+                itemEl.__impressed = true;
+                registerPostImpression(postId, user.uid);
+            }
         }
 
         function toggleReelItemPlayback(itemEl, video) {
@@ -4592,8 +4606,12 @@
             });
             const commentBtn = itemEl.querySelector('.reel-comment-btn');
             if (commentBtn) commentBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(postId); });
-            const shareBtn = itemEl.querySelector('.reel-share-btn');
-            if (shareBtn) shareBtn.addEventListener('click', (e) => { e.stopPropagation(); openSharePostSheet(postId); });
+            const repostBtn = itemEl.querySelector('.reel-repost-btn');
+            if (repostBtn) repostBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                repostBtn.disabled = true;
+                try { await toggleRepostPost(postId); } finally { repostBtn.disabled = false; }
+            });
         }
 
         function openReelViewer(startPostId) {
@@ -4652,8 +4670,9 @@
             document.getElementById('reel-viewer-overlay').classList.remove('active');
         }
 
-        // Keeps a reel item's like count/heart state and comment count in sync if the post
-        // changes elsewhere (e.g. someone else likes it) while the reel viewer is open.
+        // Keeps a reel item's like count/heart state, comment count, repost state/count, and
+        // view count in sync if the post changes elsewhere (e.g. someone else likes it) while
+        // the reel viewer is open.
         function patchReelItemIfPresent(postId, post) {
             const track = document.getElementById('reel-viewer-track');
             if (!track) return;
@@ -4672,6 +4691,16 @@
             }
             const commentCountEl = itemEl.querySelector('.reel-comment-btn span');
             if (commentCountEl) commentCountEl.textContent = formatFeedCount(post.commentCount || 0);
+
+            const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
+            const repostBtn = itemEl.querySelector('.reel-repost-btn');
+            if (repostBtn) {
+                repostBtn.classList.toggle('reposted', repostedByMe);
+                const countEl = repostBtn.querySelector('span');
+                if (countEl) countEl.textContent = formatFeedCount(post.repostCount || 0);
+            }
+            const viewCountEl = itemEl.querySelector('.reel-item-view-stat span');
+            if (viewCountEl) viewCountEl.textContent = formatFeedCount(post.impressionCount || 0);
         }
 
         // reel-viewer-close was replaced by the reel viewer's own header (see #reel-viewer-overlay

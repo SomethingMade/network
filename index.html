@@ -4630,7 +4630,8 @@
             vid.controlsList = hideSave ? 'nodownload noremoteplayback' : '';
             vid.disablePictureInPicture = !!hideSave;
             vid.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
-            document.getElementById('video-viewer-save').style.display = hideSave ? 'none' : '';
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            document.getElementById('video-viewer-save').style.display = (hideSave || !isVerifiedUid(myUid)) ? 'none' : '';
             const overlay = document.getElementById('video-viewer-overlay');
             overlay.classList.toggle('no-save', !!hideSave);
             overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
@@ -5127,8 +5128,17 @@
 
 
         // Downloads an image/video to the user's device (Downloads folder / Photos on most mobile browsers).
+        // Video downloads are a verified-only perk (see isVerifiedUid) — gated here so every call site
+        // app-wide (image/video viewer, story viewer, etc.) is covered from this single choke point.
         async function downloadMediaFile(url, kind = 'file') {
             if (!url) return;
+            if (kind === 'video') {
+                const myUid = auth.currentUser && auth.currentUser.uid;
+                if (!isVerifiedUid(myUid)) {
+                    notify('Only verified users can download videos', 'error');
+                    return;
+                }
+            }
             const extGuess = kind === 'video' ? 'mp4' : 'jpg';
             const fileName = `${kind}-${Date.now()}.${extGuess}`;
             try {
@@ -13665,7 +13675,9 @@
             if (!storyState.isOwn) return;
             pauseStory();
             const current = storyState.items[storyState.index];
-            document.getElementById('btn-story-save').style.display = (current && current.type !== 'text') ? '' : 'none';
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            const canSaveThis = current && current.type !== 'text' && (current.type !== 'video' || isVerifiedUid(myUid));
+            document.getElementById('btn-story-save').style.display = canSaveThis ? '' : 'none';
             storyOptionsSheet.classList.add('active');
         });
 

@@ -4491,20 +4491,9 @@
             nameEl.textContent = data.name || 'New message';
             textEl.textContent = data.text || '';
 
-            if (data.avatar) {
-                avatarEl.style.backgroundImage = `url('${data.avatar}')`;
-                avatarEl.style.backgroundColor = '';
-                avatarEl.textContent = '';
-            } else {
-                avatarEl.style.backgroundImage = 'none';
-                avatarEl.style.backgroundColor = 'var(--primary-blue)';
-                avatarEl.style.color = '#FFFFFF';
-                avatarEl.style.display = 'flex';
-                avatarEl.style.alignItems = 'center';
-                avatarEl.style.justifyContent = 'center';
-                avatarEl.style.fontWeight = 'bold';
-                avatarEl.textContent = data.name ? data.name.charAt(0).toUpperCase() : '?';
-            }
+            avatarEl.style.backgroundImage = `url('${data.avatar || DEFAULT_AVATAR_URL}')`;
+            avatarEl.style.backgroundColor = '';
+            avatarEl.textContent = '';
 
             banner.onclick = () => {
                 hideInAppMessageBanner();
@@ -6717,12 +6706,8 @@
         let cachedNotifications = {};
 
         function feedAvatarHtml(profile, sizeClass) {
-            const name = (profile && profile.name) || 'User';
-            const photoURL = profile && profile.photoURL;
-            const initial = name.charAt(0).toUpperCase();
-            return photoURL
-                ? `<div class="avatar ${sizeClass || ''}" style="background-image: url('${photoURL}');"></div>`
-                : `<div class="avatar ${sizeClass || ''}">${initial}</div>`;
+            const photoURL = (profile && profile.photoURL) || DEFAULT_AVATAR_URL;
+            return `<div class="avatar ${sizeClass || ''}" style="background-image: url('${photoURL}');"></div>`;
         }
 
         // Fills in a feed post card's avatar, name, and verified badge from the live `cachedUsers`
@@ -6934,9 +6919,7 @@
             return snippet;
         }
         function buildSearchDropdownAvatar(name, avatarUrl) {
-            if (avatarUrl) return `<div class="search-dropdown-avatar" style="background-image:url('${avatarUrl}')"></div>`;
-            const initial = (name || '?').charAt(0).toUpperCase();
-            return `<div class="search-dropdown-avatar" style="background:var(--primary-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600;">${initial}</div>`;
+            return `<div class="search-dropdown-avatar" style="background-image:url('${avatarUrl || DEFAULT_AVATAR_URL}')"></div>`;
         }
         // Global search across: the full user directory (cachedUsers — everyone on Xoxa, not
         // just people already messaged) and post captions (cachedPosts). Each source is capped
@@ -7312,19 +7295,10 @@
 
             const avatarEl = document.getElementById('status-viewer-avatar');
             const name = post.name || 'User';
-            if (post.photoURL) {
-                avatarEl.style.backgroundImage = `url('${post.photoURL}')`;
-                avatarEl.textContent = '';
-            } else {
-                avatarEl.style.backgroundImage = 'none';
-                avatarEl.style.backgroundColor = 'var(--primary-blue)';
-                avatarEl.style.color = '#FFFFFF';
-                avatarEl.style.display = 'flex';
-                avatarEl.style.alignItems = 'center';
-                avatarEl.style.justifyContent = 'center';
-                avatarEl.style.fontWeight = 'bold';
-                avatarEl.textContent = name.charAt(0).toUpperCase();
-            }
+            avatarEl.style.backgroundImage = `url('${(cachedUsers[post.uid] && cachedUsers[post.uid].photoURL) || post.photoURL || DEFAULT_AVATAR_URL}')`;
+            avatarEl.style.backgroundColor = '';
+            avatarEl.style.display = '';
+            avatarEl.textContent = '';
             document.getElementById('status-viewer-name').innerHTML = escapeHtmlForPost(name) + verifiedBadgeFor(post.uid, false);
             document.getElementById('status-viewer-time').textContent = formatTime(post.timestamp);
 
@@ -11201,7 +11175,7 @@
             const newName = document.getElementById('profile-name').value.trim();
             const newAbout = document.getElementById('profile-about').value.trim();
             const newWebsite = document.getElementById('profile-website').value.trim();
-            const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || "");
+            const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || DEFAULT_AVATAR_URL);
             const existingProfile = cachedUsers[user.uid] || {};
             const finalCover = pendingCoverURL !== null ? pendingCoverURL : (existingProfile.coverPhotoURL || "");
             const saveBtn = document.getElementById('btn-save-profile');
@@ -11974,14 +11948,11 @@
             const membersList = document.getElementById('group-info-members-list');
             membersList.innerHTML = '';
             memberIds.forEach(uid => {
-                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: DEFAULT_AVATAR_URL };
                 const row = document.createElement('div');
                 row.className = 'group-member-row';
                 row.dataset.uid = uid;
-                const initial = (profile.name || '?').charAt(0).toUpperCase();
-                const avatarHtml = profile.photoURL
-                    ? `<div class="avatar" style="background-image: url('${profile.photoURL}'); border:none;"></div>`
-                    : `<div class="avatar" style="background-color:var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold;">${initial}</div>`;
+                const avatarHtml = `<div class="avatar" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border:none;"></div>`;
                 row.innerHTML = `${avatarHtml}<h4>${profile.name}${verifiedBadgeFor(uid, false)}${uid === group.ownerUid ? ' · Owner' : ''}</h4>`;
                 row.addEventListener('click', () => {
                     groupInfoSheet.classList.remove('active');
@@ -12107,16 +12078,9 @@
             const coverEl = document.getElementById('user-info-cover-photo');
             if (coverEl) coverEl.style.backgroundImage = profile.coverPhotoURL ? `url('${profile.coverPhotoURL}')` : 'none';
             const avatarEl = document.getElementById('user-info-avatar');
-            if (profile.photoURL) {
-                avatarEl.style.backgroundImage = `url('${profile.photoURL}')`;
-                avatarEl.style.backgroundColor = '';
-                avatarEl.textContent = '';
-            } else {
-                avatarEl.style.backgroundImage = 'none';
-                avatarEl.style.backgroundColor = 'var(--primary-blue)';
-                avatarEl.style.color = '#FFFFFF';
-                avatarEl.textContent = (profile.name || '?').charAt(0).toUpperCase();
-            }
+            avatarEl.style.backgroundImage = `url('${profile.photoURL || DEFAULT_AVATAR_URL}')`;
+            avatarEl.style.backgroundColor = '';
+            avatarEl.textContent = '';
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
@@ -12943,11 +12907,7 @@
 
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'story-avatar-img';
-            if (photoURL) {
-                avatarDiv.style.backgroundImage = `url('${photoURL}')`;
-            } else {
-                avatarDiv.textContent = (name || "?").charAt(0).toUpperCase();
-            }
+            avatarDiv.style.backgroundImage = `url('${photoURL || DEFAULT_AVATAR_URL}')`;
 
             inner.appendChild(avatarDiv);
             ring.appendChild(inner);
@@ -13008,11 +12968,7 @@
             ring.classList.add('story-card-avatar-ring');
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'story-card-avatar';
-            if (photoURL) {
-                avatarDiv.style.backgroundImage = `url('${photoURL}')`;
-            } else {
-                avatarDiv.textContent = (name || "?").charAt(0).toUpperCase();
-            }
+            avatarDiv.style.backgroundImage = `url('${photoURL || DEFAULT_AVATAR_URL}')`;
             inner.appendChild(avatarDiv);
             ring.appendChild(inner);
             wrap.appendChild(ring);
@@ -13329,20 +13285,10 @@
 
             document.getElementById('story-viewer-name').innerHTML = escapeHtmlForPost(name) + verifiedBadgeFor(uid, false);
             const avatarEl = document.getElementById('story-viewer-avatar');
-            
-            if(photoURL) {
-                avatarEl.style.backgroundImage = `url('${photoURL}')`;
-                avatarEl.textContent = "";
-            } else {
-                avatarEl.style.backgroundImage = "none";
-                avatarEl.style.backgroundColor = "var(--primary-blue)";
-                avatarEl.style.color = "#FFFFFF";
-                avatarEl.style.display = "flex";
-                avatarEl.style.alignItems = "center";
-                avatarEl.style.justifyContent = "center";
-                avatarEl.style.fontWeight = "bold";
-                avatarEl.textContent = name.charAt(0).toUpperCase();
-            }
+            avatarEl.style.backgroundImage = `url('${photoURL || DEFAULT_AVATAR_URL}')`;
+            avatarEl.style.backgroundColor = '';
+            avatarEl.style.display = '';
+            avatarEl.textContent = "";
 
             document.getElementById('story-viewer-more').style.display = isOwn ? 'block' : 'none';
             document.getElementById('story-controls-bottom').style.display = isOwn ? 'none' : 'flex';
@@ -13661,14 +13607,12 @@
             } else {
                 viewers.forEach(v => {
                     const profile = cachedUsers[v.uid] || {};
-                    const photoURL = profile.photoURL || v.photoURL || '';
+                    const photoURL = profile.photoURL || v.photoURL || DEFAULT_AVATAR_URL;
                     const name = profile.name || v.name || 'User';
 
                     const row = document.createElement('div');
                     row.className = 'story-viewers-list-item';
-                    const avatarHtml = photoURL
-                        ? `<div class="avatar" style="background-image:url('${photoURL}');"></div>`
-                        : `<div class="avatar" style="background:var(--bg-hover); color:var(--primary-blue); display:flex; align-items:center; justify-content:center;">${name.charAt(0).toUpperCase()}</div>`;
+                    const avatarHtml = `<div class="avatar" style="background-image:url('${photoURL}');"></div>`;
                     row.innerHTML = `${avatarHtml}<div class="sv-info"><span class="sv-name">${name}</span><span class="sv-time">${formatTime(v.viewedAt || Date.now())}</span></div>`;
                     listEl.appendChild(row);
                 });
@@ -13935,12 +13879,9 @@
             item.className = 'chat-item';
             item.dataset.uid = uid;
             item.dataset.name = displayName;
-            item.dataset.avatar = profile.photoURL || '';
+            item.dataset.avatar = profile.photoURL || DEFAULT_AVATAR_URL;
 
-            const initial = displayName.charAt(0).toUpperCase();
-            const avatarHtml = profile.photoURL
-                ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>`
-                : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+            const avatarHtml = `<div class="avatar" data-full="${profile.photoURL || DEFAULT_AVATAR_URL}" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>`;
 
             let subtitle, actionHtml;
             if (mode === 'blocked') {
@@ -14065,15 +14006,12 @@
 
             let avatarHtml, metaHtml, actionsHtml;
             if (isMatch) {
-                const profile = cachedUsers[uid] || { name, photoURL: '' };
+                const profile = cachedUsers[uid] || { name, photoURL: DEFAULT_AVATAR_URL };
                 const displayName = profile.name || name;
-                const initial = displayName.charAt(0).toUpperCase();
-                avatarHtml = profile.photoURL
-                    ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border:none;"></div>`
-                    : `<div class="avatar" style="background-color: var(--primary-blue); color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+                avatarHtml = `<div class="avatar" data-full="${profile.photoURL || DEFAULT_AVATAR_URL}" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border:none;"></div>`;
                 metaHtml = `<h3>${displayName}</h3><p>On Xoxa${profile.about ? ' · ' + profile.about : ''}</p>`;
                 const alreadyContact = !!cachedContacts[uid];
-                actionsHtml = `<button type="button" class="chat-btn-small" data-action="device-chat" data-uid="${uid}" data-name="${displayName}" data-avatar="${profile.photoURL || ''}">${alreadyContact ? 'Chat' : 'Follow'}</button>`;
+                actionsHtml = `<button type="button" class="chat-btn-small" data-action="device-chat" data-uid="${uid}" data-name="${displayName}" data-avatar="${profile.photoURL || DEFAULT_AVATAR_URL}">${alreadyContact ? 'Chat' : 'Follow'}</button>`;
             } else {
                 avatarHtml = `<div class="avatar" style="background-color: var(--bg-hover); color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${(name || '?').charAt(0).toUpperCase()}</div>`;
                 metaHtml = `<h3>${name}</h3><p>Not on Xoxa yet</p>`;
@@ -14247,26 +14185,14 @@
             container.appendChild(title);
 
             pendingUids.forEach(uid => {
-                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: DEFAULT_AVATAR_URL };
                 const row = document.createElement('div');
                 row.className = 'chat-request-row';
 
                 const avatarWrap = document.createElement('div');
-                if (profile.photoURL) {
-                    avatarWrap.className = 'avatar';
-                    avatarWrap.style.backgroundImage = `url('${profile.photoURL}')`;
-                    avatarWrap.setAttribute('data-full', profile.photoURL);
-                } else {
-                    avatarWrap.className = 'avatar';
-                    avatarWrap.style.backgroundColor = 'var(--primary-blue)';
-                    avatarWrap.style.color = 'white';
-                    avatarWrap.style.display = 'flex';
-                    avatarWrap.style.alignItems = 'center';
-                    avatarWrap.style.justifyContent = 'center';
-                    avatarWrap.style.fontWeight = 'bold';
-                    avatarWrap.style.fontSize = '18px';
-                    avatarWrap.textContent = (profile.name || '?').charAt(0).toUpperCase();
-                }
+                avatarWrap.className = 'avatar';
+                avatarWrap.style.backgroundImage = `url('${profile.photoURL || DEFAULT_AVATAR_URL}')`;
+                avatarWrap.setAttribute('data-full', profile.photoURL || DEFAULT_AVATAR_URL);
                 row.appendChild(avatarWrap);
 
                 const info = document.createElement('div');
@@ -14346,7 +14272,7 @@
 
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const isAI = uid === AI_UID;
-            const profile = isAI ? { name: AI_NAME, photoURL: '' } : (cachedUsers[uid] || { name: 'Unknown User', photoURL: '' });
+            const profile = isAI ? { name: AI_NAME, photoURL: '' } : (cachedUsers[uid] || { name: 'Unknown User', photoURL: DEFAULT_AVATAR_URL });
             const isSelf = auth.currentUser && uid === auth.currentUser.uid;
             const displayName = isSelf ? 'My Account' : profile.name;
 
@@ -14354,15 +14280,12 @@
             item.className = 'chat-item' + (uid === activeChatUid ? ' active-chat' : '');
             item.dataset.uid = uid;
             item.dataset.name = displayName;
-            item.dataset.avatar = profile.photoURL;
+            item.dataset.avatar = profile.photoURL || DEFAULT_AVATAR_URL;
             item.dataset.favourite = (metaData && metaData.favourite) ? 'true' : 'false';
             
-            const initial = displayName.charAt(0).toUpperCase();
             let avatarHtml = isAI
                 ? `<div class="avatar ai-avatar-nebula" style="border: none; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg></div>`
-                : (profile.photoURL 
-                    ? `<div class="avatar" data-full="${profile.photoURL}" style="background-image: url('${profile.photoURL}'); border: none;"></div>` 
-                    : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`);
+                : `<div class="avatar" data-full="${profile.photoURL || DEFAULT_AVATAR_URL}" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>`;
 
             if (isChatPane && !isAI) {
                 avatarHtml = wrapAvatarWithStoryRing(avatarHtml, getActiveStoryItemsForUid(uid));
@@ -14441,10 +14364,7 @@
         }
 
         function callHistoryAvatarHtml(name, photoURL) {
-            const initial = (name || '?').charAt(0).toUpperCase();
-            return photoURL
-                ? `<div class="avatar" style="background-image: url('${photoURL}'); border: none;"></div>`
-                : `<div class="avatar" style="background-color: var(--primary-blue); color: white; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:18px;">${initial}</div>`;
+            return `<div class="avatar" style="background-image: url('${photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>`;
         }
 
         // Long-press a call row to start selecting, then delete the selected ones (or all of
@@ -14892,13 +14812,8 @@
 
         function callAvatarHtml(name, photoURL) {
             const el = document.getElementById('call-avatar');
-            if (photoURL) {
-                el.style.backgroundImage = `url('${photoURL}')`;
-                el.textContent = '';
-            } else {
-                el.style.backgroundImage = 'none';
-                el.textContent = name ? name.charAt(0).toUpperCase() : '?';
-            }
+            el.style.backgroundImage = `url('${photoURL || DEFAULT_AVATAR_URL}')`;
+            el.textContent = '';
         }
 
         function resetCallControlsUI() {
@@ -15647,8 +15562,7 @@
             avatarWrap.className = 'gc-tile-avatar-wrap';
             const avatarEl = document.createElement('div');
             avatarEl.className = 'gc-tile-avatar';
-            if (avatar) avatarEl.style.backgroundImage = `url('${avatar}')`;
-            else avatarEl.textContent = name ? name.charAt(0).toUpperCase() : '?';
+            avatarEl.style.backgroundImage = `url('${avatar || DEFAULT_AVATAR_URL}')`;
             const badge = document.createElement('div');
             badge.className = 'gc-tile-mute-badge';
             badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 5.83 1.06"></path><path d="M19 10v2a7 7 0 0 1-1.16 3.88"></path><path d="M5 10v2a7 7 0 0 0 7 7c.79 0 1.55-.13 2.25-.38"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line><line x1="2" y1="2" x2="22" y2="22"></line></svg>';
@@ -17133,24 +17047,14 @@
                 avatarEl.style.alignItems = "center";
                 avatarEl.style.justifyContent = "center";
                 avatarEl.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"></path><circle cx="19" cy="18" r="2"></circle><circle cx="5" cy="18" r="1.5"></circle></svg>';
-            } else if(otherAvatar) {
-                avatarEl.classList.remove('ai-avatar-nebula');
-                avatarEl.style.background = "";
-                avatarEl.innerHTML = "";
-                avatarEl.style.backgroundImage = `url('${otherAvatar}')`;
-                avatarEl.textContent = "";
             } else {
                 avatarEl.classList.remove('ai-avatar-nebula');
                 avatarEl.style.background = "";
                 avatarEl.innerHTML = "";
-                avatarEl.style.backgroundImage = "none";
-                avatarEl.style.backgroundColor = "var(--primary-blue)";
-                avatarEl.style.color = "#FFFFFF";
-                avatarEl.style.display = "flex";
-                avatarEl.style.alignItems = "center";
-                avatarEl.style.justifyContent = "center";
-                avatarEl.style.fontWeight = "bold";
-                avatarEl.textContent = otherName ? otherName.charAt(0).toUpperCase() : "?";
+                avatarEl.style.backgroundImage = `url('${otherAvatar || DEFAULT_AVATAR_URL}')`;
+                avatarEl.style.backgroundColor = "";
+                avatarEl.style.display = "";
+                avatarEl.textContent = "";
             }
 
             // Sub for Bidirectional Blocks
@@ -18518,6 +18422,15 @@
 
             onValue(ref(database, "users"), (snap) => {
                 cachedUsers = snap.exists() ? snap.val() : {};
+                // Normalize once here (rather than at every render call site) so that any user who
+                // never set a profile picture — no photoURL field, or an empty string — consistently
+                // shows the default avatar graphic everywhere in the app, instead of a per-screen
+                // mix of blank circles, initials, or broken images.
+                Object.keys(cachedUsers).forEach(uid => {
+                    if (cachedUsers[uid] && !cachedUsers[uid].photoURL) {
+                        cachedUsers[uid].photoURL = DEFAULT_AVATAR_URL;
+                    }
+                });
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderChatRequests();

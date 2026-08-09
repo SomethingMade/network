@@ -1444,6 +1444,11 @@
         .wallpaper-swatch.selected { border-color: var(--primary-blue); }
         .wallpaper-swatch.selected::after { content: ''; position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; background: var(--primary-blue) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>') center/12px no-repeat; }
 
+        .bubble-color-swatch span { color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+        .bubble-color-custom-swatch { position: relative; background: repeating-conic-gradient(#e0e0e0 0% 25%, #f5f5f5 0% 50%) 0 0/12px 12px; cursor: pointer; }
+        .bubble-color-custom-swatch span { color: var(--text-secondary); text-shadow: none; font-weight: 600; }
+        .bubble-color-custom-swatch input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; border: none; padding: 0; cursor: pointer; opacity: 0; }
+
         .scroll-to-bottom-btn {
             position: absolute;
             right: 24px;
@@ -3252,6 +3257,7 @@
                     <button class="msg-option-btn" id="btn-msg-copy">Copy Text</button>
                     <button class="msg-option-btn" id="btn-msg-forward">Forward</button>
                     <button class="msg-option-btn" id="btn-msg-edit">Edit Message</button>
+                    <button class="msg-option-btn" id="btn-msg-bubble-color">Change Bubble Color</button>
                     <button class="msg-option-btn" id="btn-msg-delete" style="color: var(--danger-red);">Delete for Everyone</button>
                 </div>
             </div>
@@ -3314,6 +3320,27 @@
             </div>
             <div class="sheet-upload-spinner" id="wallpaper-upload-spinner" style="display:none; position:static; margin:4px auto 0;"><div class="spinner-sm" style="border-color: rgba(120,120,120,0.25); border-top-color: var(--primary-blue);"></div></div>
             <input type="file" id="wallpaper-file-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+        </div>
+    </div>
+
+    <div id="bubble-color-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 28px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 4px;">Chat Bubble Color</div>
+            <p style="color:var(--text-secondary); font-size:13px; text-align:center; margin-bottom:20px;">This changes the color of your sent messages in all chats</p>
+            <div class="wallpaper-grid" id="bubble-color-grid">
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="default" style="background: var(--primary-blue);"><span>Default</span></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#25D366" style="background: #25D366;"></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#8E44AD" style="background: #8E44AD;"></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#FF6B6B" style="background: #FF6B6B;"></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#FF9F43" style="background: #FF9F43;"></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#00B4D8" style="background: #00B4D8;"></div>
+                <div class="wallpaper-swatch bubble-color-swatch" data-color="#2C3E50" style="background: #2C3E50;"></div>
+                <label class="wallpaper-swatch bubble-color-custom-swatch" id="bubble-color-custom-swatch">
+                    <span>Custom</span>
+                    <input type="color" id="bubble-color-custom-input" value="#0A84FF">
+                </label>
+            </div>
         </div>
     </div>
 
@@ -4424,6 +4451,82 @@
                 notify(valueToSave === 'none' ? 'Wallpaper reset to default' : 'Wallpaper updated');
             } catch (err) {
                 notify('Could not update wallpaper', 'error');
+            }
+        });
+
+        const BUBBLE_COLOR_PRESETS = ['default', '#25D366', '#8E44AD', '#FF6B6B', '#FF9F43', '#00B4D8', '#2C3E50'];
+
+        function currentBubbleColorValue() {
+            const user = auth.currentUser;
+            if (!user) return 'default';
+            const profile = cachedUsers[user.uid] || {};
+            return profile.chatBubbleColor || 'default';
+        }
+
+        // Overrides --msg-out-bg on the shared chat-view-messages pane, so every chat
+        // (DMs and groups) shows the same sent-message bubble color, same pattern as wallpaper.
+        function applyChatBubbleColorToDOM(value) {
+            const messagesEl = document.getElementById('chat-view-messages');
+            if (!messagesEl) return;
+            if (!value || value === 'default') {
+                messagesEl.style.removeProperty('--msg-out-bg');
+            } else {
+                messagesEl.style.setProperty('--msg-out-bg', value);
+            }
+        }
+
+        function refreshBubbleColorGridSelection(value) {
+            document.querySelectorAll('#bubble-color-grid .bubble-color-swatch').forEach(el => {
+                el.classList.toggle('selected', el.dataset.color === value);
+            });
+            const customInput = document.getElementById('bubble-color-custom-input');
+            const customSwatch = document.getElementById('bubble-color-custom-swatch');
+            const isCustom = value && value !== 'default' && !BUBBLE_COLOR_PRESETS.includes(value);
+            if (customInput && isCustom) customInput.value = value;
+            customSwatch.classList.toggle('selected', !!isCustom);
+        }
+
+        document.getElementById('btn-msg-bubble-color').addEventListener('click', () => {
+            document.getElementById('msg-options-sheet-overlay').classList.remove('active');
+            const value = currentBubbleColorValue();
+            refreshBubbleColorGridSelection(value);
+            document.getElementById('bubble-color-sheet-overlay').classList.add('active');
+        });
+
+        document.getElementById('bubble-color-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'bubble-color-sheet-overlay') e.target.classList.remove('active');
+        });
+
+        document.getElementById('bubble-color-grid').addEventListener('click', async (e) => {
+            const swatch = e.target.closest('.bubble-color-swatch');
+            if (!swatch || swatch.id === 'bubble-color-custom-swatch') return;
+            const user = auth.currentUser;
+            if (!user) return;
+            const valueToSave = swatch.dataset.color;
+
+            try {
+                await update(ref(database, `users/${user.uid}`), { chatBubbleColor: valueToSave });
+                applyChatBubbleColorToDOM(valueToSave);
+                refreshBubbleColorGridSelection(valueToSave);
+                notify(valueToSave === 'default' ? 'Bubble color reset to default' : 'Bubble color updated');
+            } catch (err) {
+                notify('Could not update bubble color', 'error');
+            }
+        });
+
+        document.getElementById('bubble-color-custom-input').addEventListener('input', (e) => {
+            applyChatBubbleColorToDOM(e.target.value);
+            refreshBubbleColorGridSelection(e.target.value);
+        });
+
+        document.getElementById('bubble-color-custom-input').addEventListener('change', async (e) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await update(ref(database, `users/${user.uid}`), { chatBubbleColor: e.target.value });
+                notify('Bubble color updated');
+            } catch (err) {
+                notify('Could not update bubble color', 'error');
             }
         });
 
@@ -12303,6 +12406,7 @@
             document.getElementById('chat-view-name').innerHTML = groupNameLabel(group);
             document.getElementById('chat-view-status').textContent = group.members ? `${Object.keys(group.members).length} members` : '';
             applyChatWallpaperToDOM(currentWallpaperValue());
+            applyChatBubbleColorToDOM(currentBubbleColorValue());
             document.getElementById('chat-view-about-bubble').style.display = 'none';
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
@@ -17074,6 +17178,7 @@
             document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}`;
             updateActiveChatStatus();
             applyChatWallpaperToDOM(currentWallpaperValue());
+            applyChatBubbleColorToDOM(currentBubbleColorValue());
             
             const avatarEl = document.getElementById('chat-view-avatar');
             if (otherUid === AI_UID) {
@@ -18473,6 +18578,7 @@
                 renderChatRequests();
                 if (activeChatUid) updateActiveChatStatus();
                 applyChatWallpaperToDOM(currentWallpaperValue());
+            applyChatBubbleColorToDOM(currentBubbleColorValue());
                 renderDiscoverGridIfActive();
                 refreshAllFeedPostProfiles();
                 refreshChatListOnlineDots();

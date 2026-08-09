@@ -430,6 +430,10 @@
         /* Same reasoning again: the reel viewer's header camera icon opens this, so it needs
            to clear the reel viewer's z-index too, not just its own default (100005). */
         #status-upload-overlay { z-index: 100010; }
+        /* Post Options (the "..." menu) can also be opened from inside the image viewer
+           (z-index 100008, see image-viewer-post-menu-btn), so it needs to clear that too,
+           not just the default bottom-sheet layer (100002). */
+        #post-options-sheet-overlay { z-index: 100010; }
         #force-update-overlay { z-index: 999999; }
         #force-update-overlay .custom-modal { text-align: center; }
         #force-update-overlay .force-update-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: white; }
@@ -1995,10 +1999,17 @@
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #video-viewer-overlay.active { opacity: 1; visibility: visible; }
-        /* Also opened by tapping media in the contact info sheet's "media grid" (#user-info-sheet-overlay,
-           z-index 100010) as well as other bottom sheets at that same tier, so it needs to clear those
-           too, not just its own default (100006) — otherwise it renders behind the sheet it was opened from. */
-        #image-viewer-overlay.active, #video-viewer-overlay.active { z-index: 100012; }
+        /* Default active tier: above the reel viewer (100007) but below the top bottom-sheet tier
+           (100010) — Comments and Post Options are both opened from inside the image viewer (see
+           image-viewer-comment-btn / image-viewer-post-menu-btn), so they need to paint above it,
+           not sit behind it. */
+        #image-viewer-overlay.active, #video-viewer-overlay.active { z-index: 100008; }
+        /* Elevated tier: also opened by tapping media in the contact info sheet's "media grid"
+           (#user-info-sheet-overlay, z-index 100010) as well as other bottom sheets at that same
+           tier, so it needs to clear those instead — otherwise it renders behind the sheet it was
+           opened from. buildProfileMediaGrid's click handler adds this class right before opening;
+           closeImageViewer/closeVideoViewer remove it again on close. */
+        #image-viewer-overlay.active.above-sheet, #video-viewer-overlay.active.above-sheet { z-index: 100012; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
@@ -4822,7 +4833,7 @@
         document.getElementById('image-viewer-next').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(1); });
         function closeImageViewer() {
             const overlay = document.getElementById('image-viewer-overlay');
-            overlay.classList.remove('active', 'privacy-blur');
+            overlay.classList.remove('active', 'privacy-blur', 'above-sheet');
             document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
             currentViewerGallery = null;
@@ -4887,7 +4898,7 @@
             vid.src = '';
             musicAudio.pause();
             musicAudio.src = '';
-            document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur');
+            document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur', 'above-sheet');
             currentViewerVideoUrl = '';
         }
         document.getElementById('video-viewer-close').addEventListener('click', () => history.back());
@@ -12292,9 +12303,14 @@
                 item.addEventListener('click', () => {
                     const post = cachedPosts[item.dataset.postId];
                     if (!post) return;
+                    // Opened from inside a bottom sheet (the contact info media grid), so the
+                    // viewer needs the elevated .above-sheet z-index to clear it — see the tier
+                    // comment above #image-viewer-overlay.active.above-sheet.
                     if (item.dataset.isVideo === '1') {
+                        document.getElementById('video-viewer-overlay').classList.add('above-sheet');
                         openVideoViewer(post.videoUrl, false, post.music || null);
                     } else {
+                        document.getElementById('image-viewer-overlay').classList.add('above-sheet');
                         openImageViewer(post.imageUrl, false, imageGallery, imageGallery.indexOf(post.imageUrl), item.dataset.postId, imageGalleryPostIds);
                     }
                 });

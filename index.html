@@ -806,8 +806,17 @@
 
         .feed-comment-item { display: flex; gap: 12px; padding: 14px 0; align-items: flex-start; }
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
-        .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; }
+        .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; position: relative; }
         .feed-comment-item.is-reply .avatar { width: 26px; height: 26px; font-size: 11px; }
+        .feed-comment-item.is-reply::before {
+            content: ''; position: absolute; left: -24px; top: -14px; width: 24px; height: 37px;
+            border-left: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color);
+            border-bottom-left-radius: 10px;
+        }
+        .feed-comment-item.is-reply.has-next-reply::after {
+            content: ''; position: absolute; left: -24px; top: 23px; bottom: 0;
+            border-left: 2px solid var(--border-color);
+        }
         .feed-comment-body { flex: 1; min-width: 0; }
         .feed-comment-header-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
         .feed-comment-header-row .name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
@@ -2224,6 +2233,8 @@
             .tag-people-item-check { width: 20px; height: 20px; }
             .feed-comment-item .avatar { width: 27px; height: 27px; }
             .feed-comment-item.is-reply .avatar { width: 21px; height: 21px; }
+            .feed-comment-item.is-reply::before { height: 34px; }
+            .feed-comment-item.is-reply.has-next-reply::after { top: 20px; }
             .story-action-avatar { width: 40px; height: 40px; }
             .sheet-avatar-upload { width: 80px; height: 80px; }
             .sheet-avatar-upload .avatar-circle, .wa-avatar-block .avatar-circle { width: 80px; height: 80px; }
@@ -9991,10 +10002,10 @@
 
         const COMMENT_LIKE_EMOJI = '❤️';
 
-        function buildCommentEl(commentId, comment, isReply, replyCount) {
+        function buildCommentEl(commentId, comment, isReply, replyCount, hasNextReply) {
             const user = auth.currentUser;
             const item = document.createElement('div');
-            item.className = 'feed-comment-item' + (isReply ? ' is-reply' : '');
+            item.className = 'feed-comment-item' + (isReply ? ' is-reply' : '') + (hasNextReply ? ' has-next-reply' : '');
             item.dataset.commentId = commentId;
             if (isReply) {
                 item.dataset.parentId = comment.parentId || '';
@@ -10068,8 +10079,8 @@
             topLevel.forEach(([commentId, comment]) => {
                 const replies = repliesByParent[commentId] || [];
                 list.appendChild(buildCommentEl(commentId, comment, false, replies.length));
-                replies.forEach(([replyId, reply]) => {
-                    list.appendChild(buildCommentEl(replyId, reply, true));
+                replies.forEach(([replyId, reply], idx) => {
+                    list.appendChild(buildCommentEl(replyId, reply, true, 0, idx < replies.length - 1));
                 });
             });
             list.scrollTop = list.scrollHeight;

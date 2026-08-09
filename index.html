@@ -2101,6 +2101,13 @@
            opened from. buildProfileMediaGrid's click handler adds this class right before opening;
            closeImageViewer/closeVideoViewer remove it again on close. */
         #image-viewer-overlay.active.above-sheet, #video-viewer-overlay.active.above-sheet { z-index: 100012; }
+        /* Comments/Post-Options can themselves be opened from inside the image/video viewer
+           (image-viewer-comment-btn, image-viewer-post-menu-btn). Their base tier (100010) clears
+           the viewer's default tier (100008) fine, but not its elevated .above-sheet tier (100012)
+           — reached when the viewer was itself opened from another bottom sheet, e.g. a profile's
+           media grid. syncSheetAboveViewer() adds this class in that case so the sheet still ends
+           up on top instead of rendering behind the still-visible viewer. */
+        #post-comments-sheet-overlay.above-viewer, #post-options-sheet-overlay.above-viewer { z-index: 100013; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
@@ -8858,7 +8865,7 @@
             });
 
             document.getElementById('btn-post-message').addEventListener('click', () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) {
                     const { post } = activePostOptions;
                     pauseAllFeedMedia();
@@ -8866,7 +8873,7 @@
                 }
             });
             document.getElementById('btn-post-unfollow').addEventListener('click', async () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
                 const { post } = activePostOptions;
                 if (!post.uid) return;
@@ -8879,11 +8886,11 @@
                 }
             });
             document.getElementById('btn-post-edit').addEventListener('click', () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) enterPostEditMode(activePostOptions.postId, activePostOptions.post, activePostOptions.card);
             });
             document.getElementById('btn-post-pin').addEventListener('click', async () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
                 const { postId } = activePostOptions;
                 const user = auth.currentUser;
@@ -8902,17 +8909,17 @@
                 }
             });
             document.getElementById('btn-post-report').addEventListener('click', () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) openReportPostSheet(activePostOptions.postId, activePostOptions.post);
             });
             document.getElementById('btn-post-delete').addEventListener('click', async () => {
-                document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
                 const confirmed = await showCustomModal('Delete Post?', 'This will permanently remove the post and its comments. This cannot be undone.', true);
                 if (confirmed) deletePost(activePostOptions.postId);
             });
             document.getElementById('post-options-sheet-overlay').addEventListener('click', (e) => {
-                if (e.target.id === 'post-options-sheet-overlay') document.getElementById('post-options-sheet-overlay').classList.remove('active');
+                if (e.target.id === 'post-options-sheet-overlay') document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
             });
         }
 
@@ -8942,7 +8949,9 @@
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-post-delete').textContent = isRepost ? 'Undo Repost' : 'Delete Post';
-            document.getElementById('post-options-sheet-overlay').classList.add('active');
+            const optionsOverlay = document.getElementById('post-options-sheet-overlay');
+            syncSheetAboveViewer(optionsOverlay);
+            optionsOverlay.classList.add('active');
         }
 
         // --- REPORT POST / SECTION 77 TAKE-DOWN REQUEST ---
@@ -10017,9 +10026,21 @@
             }
         }
 
+        // If the image/video viewer is currently open in its elevated .above-sheet tier
+        // (100012 — see the tier comment above #image-viewer-overlay.active.above-sheet), a sheet
+        // opened on top of it (Comments, Post Options) needs the matching .above-viewer tier
+        // (100013) or it renders behind the still-visible viewer instead of on top of it.
+        function syncSheetAboveViewer(sheetEl) {
+            const imageViewer = document.getElementById('image-viewer-overlay');
+            const videoViewer = document.getElementById('video-viewer-overlay');
+            const viewerElevated = imageViewer.classList.contains('active') && imageViewer.classList.contains('above-sheet')
+                || videoViewer.classList.contains('active') && videoViewer.classList.contains('above-sheet');
+            sheetEl.classList.toggle('above-viewer', viewerElevated);
+        }
         function openPostComments(postId) {
             activeCommentsPostId = postId;
             const overlay = document.getElementById('post-comments-sheet-overlay');
+            syncSheetAboveViewer(overlay);
             overlay.classList.add('active');
             const commentInput = document.getElementById('post-comment-input');
             commentInput.value = '';
@@ -10045,7 +10066,7 @@
         }
 
         function closePostComments() {
-            document.getElementById('post-comments-sheet-overlay').classList.remove('active');
+            document.getElementById('post-comments-sheet-overlay').classList.remove('active', 'above-viewer');
             if (postCommentsUnsub) { postCommentsUnsub(); postCommentsUnsub = null; }
             activeCommentsPostId = null;
             setReplyToComment(null);

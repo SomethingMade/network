@@ -1943,6 +1943,10 @@
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #video-viewer-overlay.active { opacity: 1; visibility: visible; }
+        /* Also opened by tapping media in the contact info sheet's "media grid" (#user-info-sheet-overlay,
+           z-index 100010) as well as other bottom sheets at that same tier, so it needs to clear those
+           too, not just its own default (100006) — otherwise it renders behind the sheet it was opened from. */
+        #image-viewer-overlay.active, #video-viewer-overlay.active { z-index: 100012; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
@@ -5585,6 +5589,45 @@
             }
         }
         window.addEventListener('hashchange', handleHashChange);
+
+        // --- GENERIC BACK-BUTTON SUPPORT FOR SIMPLE BOTTOM SHEETS ---
+        // The major overlays (chat, story, image/video/reel viewer, user-info, status, post-composer)
+        // are wired into the URL hash system above and already close on the device back button via
+        // handleHashChange(). The many smaller `.bottom-sheet-overlay` sheets (options menus, pickers,
+        // comments, settings, etc.) are opened/closed by simply toggling their 'active' class from
+        // dozens of scattered call sites, with no history entry — so on a phone, pressing the device
+        // back button while one is open skipped straight past it (closing/backgrounding the app instead
+        // of just closing the sheet). Rather than rewire every individual call site, track class
+        // changes generically: push one history entry per sheet that opens, and let the back button
+        // consume it by closing whichever sheet is currently on top.
+        const sheetOpenStack = [];
+        let closingSheetViaBackButton = false;
+        document.querySelectorAll('.bottom-sheet-overlay').forEach(overlay => {
+            // user-info-sheet-overlay already manages its own history entry via the hash system
+            // above (see 'user-info' handling in handleHashChange) — don't double-track it here.
+            if (overlay.id === 'user-info-sheet-overlay') return;
+            new MutationObserver(() => {
+                const isActive = overlay.classList.contains('active');
+                const idx = sheetOpenStack.indexOf(overlay.id);
+                if (isActive && idx === -1) {
+                    sheetOpenStack.push(overlay.id);
+                    history.pushState({ sheetNav: overlay.id }, '', location.href);
+                } else if (!isActive && idx !== -1) {
+                    sheetOpenStack.splice(idx, 1);
+                    // Closed via an in-app control (X button, backdrop tap, etc.) rather than the
+                    // device back button — consume the history entry pushed on open so it doesn't
+                    // leave an inert extra back-step behind for the user to hit later.
+                    if (!closingSheetViaBackButton) history.back();
+                }
+            }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        });
+        window.addEventListener('popstate', () => {
+            if (!sheetOpenStack.length) return;
+            closingSheetViaBackButton = true;
+            const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
+            if (overlay) overlay.classList.remove('active');
+            closingSheetViaBackButton = false;
+        });
 
         // --- SLIDING NAV INDICATOR ---
         function updateNavIndicator() {

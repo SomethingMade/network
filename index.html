@@ -1968,11 +1968,15 @@
         .sv-time { font-size: 12px; color: var(--text-secondary); }
 
         /* ── FULL IMAGE VIEWER (avatar preview) ── */
-        #image-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
+        #image-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #image-viewer-overlay.active { opacity: 1; visibility: visible; }
-        #image-viewer-overlay img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+        .image-viewer-media { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+        #image-viewer-img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
         .image-viewer-close { position: absolute; top: 20px; right: 20px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
         .image-viewer-close:hover { opacity: 0.75; }
+        .image-viewer-post-menu-btn { position: absolute; top: 20px; right: 68px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border: none; border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
+        .image-viewer-post-menu-btn:hover { opacity: 0.75; }
+        .image-viewer-post-menu-btn svg { width: 100%; height: 100%; }
         .image-viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.45); border: none; color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 2; transition: background 0.15s ease; }
         .image-viewer-nav:hover { background: rgba(0,0,0,0.7); }
         .image-viewer-nav svg { width: 22px; height: 22px; }
@@ -1981,6 +1985,12 @@
         .image-viewer-nav.visible { display: flex; }
         .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; }
         .image-viewer-counter.visible { display: block; }
+        .image-viewer-post-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: space-around; background: #000; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,0.08); }
+        .image-viewer-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 12px; border-radius: 20px; transition: background 0.15s ease, color 0.15s ease; }
+        .image-viewer-post-action-btn:hover { background: rgba(255,255,255,0.08); }
+        .image-viewer-post-action-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+        .image-viewer-post-action-btn.liked { color: var(--danger-red); }
+        .image-viewer-post-action-btn.reposted { color: var(--success-green); }
 
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
@@ -4181,14 +4191,36 @@
     <div id="image-viewer-overlay">
         <svg class="image-viewer-save" id="image-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        <img id="image-viewer-img" src="" alt="Full image">
-        <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="image-viewer-prev" aria-label="Previous image">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <button type="button" class="image-viewer-post-menu-btn" id="image-viewer-post-menu-btn" title="More" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
         </button>
-        <button type="button" class="image-viewer-nav image-viewer-nav-next" id="image-viewer-next" aria-label="Next image">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
-        <div class="image-viewer-counter" id="image-viewer-counter"></div>
+        <div class="image-viewer-media" id="image-viewer-media">
+            <img id="image-viewer-img" src="" alt="Full image">
+            <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="image-viewer-prev" aria-label="Previous image">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <button type="button" class="image-viewer-nav image-viewer-nav-next" id="image-viewer-next" aria-label="Next image">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <div class="image-viewer-counter" id="image-viewer-counter"></div>
+        </div>
+        <div class="image-viewer-post-actions" id="image-viewer-post-actions" style="display:none;">
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-like-btn">
+                <svg class="image-viewer-like-icon" id="image-viewer-like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
+                <span id="image-viewer-like-count">0</span>
+            </button>
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-comment-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <span id="image-viewer-comment-count">0</span>
+            </button>
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-repost-btn" title="Repost">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                <span id="image-viewer-repost-count">0</span>
+            </button>
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-share-btn" title="Share">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
     </div>
 
     <div id="video-viewer-overlay">
@@ -4696,23 +4728,80 @@
 
         let currentViewerImageUrl = '';
         let currentViewerGallery = null;
+        let currentViewerGalleryPostIds = null;
         let currentViewerIndex = 0;
+        let currentViewerPostId = null;
         // `gallery` (optional) is the full array of image URLs for a multi-image post; `startIndex`
         // is which one was tapped. When provided (length > 1), prev/next arrows and a counter appear
         // and clicking them just swaps image-viewer-img's src, no need to reopen the viewer.
-        function openImageViewer(url, hideSave, gallery, startIndex) {
+        // `postId` (optional) shows the like/comment/repost/share bar at the bottom, cropping the
+        // image area to make room for it, and syncs live counts from cachedPosts. `galleryPostIds`
+        // (optional) is a parallel array to `gallery` for cases like the profile media grid, where
+        // each image in the gallery belongs to a different post — stepping through updates the bar.
+        function openImageViewer(url, hideSave, gallery, startIndex, postId, galleryPostIds) {
             if (!url) return;
             const isGallery = Array.isArray(gallery) && gallery.length > 1;
             currentViewerGallery = isGallery ? gallery : null;
+            currentViewerGalleryPostIds = (isGallery && Array.isArray(galleryPostIds)) ? galleryPostIds : null;
             currentViewerIndex = isGallery ? Math.max(0, gallery.indexOf(url) !== -1 ? gallery.indexOf(url) : (startIndex || 0)) : 0;
+            currentViewerPostId = postId || null;
             renderImageViewerFrame(isGallery ? gallery[currentViewerIndex] : url, hideSave);
             const overlay = document.getElementById('image-viewer-overlay');
             document.getElementById('image-viewer-prev').classList.toggle('visible', isGallery);
             document.getElementById('image-viewer-next').classList.toggle('visible', isGallery);
             document.getElementById('image-viewer-counter').classList.toggle('visible', isGallery);
+            updateImageViewerPostBarVisibility();
             overlay.classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
+        function updateImageViewerPostBarVisibility() {
+            document.getElementById('image-viewer-post-actions').style.display = currentViewerPostId ? 'flex' : 'none';
+            document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
+            if (currentViewerPostId) {
+                document.getElementById('image-viewer-save').style.display = 'none';
+                syncImageViewerPostBar();
+            }
+        }
+        // Reflects cachedPosts[currentViewerPostId] (likeCount/commentCount/repostCount and
+        // whether I've liked/reposted it) onto the bottom action bar. Called on open, and again
+        // whenever that post's data changes in Firebase (see patchFeedPostCounts call sites).
+        function syncImageViewerPostBar() {
+            if (!currentViewerPostId) return;
+            const post = cachedPosts[currentViewerPostId];
+            if (!post) return;
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const likedByMe = !!(post.reactions && myUid && post.reactions[myUid]);
+            const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
+
+            const likeBtn = document.getElementById('image-viewer-like-btn');
+            likeBtn.classList.toggle('liked', likedByMe);
+            document.getElementById('image-viewer-like-icon').setAttribute('fill', likedByMe ? 'currentColor' : 'none');
+            document.getElementById('image-viewer-like-count').textContent = post.likeCount || 0;
+            document.getElementById('image-viewer-comment-count').textContent = post.commentCount || 0;
+            document.getElementById('image-viewer-repost-btn').classList.toggle('reposted', repostedByMe);
+            document.getElementById('image-viewer-repost-count').textContent = formatFeedCount(post.repostCount || 0);
+        }
+        document.getElementById('image-viewer-like-btn').addEventListener('click', () => {
+            if (currentViewerPostId) toggleLikePost(currentViewerPostId);
+        });
+        document.getElementById('image-viewer-comment-btn').addEventListener('click', () => {
+            if (currentViewerPostId) openPostComments(currentViewerPostId);
+        });
+        document.getElementById('image-viewer-repost-btn').addEventListener('click', async (e) => {
+            if (!currentViewerPostId) return;
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            try { await toggleRepostPost(currentViewerPostId); } finally { btn.disabled = false; }
+        });
+        document.getElementById('image-viewer-share-btn').addEventListener('click', () => {
+            if (currentViewerPostId) openSharePostSheet(currentViewerPostId);
+        });
+        document.getElementById('image-viewer-post-menu-btn').addEventListener('click', () => {
+            if (!currentViewerPostId) return;
+            const post = cachedPosts[currentViewerPostId];
+            if (post) openPostOptions(currentViewerPostId, post, null);
+        });
         function renderImageViewerFrame(url, hideSave) {
             currentViewerImageUrl = url;
             const imgEl = document.getElementById('image-viewer-img');
@@ -4731,7 +4820,9 @@
             if (!currentViewerGallery) return;
             const len = currentViewerGallery.length;
             currentViewerIndex = (currentViewerIndex + delta + len) % len;
+            currentViewerPostId = currentViewerGalleryPostIds ? (currentViewerGalleryPostIds[currentViewerIndex] || null) : currentViewerPostId;
             renderImageViewerFrame(currentViewerGallery[currentViewerIndex]);
+            updateImageViewerPostBarVisibility();
         }
         document.getElementById('image-viewer-prev').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(-1); });
         document.getElementById('image-viewer-next').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(1); });
@@ -4741,7 +4832,9 @@
             document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
             currentViewerGallery = null;
+            currentViewerGalleryPostIds = null;
             currentViewerIndex = 0;
+            currentViewerPostId = null;
         }
         document.getElementById('image-viewer-close').addEventListener('click', () => history.back());
         document.getElementById('image-viewer-save').addEventListener('click', (e) => {
@@ -8046,6 +8139,7 @@
                 if (existingCard && contentUnchanged) {
                     patchFeedPostCounts(existingCard, post);
                     patchDuplicateContentCards(list, postId, post, existingCard);
+                    if (currentViewerPostId === postId) syncImageViewerPostBar();
                     return;
                 }
                 // Even if this exact card doesn't exist yet (or its content changed), other
@@ -8767,6 +8861,7 @@
         });
 
         function enterPostEditMode(postId, post, card) {
+            if (!card) { notify('Open this post in the feed to edit it', 'error'); return; }
             const body = card.querySelector('.feed-post-body');
             if (!body || card.querySelector('.feed-post-edit-box')) return;
 
@@ -9616,7 +9711,7 @@
             card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
                 imgEl.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10));
+                    openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10), originalId);
                 });
             });
 
@@ -12172,7 +12267,9 @@
                 return;
             }
 
-            const imageGallery = items.filter(([, post]) => post.imageUrl).map(([, post]) => post.imageUrl);
+            const imageItems = items.filter(([, post]) => post.imageUrl);
+            const imageGallery = imageItems.map(([, post]) => post.imageUrl);
+            const imageGalleryPostIds = imageItems.map(([postId]) => postId);
 
             gridEl.innerHTML = items.map(([postId, post], idx) => {
                 const isVideo = !post.imageUrl && !!post.videoUrl;
@@ -12201,7 +12298,7 @@
                     if (item.dataset.isVideo === '1') {
                         openVideoViewer(post.videoUrl, false, post.music || null);
                     } else {
-                        openImageViewer(post.imageUrl, false, imageGallery);
+                        openImageViewer(post.imageUrl, false, imageGallery, imageGallery.indexOf(post.imageUrl), item.dataset.postId, imageGalleryPostIds);
                     }
                 });
             });

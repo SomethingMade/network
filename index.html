@@ -412,18 +412,19 @@
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: min(85vh, 100%); overflow-y: auto; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
 
-        /* ── CONTACT INFO AS A FULL-SCREEN PAGE (phone) ──
-           Redesigned to read like a social profile page (Threads-style) rather than a
-           WhatsApp-style bottom sheet: back-arrow navigation, name+avatar header block,
-           bio, link, pills, stats, and a Media section below a divider. On phones this
-           takes over the whole screen and slides in from the right, same mechanics as
-           chat-view-overlay, instead of sliding up as a rounded sheet. The base
-           .bottom-sheet-overlay's opacity/visibility toggle is neutralized here (the
-           overlay is always "present", just off-canvas) so only the panel's own
+        /* ── CONTACT INFO & OWN PROFILE AS A FULL-SCREEN PAGE (phone) ──
+           Both the "Contact Info" panel (viewing someone else) and the "Profile" panel
+           (editing your own) read like a social profile page (Threads-style) rather
+           than a WhatsApp-style bottom sheet: back-arrow navigation, name+avatar header
+           block, bio, link, pills, stats, and a Media section below a divider. On
+           phones this takes over the whole screen and slides in from the right, same
+           mechanics as chat-view-overlay, instead of sliding up as a rounded sheet. The
+           base .bottom-sheet-overlay's opacity/visibility toggle is neutralized here
+           (the overlay is always "present", just off-canvas) so only the panel's own
            transform animates — an opacity fade running underneath a transform slide at
            the same time reads as a flicker, not a clean single motion. */
         @media (max-width: 767px) {
-            #user-info-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -434,10 +435,10 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #user-info-sheet-overlay.active {
+            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active {
                 pointer-events: auto;
             }
-            #user-info-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -453,10 +454,10 @@
                 flex-direction: column;
                 overflow-y: auto;
             }
-            #user-info-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -493,23 +494,43 @@
 
         .tm-profile-media-section { border-top: 1px solid var(--border-color); padding-top: 18px; margin-top: 18px; }
 
+        /* Editable variants of the tm-profile-* text styles, used on the "Profile" (own)
+           panel where Contact Info shows static text — same font metrics as their
+           read-only counterparts so the two panels line up visually, just transparent/
+           borderless until focused (reserved-space bottom border avoids a layout shift
+           on focus). */
+        .tm-profile-name-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 24px; font-weight: 800; letter-spacing: -0.3px; padding: 0; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease; }
+        .tm-profile-name-input:focus { border-bottom-color: var(--primary-blue); }
+        .tm-profile-name-input::placeholder { color: var(--text-secondary); font-weight: 700; }
+        .tm-profile-bio-input { display: block; width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; line-height: 1.5; padding: 0; margin: 0 0 6px; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease; }
+        .tm-profile-bio-input:focus { border-bottom-color: var(--primary-blue); }
+        .tm-profile-bio-input::placeholder { color: var(--text-secondary); }
+        .tm-profile-link-input { display: block; width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; padding: 0; margin-bottom: 14px; opacity: 0.75; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease, opacity 0.2s ease; }
+        .tm-profile-link-input:focus { border-bottom-color: var(--primary-blue); opacity: 1; }
+        .tm-profile-link-input::placeholder { color: var(--text-secondary); opacity: 1; }
+
+        /* Own-profile avatar sits in the same spot as Contact Info's tm-profile-avatar,
+           but keeps the upload/camera-badge behavior of .sheet-avatar-upload — this just
+           resizes it down from the 96px settings-sheet default to match. */
+        .tm-profile-top .sheet-avatar-upload { width: 92px; height: 92px; margin: 0; flex-shrink: 0; }
+        .tm-profile-top .sheet-avatar-upload .avatar-circle { width: 92px; height: 92px; border: 1.5px solid var(--nav-active-black); box-shadow: none; }
+
         /* ── PROFILE VIEW AS SIDEBAR (tablet & desktop) ──
-           On screens wide enough for the app's list/chat panes (≥768px),
-           the "Contact Info" / profile-view sheet docks to the right edge
-           as a fixed-width panel — X/WhatsApp-Web style — instead of
-           sliding up as a centered bottom sheet like it does on phones.
-           The dark blurred backdrop is dropped so the chat stays visible
-           and usable underneath; clicking outside the panel still closes
-           it via the existing generic overlay click handler. */
+           On screens wide enough for the app's list/chat panes (≥768px), both the
+           "Contact Info" panel and the "Profile" panel dock to the right edge as a
+           fixed-width panel — X/WhatsApp-Web style — instead of sliding up as a
+           centered bottom sheet like it does on phones. The dark blurred backdrop is
+           dropped so the chat stays visible and usable underneath; clicking outside the
+           panel still closes it via the existing generic overlay click handler. */
         @media (min-width: 768px) {
-            #user-info-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay {
                 align-items: stretch;
                 justify-content: flex-end;
                 background: rgba(0, 0, 0, 0.08);
                 backdrop-filter: none;
                 -webkit-backdrop-filter: none;
             }
-            #user-info-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet {
                 width: 400px;
                 max-width: 400px;
                 height: 100%;
@@ -522,10 +543,10 @@
                 transition: transform 0.35s var(--ease-smooth);
                 padding: 20px 24px 32px;
             }
-            #user-info-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -2933,65 +2954,53 @@
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
 
-            <div class="wa-sheet-header">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" id="btn-close-profile" class="wa-header-icon-btn" aria-label="Close">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <button type="button" id="btn-open-settings" class="wa-header-icon-btn" aria-label="Settings">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
-                </div>
-                <div class="wa-header-title">Profile</div>
-                <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
-            </div>
-
             <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
                 <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
                 <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
             </div>
             <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
 
-            <div class="wa-avatar-block wa-avatar-block-overlap">
-                <div class="sheet-avatar-upload" id="sheet-avatar-upload">
-                    <div class="avatar-circle" id="profile-avatar-preview"></div>
-                    <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
-                    <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
-                </div>
-                <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
-            </div>
-
-            <p id="my-profile-follow-stats" style="text-align:center; font-size:13px; color:var(--text-secondary); margin:-8px 0 18px;"><span id="my-profile-following-count" style="font-weight:700; color:var(--text-primary); font-size:14px;">0</span> Following &nbsp;·&nbsp; <span id="my-profile-followers-count" style="font-weight:700; color:var(--text-primary); font-size:14px;">0</span> Followers</p>
-
-            <div class="wa-field-group">
-                <div class="wa-field-row">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <div class="wa-field-body">
-                        <span class="wa-field-label">Name</span>
-                        <input type="text" id="profile-name" class="wa-field-input" placeholder="Your display name" autocomplete="off">
-                    </div>
-                </div>
-                <div class="wa-field-row">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    <div class="wa-field-body">
-                        <span class="wa-field-label">About</span>
-                        <input type="text" id="profile-about" class="wa-field-input" maxlength="80" placeholder="Hey there! I'm using Xoxa" autocomplete="off">
-                    </div>
-                </div>
-                <div class="wa-field-row">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                    <div class="wa-field-body">
-                        <span class="wa-field-label">Website</span>
-                        <input type="text" id="profile-website" class="wa-field-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
-                    </div>
+            <div class="tm-profile-header">
+                <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                    <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
                 </div>
             </div>
 
-            <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
-                <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
-                <div class="profile-suggested-scroll" id="profile-suggested-scroll"></div>
-            </div>
+            <div class="tm-profile-content">
+                <div class="tm-profile-top">
+                    <div class="tm-profile-id">
+                        <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
+                    </div>
+                    <div class="sheet-avatar-upload" id="sheet-avatar-upload">
+                        <div class="avatar-circle" id="profile-avatar-preview"></div>
+                        <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                        <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+                    </div>
+                    <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                </div>
 
+                <input type="text" id="profile-about" class="tm-profile-bio-input" maxlength="80" placeholder="Hey there! I'm using Xoxa" autocomplete="off">
+
+                <input type="text" id="profile-website" class="tm-profile-link-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
+
+                <p id="my-profile-follow-stats" class="tm-profile-stats"><b id="my-profile-followers-count">0</b> followers &nbsp;·&nbsp; <b id="my-profile-following-count">0</b> following</p>
+
+                <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
+                    <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
+                    <div class="profile-suggested-scroll" id="profile-suggested-scroll"></div>
+                </div>
+
+                <div class="wa-profile-media-section tm-profile-media-section" id="my-profile-media-section">
+                    <div class="wa-profile-media-title">Media</div>
+                    <div class="profile-media-grid" id="my-profile-media-grid"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -11217,6 +11226,7 @@
                 refreshTrialBadgeUI(myProfile);
 
                 renderProfileSuggestedFriends();
+                buildProfileMediaGrid(document.getElementById('my-profile-media-grid'), user.uid);
                 profileSheetOverlay.classList.add('active');
             }
         }

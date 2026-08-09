@@ -3186,7 +3186,16 @@
                     </div>
                     <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
+                <div class="wa-list-row wa-row-clickable" id="setting-refresh-app">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Check Updates</span>
+                        <span class="wa-row-sub">Clear cached files and reload the latest version</span>
+                    </div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
             </div>
+
 
             <div class="wa-section">
                 <div class="wa-section-title">Privacy</div>
@@ -3537,7 +3546,7 @@
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-chats">
                                         <button type="button" class="chats-menu-item" id="header-menu-refresh-chats">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                            <span>Refresh App</span>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
                                 </div>
@@ -3608,7 +3617,7 @@
                                     <div class="chat-view-menu-dropdown" id="home-header-menu-dropdown">
                                         <button type="button" class="chats-menu-item" id="home-header-menu-refresh">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                            <span>Refresh App</span>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
                                 </div>
@@ -3668,7 +3677,7 @@
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-groups">
                                         <button type="button" class="chats-menu-item" id="header-menu-refresh-groups">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                            <span>Refresh App</span>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
                                 </div>
@@ -3717,7 +3726,7 @@
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-calls">
                                         <button type="button" class="chats-menu-item" id="header-menu-refresh-calls">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                            <span>Refresh App</span>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
                                 </div>
@@ -3758,7 +3767,7 @@
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-contacts">
                                         <button type="button" class="chats-menu-item" id="header-menu-refresh-contacts">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                            <span>Refresh App</span>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
                                 </div>
@@ -6188,10 +6197,21 @@
             });
         })();
 
-        // --- Header three-dot menu on every tab (currently just "Refresh App", same pattern
+        // --- Header three-dot menu on every tab (currently just "Check Updates", same pattern
         // as the chat view's three-dot menu below). Each tab has its own button/dropdown ids
         // since they all render at once in the DOM, so this is one reusable setup function
         // called once per tab instead of duplicating the listener logic five times. ---
+        async function confirmAndRefreshApp() {
+            const confirmed = await showCustomModal(
+                "Check Updates",
+                "This clears all cached files and reloads the app so you get the latest version. Your chats and account stay safe on the server.",
+                true
+            );
+            if (!confirmed) return;
+            notify("Refreshing app...");
+            clearAllCachesAndReload();
+        }
+        document.getElementById('setting-refresh-app').addEventListener('click', confirmAndRefreshApp);
         function setupHeaderMenu(btnId, dropdownId, refreshId) {
             const menuBtn = document.getElementById(btnId);
             const dropdown = document.getElementById(dropdownId);
@@ -6212,14 +6232,7 @@
 
             refreshBtn.addEventListener('click', async () => {
                 closeMenu();
-                const confirmed = await showCustomModal(
-                    "Refresh App",
-                    "This clears all cached files and reloads the app so you get the latest version. Your chats and account stay safe on the server.",
-                    true
-                );
-                if (!confirmed) return;
-                notify("Refreshing app...");
-                clearAllCachesAndReload();
+                confirmAndRefreshApp();
             });
         }
         setupHeaderMenu('btn-header-menu', 'home-header-menu-dropdown', 'home-header-menu-refresh');

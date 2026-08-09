@@ -458,6 +458,10 @@
         .feed-composer-charcount { text-align: right; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-top: 4px; }
         .feed-composer-charcount.warn { color: #FF9F0A; }
         .feed-composer-charcount.limit { color: var(--danger-red); }
+        .feed-composer-audience { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px 50px; padding: 5px 12px; border-radius: var(--radius-pill); background: var(--bg-input); font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; width: max-content; transition: background 0.15s ease, color 0.15s ease; }
+        .feed-composer-audience:hover { background: var(--bg-alt); }
+        .feed-composer-audience svg { flex-shrink: 0; }
+        .feed-composer-audience.followers-only { color: var(--primary-blue); background: rgba(var(--primary-rgb), 0.1); }
         .feed-composer-preview { position: relative; margin-top: 10px; }
         .feed-composer-preview-main { position: relative; border-radius: 14px; overflow: hidden; background: #000; height: min(58vh, 480px); display: flex; align-items: center; justify-content: center; }
         .feed-composer-preview-main img,
@@ -2496,6 +2500,11 @@
                     <div class="mention-autocomplete-dropdown" id="feed-composer-mention-dropdown"></div>
                 </div>
                 <div class="feed-composer-charcount" id="feed-composer-charcount" style="display:none;"></div>
+                <div class="feed-composer-audience" id="feed-composer-audience-btn" title="Who can see this post?">
+                    <svg class="feed-composer-audience-icon" id="feed-composer-audience-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    <span id="feed-composer-audience-label">Everyone</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
                 <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
                 <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
                     <div class="feed-composer-preview-main" id="feed-composer-preview-main">
@@ -6916,6 +6925,16 @@
         let feedComposerVideo = null; // { url } or null, mutually exclusive with images
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
+        let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
+        // A 'followers'-only post is visible to its author and to anyone who follows them
+        // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
+        function canViewPost(post) {
+            if (!post || post.visibility !== 'followers') return true;
+            const user = auth.currentUser;
+            if (!user) return false;
+            if (post.uid === user.uid) return true;
+            return !!(post.uid && cachedContacts[post.uid]);
+        }
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
         let postCommentsUnsub = null;
@@ -7979,6 +7998,7 @@
                         if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                             oldestLoadedPostTimestamp = post.timestamp;
                         }
+                        if (!canViewPost(post)) return;
                         if (cachedPosts[postId]) return;
                         cachedPosts[postId] = post;
                         if (list) list.appendChild(buildFeedPostCard(postId, post));
@@ -8093,6 +8113,10 @@
                 if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                     oldestLoadedPostTimestamp = post.timestamp;
                 }
+
+                // Followers-only posts from people the viewer doesn't follow (and isn't the
+                // author of) never enter the feed at all — not cached, not queued, not shown.
+                if (!canViewPost(post)) return;
 
                 if (feedInitialBurstActive) {
                     bumpFeedBurstQuiet();
@@ -8219,6 +8243,9 @@
             const previewRemove = document.getElementById('feed-composer-preview-remove');
             const thumbStrip = document.getElementById('feed-composer-thumb-strip');
             const musicBtn = document.getElementById('feed-composer-music-btn');
+            const audienceBtn = document.getElementById('feed-composer-audience-btn');
+            const audienceIcon = document.getElementById('feed-composer-audience-icon');
+            const audienceLabel = document.getElementById('feed-composer-audience-label');
             const musicBtnText = document.getElementById('feed-composer-music-btn-text');
             const musicClearBtn = document.getElementById('feed-composer-music-clear');
             const attachLabel = document.querySelector('label.feed-composer-attach[for="feed-composer-file"]');
@@ -8542,6 +8569,23 @@
                 updateComposerMusicChip();
             });
 
+            const AUDIENCE_ICONS = {
+                everyone: '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>',
+                followers: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>'
+            };
+            function updateComposerAudienceUI() {
+                const isFollowers = feedComposerVisibility === 'followers';
+                audienceIcon.innerHTML = AUDIENCE_ICONS[isFollowers ? 'followers' : 'everyone'];
+                audienceLabel.textContent = isFollowers ? 'Followers' : 'Everyone';
+                audienceBtn.classList.toggle('followers-only', isFollowers);
+                audienceBtn.title = isFollowers ? 'Only your followers can see this post' : 'Anyone can see this post';
+            }
+            audienceBtn.addEventListener('click', () => {
+                feedComposerVisibility = feedComposerVisibility === 'followers' ? 'everyone' : 'followers';
+                updateComposerAudienceUI();
+            });
+            updateComposerAudienceUI();
+
             submitBtn.addEventListener('click', async () => {
                 const text = input.value.trim();
                 if (text.length > FEED_POST_MAX_CHARS) {
@@ -8581,6 +8625,7 @@
                         music: ((feedComposerImages.length || feedComposerVideo) && feedComposerMusic) ? feedComposerMusic : null,
                         poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         mentions: mentionedUids.size ? mentionsMap : null,
+                        visibility: feedComposerVisibility === 'followers' ? 'followers' : 'everyone',
                         timestamp: serverTimestamp(),
                         likeCount: 0,
                         commentCount: 0
@@ -8590,6 +8635,8 @@
                     });
                     composerTaggedUids = new Set();
                     updateComposerTagsUI();
+                    feedComposerVisibility = 'everyone';
+                    updateComposerAudienceUI();
                     input.value = '';
                     input.style.height = 'auto';
                     updateCharCount();

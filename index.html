@@ -5594,38 +5594,61 @@
         // The major overlays (chat, story, image/video/reel viewer, user-info, status, post-composer)
         // are wired into the URL hash system above and already close on the device back button via
         // handleHashChange(). The many smaller `.bottom-sheet-overlay` sheets (options menus, pickers,
-        // comments, settings, etc.) are opened/closed by simply toggling their 'active' class from
-        // dozens of scattered call sites, with no history entry — so on a phone, pressing the device
-        // back button while one is open skipped straight past it (closing/backgrounding the app instead
-        // of just closing the sheet). Rather than rewire every individual call site, track class
-        // changes generically: push one history entry per sheet that opens, and let the back button
-        // consume it by closing whichever sheet is currently on top.
-        const sheetOpenStack = [];
-        let closingSheetViaBackButton = false;
-        document.querySelectorAll('.bottom-sheet-overlay').forEach(overlay => {
+        // comments, settings, story caption/music, etc.) are opened/closed by simply toggling their
+        // 'active' class from dozens of scattered call sites, with no history entry — so on a phone,
+        // pressing the device back button while one is open skipped straight past it (closing/
+        // backgrounding the app instead of just closing the sheet). Rather than rewire every
+        // individual call site, track class changes generically and reconcile against the history
+        // stack in a microtask batch (not immediately per-mutation): several multi-step flows close
+        // one sheet and open the next synchronously in the same click handler (e.g. story upload's
+        // Next/Skip buttons going caption → music), and reacting to each class change immediately
+        // would race a queued history.back() from the close against the pushState from the very next
+        // open — closing the sheet that was just opened. Batching lets same-tick close+open pairs
+        // net out to a single replaceState instead.
+        const sheetTrackedOverlays = Array.from(document.querySelectorAll('.bottom-sheet-overlay'))
             // user-info-sheet-overlay already manages its own history entry via the hash system
             // above (see 'user-info' handling in handleHashChange) — don't double-track it here.
-            if (overlay.id === 'user-info-sheet-overlay') return;
-            new MutationObserver(() => {
-                const isActive = overlay.classList.contains('active');
-                const idx = sheetOpenStack.indexOf(overlay.id);
-                if (isActive && idx === -1) {
-                    sheetOpenStack.push(overlay.id);
-                    history.pushState({ sheetNav: overlay.id }, '', location.href);
-                } else if (!isActive && idx !== -1) {
-                    sheetOpenStack.splice(idx, 1);
-                    // Closed via an in-app control (X button, backdrop tap, etc.) rather than the
-                    // device back button — consume the history entry pushed on open so it doesn't
-                    // leave an inert extra back-step behind for the user to hit later.
-                    if (!closingSheetViaBackButton) history.back();
-                }
-            }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+            .filter(overlay => overlay.id !== 'user-info-sheet-overlay');
+        const sheetOpenStack = [];
+        let closingSheetViaBackButton = false;
+        let sheetSyncScheduled = false;
+        function scheduleSheetHistorySync() {
+            if (sheetSyncScheduled) return;
+            sheetSyncScheduled = true;
+            Promise.resolve().then(() => {
+                sheetSyncScheduled = false;
+                syncSheetHistory();
+            });
+        }
+        function syncSheetHistory() {
+            const activeIds = sheetTrackedOverlays.filter(o => o.classList.contains('active')).map(o => o.id);
+            const opened = activeIds.filter(id => !sheetOpenStack.includes(id));
+            const closed = sheetOpenStack.filter(id => !activeIds.includes(id));
+            if (!opened.length && !closed.length) return;
+            closed.forEach(id => { const i = sheetOpenStack.indexOf(id); if (i !== -1) sheetOpenStack.splice(i, 1); });
+            opened.forEach(id => sheetOpenStack.push(id));
+            if (closingSheetViaBackButton) return; // browser already moved the history pointer for us
+            if (opened.length && closed.length) {
+                history.replaceState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
+            } else if (opened.length) {
+                history.pushState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
+            } else {
+                history.back();
+            }
+        }
+        sheetTrackedOverlays.forEach(overlay => {
+            new MutationObserver(scheduleSheetHistorySync)
+                .observe(overlay, { attributes: true, attributeFilter: ['class'] });
         });
         window.addEventListener('popstate', () => {
             if (!sheetOpenStack.length) return;
             closingSheetViaBackButton = true;
             const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
             if (overlay) overlay.classList.remove('active');
+            // Flush synchronously (rather than waiting for the microtask) so the flag is still
+            // true when syncSheetHistory reconciles this particular change.
+            sheetSyncScheduled = false;
+            syncSheetHistory();
             closingSheetViaBackButton = false;
         });
 

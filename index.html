@@ -2950,6 +2950,13 @@
                         <span id="user-info-about" style="font-size:15px; font-weight:500; color:var(--text-primary);">—</span>
                     </div>
                 </div>
+                <div class="wa-field-row" id="user-info-joined-row" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <div class="wa-field-body">
+                        <span class="wa-field-label">Joined</span>
+                        <span id="user-info-joined" style="font-size:15px; font-weight:500; color:var(--text-primary);">—</span>
+                    </div>
+                </div>
             </div>
 
             <div style="display:flex; gap:10px; margin-top:4px; margin-bottom:22px;">
@@ -5495,6 +5502,13 @@
             if (diffDays > 1 && diffDays < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
             const sameYear = d.getFullYear() === now.getFullYear();
             return d.toLocaleDateString(undefined, sameYear ? { month: 'long', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+
+        // "Joined <Month Year>" label for the profile sheet — coarser than the chat
+        // date separators above since only the month/year is meaningful here.
+        function formatJoinedDate(timestamp) {
+            if (!timestamp) return '';
+            return new Date(timestamp).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
         }
 
         function buildDateSeparator(timestamp) {
@@ -12369,6 +12383,11 @@
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
+            const joinedRow = document.getElementById('user-info-joined-row');
+            const joinedLabel = formatJoinedDate(profile.createdAt);
+            if (joinedRow) joinedRow.style.display = joinedLabel ? 'flex' : 'none';
+            const joinedEl = document.getElementById('user-info-joined');
+            if (joinedEl) joinedEl.textContent = joinedLabel;
             const websiteEl = document.getElementById('user-info-website');
             const websiteInfo = normalizeProfileWebsite(profile.website);
             if (websiteEl) {
@@ -14973,7 +14992,12 @@
                     photoURL: user.photoURL || existingProfileData.photoURL || DEFAULT_AVATAR_URL,
                     email: user.email || "",
                     phoneNumber: user.phoneNumber || "",
-                    about: existingProfileData.about || DEFAULT_ABOUT
+                    about: existingProfileData.about || DEFAULT_ABOUT,
+                    // Set once on first login and never touched again, so it reflects when
+                    // the account was actually created rather than the most recent login.
+                    // Falls back to the Firebase Auth account creation time when available,
+                    // so accounts created before this field existed still show something sane.
+                    createdAt: existingProfileData.createdAt || (user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : Date.now())
                 });
 
                 try {

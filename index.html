@@ -2108,6 +2108,9 @@
            media grid. syncSheetAboveViewer() adds this class in that case so the sheet still ends
            up on top instead of rendering behind the still-visible viewer. */
         #post-comments-sheet-overlay.above-viewer, #post-options-sheet-overlay.above-viewer { z-index: 100013; }
+        /* GIF picker can itself be opened from inside the Comments sheet (comment target),
+           which may already be sitting in the .above-viewer tier above — same fix, one tier up. */
+        #gif-picker-sheet-overlay.above-viewer { z-index: 100014; }
         #video-viewer-overlay video { width: 100%; height: 100%; object-fit: contain; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
@@ -10134,14 +10137,19 @@
 
         function openGifPickerSheet(target = 'comment') {
             gifPickerTarget = target;
-            document.getElementById('gif-picker-sheet-overlay').classList.add('active');
+            const gifOverlay = document.getElementById('gif-picker-sheet-overlay');
+            // Only the 'comment' target is launched from a sheet that can itself be elevated
+            // (see syncSheetAboveViewer) — other targets (post/chat/group composers) never are.
+            const commentsElevated = target === 'comment' && document.getElementById('post-comments-sheet-overlay').classList.contains('above-viewer');
+            gifOverlay.classList.toggle('above-viewer', commentsElevated);
+            gifOverlay.classList.add('active');
             document.getElementById('gif-picker-search').value = '';
             document.getElementById('gif-picker-empty').textContent = 'No GIFs found.';
             loadGifResults('');
         }
 
         function closeGifPickerSheet() {
-            document.getElementById('gif-picker-sheet-overlay').classList.remove('active');
+            document.getElementById('gif-picker-sheet-overlay').classList.remove('active', 'above-viewer');
         }
 
         function selectCommentGif(url, previewUrl) {

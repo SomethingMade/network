@@ -1250,7 +1250,8 @@
         @media (max-width: 768px) { .auth-card-brand { display: flex; } }
 
         /* ── MAIN MESSENGER APP (3-Pane Grid) ── */
-        #messenger-screen { display: none; height: 100vh; width: 100vw; background: var(--bg-base); }
+        #messenger-screen { display: none; height: 100vh; width: 100%; background: var(--bg-base); }
+        #app-shell { position: relative; height: 100vh; width: 100%; }
         .app-grid { display: grid; grid-template-columns: 88px 380px 1fr; height: 100%; width: 100%; }
 
         /* Left Pane: Sidebar Nav */
@@ -2231,7 +2232,32 @@
         .status-upload-action-btn .spinner-sm { width: 18px; height: 18px; border-width: 2px; }
 
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
-        @media (max-width: 1024px) { .app-grid { grid-template-columns: 88px 1fr; } .workspace-pane { display: none; } .chat-view-overlay { left: 88px; border-left: none; } }
+        @media (max-width: 1024px) {
+            .app-grid { grid-template-columns: 88px 1fr; }
+            .workspace-pane { display: none; }
+            .chat-view-overlay { left: 88px; border-left: none; }
+            /* Without a workspace pane, the list column would otherwise stretch edge to
+               edge on a tablet; cap it to a comfortable reading width and center it so
+               it doesn't feel like a single overstretched list. */
+            .chat-pane { max-width: 480px; width: 100%; justify-self: center; border-right: none; }
+        }
+        /* ── WIDE-SCREEN TUNING (tablets landscape and up): keep message content from
+           ballooning edge-to-edge as the viewport widens ── */
+        @media (min-width: 900px) {
+            .chat-view-messages { padding: 24px clamp(24px, 9vw, 170px); }
+            .msg-bubble { max-width: min(68%, 560px); }
+        }
+        /* ── ULTRA-WIDE DESKTOP: float the whole 3-pane app as a centered, capped-width
+           card instead of letting it stretch across very large monitors ── */
+        @media (min-width: 1440px) {
+            #app-shell {
+                max-width: 1600px;
+                margin: 0 auto;
+                transform: translateZ(0);
+                box-shadow: 0 0 0 1px var(--border-color), var(--shadow-elevated);
+            }
+            body:not(.glass-theme) { background-color: var(--bg-alt); }
+        }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
             .side-nav {
@@ -3587,6 +3613,7 @@
         </div>
     </div>
 
+    <div id="app-shell">
     <div id="messenger-screen">
         <div class="app-grid">
             
@@ -4020,6 +4047,7 @@
         
         <div id="chat-blocked-banner">You blocked this contact. Tap to unblock.</div>
         <div id="group-post-restricted-banner" style="display:none; padding:16px; text-align:center; background: var(--bg-hover); color: var(--text-secondary); font-size: 13px; border-top: 1px solid var(--border-color);">Only the group owner can post here</div>
+    </div>
     </div>
 
     <div id="call-overlay">

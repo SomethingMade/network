@@ -795,6 +795,12 @@
         .profile-media-grid-item .profile-media-pin-badge { position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item:active { opacity: 0.85; }
         .profile-media-empty { grid-column: 1 / -1; text-align: center; font-size: 13.5px; color: var(--text-secondary); padding: 22px 0; }
+        /* ── PROFILE SUBTABS (Posts / Media switcher above the section) ── */
+        .profile-subtabs { display: flex; gap: 8px; margin: 4px 0 14px; }
+        .profile-subtab-btn { flex: 1; text-align: center; padding: 9px 0; border-radius: var(--radius-pill); border: 1.5px solid var(--border-color); background: none; color: var(--text-secondary); font-size: 13.5px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .profile-subtab-btn.active { background: var(--gradient-brand); color: #fff; border-color: transparent; }
+        .profile-posts-list .feed-post-card { padding-left: 0; padding-right: 0; }
+        .profile-posts-empty { text-align: center; font-size: 13.5px; color: var(--text-secondary); padding: 30px 0; }
         .feed-composer-thumb-strip { display: flex; gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 2px; }
         .feed-composer-thumb { position: relative; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; flex-shrink: 0; cursor: pointer; border: 2px solid transparent; opacity: 0.65; transition: opacity 0.15s ease, border-color 0.15s ease; }
         .feed-composer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3174,8 +3180,12 @@
                 </div>
 
                 <div class="wa-profile-media-section tm-profile-media-section" id="my-profile-media-section">
-                    <div class="wa-profile-media-title">Media</div>
-                    <div class="profile-media-grid" id="my-profile-media-grid"></div>
+                    <div class="profile-subtabs" id="my-profile-subtabs">
+                        <button type="button" class="profile-subtab-btn active" data-subtab="posts">Posts</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="media">Media</button>
+                    </div>
+                    <div class="profile-posts-list" id="my-profile-posts-list"></div>
+                    <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
                 </div>
             </div>
         </div>
@@ -3241,8 +3251,12 @@
                 </div>
 
                 <div class="wa-profile-media-section tm-profile-media-section" id="user-info-media-section">
-                    <div class="wa-profile-media-title">Media</div>
-                    <div class="profile-media-grid" id="user-info-media-grid"></div>
+                    <div class="profile-subtabs" id="user-info-subtabs">
+                        <button type="button" class="profile-subtab-btn active" data-subtab="posts">Posts</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="media">Media</button>
+                    </div>
+                    <div class="profile-posts-list" id="user-info-posts-list"></div>
+                    <div class="profile-media-grid" id="user-info-media-grid" style="display:none;"></div>
                 </div>
             </div>
         </div>
@@ -9357,7 +9371,9 @@
                     if (cachedUsers[user.uid]) cachedUsers[user.uid].pinnedPostId = newPinnedId;
                     notify(isPinned ? 'Unpinned from profile' : 'Pinned to profile');
                     // Harmless if the profile sheet isn't currently open — just keeps its grid
-                    // fresh for next time, same as the live-profile listeners elsewhere do.
+                    // (and posts list) fresh for next time, same as the live-profile listeners
+                    // elsewhere do.
+                    buildProfilePostsList(document.getElementById('user-info-posts-list'), user.uid);
                     buildProfileMediaGrid(document.getElementById('user-info-media-grid'), user.uid);
                 } catch (e) {
                     notify('Failed to update pin', 'error');
@@ -11798,7 +11814,9 @@
                 refreshTrialBadgeUI(myProfile);
 
                 renderProfileSuggestedFriends();
+                buildProfilePostsList(document.getElementById('my-profile-posts-list'), user.uid);
                 buildProfileMediaGrid(document.getElementById('my-profile-media-grid'), user.uid);
+                initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid');
                 profileSheetOverlay.classList.add('active');
             }
         }
@@ -13131,6 +13149,53 @@
         // media in them wasn't uploaded by this user. Tapping an image opens the full-screen
         // viewer with the rest of the grid's images as a swipeable gallery; tapping a video
         // opens the video viewer.
+        // Wires up the Posts/Media segmented control above a profile's media section. Toggling
+        // just swaps which of the two pre-built containers is visible — both are already
+        // populated by buildProfilePostsList/buildProfileMediaGrid whenever the sheet opens, so
+        // switching tabs is instant with no extra fetch. Idempotent (safe to call every open).
+        function initProfileSubtabs(subtabsId, postsListId, mediaGridId) {
+            const wrap = document.getElementById(subtabsId);
+            if (!wrap || wrap.dataset.bound) return;
+            wrap.dataset.bound = 'true';
+            wrap.querySelectorAll('.profile-subtab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (btn.classList.contains('active')) return;
+                    wrap.querySelectorAll('.profile-subtab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const showPosts = btn.dataset.subtab === 'posts';
+                    const postsList = document.getElementById(postsListId);
+                    const mediaGrid = document.getElementById(mediaGridId);
+                    if (postsList) postsList.style.display = showPosts ? '' : 'none';
+                    if (mediaGrid) mediaGrid.style.display = showPosts ? 'none' : '';
+                });
+            });
+        }
+
+        // Renders the full "Posts" tab of a profile — every post by this user (text-only posts
+        // included, unlike the media-only grid), using the same interactive card as the main
+        // feed. Pinned post leads, everything else newest-first.
+        function buildProfilePostsList(listEl, uid) {
+            if (!listEl) return;
+            if (!uid) { listEl.innerHTML = ''; return; }
+
+            const pinnedId = (cachedUsers[uid] && cachedUsers[uid].pinnedPostId) || null;
+            const items = Object.keys(cachedPosts)
+                .map(postId => [postId, cachedPosts[postId]])
+                .filter(([, post]) => post && post.uid === uid)
+                .sort((a, b) => {
+                    if (pinnedId && a[0] === pinnedId) return -1;
+                    if (pinnedId && b[0] === pinnedId) return 1;
+                    return (b[1].timestamp || 0) - (a[1].timestamp || 0);
+                });
+
+            listEl.innerHTML = '';
+            if (!items.length) {
+                listEl.innerHTML = '<div class="profile-posts-empty">No posts yet.</div>';
+                return;
+            }
+            items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
+        }
+
         function buildProfileMediaGrid(gridEl, uid) {
             if (!gridEl) return;
             if (!uid) { gridEl.innerHTML = ''; return; }
@@ -13239,7 +13304,9 @@
                 followBtn.style.display = isMe ? 'none' : 'flex';
                 updateUserInfoFollowButton(uid);
             }
+            buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
             buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
+            initProfileSubtabs('user-info-subtabs', 'user-info-posts-list', 'user-info-media-grid');
             userInfoSheet.classList.add('active');
             if (window.location.hash !== '#user-info') window.location.hash = 'user-info';
         }

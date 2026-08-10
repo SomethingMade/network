@@ -2298,7 +2298,9 @@
                 z-index: 100;
                 box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
                 background: var(--bg-surface) !important;
+                transition: transform 0.25s ease;
             }
+            .side-nav.nav-scroll-hidden { transform: translateY(100%); }
             /* Reels has its own bottom-nav icon (unlike the other full-screen viewers —
                stories, status, images — which open contextually), so it should read as a
                tab you stay inside: keep the bar visible above the reel content instead of
@@ -6079,6 +6081,9 @@
                     fabNewPost.style.display = (hash === 'tab-status') ? 'flex' : 'none';
                     fabNewPost.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
                 }
+
+                const sideNavEl = document.querySelector('.side-nav');
+                if (sideNavEl) sideNavEl.classList.remove('nav-scroll-hidden'); // always start visible on tab entry
 
                 if (hash === 'tab-status') {
                     renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
@@ -12095,6 +12100,32 @@
                 }
                 lastScrollTop = current;
             }, { passive: true });
+        })();
+
+        // --- Hide the bottom nav bar while scrolling down any tab's main list, same pattern
+        // as the "New Post" FAB above. Each tab has its own scroll container, so wire each
+        // one up independently but toggle the same shared nav element. ---
+        (function initNavScrollHide() {
+            const nav = document.querySelector('.side-nav');
+            if (!nav) return;
+            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'calls-list-container', 'contacts-list-container'];
+            const THRESHOLD = 6; // ignore tiny scroll jitter
+            scrollIds.forEach(id => {
+                const scrollEl = document.getElementById(id);
+                if (!scrollEl) return;
+                let lastScrollTop = scrollEl.scrollTop; // match actual position, not an assumed 0
+                scrollEl.addEventListener('scroll', () => {
+                    const current = scrollEl.scrollTop;
+                    const delta = current - lastScrollTop;
+                    if (Math.abs(delta) < THRESHOLD) return;
+                    if (delta > 0 && current > 40) {
+                        nav.classList.add('nav-scroll-hidden'); // scrolling down
+                    } else {
+                        nav.classList.remove('nav-scroll-hidden'); // scrolling up
+                    }
+                    lastScrollTop = current;
+                }, { passive: true });
+            });
         })();
 
         // --- GROUPS ---

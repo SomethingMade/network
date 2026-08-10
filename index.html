@@ -2647,6 +2647,10 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
                             <span>Photo/Video</span>
                         </label>
+                        <label class="feed-composer-attach" for="feed-composer-camera" title="Camera">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                            <span>Camera</span>
+                        </label>
                         <button type="button" class="feed-composer-attach feed-composer-tag-btn" id="feed-composer-tag-btn" title="Tag People">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41L11 3.83A2 2 0 0 0 9.59 3.24L4 3a1 1 0 0 0-1 1l.24 5.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.82z"></path><circle cx="7.5" cy="7.5" r="1.25" fill="currentColor" stroke="none"></circle></svg>
                             <span id="feed-composer-tag-btn-text">Tag People</span>
@@ -2666,6 +2670,7 @@
                         </button>
                     </div>
                     <input type="file" id="feed-composer-file" accept="image/*,video/*" multiple style="display:none;">
+                    <input type="file" id="feed-composer-camera" accept="image/*,video/*" capture="environment" style="display:none;">
                 </div>
             </div>
         </div>
@@ -4095,6 +4100,12 @@
                     </div>
                     <span>Photos &amp; Videos</span>
                 </button>
+                <button type="button" class="attach-option" id="attach-option-camera">
+                    <div class="attach-icon-circle media">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    </div>
+                    <span>Camera</span>
+                </button>
                 <button type="button" class="attach-option" id="attach-option-document">
                     <div class="attach-icon-circle doc">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
@@ -4106,6 +4117,7 @@
     </div>
 
     <input type="file" id="chat-media-input" accept="image/*,video/*" multiple style="display:none;">
+    <input type="file" id="chat-camera-input" accept="image/*,video/*" capture="environment" style="display:none;">
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
 
     <div id="sticker-sheet-overlay" class="bottom-sheet-overlay">
@@ -4150,8 +4162,17 @@
                     <span class="wa-row-sub">Upload from your gallery</span>
                 </div>
             </div>
+            <div class="wa-list-row" id="story-type-camera-option" style="cursor:pointer;">
+                <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Camera</span>
+                    <span class="wa-row-sub">Take a new photo or video</span>
+                </div>
+            </div>
         </div>
     </div>
+
+    <input type="file" id="story-camera-input" accept="image/jpeg, image/png, image/webp, video/mp4" capture="environment" style="display:none;">
 
     <div id="e2e-backup-prompt-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="padding-bottom: 28px; text-align: center;">
@@ -8466,8 +8487,10 @@
                 refreshPollOptionRemoveButtons();
             }
 
+            const cameraLabel = document.querySelector('label.feed-composer-attach[for="feed-composer-camera"]');
             function setMediaControlsDisabled(disabled) {
                 if (attachLabel) attachLabel.classList.toggle('disabled', disabled);
+                if (cameraLabel) cameraLabel.classList.toggle('disabled', disabled);
                 if (gifBtn) gifBtn.classList.toggle('disabled', disabled);
             }
 
@@ -8688,6 +8711,20 @@
                     fileInput.value = '';
                     refreshSubmitState();
                 }
+            });
+
+            // Camera capture reuses the exact same upload/validation pipeline as the regular
+            // file picker above — it just hands its captured file to `fileInput` via a
+            // DataTransfer and re-fires 'change', instead of duplicating that whole handler.
+            const cameraInput = document.getElementById('feed-composer-camera');
+            cameraInput.addEventListener('change', () => {
+                const file = cameraInput.files && cameraInput.files[0];
+                cameraInput.value = '';
+                if (!file) return;
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                fileInput.dispatchEvent(new Event('change'));
             });
 
             previewRemove.addEventListener('click', () => {
@@ -13303,6 +13340,24 @@
         document.getElementById('story-type-media-option').addEventListener('click', () => {
             closeStoryTypeSheet();
             document.getElementById('story-file-input').click();
+        });
+        document.getElementById('story-type-camera-option').addEventListener('click', () => {
+            closeStoryTypeSheet();
+            document.getElementById('story-camera-input').click();
+        });
+        // Captured file is relayed into the existing story-file-input change handler via
+        // DataTransfer + re-dispatched 'change' — same pattern as the post composer's camera
+        // button — so it reuses that handler's upload/validation logic instead of duplicating it.
+        document.getElementById('story-camera-input').addEventListener('change', () => {
+            const camInput = document.getElementById('story-camera-input');
+            const file = camInput.files && camInput.files[0];
+            camInput.value = '';
+            if (!file) return;
+            const storyFileInput = document.getElementById('story-file-input');
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            storyFileInput.files = dt.files;
+            storyFileInput.dispatchEvent(new Event('change'));
         });
 
         function renderTextStorySwatches() {
@@ -18165,6 +18220,10 @@
             attachSheetOverlay.classList.remove('active');
             document.getElementById('chat-media-input').click();
         });
+        document.getElementById('attach-option-camera').addEventListener('click', () => {
+            attachSheetOverlay.classList.remove('active');
+            document.getElementById('chat-camera-input').click();
+        });
         document.getElementById('attach-option-document').addEventListener('click', () => {
             attachSheetOverlay.classList.remove('active');
             document.getElementById('chat-document-input').click();
@@ -18529,6 +18588,7 @@
         }
 
         document.getElementById('chat-media-input').addEventListener('change', (e) => handleAttachInputChange(e, 'media'));
+        document.getElementById('chat-camera-input').addEventListener('change', (e) => handleAttachInputChange(e, 'media'));
         document.getElementById('chat-document-input').addEventListener('change', (e) => handleAttachInputChange(e, 'document'));
 
         // --- VOICE NOTES ---

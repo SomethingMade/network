@@ -10566,12 +10566,21 @@
         // (100012 — see the tier comment above #image-viewer-overlay.active.above-sheet), a sheet
         // opened on top of it (Comments, Post Options) needs the matching .above-viewer tier
         // (100013) or it renders behind the still-visible viewer instead of on top of it.
+        //
+        // Same problem, different cause, when a post card is opened from inside the profile
+        // ("my profile") or "view user" bottom sheet: post-comments-sheet-overlay and
+        // post-options-sheet-overlay share the same base z-index (100010) as those profile
+        // sheets, but sit earlier in the DOM — so on a stacking tie the profile sheet (later
+        // in the DOM) paints on top and swallows clicks meant for Comments/Options. Bump to
+        // the same elevated tier whenever a profile sheet is open, regardless of the viewer.
         function syncSheetAboveViewer(sheetEl) {
             const imageViewer = document.getElementById('image-viewer-overlay');
             const videoViewer = document.getElementById('video-viewer-overlay');
             const viewerElevated = imageViewer.classList.contains('active') && imageViewer.classList.contains('above-sheet')
                 || videoViewer.classList.contains('active') && videoViewer.classList.contains('above-sheet');
-            sheetEl.classList.toggle('above-viewer', viewerElevated);
+            const profileSheetOpen = document.getElementById('profile-bottom-sheet-overlay').classList.contains('active')
+                || document.getElementById('user-info-sheet-overlay').classList.contains('active');
+            sheetEl.classList.toggle('above-viewer', viewerElevated || profileSheetOpen);
         }
         function openPostComments(postId) {
             activeCommentsPostId = postId;

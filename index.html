@@ -1043,6 +1043,22 @@
         .wa-insights-post-date { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .wa-insights-post-views { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
         .wa-insights-post-views svg { width: 14px; height: 14px; }
+        .wa-earnings-card { border-radius: 16px; padding: 16px; margin: 0 16px; }
+        .wa-earnings-card.locked { display: flex; gap: 12px; background: var(--bg-alt); }
+        .wa-earnings-lock-icon { width: 38px; height: 38px; border-radius: 50%; background: var(--bg-input); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .wa-earnings-lock-icon svg { width: 18px; height: 18px; }
+        .wa-earnings-lock-body { flex: 1; min-width: 0; }
+        .wa-earnings-lock-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+        .wa-earnings-lock-sub { font-size: 12.5px; color: var(--text-secondary); margin: 3px 0 10px; line-height: 1.4; }
+        .wa-earnings-progress-track { height: 6px; border-radius: 6px; background: var(--bg-input); overflow: hidden; }
+        .wa-earnings-progress-fill { height: 100%; background: var(--gradient-brand); border-radius: 6px; width: 0%; transition: width 0.3s ease; }
+        .wa-earnings-progress-label { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-top: 6px; }
+        .wa-earnings-card.unlocked { background: var(--gradient-brand); color: #fff; }
+        .wa-earnings-unlocked-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .wa-earnings-value { font-size: 26px; font-weight: 800; letter-spacing: -0.3px; }
+        .wa-earnings-tier-badge { font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,0.22); padding: 4px 10px; border-radius: 20px; flex-shrink: 0; }
+        .wa-earnings-sub { font-size: 12.5px; font-weight: 600; opacity: 0.9; margin-top: 4px; }
+        .wa-earnings-next-tier { font-size: 11.5px; opacity: 0.85; margin-top: 8px; }
         .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); gap: 12px; }
         .setting-item:last-child { border-bottom: none; }
         .setting-item span { font-size: 15px; font-weight: 500; color: var(--text-primary); }
@@ -3521,6 +3537,31 @@
                         <span class="wa-insights-card-value" id="insights-contacts-count">0</span>
                         <span class="wa-insights-card-label">Contacts</span>
                     </div>
+                </div>
+            </div>
+
+            <div class="wa-section" id="insights-earnings-section">
+                <div class="wa-section-title">Earnings</div>
+                <div id="insights-earnings-locked" class="wa-earnings-card locked" style="display:none;">
+                    <div class="wa-earnings-lock-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </div>
+                    <div class="wa-earnings-lock-body">
+                        <div class="wa-earnings-lock-title">Earnings locked</div>
+                        <div class="wa-earnings-lock-sub">Reach 100 followers to start earning from your post views</div>
+                        <div class="wa-earnings-progress-track">
+                            <div class="wa-earnings-progress-fill" id="insights-earnings-progress-fill"></div>
+                        </div>
+                        <div class="wa-earnings-progress-label" id="insights-earnings-progress-label">0/100 followers</div>
+                    </div>
+                </div>
+                <div id="insights-earnings-unlocked" class="wa-earnings-card unlocked" style="display:none;">
+                    <div class="wa-earnings-unlocked-top">
+                        <span class="wa-earnings-value" id="insights-earnings-amount">R0.00</span>
+                        <span class="wa-earnings-tier-badge" id="insights-earnings-tier-badge">Tier 1</span>
+                    </div>
+                    <div class="wa-earnings-sub" id="insights-earnings-rate-label">R0.00 per 1,000 views</div>
+                    <div class="wa-earnings-next-tier" id="insights-earnings-next-tier"></div>
                 </div>
             </div>
 
@@ -12097,6 +12138,50 @@
             if (e.target === insightsSheetOverlay) insightsSheetOverlay.classList.remove('active');
         });
 
+        // Follower-gated earnings: locked below 100 followers, then a tiered rate per
+        // 1,000 post impressions once unlocked (higher follower counts unlock better
+        // rates). Purely a display of estimated earnings for now — no payout flow yet.
+        const EARNINGS_TIERS = [
+            { minFollowers: 100, rate: 5, label: 'Tier 1' },
+            { minFollowers: 1000, rate: 10, label: 'Tier 2' },
+            { minFollowers: 10000, rate: 15, label: 'Tier 3' },
+            { minFollowers: 50000, rate: 25, label: 'Tier 4' }
+        ];
+        function getEarningsTier(followerCount) {
+            let current = null;
+            for (const tier of EARNINGS_TIERS) {
+                if (followerCount >= tier.minFollowers) current = tier;
+            }
+            return current;
+        }
+        function renderInsightsEarnings(followerCount, totalImpressions) {
+            const lockedEl = document.getElementById('insights-earnings-locked');
+            const unlockedEl = document.getElementById('insights-earnings-unlocked');
+            const tier = getEarningsTier(followerCount);
+            if (!tier) {
+                lockedEl.style.display = 'flex';
+                unlockedEl.style.display = 'none';
+                const pct = Math.min(100, Math.round((followerCount / 100) * 100));
+                document.getElementById('insights-earnings-progress-fill').style.width = pct + '%';
+                document.getElementById('insights-earnings-progress-label').textContent = `${followerCount}/100 followers`;
+                return;
+            }
+            lockedEl.style.display = 'none';
+            unlockedEl.style.display = 'block';
+            const amount = (totalImpressions / 1000) * tier.rate;
+            document.getElementById('insights-earnings-amount').textContent = 'R' + amount.toFixed(2);
+            document.getElementById('insights-earnings-tier-badge').textContent = tier.label;
+            document.getElementById('insights-earnings-rate-label').textContent = `R${tier.rate.toFixed(2)} per 1,000 views`;
+            const nextTier = EARNINGS_TIERS[EARNINGS_TIERS.indexOf(tier) + 1];
+            const nextTierEl = document.getElementById('insights-earnings-next-tier');
+            if (nextTier) {
+                const remaining = nextTier.minFollowers - followerCount;
+                nextTierEl.textContent = `${remaining.toLocaleString()} more follower${remaining === 1 ? '' : 's'} to reach R${nextTier.rate.toFixed(2)}/1,000 views`;
+            } else {
+                nextTierEl.textContent = "You've reached the highest earnings tier";
+            }
+        }
+
         function renderAccountInsights() {
             const user = auth.currentUser;
             if (!user) return;
@@ -12120,6 +12205,7 @@
             document.getElementById('insights-following-count').textContent = myProfile.followingCount || 0;
             document.getElementById('insights-groups-count').textContent = myGroupsCount;
             document.getElementById('insights-contacts-count').textContent = myContactsCount;
+            renderInsightsEarnings(myProfile.followersCount || 0, totalImpressions);
 
             const creationTime = user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : null;
             document.getElementById('insights-member-since').textContent = creationTime ? formatJoinedDate(creationTime) : 'Unknown';

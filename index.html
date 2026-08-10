@@ -561,7 +561,57 @@
             }
         }
 
-        /* --- FEED --- */
+        /* Search — reuses the exact same full-screen-page (phone) / right-docked-panel
+           (tablet & desktop) mechanics as the Profile view above, just for its own overlay. */
+        @media (max-width: 767px) {
+            #search-fullscreen-overlay {
+                opacity: 1;
+                visibility: visible;
+                pointer-events: none;
+                background: transparent;
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                align-items: stretch;
+                justify-content: flex-start;
+                transition: none;
+            }
+            #search-fullscreen-overlay.active { pointer-events: auto; }
+            #search-fullscreen-overlay .bottom-sheet {
+                width: 100%;
+                max-width: 100%;
+                height: 100%;
+                max-height: 100%;
+                margin: 0;
+                border-radius: 0;
+                box-shadow: none;
+                background: var(--bg-base);
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            #search-fullscreen-overlay.active .bottom-sheet { transform: translateX(0); }
+        }
+        @media (min-width: 768px) {
+            #search-fullscreen-overlay {
+                align-items: stretch;
+                justify-content: flex-end;
+                background: rgba(0, 0, 0, 0.08);
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+            }
+            #search-fullscreen-overlay .bottom-sheet {
+                width: 400px;
+                max-width: 400px;
+                height: 100%;
+                max-height: 100%;
+                margin: 0;
+                border-radius: 0;
+                border-left: 1px solid var(--border-color);
+                box-shadow: -12px 0 32px rgba(17, 17, 17, 0.08);
+                transform: translateX(100%);
+                transition: transform 0.35s var(--ease-smooth);
+            }
+            #search-fullscreen-overlay.active .bottom-sheet { transform: translateX(0); }
+        }
         .feed-composer { background: var(--bg-alt); border-radius: 18px; padding: 14px 16px; margin: 12px 16px 4px; }
         .feed-composer-row { display: flex; gap: 10px; align-items: flex-start; position: relative; }
         .feed-composer-row .avatar { background-color: var(--primary-blue); background-size: cover; background-position: center; border-radius: 50%; }
@@ -1303,23 +1353,19 @@
         .search-box input::placeholder { color: var(--text-secondary); }
         .search-box svg { position: absolute; left: 14px; top: 11px; width: 18px; height: 18px; color: var(--text-secondary); }
 
-        /* ── HEADER SEARCH ICON + FULL-SCREEN SEARCH MODE ── */
+        /* ── HEADER SEARCH ICON → OPENS FULL-SCREEN SEARCH (same page mechanics as Profile) ── */
         .search-icon-btn { position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); flex-shrink: 0; }
         .search-icon-btn svg { width: 20px; height: 20px; }
-        .search-box-back-btn { display: none; flex-shrink: 0; align-items: center; justify-content: center; width: 22px; height: 22px; cursor: pointer; color: var(--text-primary); }
-        .search-box-back-btn svg { width: 20px; height: 20px; }
-        /* Search bars are hidden inline; they only appear once their header enters search-mode. */
-        .chat-header-area .search-box { display: none; }
-        .chat-header-area.search-mode > *:not(.search-box) { display: none !important; }
-        .chat-header-area.search-mode .search-box {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 0;
-        }
-        .chat-header-area.search-mode .search-box-back-btn { display: flex; }
-        .chat-header-area.search-mode .search-box > svg { position: static; flex-shrink: 0; width: 18px; height: 18px; color: var(--text-secondary); }
-        .chat-header-area.search-mode .search-box input { flex: 1; width: auto; padding: 11px 16px; }
+        /* The inline search bars stay hidden in the header; they only appear once moved into
+           #search-fullscreen-overlay by openFullscreenSearch(). */
+        .search-box-collapsible { display: none; }
+
+        #search-fullscreen-overlay .bottom-sheet { display: flex; flex-direction: column; padding: 0 !important; }
+        #search-fullscreen-overlay .sheet-handle { display: none; }
+        .search-fullscreen-header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+        .search-fullscreen-input-slot { flex: 1; min-width: 0; }
+        .search-fullscreen-input-slot .search-box { display: block; margin-bottom: 0; }
+        .search-fullscreen-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
         /* ── Chats-tab search: history + autosuggest dropdown ── */
         .chat-search-dropdown { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: var(--shadow-elevated); max-height: 320px; overflow-y: auto; z-index: 40; display: none; padding: 6px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
@@ -3084,6 +3130,19 @@
         </div>
     </div>
 
+    <div id="search-fullscreen-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet">
+            <div class="sheet-handle"></div>
+            <div class="search-fullscreen-header">
+                <button type="button" id="btn-close-search-fullscreen" class="tm-profile-back-btn" aria-label="Close search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="search-fullscreen-input-slot" id="search-fullscreen-input-slot"></div>
+            </div>
+            <div class="search-fullscreen-body" id="search-fullscreen-body"></div>
+        </div>
+    </div>
+
     <div id="user-info-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
@@ -3684,7 +3743,7 @@
                         <div class="chat-header-top">
                             <h1>Chats</h1>
                             <div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" title="Search">
+                                <div class="search-icon-btn js-search-open" data-search-list="chat-list-container" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="chat-view-menu-wrap">
@@ -3703,10 +3762,7 @@
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
-                        <div class="search-box">
-                            <div class="search-box-back-btn js-search-back" title="Back">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            </div>
+                        <div class="search-box search-box-collapsible">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-chats" placeholder="Search" autocomplete="off">
                         </div>
@@ -3753,7 +3809,7 @@
                         <div class="chat-header-top">
                             <h1>Home</h1>
                             <div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" title="Search">
+                                <div class="search-icon-btn js-search-open" data-search-list="discover-grid-scroll" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="notif-bell-btn js-notif-bell" title="Notifications">
@@ -3784,10 +3840,7 @@
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div>
                         </div>
-                        <div class="search-box">
-                            <div class="search-box-back-btn js-search-back" title="Back">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            </div>
+                        <div class="search-box search-box-collapsible">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-discover" placeholder="Search by name or @username" autocomplete="off">
                             <div class="chat-search-dropdown" id="discover-search-dropdown"></div>
@@ -3880,7 +3933,7 @@
                         <div class="chat-header-top" id="calls-header-default">
                             <h1>Calls</h1>
                             <div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" title="Search">
+                                <div class="search-icon-btn js-search-open" data-search-list="calls-list-container" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="notif-bell-btn js-notif-bell" title="Notifications">
@@ -3917,10 +3970,7 @@
                                 <svg id="btn-delete-selected-calls" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;" title="Delete selected"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
                             </div>
                         </div>
-                        <div class="search-box">
-                            <div class="search-box-back-btn js-search-back" title="Back">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            </div>
+                        <div class="search-box search-box-collapsible">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-calls" placeholder="Search calls..." autocomplete="off">
                         </div>
@@ -3931,7 +3981,7 @@
                 <div id="tab-contacts" class="tab-content">
                     <div class="chat-header-area">
                         <div class="chat-header-top"><h1>Following</h1><div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" title="Search">
+                                <div class="search-icon-btn js-search-open" data-search-list="contacts-list-container" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="notif-bell-btn js-notif-bell" title="Notifications">
@@ -3957,10 +4007,7 @@
                                 </div>
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             </div></div>
-                        <div class="search-box">
-                            <div class="search-box-back-btn js-search-back" title="Back">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                            </div>
+                        <div class="search-box search-box-collapsible">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <input type="text" id="search-contacts" placeholder="Find people..." autocomplete="off">
                         </div>
@@ -5890,31 +5937,78 @@
         chatSearchInput.addEventListener('input', () => filterListItems(chatSearchInput, 'chat-list-container'));
         contactSearchInput.addEventListener('input', () => filterListItems(contactSearchInput, 'contacts-list-container'));
 
-        // Header search icon → expands that tab's existing search bar into a full-width bar
-        // (hiding the title/icons/filter chrome), reusing the same input + listeners already
-        // wired up above. Back arrow collapses it and clears the query.
-        document.querySelectorAll('.js-search-open').forEach(btn => {
-            btn.addEventListener('click', () => {
+        // Header search icon → opens the same full-screen search overlay used everywhere,
+        // reusing that tab's existing search bar + result list (moved into the overlay, then
+        // moved back on close) rather than duplicating them. Visually this is the same
+        // slide-in-page mechanics as the Profile view (see #search-fullscreen-overlay CSS).
+        (function initFullscreenSearch() {
+            const overlay = document.getElementById('search-fullscreen-overlay');
+            const inputSlot = document.getElementById('search-fullscreen-input-slot');
+            const body = document.getElementById('search-fullscreen-body');
+            const backBtn = document.getElementById('btn-close-search-fullscreen');
+            if (!overlay || !inputSlot || !body || !backBtn) return;
+
+            let movedBox = null, boxParent = null, boxNext = null;
+            let movedLists = []; // [{el, parent, next}]
+
+            function openFullscreenSearch(btn) {
                 const headerArea = btn.closest('.chat-header-area');
-                if (!headerArea) return;
-                headerArea.classList.add('search-mode');
-                const input = headerArea.querySelector('.search-box input');
-                if (input) setTimeout(() => input.focus(), 50);
-            });
-        });
-        document.querySelectorAll('.js-search-back').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const headerArea = btn.closest('.chat-header-area');
-                if (!headerArea) return;
-                headerArea.classList.remove('search-mode');
-                const input = headerArea.querySelector('.search-box input');
-                if (input) {
-                    input.value = '';
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.blur();
+                const searchBox = headerArea ? headerArea.querySelector('.search-box') : null;
+                if (!searchBox) return;
+
+                movedBox = searchBox;
+                boxParent = searchBox.parentNode;
+                boxNext = searchBox.nextSibling;
+                inputSlot.appendChild(searchBox);
+
+                movedLists = [];
+                const listIds = (btn.dataset.searchList || '').split(',').map(s => s.trim()).filter(Boolean);
+                listIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    movedLists.push({ el, parent: el.parentNode, next: el.nextSibling });
+                    body.appendChild(el);
+                });
+
+                overlay.classList.add('active');
+                const input = searchBox.querySelector('input');
+                if (input) setTimeout(() => input.focus(), 250);
+            }
+
+            // Runs regardless of how the overlay was closed (back button, backdrop click, or
+            // the device/browser back button via the app's generic sheet-history handling),
+            // so the search bar and its results always end up back in their original tab.
+            function restoreMovedNodes() {
+                if (movedBox) {
+                    const input = movedBox.querySelector('input');
+                    if (input) {
+                        input.value = '';
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.blur();
+                    }
+                    if (boxNext) boxParent.insertBefore(movedBox, boxNext);
+                    else boxParent.appendChild(movedBox);
+                    movedBox = null;
                 }
+                movedLists.forEach(({ el, parent, next }) => {
+                    if (next) parent.insertBefore(el, next);
+                    else parent.appendChild(el);
+                });
+                movedLists = [];
+            }
+
+            document.querySelectorAll('.js-search-open').forEach(btn => {
+                btn.addEventListener('click', () => openFullscreenSearch(btn));
             });
-        });
+            backBtn.addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('active');
+            });
+            new MutationObserver(() => {
+                if (!overlay.classList.contains('active')) restoreMovedNodes();
+            }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        })();
+
         const groupSearchInput = document.getElementById('search-groups');
         groupSearchInput.addEventListener('input', () => {
             filterListItems(groupSearchInput, 'my-groups-list-container');

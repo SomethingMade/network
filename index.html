@@ -8733,14 +8733,14 @@
 
                 if (existingCard && contentUnchanged) {
                     patchFeedPostCounts(existingCard, post);
-                    patchDuplicateContentCards(list, postId, post, existingCard);
+                    patchDuplicateContentCards(postId, post, existingCard);
                     if (currentViewerPostId === postId) syncImageViewerPostBar();
                     return;
                 }
                 // Even if this exact card doesn't exist yet (or its content changed), other
                 // cards elsewhere in the feed may be showing this same post via a repost — keep
                 // their like/comment/repost counts in sync either way.
-                if (!existingCard || !contentUnchanged) patchDuplicateContentCards(list, postId, post, existingCard);
+                if (!existingCard || !contentUnchanged) patchDuplicateContentCards(postId, post, existingCard);
 
                 // Actual content edit (or a card we don't have yet) — safe to rebuild, but still
                 // don't yank it out from under someone actively editing it.
@@ -8786,9 +8786,10 @@
                 }
 
                 delete cachedPosts[postId];
-                const list = document.getElementById('feed-posts-list');
-                const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
-                if (existingCard) {
+                // A genuinely deleted post can be showing in more than one place at once — the
+                // main feed, and/or a profile's Posts tab (yours or the author's) — so clean up
+                // every card for it, not just whichever one lives in the main feed list.
+                document.querySelectorAll(`.feed-post-card[data-post-id="${postId}"]`).forEach(existingCard => {
                     const vid = existingCard.querySelector('.feed-post-video');
                     if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
                     const postImg = existingCard.querySelector('.x-media-grid-item img');
@@ -8796,7 +8797,7 @@
                     if (feedImpressionObserver) feedImpressionObserver.unobserve(existingCard);
                     if (existingCard.__impressionTimer) clearTimeout(existingCard.__impressionTimer);
                     existingCard.remove();
-                }
+                });
                 updateFeedEmptyState();
                 if (removedPost && removedPost.videoUrl) renderStatusGridIfActive();
             });
@@ -9962,9 +9963,12 @@
         // feed can share the same content post (its own direct card, plus one per repost of
         // it). When that content post's counts change, patch every card showing it, not just
         // whichever one happens to have that id as its own postId.
-        function patchDuplicateContentCards(list, contentPostId, post, skipCard) {
-            if (!list) return;
-            list.querySelectorAll(`[data-content-post-id="${contentPostId}"]`).forEach(card => {
+        // Patches every card showing this post's content anywhere in the app — the main feed,
+        // a profile's Posts tab, reposts of it, all of it — not just one specific list. Scoped
+        // globally (rather than to a single container) so a like/comment/repost on a post shows
+        // up in real time wherever else that same post happens to be rendered right now.
+        function patchDuplicateContentCards(contentPostId, post, skipCard) {
+            document.querySelectorAll(`[data-content-post-id="${contentPostId}"]`).forEach(card => {
                 if (card !== skipCard) patchFeedPostCounts(card, post);
             });
         }

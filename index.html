@@ -420,19 +420,19 @@
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: min(85vh, 100%); overflow-y: auto; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
 
-        /* ── CONTACT INFO & OWN PROFILE AS A FULL-SCREEN PAGE (phone) ──
-           Both the "Contact Info" panel (viewing someone else) and the "Profile" panel
-           (editing your own) read like a social profile page (Threads-style) rather
-           than a WhatsApp-style bottom sheet: back-arrow navigation, name+avatar header
-           block, bio, link, pills, stats, and a Media section below a divider. On
-           phones this takes over the whole screen and slides in from the right, same
-           mechanics as chat-view-overlay, instead of sliding up as a rounded sheet. The
-           base .bottom-sheet-overlay's opacity/visibility toggle is neutralized here
-           (the overlay is always "present", just off-canvas) so only the panel's own
-           transform animates — an opacity fade running underneath a transform slide at
-           the same time reads as a flicker, not a clean single motion. */
+        /* ── CONTACT INFO, PROFILE & INSIGHTS AS A FULL-SCREEN PAGE (phone) ──
+           The "Contact Info" panel (viewing someone else), the "Profile" panel
+           (editing your own), and "Account Insights" read like a social profile/stats
+           page (Threads-style) rather than a WhatsApp-style bottom sheet: back-arrow
+           navigation, header block, and content below. On phones these take over the
+           whole screen and slide in from the right, same mechanics as chat-view-overlay,
+           instead of sliding up as a rounded sheet. The base .bottom-sheet-overlay's
+           opacity/visibility toggle is neutralized here (the overlay is always
+           "present", just off-canvas) so only the panel's own transform animates — an
+           opacity fade running underneath a transform slide at the same time reads as
+           a flicker, not a clean single motion. */
         @media (max-width: 767px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -443,10 +443,10 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #settings-bottom-sheet-overlay.active {
+            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active {
                 pointer-events: auto;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -462,10 +462,10 @@
                 flex-direction: column;
                 overflow-y: auto;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -1033,6 +1033,16 @@
         .wa-insights-card-value { font-size: 22px; font-weight: 700; color: var(--text-primary); }
         .wa-insights-card-label { font-size: 12.5px; color: var(--text-secondary); }
         .wa-insights-note { font-size: 12.5px; color: var(--text-secondary); text-align: center; margin: 4px 16px 8px; }
+        .wa-insights-post-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; }
+        .wa-insights-post-row:hover { background: var(--bg-hover); }
+        .wa-insights-post-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--bg-alt); flex-shrink: 0; }
+        .wa-insights-post-thumb.placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+        .wa-insights-post-thumb.placeholder svg { width: 18px; height: 18px; }
+        .wa-insights-post-body { flex: 1; min-width: 0; }
+        .wa-insights-post-text { font-size: 13.5px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wa-insights-post-date { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .wa-insights-post-views { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+        .wa-insights-post-views svg { width: 14px; height: 14px; }
         .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); gap: 12px; }
         .setting-item:last-child { border-bottom: none; }
         .setting-item span { font-size: 15px; font-weight: 500; color: var(--text-primary); }
@@ -3488,6 +3498,10 @@
                         <span class="wa-insights-card-label">Posts</span>
                     </div>
                     <div class="wa-insights-card">
+                        <span class="wa-insights-card-value" id="insights-impressions-count">0</span>
+                        <span class="wa-insights-card-label">Post Views</span>
+                    </div>
+                    <div class="wa-insights-card">
                         <span class="wa-insights-card-value" id="insights-media-count">0</span>
                         <span class="wa-insights-card-label">Media Shared</span>
                     </div>
@@ -3508,6 +3522,11 @@
                         <span class="wa-insights-card-label">Contacts</span>
                     </div>
                 </div>
+            </div>
+
+            <div class="wa-section" id="insights-top-posts-section" style="display:none;">
+                <div class="wa-section-title">Most Viewed Posts</div>
+                <div id="insights-top-posts-list"></div>
             </div>
 
             <div class="wa-section">
@@ -12083,8 +12102,11 @@
             if (!user) return;
             const myProfile = cachedUsers[user.uid] || {};
 
-            const myPosts = Object.values(cachedPosts).filter(post => post && post.uid === user.uid && !post.repostOf);
+            const myPosts = Object.entries(cachedPosts)
+                .filter(([id, post]) => post && post.uid === user.uid && !post.repostOf)
+                .map(([id, post]) => ({ ...post, postId: id }));
             const myMedia = myPosts.filter(post => post.imageUrl || post.videoUrl);
+            const totalImpressions = myPosts.reduce((sum, post) => sum + (post.impressionCount || 0), 0);
             const myGroupsCount = Object.keys(cachedGroups).filter(gid => {
                 const g = cachedGroups[gid];
                 return g && g.members && g.members[user.uid] && !g.isBusinessPage;
@@ -12092,6 +12114,7 @@
             const myContactsCount = Object.keys(cachedContacts).length;
 
             document.getElementById('insights-posts-count').textContent = myPosts.length;
+            document.getElementById('insights-impressions-count').textContent = formatFeedCount(totalImpressions);
             document.getElementById('insights-media-count').textContent = myMedia.length;
             document.getElementById('insights-followers-count').textContent = myProfile.followersCount || 0;
             document.getElementById('insights-following-count').textContent = myProfile.followingCount || 0;
@@ -12101,6 +12124,50 @@
             const creationTime = user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : null;
             document.getElementById('insights-member-since').textContent = creationTime ? formatJoinedDate(creationTime) : 'Unknown';
             document.getElementById('insights-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
+
+            renderInsightsTopPosts(myPosts);
+        }
+
+        // Top 5 of the user's own posts by impression (view) count, each row opening
+        // straight into that post's comments sheet so tapping a stat leads somewhere.
+        function renderInsightsTopPosts(myPosts) {
+            const section = document.getElementById('insights-top-posts-section');
+            const list = document.getElementById('insights-top-posts-list');
+            const viewedPosts = myPosts.filter(post => (post.impressionCount || 0) > 0);
+            if (!viewedPosts.length) {
+                section.style.display = 'none';
+                list.innerHTML = '';
+                return;
+            }
+            const top = [...viewedPosts].sort((a, b) => (b.impressionCount || 0) - (a.impressionCount || 0)).slice(0, 5);
+            list.innerHTML = top.map(post => {
+                const thumbUrl = post.imageUrl || (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+                const thumbHtml = thumbUrl
+                    ? `<img class="wa-insights-post-thumb" src="${escapeHtmlForPost(thumbUrl)}" alt="">`
+                    : `<div class="wa-insights-post-thumb placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M4 15l4-4 4 4 4-6 4 4"></path></svg></div>`;
+                const snippet = post.text ? post.text.slice(0, 60) : (post.videoUrl ? 'Video post' : (post.imageUrl ? 'Photo post' : 'Post'));
+                return `
+                    <div class="wa-insights-post-row" data-post-id="${post.postId || ''}">
+                        ${thumbHtml}
+                        <div class="wa-insights-post-body">
+                            <div class="wa-insights-post-text">${escapeHtmlForPost(snippet)}</div>
+                            <div class="wa-insights-post-date">${formatTime(post.timestamp)}</div>
+                        </div>
+                        <div class="wa-insights-post-views">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                            ${formatFeedCount(post.impressionCount || 0)}
+                        </div>
+                    </div>`;
+            }).join('');
+            list.querySelectorAll('.wa-insights-post-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const postId = row.dataset.postId;
+                    if (!postId) return;
+                    insightsSheetOverlay.classList.remove('active');
+                    openPostComments(postId);
+                });
+            });
+            section.style.display = '';
         }
 
         document.getElementById('btn-save-profile').addEventListener('click', async (e) => {

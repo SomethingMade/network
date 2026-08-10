@@ -714,19 +714,18 @@
         .feed-post-edit-save { background: var(--gradient-brand); color: #fff; }
         .feed-post-body { margin-top: 6px; }
         .feed-post-text { font-size: 15px; color: var(--text-primary); line-height: 1.35; margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
-        .x-media-grid { display: grid; gap: 2px; margin-top: 10px; overflow: hidden; margin-left: -16px; margin-right: -16px; width: calc(100% + 32px); }
-        .x-media-grid[data-count="1"] { grid-template-columns: 1fr; }
-        .x-media-grid[data-count="2"] { grid-template-columns: 1fr 1fr; }
-        .x-media-grid[data-count="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-        .x-media-grid[data-count="3"] .x-media-grid-item:first-child { grid-row: 1 / 3; aspect-ratio: unset; max-height: none; height: 100%; }
-        .x-media-grid[data-count="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-        .x-media-grid-item { position: relative; overflow: hidden; background: var(--bg-alt); }
+        .x-media-grid { position: relative; margin-top: 10px; margin-left: -16px; margin-right: -16px; width: calc(100% + 32px); }
+        .x-media-carousel-track { display: flex; gap: 8px; padding: 0 28px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 28px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .x-media-carousel-track::-webkit-scrollbar { display: none; }
+        .x-media-grid-item { position: relative; overflow: hidden; background: var(--bg-alt); border-radius: 12px; flex: 0 0 calc(100% - 56px); scroll-snap-align: center; aspect-ratio: 1 / 1; max-height: 420px; }
+        .x-media-grid[data-count="1"] .x-media-carousel-track { padding: 0; gap: 0; }
+        .x-media-grid[data-count="1"] .x-media-grid-item { flex-basis: 100%; border-radius: 0; aspect-ratio: unset; max-height: 520px; }
         .x-media-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; pointer-events: auto; }
-        .x-media-grid[data-count="1"] .x-media-grid-item { aspect-ratio: unset; max-height: 520px; }
         .x-media-grid[data-count="1"] .x-media-grid-item img { height: auto; max-height: 520px; object-fit: cover; }
-        .x-media-grid[data-count="2"] .x-media-grid-item,
-        .x-media-grid[data-count="3"] .x-media-grid-item,
-        .x-media-grid[data-count="4"] .x-media-grid-item { aspect-ratio: 1 / 1; max-height: 220px; }
+        .x-media-carousel-counter { position: absolute; top: 10px; right: 34px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 12px; pointer-events: none; z-index: 2; }
+        .x-media-carousel-dots { position: absolute; bottom: 10px; left: 28px; right: 28px; display: flex; justify-content: center; gap: 5px; pointer-events: none; z-index: 2; }
+        .x-media-carousel-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); transition: 0.2s ease; }
+        .x-media-carousel-dots .dot.active { background: #fff; width: 14px; border-radius: 3px; }
         /* ── PROFILE MEDIA GRID (shown in a user's profile sheet: their posted photos/videos) ── */
         .wa-profile-media-section { margin: 4px 0 20px; }
         .wa-profile-media-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; padding: 0 4px 10px; }
@@ -9720,8 +9719,12 @@
                 </div>
                 <audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : '';
             const imageHtml = postImages.length ? `
-                <div class="x-media-grid" data-count="${Math.min(postImages.length, 4)}">
-                    ${postImages.slice(0, 4).map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
+                <div class="x-media-grid" data-count="${postImages.length}">
+                    <div class="x-media-carousel-track">
+                        ${postImages.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
+                    </div>
+                    ${postImages.length > 1 ? `<span class="x-media-carousel-counter">1/${postImages.length}</span>
+                    <div class="x-media-carousel-dots">${postImages.map((_, idx) => `<span class="dot${idx === 0 ? ' active' : ''}"></span>`).join('')}</div>` : ''}
                 </div>${musicChipHtml}` : '';
             const videoMusicChipHtml = (post.videoUrl && post.music) ? `
                 <div class="feed-post-music-chip feed-post-video-music-chip">
@@ -9896,6 +9899,27 @@
                     openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10), originalId);
                 });
             });
+            // Swipeable multi-image carousel: update the "N/total" badge and active dot as the
+            // track scrolls, instead of the old fixed 4-tile grid.
+            const carouselTrack = card.querySelector('.x-media-carousel-track');
+            if (carouselTrack && postImages.length > 1) {
+                const counterEl = card.querySelector('.x-media-carousel-counter');
+                const dotEls = card.querySelectorAll('.x-media-carousel-dots .dot');
+                let carouselScrollTimeout = null;
+                carouselTrack.addEventListener('scroll', () => {
+                    if (carouselScrollTimeout) clearTimeout(carouselScrollTimeout);
+                    carouselScrollTimeout = setTimeout(() => {
+                        // Slides peek (each slide is narrower than the track, with a gap between
+                        // them), so the per-slide scroll step is the slide's own width + gap —
+                        // not the visible track width used before peeking was added.
+                        const firstItem = carouselTrack.querySelector('.x-media-grid-item');
+                        const step = firstItem ? (firstItem.getBoundingClientRect().width + 8) : carouselTrack.clientWidth;
+                        const idx = Math.min(postImages.length - 1, Math.max(0, Math.round(carouselTrack.scrollLeft / step)));
+                        if (counterEl) counterEl.textContent = `${idx + 1}/${postImages.length}`;
+                        dotEls.forEach((d, i) => d.classList.toggle('active', i === idx));
+                    }, 60);
+                }, { passive: true });
+            }
 
             const videoWrap = card.querySelector('.feed-post-video-wrap');
             if (videoWrap) initFeedVideoPlayer(videoWrap);

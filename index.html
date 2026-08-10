@@ -31,6 +31,7 @@
             --danger-red: #FF453A;
             --success-green: #34C759;
             --comment-blue: #1D9BF0;
+            --link-color: var(--primary-blue);
             --font-brand: 'Michroma', sans-serif;
             
             /* Light Theme Basics */
@@ -149,6 +150,7 @@
             --accent-rgb: 46, 46, 46;
             --nav-active-green: #111111;
             --gradient-brand: linear-gradient(135deg, #111111 0%, #2E2E2E 100%);
+            --link-color: var(--comment-blue);
         }
         body.dark-theme.black-accent {
             --primary-blue: #6E6E73;
@@ -157,6 +159,7 @@
             --accent-rgb: 58, 58, 60;
             --nav-active-green: #6E6E73;
             --gradient-brand: linear-gradient(135deg, #6E6E73 0%, #3A3A3C 100%);
+            --link-color: var(--comment-blue);
         }
         body.glass-theme.black-accent {
             --primary-blue: #111111;
@@ -166,6 +169,7 @@
             --nav-active-green: #111111;
             --gradient-brand: linear-gradient(135deg, #111111 0%, #2E2E2E 100%);
             --msg-out-bg: rgba(17, 17, 17, 0.85);
+            --link-color: var(--comment-blue);
         }
         body.glass-theme.black-accent::before {
             background:
@@ -755,7 +759,7 @@
         .feed-post-tagged-chip:active { transform: scale(0.96); }
         .feed-hashtag { color: var(--primary-blue); font-weight: 600; cursor: pointer; }
         .feed-hashtag:hover { text-decoration: underline; }
-        .feed-link { color: var(--primary-blue); font-weight: 600; text-decoration: underline; word-break: break-all; }
+        .feed-link { color: var(--link-color); font-weight: 600; text-decoration: underline; word-break: break-all; }
         .feed-search-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px 20px; display: none; }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
@@ -1012,7 +1016,7 @@
         .wa-field-row > svg { width: 19px; height: 19px; color: var(--primary-blue); flex-shrink: 0; }
         .wa-field-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
         .wa-field-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
-        .profile-website-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: 20px; background: rgba(var(--primary-rgb), 0.12); color: var(--primary-blue); font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 0.15s ease; }
+        .profile-website-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: 20px; background: rgba(var(--primary-rgb), 0.12); color: var(--link-color); font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 0.15s ease; }
         .profile-website-chip:hover { background: rgba(var(--primary-rgb), 0.2); }
         .profile-website-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
         .profile-website-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2551,7 +2555,7 @@
         .msg-call-title.missed { color: var(--danger-red); }
         .msg-call-sub { font-size: 12px; color: var(--text-secondary); }
 
-        .msg-link { color: var(--primary-blue); font-weight: 600; text-decoration: underline; word-break: break-all; }
+        .msg-link { color: var(--link-color); font-weight: 600; text-decoration: underline; word-break: break-all; }
         .msg-bubble.out .msg-link { color: inherit; text-decoration-color: rgba(255,255,255,0.6); }
     </style>
 </head>
@@ -2888,7 +2892,7 @@
             </div>
             <div class="feed-comment-input-row">
                 <div class="avatar" id="comment-input-avatar" style="width:32px; height:32px; flex-shrink:0;"></div>
-                <input type="text" id="post-comment-input" placeholder="Add a comment..." autocomplete="off">
+                <input type="text" id="post-comment-input" placeholder="Add a comment..." maxlength="500" autocomplete="off">
                 <div class="mention-autocomplete-dropdown" id="comment-mention-dropdown"></div>
                 <button type="button" class="feed-comment-gif-btn" id="btn-comment-gif">GIF</button>
                 <button type="button" id="btn-send-comment" disabled>Send</button>
@@ -8896,7 +8900,7 @@
                 const btn = e.target.closest('button[data-emoji]');
                 if (!btn) return;
                 const input = document.getElementById('post-comment-input');
-                input.value += btn.dataset.emoji;
+                input.value = (input.value + btn.dataset.emoji).slice(0, 500);
                 input.dispatchEvent(new Event('input', { bubbles: true }));
                 input.focus();
             });
@@ -10448,6 +10452,10 @@
             if (!user) return;
             const input = document.getElementById('post-comment-input');
             const text = input.value.trim();
+            if (text.length > 500) {
+                notify('Comments are limited to 500 characters', 'error');
+                return;
+            }
             const gifUrl = selectedCommentGif ? selectedCommentGif.url : null;
             if (!text && !gifUrl) return;
             const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'User', photoURL: user.photoURL || '' };

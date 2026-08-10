@@ -8390,7 +8390,11 @@
             const anchorCard = findFeedAnchorCard(list, container);
             const anchorOffsetBefore = anchorCard ? anchorCard.getBoundingClientRect().top : null;
 
-            const cards = Array.from(list.children);
+            // Only real post cards participate in ranking/sorting — the infinite-scroll
+            // sentinel (and anything else without a post id) must never be swept into this,
+            // or it ends up mid-list instead of pinned to the bottom, which silently breaks
+            // the IntersectionObserver that drives loading older pages.
+            const cards = Array.from(list.children).filter(el => el.dataset.postId);
             cards.sort((a, b) => {
                 const postIdA = a.dataset.postId, postIdB = b.dataset.postId;
                 const postA = cachedPosts[postIdA], postB = cachedPosts[postIdB];
@@ -8398,6 +8402,8 @@
                 return computeFeedScore(postIdB, postB) - computeFeedScore(postIdA, postA);
             });
             cards.forEach(card => list.appendChild(card));
+            const sentinel = document.getElementById('feed-load-more-sentinel');
+            if (sentinel) list.appendChild(sentinel);
 
             // Skip the "keep the anchor card visually still" compensation while the initial
             // page is still streaming in. At that point nobody has scrolled anywhere to

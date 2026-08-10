@@ -478,7 +478,7 @@
         .tm-profile-avatar.avatar-circle { width: 92px; height: 92px; flex-shrink: 0; border-radius: 50%; background-color: var(--border-color); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700; border: 1.5px solid var(--nav-active-black); box-shadow: none; cursor: pointer; }
 
         .tm-profile-bio { font-size: 15px; line-height: 1.5; color: var(--text-primary); margin: 0 0 4px; white-space: pre-wrap; }
-        .tm-profile-link { display: block; font-size: 15px; color: var(--text-primary); text-decoration: none; margin-bottom: 12px; word-break: break-word; opacity: 0.75; }
+        .tm-profile-link { display: block; font-size: 15px; color: var(--primary-blue); text-decoration: none; margin-bottom: 12px; word-break: break-word; font-weight: 600; }
         .tm-profile-link:hover { text-decoration: underline; }
 
         .tm-profile-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -5089,9 +5089,10 @@
                 </div>`;
         }
 
-        // Caption stays on textContent (plain user text, no markup needed). The name goes through
-        // innerHTML so the verified badge can sit next to it — same escape-then-append pattern as
-        // every other name render (see verifiedBadgeFor), so user-authored text still can't inject markup.
+        // Caption goes through linkifyHashtags so URLs/hashtags in reel captions get the same
+        // tappable blue-link treatment as feed posts/comments. The name goes through innerHTML so
+        // the verified badge can sit next to it — same escape-then-append pattern as every other
+        // name render (see verifiedBadgeFor), so user-authored text still can't inject markup.
         function fillReelItemText(itemEl, postId) {
             const post = cachedPosts[postId];
             const uid = post && post.uid;
@@ -5099,7 +5100,7 @@
             const nameEl = itemEl.querySelector('.reel-item-author span');
             if (nameEl) nameEl.innerHTML = escapeHtmlForPost(author.name || (post && post.name) || 'User') + verifiedBadgeFor(uid, uid === AI_UID);
             const captionEl = itemEl.querySelector('.reel-item-caption');
-            if (captionEl) captionEl.textContent = (post && post.text) || '';
+            if (captionEl) captionEl.innerHTML = (post && post.text) ? linkifyHashtags(post.text) : '';
         }
 
         function reelExtendQueueIfNeeded() {
@@ -10415,7 +10416,14 @@
         // resolves to a Business Account in blue. Clicking it opens that business's profile.
         function linkifyBioMentions(text) {
             const escaped = escapeHtmlForPost(text || '');
-            return escaped.replace(/@([a-zA-Z0-9_]{2,20})/g, (match, handle) => {
+            const withUrls = escaped.replace(MSG_URL_REGEX, (raw) => {
+                const cleaned = raw.replace(/[.,!?;:'")\]]+$/, '');
+                const trailing = raw.slice(cleaned.length);
+                if (!cleaned) return raw;
+                const href = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
+                return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="feed-link" onclick="event.stopPropagation()">${cleaned}</a>${trailing}`;
+            });
+            return withUrls.replace(/@([a-zA-Z0-9_]{2,20})/g, (match, handle) => {
                 const entry = Object.entries(cachedUsers).find(([, u]) => u && u.username && u.username.toLowerCase() === handle.toLowerCase());
                 if (entry && entry[1].isBusinessAccount) {
                     const [uid] = entry;
@@ -12375,7 +12383,7 @@
             if (!group) return;
 
             document.getElementById('group-info-title').innerHTML = groupNameLabel(group);
-            document.getElementById('group-info-description').textContent = group.description || 'No description';
+            document.getElementById('group-info-description').innerHTML = group.description ? linkifyHashtags(group.description) : 'No description';
             const badge = document.getElementById('group-info-visibility-badge');
             if (group.isBusinessPage) {
                 badge.textContent = 'Verified Business Page';
@@ -13851,10 +13859,10 @@
             const captionEl = document.getElementById('story-viewer-caption');
             document.getElementById('story-viewer-timestamp').textContent = formatTime(current.createdAt);
             if (current.caption) {
-                captionEl.textContent = current.caption;
+                captionEl.innerHTML = linkifyHashtags(current.caption);
                 captionEl.style.display = 'block';
             } else {
-                captionEl.textContent = '';
+                captionEl.innerHTML = '';
                 captionEl.style.display = 'none';
             }
 

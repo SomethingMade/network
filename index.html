@@ -1382,6 +1382,15 @@
         .search-dropdown-item .search-dropdown-remove:hover { background: var(--bg-input); color: var(--text-primary); }
         .search-dropdown-item mark { background: none; color: var(--primary-blue); font-weight: 700; }
 
+        /* When the search bar is opened full-screen (see initFullscreenSearch), its history/
+           results panel is moved out of the input and into the scrollable body so it reads as
+           a normal full page of content — not a small floating dropdown sitting on top of the
+           feed/list underneath. This overrides the floating-dropdown geometry above for that
+           context, and hides whatever list it's covering (chat/discover list) while it's shown. */
+        #search-fullscreen-body > .chat-search-dropdown { position: static; flex: 1; min-height: 0; width: 100%; max-height: none; margin: 0; padding: 6px 10px 24px; border: none; border-radius: 0; box-shadow: none; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; overflow-y: auto; -webkit-overflow-scrolling: touch; display: none; }
+        #search-fullscreen-body > .chat-search-dropdown.active { display: flex; flex-direction: column; }
+        #search-fullscreen-body > .chat-search-dropdown.active ~ * { display: none; }
+
         /* ── WHATSAPP-STYLE FILTER CHIPS & ARCHIVED ROW ── */
         .wa-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 4px; margin-bottom: 4px; scrollbar-width: none; }
         .wa-filter-row::-webkit-scrollbar { display: none; }
@@ -5950,6 +5959,7 @@
 
             let movedBox = null, boxParent = null, boxNext = null;
             let movedLists = []; // [{el, parent, next}]
+            let movedDropdown = null, dropdownParent = null, dropdownNext = null;
 
             function openFullscreenSearch(btn) {
                 const headerArea = btn.closest('.chat-header-area');
@@ -5970,6 +5980,18 @@
                     body.appendChild(el);
                 });
 
+                // Some search bars (e.g. Discover) carry a history/results panel that's normally
+                // an absolutely-positioned dropdown anchored to the input. Pull it out into the
+                // body too, ahead of the list it searches, so it renders as a full page of
+                // history/results instead of floating over that list (see CSS above).
+                const dropdownEl = searchBox.querySelector('.chat-search-dropdown');
+                if (dropdownEl) {
+                    movedDropdown = dropdownEl;
+                    dropdownParent = dropdownEl.parentNode;
+                    dropdownNext = dropdownEl.nextSibling;
+                    body.insertBefore(dropdownEl, body.firstChild);
+                }
+
                 overlay.classList.add('active');
                 const input = searchBox.querySelector('input');
                 if (input) setTimeout(() => input.focus(), 250);
@@ -5979,6 +6001,12 @@
             // the device/browser back button via the app's generic sheet-history handling),
             // so the search bar and its results always end up back in their original tab.
             function restoreMovedNodes() {
+                if (movedDropdown) {
+                    movedDropdown.classList.remove('active');
+                    if (dropdownNext) dropdownParent.insertBefore(movedDropdown, dropdownNext);
+                    else dropdownParent.appendChild(movedDropdown);
+                    movedDropdown = null;
+                }
                 if (movedBox) {
                     const input = movedBox.querySelector('input');
                     if (input) {

@@ -2194,8 +2194,18 @@
         /* ── FULL IMAGE VIEWER (avatar preview) ── */
         #image-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #image-viewer-overlay.active { opacity: 1; visibility: visible; }
-        .image-viewer-media { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        #image-viewer-img { width: 100%; height: auto; max-height: 100%; object-fit: contain; object-position: center; display: block; }
+        .image-viewer-media { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; align-items: flex-start; justify-content: center; -webkit-overflow-scrolling: touch; }
+        /* Width always spans edge-to-edge (matches WhatsApp/Instagram full-image view); height
+           follows the image's natural aspect ratio instead of being capped to the container, so a
+           tall/portrait photo (e.g. a screenshot) no longer gets shrunk-and-letterboxed with black
+           bars down the sides — it just scrolls vertically within .image-viewer-media instead.
+           margin:auto (rather than align-items:center on the container) is what actually centers
+           it vertically when it's shorter than the container: auto-margins on a flex item resolve
+           to equal top/bottom space when there's room, but drop to 0 once the image is taller than
+           the container, so the top of a tall image stays reachable by scrolling instead of being
+           clipped off-screen (a plain align-items:center would clip the overflow in most browsers).
+        */
+        #image-viewer-img { width: 100%; height: auto; display: block; margin: auto 0; }
         .image-viewer-close { position: absolute; top: 20px; right: 20px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
         .image-viewer-close:hover { opacity: 0.75; }
         .image-viewer-post-menu-btn { position: absolute; top: 20px; right: 68px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border: none; border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }

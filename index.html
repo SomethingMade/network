@@ -2258,6 +2258,12 @@
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
         #reel-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100007; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; display: flex; flex-direction: column; }
         #reel-viewer-overlay.active { opacity: 1; visibility: visible; }
+        /* Same elevated tier as the image/video viewer's .above-sheet (100012) — needed when the
+           reel viewer is opened by tapping a video's expand button on a post card rendered inside
+           a bottom sheet (e.g. a profile's Posts subtab), so it doesn't render behind that sheet
+           (#user-info-sheet-overlay / #profile-bottom-sheet-overlay, both z-index 100010). See the
+           tier comment above #image-viewer-overlay.active.above-sheet for the full picture. */
+        #reel-viewer-overlay.active.above-sheet { z-index: 100012; }
         /* .reel-viewer-topbar / .reel-viewer-close are no longer used now that the reel viewer
            has a real chat-header-area (see #reel-viewer-overlay HTML) — leaving the rules here
            rather than deleting them, same as this file's other retired-but-kept UI pieces. */
@@ -5628,7 +5634,7 @@
             track.innerHTML = '';
             reelPostIds = [];
             reelActiveIndex = -1;
-            document.getElementById('reel-viewer-overlay').classList.remove('active');
+            document.getElementById('reel-viewer-overlay').classList.remove('active', 'above-sheet');
         }
 
         // Keeps a reel item's like count/heart state, comment count, repost state/count, and
@@ -10463,6 +10469,14 @@
             card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
                 imgEl.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    // Same card markup/logic is reused for post cards rendered inside a bottom
+                    // sheet (e.g. a profile's Posts subtab, see buildProfilePostsList) as for the
+                    // main feed — elevate the viewer above that sheet when that's where the tap
+                    // came from, or it opens invisibly behind it. See the tier comment above
+                    // #image-viewer-overlay.active.above-sheet.
+                    if (card.closest('.bottom-sheet-overlay.active')) {
+                        document.getElementById('image-viewer-overlay').classList.add('above-sheet');
+                    }
                     openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10), originalId);
                 });
             });
@@ -10495,6 +10509,11 @@
                 e.stopPropagation();
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();
+                // Same elevation as the image viewer above — see the comment on the image click
+                // handler just above and the tier comment on #reel-viewer-overlay.active.above-sheet.
+                if (card.closest('.bottom-sheet-overlay.active')) {
+                    document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
+                }
                 openReelViewer(originalId);
             });
             const popoutBtn = card.querySelector('.feed-video-popout-btn');

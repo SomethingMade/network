@@ -508,7 +508,7 @@
            opacity fade running underneath a transform slide at the same time reads as
            a flicker, not a clean single motion. */
         @media (max-width: 767px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay, #notifications-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -519,10 +519,10 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active {
+            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active, #notifications-sheet-overlay.active {
                 pointer-events: auto;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -538,11 +538,14 @@
                 flex-direction: column;
                 overflow-y: auto;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle {
                 display: none;
+            }
+            #notifications-sheet-overlay .notif-sheet-header, #notifications-sheet-overlay #notif-header-selection {
+                padding-top: 14px;
             }
         }
 
@@ -613,14 +616,14 @@
            dropped so the chat stays visible and usable underneath; clicking outside the
            panel still closes it via the existing generic overlay click handler. */
         @media (min-width: 768px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #notifications-sheet-overlay {
                 align-items: stretch;
                 justify-content: flex-end;
                 background: rgba(0, 0, 0, 0.08);
                 backdrop-filter: none;
                 -webkit-backdrop-filter: none;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet {
                 width: 400px;
                 max-width: 400px;
                 height: 100%;
@@ -633,10 +636,15 @@
                 transition: transform 0.35s var(--ease-smooth);
                 padding: 20px 24px 32px;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet {
+            #notifications-sheet-overlay .bottom-sheet {
+                padding: 20px 0 32px;
+                display: flex;
+                flex-direction: column;
+            }
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -782,7 +790,8 @@
         .call-item-checkbox.checked::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
         .chat-item.call-selected { background: rgba(255, 69, 58, 0.1); border-radius: 12px; }
         .chat-item.calls-selection-mode .call-again-btn { display: none; }
-        .notif-sheet-header { padding: 0 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
+        .notif-page-sheet { max-height: 80vh; display:flex; flex-direction:column; padding: 12px 0 0; }
+        .notif-sheet-header { padding: 0 20px 12px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-sheet-header svg { flex-shrink: 0; }
         .notif-sheet-header svg:active { opacity: 0.6; }
         .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; user-select: none; -webkit-user-select: none; }
@@ -3208,13 +3217,15 @@
     </div>
 
     <div id="notifications-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="max-height: 80vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+        <div class="bottom-sheet notif-page-sheet">
             <div class="notif-sheet-header" id="notif-header-default">
-                <h3 style="margin:0; font-size:16px;">Notifications</h3>
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <svg id="btn-mark-all-notifs-read" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg>
-                    <svg id="btn-close-notifs-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Close"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" id="btn-close-notifs-sheet" class="tm-profile-back-btn" aria-label="Close" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <h3 style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.3px;">Notifications</h3>
                 </div>
+                <svg id="btn-mark-all-notifs-read" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg>
             </div>
             <div class="notif-sheet-header" id="notif-header-selection" style="display:none;">
                 <div style="display:flex; align-items:center; gap:14px;">

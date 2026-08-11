@@ -409,6 +409,8 @@
            inside the Settings sheet too, and needs to clear it the same way. Placed after
            settings-bottom-sheet-overlay (and copyright-policy-sheet-overlay) in the DOM. */
         #applock-pin-sheet-overlay { z-index: 100010; }
+        /* Delete Account is opened from inside the Settings sheet too — same reasoning. */
+        #delete-account-sheet-overlay { z-index: 100010; }
         /* Same reasoning again: the reel viewer's header camera icon opens this, so it needs
            to clear the reel viewer's z-index too, not just its own default (100005). */
         #status-upload-overlay { z-index: 100010; }
@@ -3601,6 +3603,18 @@
                 </div>
             </div>
 
+            <div class="wa-section">
+                <div class="wa-section-title">Danger Zone</div>
+                <div class="wa-list-row wa-row-clickable" id="setting-delete-account">
+                    <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title" style="color:var(--danger-red);">Delete Account</span>
+                        <span class="wa-row-sub">Permanently remove your account and data</span>
+                    </div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+            </div>
+
             <button type="button" id="btn-logout" class="wa-logout-row">Sign Out</button>
         </div>
     </div>
@@ -3758,6 +3772,44 @@
             <p id="applock-pin-sheet-error" style="color: var(--danger-red); font-size: 13px; min-height: 18px; margin: 8px 0 4px;"></p>
             <button type="button" class="btn-pill btn-primary" id="applock-pin-sheet-continue-btn" style="width:100%; margin-top: 10px;">Continue</button>
             <button type="button" class="btn-pill btn-outline" id="applock-pin-sheet-cancel-btn" style="width:100%; margin-top:10px; border:none;">Cancel</button>
+        </div>
+    </div>
+
+    <div id="delete-account-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 28px; text-align: center;">
+            <div class="sheet-handle"></div>
+            <div id="delete-account-warning-step">
+                <div class="applock-icon-wrap" style="margin-left:auto; margin-right:auto; background: rgba(255,69,58,0.12); color: var(--danger-red);">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                </div>
+                <div class="sheet-title" style="margin-bottom: 6px;">Delete Your Account?</div>
+                <p style="color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; margin: 0 0 16px; text-align:left;">
+                    This permanently deletes your profile, posts, stories, contacts, saved posts, and notifications — this can't be undone. Messages you've already sent in DMs and groups may still be visible to the people you sent them to, the same way they would after uninstalling most messaging apps.
+                </p>
+                <p style="color: var(--text-secondary); font-size: 12.5px; margin: 0 0 6px; text-align:left; font-weight:600;">Type DELETE to confirm</p>
+                <input type="text" id="delete-account-confirm-input" placeholder="DELETE" autocomplete="off" autocapitalize="characters" style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); font-size:14px; text-align:center; letter-spacing:1px; box-sizing:border-box;">
+                <button type="button" class="btn-pill btn-primary" id="delete-account-continue-btn" style="width:100%; margin-top: 16px; background:var(--danger-red);" disabled>Continue</button>
+                <button type="button" class="btn-pill btn-outline" id="delete-account-cancel-btn-1" style="width:100%; margin-top:10px; border:none;">Cancel</button>
+            </div>
+            <div id="delete-account-verify-step" style="display:none;">
+                <div class="applock-icon-wrap" style="margin-left:auto; margin-right:auto; background: rgba(255,69,58,0.12); color: var(--danger-red);">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+                </div>
+                <div class="sheet-title" style="margin-bottom: 6px;">Confirm It's You</div>
+                <p id="delete-account-verify-sub" style="color: var(--text-secondary); font-size: 13.5px; line-height: 1.5; margin: 0 0 18px;">Enter the code we sent to your phone to finish deleting your account.</p>
+                <div class="pin-boxes" id="delete-account-otp-boxes">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                    <input type="tel" inputmode="numeric" maxlength="1" class="pin-box delete-account-otp-box" autocomplete="off">
+                </div>
+                <p id="delete-account-verify-error" style="color: var(--danger-red); font-size: 13px; min-height: 18px; margin: 8px 0 4px;"></p>
+                <button type="button" class="btn-pill btn-primary" id="delete-account-confirm-btn" style="width:100%; margin-top: 10px; background:var(--danger-red);">Delete My Account</button>
+                <button type="button" class="btn-pill btn-outline" id="delete-account-cancel-btn-2" style="width:100%; margin-top:10px; border:none;">Cancel</button>
+                <div id="delete-account-recaptcha-container" style="margin-top:8px;"></div>
+            </div>
         </div>
     </div>
 
@@ -4902,8 +4954,8 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -12822,6 +12874,192 @@
                     showAuthStep('phone');
                 } finally { hideLoading(); }
             }
+        });
+
+        // --- Delete Account (Settings → Danger Zone) ---
+        // Two-step flow: type "DELETE" to confirm intent, then verify identity by re-entering an
+        // OTP sent to the account's own phone number (also satisfies Firebase's requirement that
+        // deleteUser() be called shortly after a fresh sign-in). Deletes the top-level database
+        // nodes this account owns directly, plus this user's own posts (found via a uid query),
+        // then deletes the Firebase Auth user itself. Group/DM messages already sent to other
+        // people, and any media already uploaded to Cloudinary/Storage, are intentionally left in
+        // place — the same limitation most messaging apps have, and called out in the warning copy
+        // rather than promising a fan-out delete this client can't safely or completely perform.
+        const deleteAccountSheetOverlay = document.getElementById('delete-account-sheet-overlay');
+        const deleteAccountWarningStep = document.getElementById('delete-account-warning-step');
+        const deleteAccountVerifyStep = document.getElementById('delete-account-verify-step');
+        const deleteAccountConfirmInput = document.getElementById('delete-account-confirm-input');
+        const deleteAccountContinueBtn = document.getElementById('delete-account-continue-btn');
+        const deleteAccountConfirmBtn = document.getElementById('delete-account-confirm-btn');
+        const deleteAccountVerifyError = document.getElementById('delete-account-verify-error');
+        const deleteAccountVerifySub = document.getElementById('delete-account-verify-sub');
+        let deleteAccountVerificationId = null;
+        let deleteAccountRecaptchaVerifier = null;
+
+        function ensureDeleteAccountRecaptcha() {
+            if (deleteAccountRecaptchaVerifier) return deleteAccountRecaptchaVerifier;
+            deleteAccountRecaptchaVerifier = new RecaptchaVerifier(auth, 'delete-account-recaptcha-container', { size: 'invisible' });
+            return deleteAccountRecaptchaVerifier;
+        }
+        function clearDeleteAccountRecaptcha() {
+            if (deleteAccountRecaptchaVerifier) { try { deleteAccountRecaptchaVerifier.clear(); } catch (_) {} }
+            deleteAccountRecaptchaVerifier = null;
+            const old = document.getElementById('delete-account-recaptcha-container');
+            if (old) {
+                const fresh = document.createElement('div');
+                fresh.id = 'delete-account-recaptcha-container';
+                fresh.style.marginTop = '8px';
+                old.replaceWith(fresh);
+            }
+        }
+        const deleteAccountOtpCtl = wirePinBoxGroup(
+            Array.from(document.querySelectorAll('.delete-account-otp-box')),
+            () => deleteAccountConfirmBtn.click()
+        );
+
+        function resetDeleteAccountSheet() {
+            deleteAccountWarningStep.style.display = '';
+            deleteAccountVerifyStep.style.display = 'none';
+            deleteAccountConfirmInput.value = '';
+            deleteAccountContinueBtn.disabled = true;
+            deleteAccountVerifyError.textContent = '';
+            deleteAccountOtpCtl.clear();
+            deleteAccountVerificationId = null;
+            clearDeleteAccountRecaptcha();
+        }
+        function closeDeleteAccountSheet() {
+            deleteAccountSheetOverlay.classList.remove('active');
+            resetDeleteAccountSheet();
+        }
+        document.getElementById('setting-delete-account').addEventListener('click', () => {
+            resetDeleteAccountSheet();
+            deleteAccountSheetOverlay.classList.add('active');
+        });
+        document.getElementById('delete-account-cancel-btn-1').addEventListener('click', closeDeleteAccountSheet);
+        document.getElementById('delete-account-cancel-btn-2').addEventListener('click', closeDeleteAccountSheet);
+        deleteAccountSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === deleteAccountSheetOverlay) closeDeleteAccountSheet();
+        });
+        deleteAccountConfirmInput.addEventListener('input', () => {
+            deleteAccountContinueBtn.disabled = deleteAccountConfirmInput.value !== 'DELETE';
+        });
+
+        deleteAccountContinueBtn.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            deleteAccountWarningStep.style.display = 'none';
+            deleteAccountVerifyStep.style.display = '';
+            if (!user.phoneNumber) {
+                // No phone credential to re-verify with (rare — e.g. an email-only account).
+                // Fall back to the type-DELETE confirmation alone as the identity check.
+                deleteAccountVerifySub.textContent = "Tap below to permanently delete your account.";
+                document.getElementById('delete-account-otp-boxes').style.display = 'none';
+                return;
+            }
+            deleteAccountVerifySub.textContent = `Enter the code we sent to ${user.phoneNumber} to finish deleting your account.`;
+            try {
+                const verifier = ensureDeleteAccountRecaptcha();
+                const provider = new PhoneAuthProvider(auth);
+                deleteAccountVerificationId = await provider.verifyPhoneNumber(user.phoneNumber, verifier);
+                notify(`Code sent to ${user.phoneNumber}`);
+            } catch (err) {
+                deleteAccountVerifyError.textContent = (err.message || '').replace('Firebase: ', '') || "Couldn't send a verification code.";
+                clearDeleteAccountRecaptcha();
+            }
+        });
+
+        async function deleteAccountAndData(uid) {
+            const deletions = [
+                remove(ref(database, 'users/' + uid)),
+                remove(ref(database, 'contacts/' + uid)),
+                remove(ref(database, 'followers/' + uid)),
+                remove(ref(database, 'blocks/' + uid)),
+                remove(ref(database, 'user_chats/' + uid)),
+                remove(ref(database, 'user_group_chats/' + uid)),
+                remove(ref(database, 'notifications/' + uid)),
+                remove(ref(database, 'saved_posts/' + uid)),
+                remove(ref(database, 'call_log/' + uid)),
+                remove(ref(database, 'stories/' + uid)),
+            ];
+            try {
+                const username = cachedUsers[uid] && cachedUsers[uid].username;
+                if (username) deletions.push(remove(ref(database, 'usernames/' + username)));
+            } catch (e) { /* best effort */ }
+            try {
+                const postsSnap = await get(query(ref(database, 'posts'), orderByChild('uid'), equalTo(uid)));
+                if (postsSnap.exists()) {
+                    postsSnap.forEach(child => { deletions.push(remove(ref(database, 'posts/' + child.key))); return false; });
+                }
+            } catch (e) { console.error('Failed to enumerate posts for deletion', e); }
+            await Promise.allSettled(deletions);
+        }
+
+        async function finishAccountDeletion(user) {
+            deleteAccountConfirmBtn.disabled = true;
+            deleteAccountConfirmBtn.textContent = 'Deleting…';
+            showLoading();
+            try {
+                await teardownPushNotifications(user.uid);
+                await deleteAccountAndData(user.uid);
+                await deleteUser(user);
+                clearAppLockState();
+                deleteAccountSheetOverlay.classList.remove('active');
+                profileSheetOverlay.classList.remove('active');
+                settingsSheetOverlay.classList.remove('active');
+                insightsSheetOverlay.classList.remove('active');
+                resetDeleteAccountSheet();
+                confirmationResult = null;
+                document.getElementById('auth-phone').value = '';
+                clearOtpBoxes();
+                showAuthStep('phone');
+                notify('Your account has been deleted');
+            } catch (err) {
+                let msg = (err.message || '').replace('Firebase: ', '') || "Something went wrong deleting your account.";
+                if (err.code === 'auth/requires-recent-login') {
+                    msg = 'Please log out and back in, then try again.';
+                }
+                deleteAccountVerifyError.textContent = msg;
+            } finally {
+                hideLoading();
+                deleteAccountConfirmBtn.disabled = false;
+                deleteAccountConfirmBtn.textContent = 'Delete My Account';
+            }
+        }
+
+        deleteAccountConfirmBtn.addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            deleteAccountVerifyError.textContent = '';
+            if (!user.phoneNumber) {
+                await finishAccountDeletion(user);
+                return;
+            }
+            const boxes = Array.from(document.querySelectorAll('.delete-account-otp-box'));
+            const code = boxes.map(b => b.value).join('');
+            if (code.length !== boxes.length) {
+                deleteAccountVerifyError.textContent = 'Enter the 6-digit code.';
+                return;
+            }
+            if (!deleteAccountVerificationId) {
+                deleteAccountVerifyError.textContent = 'Please request a new code.';
+                return;
+            }
+            deleteAccountConfirmBtn.disabled = true;
+            deleteAccountConfirmBtn.textContent = 'Verifying…';
+            try {
+                const credential = PhoneAuthProvider.credential(deleteAccountVerificationId, code);
+                await reauthenticateWithCredential(user, credential);
+            } catch (err) {
+                let msg = (err.message || '').replace('Firebase: ', '');
+                if (err.code === 'auth/invalid-verification-code') msg = 'That code was incorrect. Please try again.';
+                else if (err.code === 'auth/code-expired') msg = 'That code has expired. Please request a new one.';
+                deleteAccountVerifyError.textContent = msg || 'Verification failed.';
+                deleteAccountOtpCtl.clear();
+                deleteAccountConfirmBtn.disabled = false;
+                deleteAccountConfirmBtn.textContent = 'Delete My Account';
+                return;
+            }
+            await finishAccountDeletion(user);
         });
 
         // --- FOLLOW / UNFOLLOW ---

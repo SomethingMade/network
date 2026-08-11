@@ -16903,10 +16903,18 @@
                 cachedCallLogEntries = [];
             }
             if (isInitialLoad) {
-                // Branded splash hides on its existing 800ms timing, unchanged. If we showed
-                // the page shimmer (logged-in path only), let it stay up for its own full
-                // PAGE_SHIMMER_MIN_MS after taking over from the splash, then reveal real content.
-                setTimeout(() => { hideLoading(); }, 800);
+                // Branded splash hides on its existing 800ms timing. It used to be a 0.5s
+                // opacity cross-fade into whatever's underneath (auth screen, or the page
+                // shimmer for the logged-in path) — same category of issue fixed on the OTP
+                // and force-update overlays: the fade let the logo linger/dissolve into the
+                // next screen instead of a clean handoff. Same instant-snap trick here.
+                setTimeout(() => {
+                    const loadingOverlay = document.getElementById('loading-overlay');
+                    loadingOverlay.style.transition = 'none';
+                    loadingOverlay.classList.remove('active');
+                    void loadingOverlay.offsetWidth;
+                    loadingOverlay.style.transition = '';
+                }, 800);
                 if (user) setTimeout(() => { hidePageShimmer(); }, 800 + PAGE_SHIMMER_MIN_MS);
                 isInitialLoad = false;
             }

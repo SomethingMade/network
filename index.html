@@ -7342,6 +7342,44 @@
             const url = await getDownloadURL(snapshot.ref);
             return url;
         }
+
+        // Client-side stand-in for Cloudinary's server-generated video poster frame: draws a
+        // frame from the video file onto a canvas and returns it as a JPEG Blob, so feed post
+        // videos hosted on Firebase Storage can still get a thumbnail uploaded alongside them.
+        function generateVideoThumbnailBlob(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.muted = true;
+                video.playsInline = true;
+                const objectUrl = URL.createObjectURL(file);
+                video.src = objectUrl;
+                const cleanup = () => URL.revokeObjectURL(objectUrl);
+                video.onloadedmetadata = () => {
+                    video.currentTime = Math.min(video.duration * 0.3, 2);
+                };
+                video.onseeked = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        canvas.toBlob((blob) => {
+                            cleanup();
+                            if (blob) resolve(blob); else reject(new Error('Thumbnail capture failed'));
+                        }, 'image/jpeg', 0.8);
+                    } catch (err) {
+                        cleanup();
+                        reject(err);
+                    }
+                };
+                video.onerror = () => {
+                    cleanup();
+                    reject(new Error('Failed to load video for thumbnail'));
+                };
+            });
+        }
         const functionsClient = getFunctions(app);
         
         // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
@@ -9429,9 +9467,22 @@
                     try {
                         submitBtn.disabled = true;
                         submitBtn.textContent = 'Uploading...';
-                        const { url } = await uploadToCloudinary(videoFile);
+                        const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
+                        const safeName = (videoFile.name || 'video').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                        const videoPath = `posts/${uid}/${Date.now()}_${safeName}`;
+                        const url = await uploadToFirebaseStorage(videoFile, videoPath);
+                        // Best-effort poster frame — a post video without one just falls back
+                        // to the existing in-browser onloadedmetadata seek at render time.
+                        let thumbnailUrl = null;
+                        try {
+                            const thumbBlob = await generateVideoThumbnailBlob(videoFile);
+                            const thumbPath = `posts/${uid}/${Date.now()}_thumb.jpg`;
+                            thumbnailUrl = await uploadToFirebaseStorage(thumbBlob, thumbPath);
+                        } catch (thumbErr) {
+                            // Non-fatal — post still works without a stored thumbnail.
+                        }
                         feedComposerImages = [];
-                        feedComposerVideo = { url };
+                        feedComposerVideo = { url, thumbnailUrl };
                         feedComposerMusic = null;
                         updateComposerMusicChip();
                         renderComposerPreview();
@@ -9464,8 +9515,11 @@
                 try {
                     submitBtn.disabled = true;
                     submitBtn.textContent = 'Uploading...';
+                    const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
                     for (const file of toUpload) {
-                        const { url } = await uploadToCloudinary(file);
+                        const safeName = (file.name || 'image').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                        const path = `posts/${uid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+                        const url = await uploadToFirebaseStorage(file, path);
                         feedComposerImages.push(url);
                     }
                     feedComposerActiveIdx = feedComposerImages.length - 1;
@@ -9573,7 +9627,7 @@
                         imageUrl: feedComposerImages.length ? feedComposerImages[0] : null,
                         imageUrls: feedComposerImages.length ? feedComposerImages : null,
                         videoUrl: feedComposerVideo ? feedComposerVideo.url : null,
-                        videoThumbnail: feedComposerVideo ? cloudinaryVideoThumbnail(feedComposerVideo.url, 1) : null,
+                        videoThumbnail: feedComposerVideo ? (feedComposerVideo.thumbnailUrl || null) : null,
                         music: ((feedComposerImages.length || feedComposerVideo) && feedComposerMusic) ? feedComposerMusic : null,
                         poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         linkPreview: linkPreview,

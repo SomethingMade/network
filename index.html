@@ -2207,6 +2207,9 @@
         .image-viewer-nav-prev { left: 14px; }
         .image-viewer-nav-next { right: 14px; }
         .image-viewer-nav.visible { display: flex; }
+        /* Below 768px, swipe replaces the arrow buttons as the nav gesture — hide arrows even
+           when .visible is set, so they don't clutter the viewer on phones. */
+        @media (max-width: 768px) { .image-viewer-nav.visible { display: none; } }
         .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; }
         .image-viewer-counter.visible { display: block; }
         .image-viewer-post-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: space-around; background: #000; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,0.08); }
@@ -5272,6 +5275,38 @@
         }
         document.getElementById('image-viewer-prev').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(-1); });
         document.getElementById('image-viewer-next').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(1); });
+        // Swipe-left/right to navigate between images in a gallery, on touch devices.
+        // Tracks horizontal vs vertical intent from the first meaningful move so a mostly-vertical
+        // drag doesn't get hijacked (lets pinch/scroll-adjacent gestures pass through untouched).
+        (function initImageViewerSwipe() {
+            const media = document.getElementById('image-viewer-media');
+            let startX = 0, startY = 0, tracking = false, isHorizontal = null;
+            media.addEventListener('touchstart', (e) => {
+                if (!currentViewerGallery || e.touches.length !== 1) { tracking = false; return; }
+                tracking = true;
+                isHorizontal = null;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }, { passive: true });
+            media.addEventListener('touchmove', (e) => {
+                if (!tracking || e.touches.length !== 1) return;
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                if (isHorizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                    isHorizontal = Math.abs(dx) > Math.abs(dy);
+                }
+                if (isHorizontal) e.preventDefault();
+            }, { passive: false });
+            media.addEventListener('touchend', (e) => {
+                if (!tracking) return;
+                tracking = false;
+                if (!isHorizontal) return;
+                const dx = e.changedTouches[0].clientX - startX;
+                const SWIPE_THRESHOLD = 50;
+                if (dx <= -SWIPE_THRESHOLD) stepImageViewer(1);
+                else if (dx >= SWIPE_THRESHOLD) stepImageViewer(-1);
+            });
+        })();
         function closeImageViewer() {
             const overlay = document.getElementById('image-viewer-overlay');
             overlay.classList.remove('active', 'privacy-blur', 'above-sheet');

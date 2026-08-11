@@ -11916,8 +11916,14 @@
                 const overlay = document.getElementById('otp-success-overlay');
                 if (!overlay) return resolve();
                 overlay.classList.remove('play');
-                void overlay.offsetWidth; // force reflow so the draw-in animations restart cleanly
+                // Skip the opacity transition on the way IN — with it, this overlay briefly
+                // cross-fades over whatever's behind it (e.g. the branded loading splash),
+                // letting that logo flash through for a frame before this covers it. Snapping to
+                // fully opaque immediately avoids that; only the fade-OUT at the end stays smooth.
+                overlay.style.transition = 'none';
                 overlay.classList.add('active');
+                void overlay.offsetWidth; // force the instant style to apply before re-enabling
+                overlay.style.transition = '';
                 requestAnimationFrame(() => overlay.classList.add('play'));
                 setTimeout(() => {
                     overlay.classList.remove('active');
@@ -11932,8 +11938,10 @@
                 const overlay = document.getElementById('otp-fail-overlay');
                 if (!overlay) return resolve();
                 overlay.classList.remove('play');
-                void overlay.offsetWidth;
+                overlay.style.transition = 'none';
                 overlay.classList.add('active');
+                void overlay.offsetWidth;
+                overlay.style.transition = '';
                 requestAnimationFrame(() => overlay.classList.add('play'));
                 setTimeout(() => {
                     overlay.classList.remove('active');

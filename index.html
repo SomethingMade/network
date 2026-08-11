@@ -6546,6 +6546,13 @@
         const sheetOpenStack = [];
         let closingSheetViaBackButton = false;
         let sheetSyncScheduled = false;
+        // Set right before a *programmatic* history.back() below (closing a sheet via its own
+        // Cancel/X/backdrop, not the device back button) — consumes that sheet's pushed history
+        // entry without also being mistaken for a real back-button press. Without this, the
+        // resulting popstate saw the stack already spliced down to just the parent sheet and
+        // closed THAT too — e.g. cancelling the App Lock PIN sheet (open on top of Settings) was
+        // also closing Settings, since popstate always acted on "whatever's now on top".
+        let suppressNextPopstateClose = false;
         function scheduleSheetHistorySync() {
             if (sheetSyncScheduled) return;
             sheetSyncScheduled = true;
@@ -6567,6 +6574,7 @@
             } else if (opened.length) {
                 history.pushState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
             } else {
+                suppressNextPopstateClose = true;
                 history.back();
             }
         }
@@ -6575,6 +6583,7 @@
                 .observe(overlay, { attributes: true, attributeFilter: ['class'] });
         });
         window.addEventListener('popstate', () => {
+            if (suppressNextPopstateClose) { suppressNextPopstateClose = false; return; }
             if (!sheetOpenStack.length) return;
             closingSheetViaBackButton = true;
             const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
@@ -6585,6 +6594,7 @@
             syncSheetHistory();
             closingSheetViaBackButton = false;
         });
+
 
         // --- SLIDING NAV INDICATOR ---
         function updateNavIndicator() {

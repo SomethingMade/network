@@ -1500,8 +1500,10 @@
         .story-card-avatar { width: 100%; height: 100%; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--primary-blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
         .story-card-name { position: absolute; left: 8px; right: 8px; bottom: 8px; color: #fff; font-size: 12.5px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .story-card-add { background: linear-gradient(160deg, var(--bg-hover), var(--bg-alt)); border: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 14px; gap: 10px; }
-        .story-card-add-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--gradient-brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
-        .story-card-add .story-card-name { position: static; color: var(--text-primary); text-shadow: none; }
+        .story-card-add-avatar { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.32; filter: saturate(0.7); }
+        .story-card-add-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.05) 0%, var(--bg-alt) 100%); }
+        .story-card-add-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--gradient-brand); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.15); position: relative; z-index: 1; }
+        .story-card-add .story-card-name { position: relative; z-index: 1; color: var(--text-primary); text-shadow: none; }
 
         .chat-avatar-ring { width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; }
         .chat-avatar-status-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
@@ -14690,7 +14692,7 @@
 
             const showNudge = ownItems.length === 0;
             container.classList.toggle('has-nudge', showNudge);
-            container.appendChild(buildAddStoryItem(showNudge));
+            container.appendChild(buildAddStoryItem(showNudge, ownProfile.photoURL || user.photoURL || ""));
 
             if (ownItems.length > 0) {
                 container.appendChild(buildStoryItem(
@@ -14714,7 +14716,7 @@
             });
         }
 
-        function buildAddStoryItem(showNudge) {
+        function buildAddStoryItem(showNudge, photoURL) {
             const wrap = document.createElement('div');
             wrap.className = 'story-item';
 
@@ -14732,11 +14734,23 @@
             inner.className = 'story-ring-inner';
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'story-avatar-img';
-            avatarDiv.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
+            if (photoURL) {
+                // Faded photo behind the plus, instead of a flat blank circle, so the "Add
+                // Story" ring still reads as "this is you" rather than an anonymous button.
+                avatarDiv.style.backgroundImage = `url('${photoURL}')`;
+                avatarDiv.style.backgroundSize = 'cover';
+                avatarDiv.style.backgroundPosition = 'center';
+                avatarDiv.style.opacity = '0.4';
+            } else {
+                avatarDiv.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
+            }
             avatarDiv.style.color = 'var(--primary-blue)';
             avatarDiv.style.fontSize = '24px';
+            avatarDiv.style.display = 'flex';
+            avatarDiv.style.alignItems = 'center';
+            avatarDiv.style.justifyContent = 'center';
             avatarDiv.textContent = '+';
-            
+
             inner.appendChild(avatarDiv);
             ring.appendChild(inner);
             wrap.appendChild(ring);
@@ -14980,10 +14994,12 @@
             return wrap;
         }
 
-        function buildAddStoryCardItem() {
+        function buildAddStoryCardItem(photoURL) {
             const wrap = document.createElement('div');
             wrap.className = 'story-card story-card-add';
             wrap.innerHTML = `
+                ${photoURL ? `<div class="story-card-add-avatar" style="background-image:url('${photoURL}')"></div>` : ''}
+                <div class="story-card-add-scrim"></div>
                 <div class="story-card-add-icon">+</div>
                 <div class="story-card-name">Add Status</div>
             `;
@@ -14998,14 +15014,14 @@
             container.innerHTML = "";
             const now = Date.now();
 
-            container.appendChild(buildAddStoryCardItem());
+            const ownProfile = (usersData && usersData[user.uid]) || {};
+            container.appendChild(buildAddStoryCardItem(ownProfile.photoURL || user.photoURL || ""));
 
             const ownRaw = [];
             if (storiesData && storiesData[user.uid]) {
                 Object.entries(storiesData[user.uid]).forEach(([key, val]) => ownRaw.push({ ...val, key }));
             }
             const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
-            const ownProfile = (usersData && usersData[user.uid]) || {};
 
             if (ownItems.length > 0) {
                 container.appendChild(buildStoryCardItem(

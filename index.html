@@ -405,6 +405,10 @@
            to clear settings-bottom-sheet-overlay's z-index too — it's placed after
            settings-bottom-sheet-overlay in the DOM, so equal z-index paints it above. */
         #copyright-policy-sheet-overlay { z-index: 100010; }
+        /* Same reasoning: the PIN setup/change/disable flow for App Lock is opened from
+           inside the Settings sheet too, and needs to clear it the same way. Placed after
+           settings-bottom-sheet-overlay (and copyright-policy-sheet-overlay) in the DOM. */
+        #applock-pin-sheet-overlay { z-index: 100010; }
         /* Same reasoning again: the reel viewer's header camera icon opens this, so it needs
            to clear the reel viewer's z-index too, not just its own default (100005). */
         #status-upload-overlay { z-index: 100010; }
@@ -2702,6 +2706,24 @@
 
         .msg-link { color: var(--link-color); font-weight: 600; text-decoration: underline; word-break: break-all; }
         .msg-bubble.out .msg-link { color: inherit; text-decoration-color: rgba(255,255,255,0.6); }
+
+        /* ── APP LOCK (Settings → Security) ──
+           Full-screen PIN/biometric gate shown on fresh app open and whenever the app returns
+           from being backgrounded, while xoxaAppLockEnabled is set — see maybeShowAppLockGate()
+           and the visibilitychange listener near it. Sits above every other overlay/sheet in the
+           app (all of which top out around z-index 100012) but below the force-update overlay,
+           since a forced update should still block access before app lock ever gets a chance to
+           show (checkForForcedUpdate() returns early in onAuthStateChanged, before this is called). */
+        #app-lock-overlay { position: fixed; inset: 0; z-index: 100090; background: var(--bg-base); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 28px; text-align: center; opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s; }
+        #app-lock-overlay.active { opacity: 1; visibility: visible; }
+        .applock-icon-wrap { width: 64px; height: 64px; border-radius: 50%; background: rgba(var(--primary-rgb),0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; color: var(--primary-blue); }
+        .applock-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+        .applock-sub { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 24px; }
+        #app-lock-unlock-error { color: var(--danger-red); font-size: 13px; min-height: 18px; margin: 12px 0 0; }
+        .applock-biometric-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--primary-blue); font-size: 13.5px; font-weight: 600; font-family: inherit; cursor: pointer; padding: 10px 16px; margin-top: 20px; }
+        .applock-forgot-link { color: var(--text-secondary); font-size: 12.5px; margin-top: 28px; text-decoration: underline; cursor: pointer; }
+        @keyframes applockShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
+        .pin-shake { animation: applockShake 0.5s ease; }
     </style>
 </head>
 <body>
@@ -2765,6 +2787,26 @@
                 <button type="button" id="force-update-reload-btn" class="btn-pill btn-primary">Update</button>
             </div>
         </div>
+    </div>
+
+    <div id="app-lock-overlay">
+        <div class="applock-icon-wrap">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        </div>
+        <div class="applock-title">Enter Your PIN</div>
+        <div class="applock-sub">Xoxa is locked for your privacy</div>
+        <div class="pin-boxes" id="app-lock-unlock-pin-boxes">
+            <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-unlock-pin-box" autocomplete="off">
+            <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-unlock-pin-box" autocomplete="off">
+            <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-unlock-pin-box" autocomplete="off">
+            <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-unlock-pin-box" autocomplete="off">
+        </div>
+        <p id="app-lock-unlock-error"></p>
+        <button type="button" class="applock-biometric-btn" id="app-lock-biometric-btn" style="display:none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c0 3-1 5-1 5"></path><path d="M8 11a4 4 0 0 1 8 0c0 2-.5 4.5-1.5 6"></path><path d="M5 11a7 7 0 0 1 14 0c0 3-1 6-2.5 8"></path><path d="M12 11v1c0 2.5-.5 4.5-1.5 6"></path><path d="M9 16.5c-.5 1-1 1.8-1.7 2.5"></path></svg>
+            Use Face/Touch ID
+        </button>
+        <span class="applock-forgot-link" id="app-lock-forgot-link">Forgot PIN? Log out</span>
     </div>
 
     <div id="custom-modal-overlay" class="modal-overlay">
@@ -3446,6 +3488,37 @@
             </div>
 
             <div class="wa-section">
+                <div class="wa-section-title">Security</div>
+                <div class="wa-list-row">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">App Lock</span>
+                        <span class="wa-row-sub">Require a PIN to open Xoxa</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="app-lock-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="wa-list-row" id="app-lock-biometric-row" style="display:none;">
+                    <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c0 3-1 5-1 5"></path><path d="M8 11a4 4 0 0 1 8 0c0 2-.5 4.5-1.5 6"></path><path d="M5 11a7 7 0 0 1 14 0c0 3-1 6-2.5 8"></path><path d="M12 11v1c0 2.5-.5 4.5-1.5 6"></path><path d="M9 16.5c-.5 1-1 1.8-1.7 2.5"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Use Face/Touch ID</span>
+                        <span class="wa-row-sub">Unlock with your device biometrics instead</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="app-lock-biometric-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="app-lock-change-pin-row" style="display:none;">
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="M21 2l-9.6 9.6"></path><path d="M15.5 7.5l3 3L22 7l-3-3"></path></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Change PIN</span></div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+            </div>
+
+            <div class="wa-section">
                 <div class="wa-section-title">Notifications</div>
                 <div class="wa-list-row">
                     <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></div>
@@ -3665,6 +3738,26 @@
 
                 <p style="color:var(--text-secondary); font-size:12px; margin-top:18px;">This policy is provided for information and doesn't constitute legal advice. If you need guidance on your specific situation, please consult a qualified attorney.</p>
             </div>
+        </div>
+    </div>
+
+    <div id="applock-pin-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 28px; text-align: center;">
+            <div class="sheet-handle"></div>
+            <div class="applock-icon-wrap" style="margin-left:auto; margin-right:auto;">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <div class="sheet-title" id="applock-pin-sheet-title" style="margin-bottom: 6px;">Create a PIN</div>
+            <p class="applock-sub" id="applock-pin-sheet-subtitle" style="margin: 0 0 18px;">Choose a 4-digit PIN to lock the app.</p>
+            <div class="pin-boxes" id="applock-pin-sheet-boxes">
+                <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-setup-pin-box" autocomplete="off">
+                <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-setup-pin-box" autocomplete="off">
+                <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-setup-pin-box" autocomplete="off">
+                <input type="tel" inputmode="numeric" maxlength="1" class="pin-box applock-setup-pin-box" autocomplete="off">
+            </div>
+            <p id="applock-pin-sheet-error" style="color: var(--danger-red); font-size: 13px; min-height: 18px; margin: 8px 0 4px;"></p>
+            <button type="button" class="btn-pill btn-primary" id="applock-pin-sheet-continue-btn" style="width:100%; margin-top: 10px;">Continue</button>
+            <button type="button" class="btn-pill btn-outline" id="applock-pin-sheet-cancel-btn" style="width:100%; margin-top:10px; border:none;">Cancel</button>
         </div>
     </div>
 
@@ -12226,12 +12319,310 @@
         const settingsSheetOverlay = document.getElementById('settings-bottom-sheet-overlay');
         document.getElementById('btn-open-settings').addEventListener('click', () => {
             settingsSheetOverlay.classList.add('active');
+            refreshAppLockSettingsUI();
         });
         document.getElementById('btn-close-settings').addEventListener('click', () => {
             settingsSheetOverlay.classList.remove('active');
         });
         settingsSheetOverlay.addEventListener('click', (e) => {
             if (e.target === settingsSheetOverlay) settingsSheetOverlay.classList.remove('active');
+        });
+
+        // --- App Lock (Settings → Security) ---
+        // A local, device-only PIN/biometric gate — not tied to the Firebase account, just
+        // guards opening this app on this device. Everything lives in localStorage:
+        //   xoxaAppLockEnabled        'true' | absent
+        //   xoxaAppLockPinHash        SHA-256 hex digest of the 4-digit PIN (never stored in plain text)
+        //   xoxaAppLockBiometricCredId  base64 WebAuthn credential id, only present once biometric is set up
+        async function sha256Hex(text) {
+            const bytes = new TextEncoder().encode(text);
+            const digest = await crypto.subtle.digest('SHA-256', bytes);
+            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        function isAppLockEnabled() { return localStorage.getItem('xoxaAppLockEnabled') === 'true'; }
+        function hasAppLockBiometric() { return !!localStorage.getItem('xoxaAppLockBiometricCredId'); }
+        async function verifyAppLockPin(pin) {
+            const stored = localStorage.getItem('xoxaAppLockPinHash');
+            if (!stored) return false;
+            return (await sha256Hex(pin)) === stored;
+        }
+        function clearAppLockState() {
+            localStorage.removeItem('xoxaAppLockEnabled');
+            localStorage.removeItem('xoxaAppLockPinHash');
+            localStorage.removeItem('xoxaAppLockBiometricCredId');
+        }
+
+        // Generic 4-box PIN input wiring, reused for both the setup/change/disable sheet and
+        // the unlock gate — each call is scoped to its own box list so the two flows (and the
+        // unrelated e2e-backup 6-box PIN, which uses the shared '.pin-box' selector by itself)
+        // never interfere with each other.
+        function wirePinBoxGroup(boxes, onComplete) {
+            boxes.forEach((box, i) => {
+                box.addEventListener('input', () => {
+                    box.value = box.value.replace(/[^0-9]/g, '').slice(0, 1);
+                    box.classList.toggle('filled', box.value.length === 1);
+                    if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+                    if (i === boxes.length - 1 && box.value) {
+                        const pin = boxes.map(b => b.value).join('');
+                        if (pin.length === boxes.length && onComplete) onComplete(pin);
+                    }
+                });
+                box.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && !box.value && i > 0) boxes[i - 1].focus();
+                });
+            });
+            return {
+                clear() { boxes.forEach(b => { b.value = ''; b.classList.remove('filled'); }); if (boxes[0]) boxes[0].focus(); },
+                shake() {
+                    const wrap = boxes[0] && boxes[0].parentElement;
+                    if (!wrap) return;
+                    wrap.classList.remove('pin-shake');
+                    void wrap.offsetWidth;
+                    wrap.classList.add('pin-shake');
+                }
+            };
+        }
+
+        // --- App Lock PIN sheet (Settings → App Lock / Change PIN / disabling App Lock) ---
+        // One shared sheet drives four flows via appLockPinFlowMode: verifying the current PIN
+        // before disabling App Lock, verifying it before letting the user pick a new one, and the
+        // create → confirm pair used both for first-time setup and right after that verification.
+        const applockPinSheetOverlay = document.getElementById('applock-pin-sheet-overlay');
+        const applockPinSheetTitle = document.getElementById('applock-pin-sheet-title');
+        const applockPinSheetSubtitle = document.getElementById('applock-pin-sheet-subtitle');
+        const applockPinSheetError = document.getElementById('applock-pin-sheet-error');
+        const applockPinSheetContinueBtn = document.getElementById('applock-pin-sheet-continue-btn');
+        let appLockPinFlowMode = 'create'; // 'verify-disable' | 'verify-change' | 'create' | 'confirm'
+        let appLockFirstNewPin = null;
+        const applockSetupPinCtl = wirePinBoxGroup(
+            Array.from(document.querySelectorAll('.applock-setup-pin-box')),
+            (pin) => applockPinSheetContinueBtn.click()
+        );
+
+        function openAppLockPinSheet(mode) {
+            appLockPinFlowMode = mode;
+            appLockFirstNewPin = null;
+            applockPinSheetError.textContent = '';
+            applockSetupPinCtl.clear();
+            if (mode === 'verify-disable') {
+                applockPinSheetTitle.textContent = 'Enter Your PIN';
+                applockPinSheetSubtitle.textContent = 'Confirm your PIN to turn off App Lock.';
+            } else if (mode === 'verify-change') {
+                applockPinSheetTitle.textContent = 'Enter Current PIN';
+                applockPinSheetSubtitle.textContent = 'Confirm your current PIN to set a new one.';
+            } else {
+                applockPinSheetTitle.textContent = 'Create a PIN';
+                applockPinSheetSubtitle.textContent = 'Choose a 4-digit PIN to lock the app.';
+            }
+            applockPinSheetOverlay.classList.add('active');
+        }
+        function closeAppLockPinSheet() {
+            applockPinSheetOverlay.classList.remove('active');
+            // Revert the toggle if the sheet is dismissed mid-flow without completing it.
+            refreshAppLockSettingsUI();
+        }
+        document.getElementById('applock-pin-sheet-cancel-btn').addEventListener('click', closeAppLockPinSheet);
+        applockPinSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === applockPinSheetOverlay) closeAppLockPinSheet();
+        });
+
+        applockPinSheetContinueBtn.addEventListener('click', async () => {
+            const boxes = Array.from(document.querySelectorAll('.applock-setup-pin-box'));
+            const pin = boxes.map(b => b.value).join('');
+            if (pin.length !== boxes.length) {
+                applockPinSheetError.textContent = 'Enter all 4 digits.';
+                return;
+            }
+            applockPinSheetError.textContent = '';
+
+            if (appLockPinFlowMode === 'verify-disable') {
+                if (!(await verifyAppLockPin(pin))) {
+                    applockPinSheetError.textContent = 'Incorrect PIN';
+                    applockSetupPinCtl.shake();
+                    applockSetupPinCtl.clear();
+                    return;
+                }
+                clearAppLockState();
+                notify('App Lock turned off');
+                applockPinSheetOverlay.classList.remove('active');
+                refreshAppLockSettingsUI();
+                return;
+            }
+
+            if (appLockPinFlowMode === 'verify-change') {
+                if (!(await verifyAppLockPin(pin))) {
+                    applockPinSheetError.textContent = 'Incorrect PIN';
+                    applockSetupPinCtl.shake();
+                    applockSetupPinCtl.clear();
+                    return;
+                }
+                appLockPinFlowMode = 'create';
+                appLockFirstNewPin = null;
+                applockPinSheetTitle.textContent = 'Create a New PIN';
+                applockPinSheetSubtitle.textContent = 'Choose a new 4-digit PIN.';
+                applockSetupPinCtl.clear();
+                return;
+            }
+
+            if (appLockPinFlowMode === 'create') {
+                appLockFirstNewPin = pin;
+                appLockPinFlowMode = 'confirm';
+                applockPinSheetTitle.textContent = 'Confirm PIN';
+                applockPinSheetSubtitle.textContent = 'Re-enter your new PIN.';
+                applockSetupPinCtl.clear();
+                return;
+            }
+
+            if (appLockPinFlowMode === 'confirm') {
+                if (pin !== appLockFirstNewPin) {
+                    applockPinSheetError.textContent = "PINs don't match — try again.";
+                    applockSetupPinCtl.shake();
+                    appLockPinFlowMode = 'create';
+                    appLockFirstNewPin = null;
+                    applockPinSheetTitle.textContent = 'Create a PIN';
+                    applockPinSheetSubtitle.textContent = 'Choose a 4-digit PIN to lock the app.';
+                    applockSetupPinCtl.clear();
+                    return;
+                }
+                localStorage.setItem('xoxaAppLockPinHash', await sha256Hex(pin));
+                localStorage.setItem('xoxaAppLockEnabled', 'true');
+                notify('App Lock is on');
+                applockPinSheetOverlay.classList.remove('active');
+                refreshAppLockSettingsUI();
+            }
+        });
+
+        // --- App Lock settings row wiring ---
+        const appLockToggle = document.getElementById('app-lock-toggle');
+        const appLockBiometricRow = document.getElementById('app-lock-biometric-row');
+        const appLockBiometricToggle = document.getElementById('app-lock-biometric-toggle');
+        const appLockChangePinRow = document.getElementById('app-lock-change-pin-row');
+
+        async function platformBiometricAvailable() {
+            try {
+                return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+            } catch (e) { return false; }
+        }
+        async function refreshAppLockSettingsUI() {
+            const enabled = isAppLockEnabled();
+            appLockToggle.checked = enabled;
+            appLockChangePinRow.style.display = enabled ? '' : 'none';
+            appLockBiometricToggle.checked = hasAppLockBiometric();
+            appLockBiometricRow.style.display = (enabled && await platformBiometricAvailable()) ? '' : 'none';
+        }
+
+        appLockToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                openAppLockPinSheet('create');
+            } else {
+                openAppLockPinSheet('verify-disable');
+            }
+        });
+        appLockChangePinRow.addEventListener('click', () => openAppLockPinSheet('verify-change'));
+
+        async function registerAppLockBiometric() {
+            const challenge = crypto.getRandomValues(new Uint8Array(32));
+            const userId = crypto.getRandomValues(new Uint8Array(16));
+            const cred = await navigator.credentials.create({
+                publicKey: {
+                    challenge,
+                    rp: { name: 'Xoxa' },
+                    user: { id: userId, name: 'App Lock', displayName: 'App Lock' },
+                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+                    timeout: 60000,
+                }
+            });
+            if (!cred) throw new Error('cancelled');
+            const credIdB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+            localStorage.setItem('xoxaAppLockBiometricCredId', credIdB64);
+        }
+        appLockBiometricToggle.addEventListener('change', async (e) => {
+            if (e.target.checked) {
+                try {
+                    await registerAppLockBiometric();
+                    notify('Face/Touch ID enabled');
+                } catch (err) {
+                    e.target.checked = false;
+                    notify("Couldn't set up Face/Touch ID", 'error');
+                }
+            } else {
+                localStorage.removeItem('xoxaAppLockBiometricCredId');
+                notify('Face/Touch ID turned off');
+            }
+        });
+
+        // --- App Lock unlock gate (full-screen, shown on open/resume while enabled) ---
+        let appLockCurrentlyUnlocked = false;
+        const appLockOverlay = document.getElementById('app-lock-overlay');
+        const appLockBiometricBtn = document.getElementById('app-lock-biometric-btn');
+        const appLockUnlockError = document.getElementById('app-lock-unlock-error');
+        const appLockUnlockCtl = wirePinBoxGroup(
+            Array.from(document.querySelectorAll('.applock-unlock-pin-box')),
+            async (pin) => {
+                if (await verifyAppLockPin(pin)) {
+                    hideAppLockOverlay();
+                } else {
+                    appLockUnlockError.textContent = 'Incorrect PIN';
+                    appLockUnlockCtl.shake();
+                    appLockUnlockCtl.clear();
+                }
+            }
+        );
+        function hideAppLockOverlay() {
+            appLockOverlay.classList.remove('active');
+            appLockCurrentlyUnlocked = true;
+        }
+        async function attemptAppLockBiometricUnlock() {
+            const credIdB64 = localStorage.getItem('xoxaAppLockBiometricCredId');
+            if (!credIdB64) return;
+            try {
+                const rawId = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0));
+                const assertion = await navigator.credentials.get({
+                    publicKey: {
+                        challenge: crypto.getRandomValues(new Uint8Array(32)),
+                        allowCredentials: [{ id: rawId, type: 'public-key' }],
+                        userVerification: 'required',
+                        timeout: 60000,
+                    }
+                });
+                if (assertion) hideAppLockOverlay();
+            } catch (e) { /* cancelled or failed — the PIN entry underneath is still available */ }
+        }
+        appLockBiometricBtn.addEventListener('click', attemptAppLockBiometricUnlock);
+        document.getElementById('app-lock-forgot-link').addEventListener('click', async () => {
+            const confirmOut = await showCustomModal("Forgot PIN?", "You'll need to log out and back in. App Lock will be turned off.", true);
+            if (!confirmOut) return;
+            clearAppLockState();
+            appLockOverlay.classList.remove('active');
+            showLoading();
+            try {
+                await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);
+                await signOut(auth);
+                confirmationResult = null;
+                document.getElementById('auth-phone').value = '';
+                clearOtpBoxes();
+                showAuthStep('phone');
+            } finally { hideLoading(); }
+        });
+
+        function showAppLockOverlay() {
+            appLockUnlockError.textContent = '';
+            appLockUnlockCtl.clear();
+            const biometricReady = hasAppLockBiometric();
+            appLockBiometricBtn.style.display = biometricReady ? 'flex' : 'none';
+            appLockOverlay.classList.add('active');
+            if (biometricReady) attemptAppLockBiometricUnlock();
+        }
+        function maybeShowAppLockGate() {
+            if (isAppLockEnabled() && !appLockCurrentlyUnlocked) showAppLockOverlay();
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                appLockCurrentlyUnlocked = false; // re-lock the next time the app becomes visible
+            } else {
+                maybeShowAppLockGate();
+            }
         });
 
         // --- Insights sheet (account data at a glance, opened from Profile) ---
@@ -15960,6 +16351,10 @@
                 
                 document.getElementById('auth-screen').style.display = 'none';
                 document.getElementById('messenger-screen').style.display = 'block';
+                // App Lock gate: shows immediately over the (still-splash-hidden) messenger
+                // screen if enabled on this device — see maybeShowAppLockGate(). Safe to call on
+                // every onAuthStateChanged refire since it no-ops once appLockCurrentlyUnlocked.
+                maybeShowAppLockGate();
                 // Still hidden behind the branded splash at this point (higher z-index) — this
                 // just gets it ready underneath so hideLoading() below reveals shimmer, not a
                 // blank/half-populated screen, on a fresh open.

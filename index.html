@@ -7248,8 +7248,21 @@
             const overlay = document.getElementById('force-update-overlay');
             if (!overlay) return;
             document.getElementById('force-update-message').textContent = message;
+            // Same instant-snap trick as the OTP success/fail overlays: this dialog's background
+            // is translucent + blurred, and #loading-overlay's own hide has a 0.5s fade — without
+            // killing both transitions for one frame, the branded splash logo cross-fades through
+            // the blur and is briefly visible behind the "Update Required" dialog.
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (loadingOverlay) {
+                loadingOverlay.style.transition = 'none';
+                loadingOverlay.classList.remove('active');
+                void loadingOverlay.offsetWidth;
+                loadingOverlay.style.transition = '';
+            }
+            overlay.style.transition = 'none';
             overlay.classList.add('active');
-            document.getElementById('loading-overlay').classList.remove('active');
+            void overlay.offsetWidth;
+            overlay.style.transition = '';
         }
 
         async function checkForForcedUpdate() {

@@ -351,6 +351,37 @@
         .otp-success-label { font-size: 16px; font-weight: 700; color: var(--text-primary); opacity: 0; transform: translateY(4px); }
         #otp-success-overlay.play .otp-success-label { animation: otpSuccessLabelIn 0.35s ease-out 0.65s forwards; }
         @keyframes otpSuccessLabelIn { to { opacity: 1; transform: translateY(0); } }
+
+        /* ── OTP FAIL ANIMATION ── same full-screen treatment as the success one above, but in
+           red with an X instead of a check, shown when the entered code is wrong. Shares the
+           same timing/markup pattern intentionally so the two feel like a matched pair. */
+        #otp-fail-overlay {
+            position: fixed; inset: 0; z-index: 100001; background: var(--bg-base);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s;
+        }
+        #otp-fail-overlay.active { opacity: 1; visibility: visible; }
+        .otp-fail-pulse {
+            position: absolute; inset: 0; border-radius: 50%; background: rgba(255, 69, 58, 0.18);
+            transform: scale(0); opacity: 0;
+        }
+        #otp-fail-overlay.play .otp-fail-pulse { animation: otpSuccessPulse 0.6s ease-out 0.35s both; }
+        .otp-fail-svg { width: 88px; height: 88px; position: relative; z-index: 1; transform: scale(0.7); opacity: 0; }
+        #otp-fail-overlay.play .otp-fail-svg { animation: otpFailShakePop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        @keyframes otpFailShakePop {
+            0% { transform: scale(0.7); opacity: 0; }
+            60% { transform: scale(1.04); opacity: 1; }
+            75% { transform: scale(1) rotate(-4deg); }
+            90% { transform: scale(1) rotate(4deg); }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+        .otp-fail-circle { fill: none; stroke: var(--danger-red, #FF453A); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        #otp-fail-overlay.play .otp-fail-circle { animation: otpSuccessDraw 0.45s ease-out 0.05s forwards; }
+        .otp-fail-x-1, .otp-fail-x-2 { fill: none; stroke: var(--danger-red, #FF453A); stroke-width: 5.5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        #otp-fail-overlay.play .otp-fail-x-1 { animation: otpSuccessDraw 0.22s ease-out 0.45s forwards; }
+        #otp-fail-overlay.play .otp-fail-x-2 { animation: otpSuccessDraw 0.22s ease-out 0.62s forwards; }
+        .otp-fail-label { font-size: 16px; font-weight: 700; color: var(--text-primary); opacity: 0; transform: translateY(4px); }
+        #otp-fail-overlay.play .otp-fail-label { animation: otpSuccessLabelIn 0.35s ease-out 0.8s forwards; }
         #page-shimmer-overlay .pshim-block { position: relative; overflow: hidden; background: var(--bg-alt); border-radius: 10px; }
         #page-shimmer-overlay .pshim-block::after {
             content: ''; position: absolute; inset: 0;
@@ -2788,6 +2819,18 @@
             </svg>
         </div>
         <div class="otp-success-label">Verified</div>
+    </div>
+
+    <div id="otp-fail-overlay" aria-hidden="true">
+        <div class="otp-success-ring-wrap">
+            <div class="otp-fail-pulse"></div>
+            <svg class="otp-fail-svg" viewBox="0 0 80 80">
+                <circle class="otp-fail-circle" cx="40" cy="40" r="36" pathLength="1"></circle>
+                <path class="otp-fail-x-1" d="M29 29 L51 51" pathLength="1"></path>
+                <path class="otp-fail-x-2" d="M51 29 L29 51" pathLength="1"></path>
+            </svg>
+        </div>
+        <div class="otp-fail-label">Incorrect code</div>
     </div>
 
     <div id="page-shimmer-overlay" aria-hidden="true">
@@ -11883,6 +11926,22 @@
             });
         }
 
+        // Same as playOtpSuccessAnimation, mirrored for the "wrong code" case.
+        function playOtpFailAnimation() {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('otp-fail-overlay');
+                if (!overlay) return resolve();
+                overlay.classList.remove('play');
+                void overlay.offsetWidth;
+                overlay.classList.add('active');
+                requestAnimationFrame(() => overlay.classList.add('play'));
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    setTimeout(() => { overlay.classList.remove('play'); resolve(); }, 260);
+                }, 1250);
+            });
+        }
+
         document.getElementById('btn-verify-otp').addEventListener('click', async (e) => {
             e.preventDefault();
             const otpCode = document.getElementById('auth-otp-code').value.trim();
@@ -11896,7 +11955,14 @@
                 await playOtpSuccessAnimation();
             } catch (err) {
                 hideLoading();
-                showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
+                // Wrong or expired digits get the matching red-X animation instead of a modal —
+                // other failures (network issues, rate limits, etc.) aren't about the code itself,
+                // so those still get the descriptive error modal.
+                if (err.code === 'auth/invalid-verification-code' || err.code === 'auth/code-expired') {
+                    await playOtpFailAnimation();
+                } else {
+                    showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
+                }
                 clearOtpBoxes(true);
             }
         });

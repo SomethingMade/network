@@ -318,6 +318,39 @@
             padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); box-sizing: border-box;
         }
         #page-shimmer-overlay.active { opacity: 1; visibility: visible; }
+
+        /* ── OTP SUCCESS ANIMATION ── shown right after a phone code is confirmed, on top of
+           everything (even the loading splash/shimmer that onAuthStateChanged brings up while
+           it swaps to the main app), so signup always gets a clear "you're verified" beat
+           instead of jumping straight from the OTP boxes into the app. Uses pathLength="1" on
+           the SVG shapes so the dash animations are geometry-independent. */
+        #otp-success-overlay {
+            position: fixed; inset: 0; z-index: 100001; background: var(--bg-base);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s;
+        }
+        #otp-success-overlay.active { opacity: 1; visibility: visible; }
+        .otp-success-ring-wrap { position: relative; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; }
+        .otp-success-pulse {
+            position: absolute; inset: 0; border-radius: 50%; background: rgba(var(--primary-rgb), 0.18);
+            transform: scale(0); opacity: 0;
+        }
+        #otp-success-overlay.play .otp-success-pulse { animation: otpSuccessPulse 0.6s ease-out 0.35s both; }
+        @keyframes otpSuccessPulse {
+            0% { transform: scale(0.4); opacity: 0.6; }
+            100% { transform: scale(1.35); opacity: 0; }
+        }
+        .otp-success-svg { width: 88px; height: 88px; position: relative; z-index: 1; transform: scale(0.7); opacity: 0; }
+        #otp-success-overlay.play .otp-success-svg { animation: otpSuccessPop 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+        @keyframes otpSuccessPop { to { transform: scale(1); opacity: 1; } }
+        .otp-success-circle { fill: none; stroke: var(--primary-blue); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        #otp-success-overlay.play .otp-success-circle { animation: otpSuccessDraw 0.45s ease-out 0.05s forwards; }
+        .otp-success-check { fill: none; stroke: var(--primary-blue); stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+        #otp-success-overlay.play .otp-success-check { animation: otpSuccessDraw 0.3s ease-out 0.45s forwards; }
+        @keyframes otpSuccessDraw { to { stroke-dashoffset: 0; } }
+        .otp-success-label { font-size: 16px; font-weight: 700; color: var(--text-primary); opacity: 0; transform: translateY(4px); }
+        #otp-success-overlay.play .otp-success-label { animation: otpSuccessLabelIn 0.35s ease-out 0.65s forwards; }
+        @keyframes otpSuccessLabelIn { to { opacity: 1; transform: translateY(0); } }
         #page-shimmer-overlay .pshim-block { position: relative; overflow: hidden; background: var(--bg-alt); border-radius: 10px; }
         #page-shimmer-overlay .pshim-block::after {
             content: ''; position: absolute; inset: 0;
@@ -2744,6 +2777,17 @@
         <div class="xoxa-mark" role="img" aria-label="Xoxa">
             <img class="xoxa-logo-img" src="https://i.postimg.cc/VL9S6ZsF/1000079873-removebg-preview.png" alt="Xoxa">
         </div>
+    </div>
+
+    <div id="otp-success-overlay" aria-hidden="true">
+        <div class="otp-success-ring-wrap">
+            <div class="otp-success-pulse"></div>
+            <svg class="otp-success-svg" viewBox="0 0 80 80">
+                <circle class="otp-success-circle" cx="40" cy="40" r="36" pathLength="1"></circle>
+                <path class="otp-success-check" d="M24 41 L35 52 L57 28" pathLength="1"></path>
+            </svg>
+        </div>
+        <div class="otp-success-label">Verified</div>
     </div>
 
     <div id="page-shimmer-overlay" aria-hidden="true">
@@ -11820,6 +11864,25 @@
             } finally { hideLoading(); otpSendInFlight = false; }
         });
 
+        // Plays the OTP success checkmark full-screen, on top of whatever's underneath (the
+        // signup flow's own loading spinner, or the app shell that onAuthStateChanged may
+        // already be swapping in behind it). Resolves once it's fully faded back out, so callers
+        // can just `await` it before doing anything else.
+        function playOtpSuccessAnimation() {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('otp-success-overlay');
+                if (!overlay) return resolve();
+                overlay.classList.remove('play');
+                void overlay.offsetWidth; // force reflow so the draw-in animations restart cleanly
+                overlay.classList.add('active');
+                requestAnimationFrame(() => overlay.classList.add('play'));
+                setTimeout(() => {
+                    overlay.classList.remove('active');
+                    setTimeout(() => { overlay.classList.remove('play'); resolve(); }, 260);
+                }, 1350);
+            });
+        }
+
         document.getElementById('btn-verify-otp').addEventListener('click', async (e) => {
             e.preventDefault();
             const otpCode = document.getElementById('auth-otp-code').value.trim();
@@ -11829,10 +11892,13 @@
             try {
                 await confirmationResult.confirm(otpCode);
                 stopWebOtpAutofill();
+                hideLoading();
+                await playOtpSuccessAnimation();
             } catch (err) {
+                hideLoading();
                 showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
                 clearOtpBoxes(true);
-            } finally { hideLoading(); }
+            }
         });
 
         // ── EMAIL AUTH (optional alternative to phone) ──

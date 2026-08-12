@@ -7980,11 +7980,14 @@
             document.querySelectorAll('#feed-posts-container .feed-post-card[data-uid]').forEach(applyLiveProfileToPostCard);
         }
 
-        // --- NEWS CARDS IN FEED (NewsAPI.org top-headlines, proxied via Cloud Function) ---
-        // NewsAPI's free tier blocks CORS from anything but localhost, so the client never
-        // calls it directly — it goes through the `getNewsHeadlines` callable Function, which
-        // holds the API key server-side and caches the response for ~20min. See
-        // functions/index.js for the Function itself.
+        // --- NEWS CARDS IN FEED (Currents API latest-news, called directly from the client) ---
+        // Currents allows any-origin CORS on its free tier (unlike NewsAPI.org, which blocks
+        // everything but localhost), so this can hit the API straight from the browser with no
+        // proxy function. Key is hardcoded below — get one at https://currentsapi.services.
+        // NOTE: a hardcoded key is visible to anyone who views page source and could be used to
+        // burn the daily quota; move it into Remote Config later if that becomes a problem, no
+        // other code here needs to change to do that.
+        const CURRENTS_API_KEY = 'c1135da92ecc417e9680d5045a974d41';
         let cachedNewsArticles = [];
         let newsArticlesFetchedAt = 0;
         let newsFetchInFlight = null;
@@ -7995,9 +7998,19 @@
             if (newsFetchInFlight) return newsFetchInFlight;
             newsFetchInFlight = (async () => {
                 try {
-                    const getNews = httpsCallable(functionsClient, 'getNewsHeadlines');
-                    const result = await getNews({ country: 'za' });
-                    cachedNewsArticles = (result.data && result.data.articles) || [];
+                    const url = `https://api.currentsapi.services/v1/latest-news?language=en&country=ZA&page_size=20&apiKey=${CURRENTS_API_KEY}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`Currents API ${response.status}`);
+                    const data = await response.json();
+                    cachedNewsArticles = (data.news || [])
+                        .filter(a => a.title)
+                        .map(a => ({
+                            title: a.title,
+                            source: a.author && a.author !== 'null' ? a.author : (() => { try { return new URL(a.url).hostname.replace(/^www\./, ''); } catch (e) { return 'News'; } })(),
+                            url: a.url,
+                            image: (a.image && a.image !== 'None') ? a.image : null,
+                            publishedAt: a.published ? new Date(a.published.replace(' ', 'T')).getTime() : Date.now()
+                        }));
                     newsArticlesFetchedAt = Date.now();
                 } catch (err) {
                     console.warn('fetchNewsHeadlines failed:', err);

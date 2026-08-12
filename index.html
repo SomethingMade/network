@@ -9575,7 +9575,7 @@
 
             const FEED_MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10MB
             const FEED_MAX_VIDEO_BYTES = 50 * 1024 * 1024;  // 50MB
-            const FEED_MAX_IMAGES = 4;
+            const FEED_MAX_IMAGES = 10;
 
             // Bridge for the shared GIF picker sheet (defined outside this closure) to hand a
             // chosen GIF back to the post composer.
@@ -14478,9 +14478,9 @@
             if (!uid) { gridEl.innerHTML = ''; return; }
 
             const pinnedId = (cachedUsers[uid] && cachedUsers[uid].pinnedPostId) || null;
-            const items = Object.keys(cachedPosts)
+            const posts = Object.keys(cachedPosts)
                 .map(postId => [postId, cachedPosts[postId]])
-                .filter(([, post]) => post && post.uid === uid && !post.repostOf && (post.imageUrl || post.videoUrl))
+                .filter(([, post]) => post && post.uid === uid && !post.repostOf && (post.imageUrl || (post.imageUrls && post.imageUrls.length) || post.videoUrl))
                 .sort((a, b) => {
                     // A pinned post always leads the grid (and so lands on the large hero tile
                     // below, since that's just whatever's at index 0); everything else stays
@@ -14490,17 +14490,31 @@
                     return (b[1].timestamp || 0) - (a[1].timestamp || 0);
                 });
 
-            if (!items.length) {
+            if (!posts.length) {
                 gridEl.innerHTML = '<div class="profile-media-empty">No media uploaded yet.</div>';
                 return;
             }
 
-            const imageItems = items.filter(([, post]) => post.imageUrl);
-            const imageGallery = imageItems.map(([, post]) => post.imageUrl);
-            const imageGalleryPostIds = imageItems.map(([postId]) => postId);
+            // Flatten to one grid tile per photo — a multi-image post (up to FEED_MAX_IMAGES)
+            // contributes a tile for every photo it carries, not just its first/cover photo,
+            // so all of a user's uploaded images end up in their Media tab. Video posts still
+            // get a single tile (their own thumbnail).
+            const items = [];
+            posts.forEach(([postId, post]) => {
+                if (post.videoUrl) {
+                    items.push({ postId, post, isVideo: true, imgUrl: null });
+                } else {
+                    const imgs = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+                    imgs.forEach(url => items.push({ postId, post, isVideo: false, imgUrl: url }));
+                }
+            });
 
-            gridEl.innerHTML = items.map(([postId, post], idx) => {
-                const isVideo = !post.imageUrl && !!post.videoUrl;
+            const imageItems = items.filter(it => !it.isVideo);
+            const imageGallery = imageItems.map(it => it.imgUrl);
+            const imageGalleryPostIds = imageItems.map(it => it.postId);
+
+            gridEl.innerHTML = items.map((it, idx) => {
+                const { postId, post, isVideo, imgUrl } = it;
                 const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
                 const pinBadge = (postId === pinnedId) ? '<svg class="profile-media-pin-badge" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path></svg>' : '';
                 let mediaTag;
@@ -14510,13 +14524,14 @@
                         ? `<img src="${thumb}" alt="" loading="lazy">`
                         : `<video src="${post.videoUrl}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=Math.min(this.duration*0.3,2)"></video>`;
                 } else {
-                    mediaTag = `<img src="${post.imageUrl}" alt="" loading="lazy">`;
+                    mediaTag = `<img src="${imgUrl}" alt="" loading="lazy">`;
                 }
                 // Mosaic layout: vary tile sizes on a repeating pattern so the grid
                 // isn't a flat uniform 3-col wall (large 2x2 tile every 7, wide 2x1 every 7).
                 const posInPattern = idx % 7;
                 const sizeClass = posInPattern === 0 ? ' size-large' : (posInPattern === 4 ? ' size-wide' : '');
-                return `<div class="profile-media-grid-item${sizeClass}" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}${pinBadge}</div>`;
+                const imgUrlAttr = (!isVideo && imgUrl) ? ` data-img-url="${escapeHtmlForPost(imgUrl)}"` : '';
+                return `<div class="profile-media-grid-item${sizeClass}" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}"${imgUrlAttr}>${mediaTag}${playBadge}${pinBadge}</div>`;
             }).join('');
 
             gridEl.querySelectorAll('.profile-media-grid-item').forEach(item => {
@@ -14530,8 +14545,9 @@
                         document.getElementById('video-viewer-overlay').classList.add('above-sheet');
                         openVideoViewer(post.videoUrl, false, post.music || null);
                     } else {
+                        const clickedUrl = item.dataset.imgUrl || post.imageUrl;
                         document.getElementById('image-viewer-overlay').classList.add('above-sheet');
-                        openImageViewer(post.imageUrl, false, imageGallery, imageGallery.indexOf(post.imageUrl), item.dataset.postId, imageGalleryPostIds);
+                        openImageViewer(clickedUrl, false, imageGallery, imageGallery.indexOf(clickedUrl), item.dataset.postId, imageGalleryPostIds);
                     }
                 });
             });

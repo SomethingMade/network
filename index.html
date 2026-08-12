@@ -7984,6 +7984,9 @@
         // Currents allows any-origin CORS on its free tier (unlike NewsAPI.org, which blocks
         // everything but localhost), so this can hit the API straight from the browser with no
         // proxy function. Key is hardcoded below — get one at https://currentsapi.services.
+        // South Africa isn't in Currents' supported `country` filter list for this endpoint
+        // (confirmed via a 400 with the allowed-values list), so this pulls global English
+        // headlines (`language=en`, no country filter) instead.
         // NOTE: a hardcoded key is visible to anyone who views page source and could be used to
         // burn the daily quota; move it into Remote Config later if that becomes a problem, no
         // other code here needs to change to do that.
@@ -7998,7 +8001,7 @@
             if (newsFetchInFlight) return newsFetchInFlight;
             newsFetchInFlight = (async () => {
                 try {
-                    const url = `https://api.currentsapi.services/v1/latest-news?language=en&country=ZA&page_size=20&apiKey=${CURRENTS_API_KEY}`;
+                    const url = `https://api.currentsapi.services/v1/latest-news?language=en&page_size=20&apiKey=${CURRENTS_API_KEY}`;
                     const response = await fetch(url);
                     const data = await response.json().catch(() => null);
                     // Currents can return HTTP 200 with {status:"error", message:"..."} for a bad
@@ -8022,10 +8025,10 @@
                         cachedNewsArticles = articles;
                         newsArticlesFetchedAt = Date.now();
                     } else {
-                        // ZA-specific results can be thin/empty on the free plan — don't cache an
-                        // empty result as if it were a real 20-minute answer, so the next feed
-                        // load tries again instead of staying blank for the full TTL.
-                        console.warn('fetchNewsHeadlines: 0 articles for country=ZA — check Currents dashboard for quota/plan coverage');
+                        // Currents returns thin/empty results occasionally on the free plan —
+                        // don't cache an empty result as if it were a real 20-minute answer, so
+                        // the next feed load tries again instead of staying blank for the full TTL.
+                        console.warn('fetchNewsHeadlines: 0 articles returned — check Currents dashboard for quota/plan coverage');
                     }
                 } catch (err) {
                     console.warn('fetchNewsHeadlines failed:', err);

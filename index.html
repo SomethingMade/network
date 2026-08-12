@@ -4271,6 +4271,10 @@
                             </div>
                         </div>
 
+                        <div class="profile-subtabs" id="feed-subtabs" style="margin: 6px 0 10px;">
+                            <button type="button" class="profile-subtab-btn active" data-feed-subtab="forYou">For You</button>
+                            <button type="button" class="profile-subtab-btn" data-feed-subtab="following">Following</button>
+                        </div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
@@ -8470,7 +8474,7 @@
                 }
             });
             reorderFeedCards();
-            updateFeedEmptyState();
+            applyFeedSubtabFilter();
             const container = document.getElementById('discover-grid-scroll');
             if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -8554,6 +8558,7 @@
                         if (list) list.appendChild(buildFeedPostCard(postId, post));
                     });
                     reorderFeedCards();
+                    applyFeedSubtabFilter();
                     const searchInput = document.getElementById('search-feed-posts');
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
@@ -8684,7 +8689,7 @@
                     const searchInput = document.getElementById('search-feed-posts');
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                 }
-                updateFeedEmptyState();
+                applyFeedSubtabFilter();
             });
 
             onChildChanged(postsQuery, (snap) => {
@@ -9615,9 +9620,59 @@
             }
         }
 
+        // 'forYou' shows every visible post as usual; 'following' narrows the already-loaded
+        // feed down to posts from people the viewer follows (plus their own). This is a pure
+        // client-side show/hide over cards already in cachedPosts/the DOM — it doesn't change
+        // what gets fetched, so switching tabs is instant with no extra network round-trip.
+        let feedActiveSubtab = 'forYou';
+
+        function feedCardMatchesSubtab(post) {
+            if (feedActiveSubtab !== 'following') return true;
+            if (!post || !post.uid) return false;
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            return post.uid === myUid || !!cachedContacts[post.uid];
+        }
+
+        function applyFeedSubtabFilter() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return;
+            list.querySelectorAll('.feed-post-card').forEach(card => {
+                const post = cachedPosts[card.dataset.postId];
+                card.style.display = feedCardMatchesSubtab(post) ? '' : 'none';
+            });
+            updateFeedEmptyState();
+        }
+
+        document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.profile-subtab-btn[data-feed-subtab]');
+            if (!btn || btn.classList.contains('active')) return;
+            triggerHaptic(10);
+            document.querySelectorAll('#feed-subtabs .profile-subtab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            feedActiveSubtab = btn.dataset.feedSubtab;
+            applyFeedSubtabFilter();
+        });
+
         function updateFeedEmptyState() {
             const emptyState = document.getElementById('feed-empty-state');
-            if (emptyState) emptyState.style.display = Object.keys(cachedPosts).length === 0 ? 'block' : 'none';
+            if (!emptyState) return;
+            const messageEl = emptyState.querySelector('p');
+            if (Object.keys(cachedPosts).length === 0) {
+                if (messageEl) messageEl.textContent = 'No posts yet. Be the first to share something!';
+                emptyState.style.display = 'block';
+                return;
+            }
+            if (feedActiveSubtab === 'following') {
+                const list = document.getElementById('feed-posts-list');
+                let visibleCount = 0;
+                if (list) list.querySelectorAll('.feed-post-card').forEach(card => { if (card.style.display !== 'none') visibleCount++; });
+                if (messageEl) messageEl.textContent = "No posts from people you follow yet — follow more people to see their posts here.";
+                emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+                return;
+            }
+            if (messageEl) messageEl.textContent = 'No posts yet. Be the first to share something!';
+            emptyState.style.display = 'none';
         }
 
         function formatVideoTime(seconds) {
@@ -20413,6 +20468,7 @@
                 renderContactsLists();
                 renderChatRequests();
                 renderDiscoverGridIfActive();
+                applyFeedSubtabFilter();
 
                 // Mirror my following count onto the public profile (users/{uid}/followingCount)
                 // so it (and the followers count from the listener below) can be shown next to my

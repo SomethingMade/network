@@ -3180,6 +3180,13 @@
                     <svg id="btn-delete-selected-notifs" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;" title="Delete selected"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
                 </div>
             </div>
+            <div class="wa-filter-row" id="notif-filter-row" style="padding: 10px 20px 4px; margin-bottom: 0;">
+                <button type="button" class="wa-chip active" data-notif-filter="all"><span>All</span></button>
+                <button type="button" class="wa-chip" data-notif-filter="follow"><span>Followers</span></button>
+                <button type="button" class="wa-chip" data-notif-filter="like"><span>Likes</span></button>
+                <button type="button" class="wa-chip" data-notif-filter="repost"><span>Repost</span></button>
+                <button type="button" class="wa-chip" data-notif-filter="comment"><span>Comments</span></button>
+            </div>
             <div id="notifications-list" style="flex:1; overflow-y:auto; padding: 4px 20px 24px;"></div>
             <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
         </div>
@@ -3594,6 +3601,17 @@
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="setting-sound-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="wa-list-row">
+                    <div class="wa-row-icon chip-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="9" y1="18" x2="15" y2="18"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Haptic Feedback</span>
+                        <span class="wa-row-sub">Vibrate when typing, reacting, and switching tabs</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-haptics-toggle" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
@@ -6696,7 +6714,10 @@
         function initTabs() {
             const navItems = document.querySelectorAll('.nav-item[data-tab]');
             navItems.forEach(item => {
-                item.addEventListener('click', () => { window.location.hash = item.getAttribute('data-tab'); });
+                item.addEventListener('click', () => {
+                    if (!item.classList.contains('active')) triggerHaptic(12);
+                    window.location.hash = item.getAttribute('data-tab');
+                });
             });
             // Reels isn't a persistent tab-content like the others — it's the same full-screen
             // overlay opened from a post's expand button, just entered here without a specific
@@ -6705,6 +6726,7 @@
             const reelsNavBtn = document.getElementById('nav-reels-btn');
             if (reelsNavBtn) {
                 reelsNavBtn.addEventListener('click', () => {
+                    triggerHaptic(12);
                     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                     reelsNavBtn.classList.add('active');
                     requestAnimationFrame(updateNavIndicator);
@@ -6839,6 +6861,35 @@
         function isMessageSoundEnabled() {
             return localStorage.getItem('settingSoundEnabled') !== 'false';
         }
+
+        // --- Haptic Feedback Setting ---
+        const hapticsToggle = document.getElementById('setting-haptics-toggle');
+        hapticsToggle.checked = localStorage.getItem('settingHapticsEnabled') !== 'false';
+        hapticsToggle.addEventListener('change', () => {
+            localStorage.setItem('settingHapticsEnabled', hapticsToggle.checked ? 'true' : 'false');
+            if (hapticsToggle.checked) triggerHaptic(15); // quick buzz to confirm it's on
+        });
+
+        function isHapticsEnabled() {
+            return localStorage.getItem('settingHapticsEnabled') !== 'false';
+        }
+
+        // Single entry point for all "ambient" haptic buzzes (typing, reacting, switching tabs)
+        // so they all respect the Haptic Feedback setting and stay silently no-op on devices/
+        // browsers without the Vibration API (e.g. iOS Safari) instead of throwing.
+        function triggerHaptic(ms = 10) {
+            if (!isHapticsEnabled()) return;
+            try { if (navigator.vibrate) navigator.vibrate(ms); } catch (err) { /* no-op */ }
+        }
+
+        // Light tap-buzz while typing a message, comment, or story reply anywhere in the app.
+        // Delegated on document (rather than wired per-input) so it keeps working for inputs
+        // that get rebuilt/re-queried across chat switches, and stays a single, easy-to-find
+        // place to extend if another message-typing field is added later.
+        const HAPTIC_TYPING_INPUT_IDS = new Set(['chat-view-input', 'feed-composer-input', 'post-comment-input', 'story-reply-input']);
+        document.addEventListener('input', (e) => {
+            if (HAPTIC_TYPING_INPUT_IDS.has(e.target.id)) triggerHaptic(6);
+        });
 
         // --- Read Receipts Privacy Setting ---
         const readReceiptsToggle = document.getElementById('setting-read-receipts-toggle');
@@ -10419,6 +10470,7 @@
             if (!user) return;
             const post = cachedPosts[postId];
             if (!post) return;
+            triggerHaptic(15);
             const myCurrentEmoji = (post.reactions && post.reactions[user.uid]) || null;
 
             if (myCurrentEmoji === emoji) {
@@ -10780,6 +10832,7 @@
         async function toggleCommentReaction(postId, commentId) {
             const user = auth.currentUser;
             if (!user || !postId || !commentId) return;
+            triggerHaptic(15);
             const myReactionRef = ref(database, `postComments/${postId}/${commentId}/reactions/${user.uid}`);
             try {
                 const snap = await get(myReactionRef);
@@ -11084,6 +11137,7 @@
 
         function notifSentenceFor(notif) {
             const name = notif.fromName || 'Someone';
+            if (notif.type === 'follow') return `<b>${name}</b> started following you`;
             if (notif.type === 'like') return `<b>${name}</b> liked your post`;
             if (notif.type === 'repost') return `<b>${name}</b> reposted your post`;
             if (notif.type === 'comment') return `<b>${name}</b> commented: ${notif.text || ''}`;
@@ -11098,11 +11152,23 @@
         let selectedNotifIds = new Set();
         let notifPressState = { timer: null, notifId: null, startX: 0, startY: 0 };
 
+        // Notifications sub-tabs: 'all' shows everything, other values match a notif's `type`
+        // directly except 'comment', which buckets in replies and mentions too (all textual
+        // interactions on a post/comment) since they don't warrant their own tab.
+        let notifActiveFilter = 'all';
+        function notifMatchesFilter(notif, filter) {
+            if (filter === 'all') return true;
+            if (filter === 'comment') return notif.type === 'comment' || notif.type === 'reply' || notif.type === 'mention';
+            return notif.type === filter;
+        }
+
         function renderNotificationsList() {
             const list = document.getElementById('notifications-list');
             const emptyEl = document.getElementById('notifications-empty');
             list.innerHTML = '';
-            const entries = Object.entries(cachedNotifications).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+            const entries = Object.entries(cachedNotifications)
+                .filter(([, notif]) => notifMatchesFilter(notif, notifActiveFilter))
+                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
             emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
 
             entries.forEach(([notifId, notif]) => {
@@ -11195,6 +11261,8 @@
             if (notif.postId) {
                 window.location.hash = 'tab-status';
                 goToPostInFeed(notif.postId);
+            } else if (notif.type === 'follow' && notif.fromUid) {
+                openUserProfileSheet(notif.fromUid);
             }
         }
 
@@ -11658,11 +11726,23 @@
         });
         document.getElementById('btn-mark-all-notifs-read').addEventListener('click', markAllNotificationsRead);
 
+        document.getElementById('notif-filter-row').addEventListener('click', (e) => {
+            const chip = e.target.closest('.wa-chip[data-notif-filter]');
+            if (!chip) return;
+            if (!chip.classList.contains('active')) triggerHaptic(10);
+            notifActiveFilter = chip.dataset.notifFilter;
+            document.querySelectorAll('#notif-filter-row .wa-chip').forEach(c => c.classList.toggle('active', c === chip));
+            exitNotifSelectionMode();
+        });
+
         document.getElementById('btn-cancel-notif-selection').addEventListener('click', exitNotifSelectionMode);
 
         document.getElementById('btn-select-all-notifs').addEventListener('click', () => {
-            const allIds = Object.keys(cachedNotifications);
-            selectedNotifIds = new Set(allIds);
+            // Only select the notifications currently visible under the active sub-tab.
+            const visibleIds = Object.entries(cachedNotifications)
+                .filter(([, notif]) => notifMatchesFilter(notif, notifActiveFilter))
+                .map(([id]) => id);
+            selectedNotifIds = new Set(visibleIds);
             updateNotifSelectionHeader();
             renderNotificationsList();
         });
@@ -12861,6 +12941,7 @@
             updates[`users/${user.uid}/followingCount`] = increment(1);
             updates[`users/${targetUid}/followersCount`] = increment(1);
             await update(ref(database), updates);
+            createNotification(targetUid, { type: 'follow' });
         }
 
         async function unfollowUser(targetUid) {
@@ -13398,6 +13479,7 @@
         document.getElementById('groups-sub-tabs').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-subtab]');
             if (!btn) return;
+            if (!btn.classList.contains('active')) triggerHaptic(10);
             document.querySelectorAll('#groups-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const subtab = btn.dataset.subtab;
@@ -13663,6 +13745,7 @@
             wrap.querySelectorAll('.profile-subtab-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (btn.classList.contains('active')) return;
+                    triggerHaptic(10);
                     wrap.querySelectorAll('.profile-subtab-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     const showPosts = btn.dataset.subtab === 'posts';
@@ -15740,6 +15823,7 @@
         document.getElementById('contacts-sub-tabs').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-subtab]');
             if (!btn) return;
+            if (!btn.classList.contains('active')) triggerHaptic(10);
             document.querySelectorAll('#contacts-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const subtab = btn.dataset.subtab;
@@ -18318,6 +18402,7 @@
             const user = auth.currentUser;
             const path = reactionsPathForMsg(msgKey);
             if (!user || !path) return;
+            triggerHaptic(15);
             const myReactionRef = ref(database, `${path}/${user.uid}`);
             try {
                 const snap = await get(myReactionRef);

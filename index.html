@@ -2464,20 +2464,20 @@
         .discover-suggest-card .discover-card:last-of-type { border-bottom: none; }
         .discover-suggest-card .profile-suggested-scroll { padding: 4px 14px 14px; }
 
-        /* News cards woven into the feed (see sprinkleNewsCards) — same card chrome as the
-           "who to follow" widget, headline layout borrowed from the X/Threads post-card
-           image inset treatment already used for feed post media. */
-        .feed-news-card { display: block; width: 100%; text-align: left; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; margin: 4px 0 14px; overflow: hidden; cursor: pointer; padding: 0; font: inherit; color: inherit; }
-        .feed-news-card:active { background: var(--bg-hover); }
-        .feed-news-card-header { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-secondary); padding: 12px 14px 0; text-transform: uppercase; letter-spacing: 0.3px; }
-        .feed-news-card-header svg { width: 13px; height: 13px; flex-shrink: 0; }
-        .feed-news-card-source { color: var(--text-secondary); }
-        .feed-news-card-body { display: flex; gap: 12px; padding: 8px 14px 14px; align-items: flex-start; }
-        .feed-news-card-text { flex: 1; min-width: 0; }
-        .feed-news-card-title { font-size: 15px; font-weight: 600; line-height: 1.32; color: var(--text-primary); margin: 0 0 6px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        .feed-news-card-time { font-size: 12.5px; color: var(--text-secondary); }
-        .feed-news-card-thumb { width: 88px; height: 88px; flex-shrink: 0; border-radius: 12px; object-fit: cover; background: var(--bg-alt); }
-        .feed-news-card-body.no-thumb .feed-news-card-title { -webkit-line-clamp: 4; }
+        /* News cards woven into the feed (see sprinkleNewsCards) — reuse the exact
+           .x-post-row/.x-media-grid child markup real posts use (so header, avatar sizing,
+           and image inset all match), but on their own top-level class rather than sharing
+           .feed-post-card — that class is targeted by delegated tap handlers (open profile,
+           open comments, etc.) that assume a real post's dataset (uid/postId), which a news
+           card doesn't have. The card-level box styling below is copied 1:1 from
+           .feed-post-card so it's visually indistinguishable. */
+        .feed-news-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
+        .feed-news-card:hover { background: var(--bg-hover); }
+        .feed-news-avatar { display: flex; align-items: center; justify-content: center; background: var(--gradient-brand) !important; }
+        .feed-news-avatar svg { width: 22px; height: 22px; color: #fff; }
+        .feed-news-card .feed-post-actions { justify-content: flex-start; }
+        .feed-news-card-readmore { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--primary-blue); background: none; border: none; font-family: inherit; cursor: pointer; padding: 0; }
+        .feed-news-card-readmore svg { width: 15px; height: 15px; }
         .discover-grid-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 60px 30px; color: var(--text-secondary); }
         .discover-grid-empty svg { opacity: 0.4; margin-bottom: 4px; }
         .discover-grid-empty p { font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
@@ -8041,31 +8041,63 @@
             return newsFetchInFlight;
         }
 
-        // Builds one news card, styled like the "who to follow" widget it's woven in
-        // alongside. Tapping opens the source article in a new tab.
+        // Builds one news card using the same header/media markup real post cards use
+        // (.x-post-row, .x-media-grid) so it reads as part of the feed, with a "Sponsored"
+        // pill (the existing gold-business pill) and a newspaper-icon avatar standing in for
+        // a user photo. Deliberately NOT given the .feed-post-card class itself — see the CSS
+        // comment above — so delegated post handlers (open profile, open comments, like, etc.)
+        // never mistake it for a real post.
         function buildNewsCard(article) {
-            const wrap = document.createElement('button');
-            wrap.type = 'button';
-            wrap.className = 'feed-news-card';
+            const card = document.createElement('div');
+            card.className = 'feed-news-card';
             const hasThumb = !!article.image;
-            wrap.innerHTML = `
-                <div class="feed-news-card-header">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12v12H4z"/><path d="M20 8v10a2 2 0 0 1-2 2H8"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
-                    <span class="feed-news-card-source"></span>
-                </div>
-                <div class="feed-news-card-body${hasThumb ? '' : ' no-thumb'}">
-                    <div class="feed-news-card-text">
-                        <p class="feed-news-card-title"></p>
-                        <span class="feed-news-card-time"></span>
+            card.innerHTML = `
+                <div class="x-post-row">
+                    <div class="x-post-avatar-col">
+                        <div class="avatar feed-news-avatar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12v12H4z"/><path d="M20 8v10a2 2 0 0 1-2 2H8"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
+                        </div>
                     </div>
-                    ${hasThumb ? `<img class="feed-news-card-thumb" src="${article.image}" loading="lazy" onerror="this.remove();this.closest('.feed-news-card-body').classList.add('no-thumb')">` : ''}
+                    <div class="x-post-content-col">
+                        <div class="x-post-headline">
+                            <div class="x-post-headline-main">
+                                <span class="name"></span>
+                                <span class="feed-post-business-pill group-badge-pill gold-business" style="display:inline-block;">Sponsored</span>
+                                <span class="time"></span>
+                            </div>
+                        </div>
+                        <div class="x-post-username">News</div>
+                    </div>
+                </div>
+                <div class="feed-post-body">
+                    <p class="feed-post-text" style="cursor:pointer;"></p>
+                </div>
+                ${hasThumb ? `
+                <div class="x-media-grid" data-count="1">
+                    <div class="x-media-carousel-track">
+                        <div class="x-media-grid-item"><img src="${article.image}" alt="" loading="lazy" style="cursor:pointer;" onerror="this.closest('.x-media-grid').remove()"></div>
+                    </div>
+                </div>` : ''}
+                <div class="feed-post-actions">
+                    <div class="feed-post-actions-left">
+                        <button type="button" class="feed-news-card-readmore">
+                            <span>Read full article</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M7 7h10v10"></path></svg>
+                        </button>
+                    </div>
                 </div>
             `;
-            wrap.querySelector('.feed-news-card-source').textContent = article.source || 'News';
-            wrap.querySelector('.feed-news-card-title').textContent = article.title || '';
-            wrap.querySelector('.feed-news-card-time').textContent = article.publishedAt ? formatTime(article.publishedAt) : '';
-            wrap.addEventListener('click', () => { if (article.url) window.open(article.url, '_blank', 'noopener'); });
-            return wrap;
+            card.querySelector('.name').textContent = article.source || 'News';
+            card.querySelector('.time').textContent = article.publishedAt ? formatTime(article.publishedAt) : '';
+            card.querySelector('.feed-post-text').textContent = article.title || '';
+            if (article.url) {
+                const openArticle = () => window.open(article.url, '_blank', 'noopener');
+                card.querySelector('.feed-news-card-readmore').addEventListener('click', openArticle);
+                card.querySelector('.feed-post-text').addEventListener('click', openArticle);
+                const img = card.querySelector('.x-media-grid-item img');
+                if (img) img.addEventListener('click', openArticle);
+            }
+            return card;
         }
 
         // Weaves news headlines in between post cards, same rhythm as sprinkleSuggestedPeople

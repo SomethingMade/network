@@ -8000,9 +8000,15 @@
                 try {
                     const url = `https://api.currentsapi.services/v1/latest-news?language=en&country=ZA&page_size=20&apiKey=${CURRENTS_API_KEY}`;
                     const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Currents API ${response.status}`);
-                    const data = await response.json();
-                    cachedNewsArticles = (data.news || [])
+                    const data = await response.json().catch(() => null);
+                    // Currents can return HTTP 200 with {status:"error", message:"..."} for a bad
+                    // key or bad params — treat that as a failure too, not silently as "0 articles",
+                    // or a bad key would poison the cache for NEWS_CACHE_MS with nothing to show
+                    // and nothing logged.
+                    if (!response.ok || !data || data.status !== 'ok') {
+                        throw new Error(`Currents API error (HTTP ${response.status}): ${(data && data.message) || 'no body'}`);
+                    }
+                    const articles = (data.news || [])
                         .filter(a => a.title)
                         .map(a => ({
                             title: a.title,
@@ -8011,7 +8017,16 @@
                             image: (a.image && a.image !== 'None') ? a.image : null,
                             publishedAt: a.published ? new Date(a.published.replace(' ', 'T')).getTime() : Date.now()
                         }));
-                    newsArticlesFetchedAt = Date.now();
+                    console.log(`fetchNewsHeadlines: got ${articles.length} article(s)`);
+                    if (articles.length) {
+                        cachedNewsArticles = articles;
+                        newsArticlesFetchedAt = Date.now();
+                    } else {
+                        // ZA-specific results can be thin/empty on the free plan — don't cache an
+                        // empty result as if it were a real 20-minute answer, so the next feed
+                        // load tries again instead of staying blank for the full TTL.
+                        console.warn('fetchNewsHeadlines: 0 articles for country=ZA — check Currents dashboard for quota/plan coverage');
+                    }
                 } catch (err) {
                     console.warn('fetchNewsHeadlines failed:', err);
                     // Keep whatever's already cached (even if stale) rather than blanking the feed
@@ -8075,6 +8090,12 @@
                     nextGap = 6 + Math.floor(seededRandom01('news-gap-' + i) * 3);
                 }
             });
+
+            // A feed shorter than the gap (new account, quiet day) would otherwise never earn
+            // a headline at all — guarantee at least one by tacking it onto the end.
+            if (articleIndex === 0) {
+                list.insertBefore(buildNewsCard(cachedNewsArticles[0]), postCards[postCards.length - 1].nextSibling);
+            }
         }
 
         // --- DISCOVER TAB (browse other Xoxa users and follow them) ---

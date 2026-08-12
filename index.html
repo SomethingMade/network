@@ -3090,6 +3090,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                     <span>Pin to Profile</span>
                 </button>
+                <button class="msg-option-btn with-icon" id="btn-post-share">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    <span>Share Post</span>
+                </button>
                 <button class="msg-option-btn with-icon" id="btn-post-report">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
                     <span>Report Post</span>
@@ -9424,6 +9428,33 @@
                     notify('Failed to update pin', 'error');
                 }
             });
+            // Sharing a post outside the app has nowhere to deep-link back into an individual
+            // post (this is a single-page app with no per-post web route), so — same pattern as
+            // "Invite a Friend" above — the share always points recipients at the Play Store;
+            // anyone who doesn't have Xoxa yet lands on the install page instead of a dead link.
+            document.getElementById('btn-post-share').addEventListener('click', async () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
+                if (!activePostOptions) return;
+                const { post } = activePostOptions;
+                const playStoreUrl = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
+                const authorName = (post.uid && cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'Someone';
+                const caption = (post.text || '').trim();
+                const captionPreview = caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
+                const shareText = captionPreview
+                    ? `${authorName} on Xoxa: "${captionPreview}" — get the app to see more: ${playStoreUrl}`
+                    : `Check out ${authorName}'s post on Xoxa — get the app: ${playStoreUrl}`;
+                if (navigator.share) {
+                    try { await navigator.share({ title: 'Xoxa', text: shareText, url: playStoreUrl }); }
+                    catch (err) { /* user cancelled share, ignore */ }
+                } else {
+                    try {
+                        await navigator.clipboard.writeText(shareText);
+                        notify('Link copied to clipboard!');
+                    } catch (err) {
+                        showCustomModal('Share Post', shareText);
+                    }
+                }
+            });
             document.getElementById('btn-post-report').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) openReportPostSheet(activePostOptions.postId, activePostOptions.post);
@@ -9462,6 +9493,7 @@
                 const isPinned = cachedUsers[user.uid] && cachedUsers[user.uid].pinnedPostId === postId;
                 pinBtn.querySelector('span').textContent = isPinned ? 'Unpin from Profile' : 'Pin to Profile';
             }
+            document.getElementById('btn-post-share').style.display = 'block';
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-post-delete').textContent = isRepost ? 'Undo Repost' : 'Delete Post';

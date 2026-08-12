@@ -12270,6 +12270,8 @@
             e.preventDefault();
             const file = e.target.files[0];
             if (!file) return;
+            const user = auth.currentUser;
+            if (!user) return;
             const wrapper = document.getElementById('sheet-avatar-upload');
             wrapper.classList.add('uploading');
             try {
@@ -12278,6 +12280,15 @@
                 const preview = document.getElementById('profile-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
                 preview.textContent = "";
+                // Saved immediately so the new photo sticks even if the user closes the
+                // profile sheet without tapping the "Save" button (that button still exists
+                // for name/about/website/cover, which stay staged in pendingPhotoURL etc.
+                // until Save is pressed).
+                await updateProfile(user, { photoURL: url });
+                await update(ref(database, 'users/' + user.uid), { photoURL: url });
+                if (cachedUsers[user.uid]) cachedUsers[user.uid].photoURL = url;
+                updateAvatarUI(user);
+                notify("Profile photo updated");
             } catch (err) {
                 showCustomModal("Upload Failed", "We couldn't upload that image.");
             } finally {

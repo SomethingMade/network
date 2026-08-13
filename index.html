@@ -3437,9 +3437,11 @@
                     <div class="profile-subtabs" id="my-profile-subtabs">
                         <button type="button" class="profile-subtab-btn active" data-subtab="posts">Posts</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="media">Media</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="saved">Saved</button>
                     </div>
                     <div class="profile-posts-list" id="my-profile-posts-list"></div>
                     <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
+                    <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
                 </div>
             </div>
         </div>
@@ -9284,6 +9286,8 @@
                     const postId = card && card.dataset.postId;
                     if (postId) btn.classList.toggle('saved', !!cachedSavedPosts[postId]);
                 });
+                const savedList = document.getElementById('my-profile-saved-list');
+                if (savedList && savedList.style.display !== 'none') buildProfileSavedList(savedList);
             });
 
             const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
@@ -12711,7 +12715,7 @@
                 renderProfileSuggestedFriends();
                 buildProfilePostsList(document.getElementById('my-profile-posts-list'), user.uid);
                 buildProfileMediaGrid(document.getElementById('my-profile-media-grid'), user.uid);
-                initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid');
+                initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list');
                 profileSheetOverlay.classList.add('active');
             }
         }
@@ -14548,7 +14552,7 @@
         // just swaps which of the two pre-built containers is visible — both are already
         // populated by buildProfilePostsList/buildProfileMediaGrid whenever the sheet opens, so
         // switching tabs is instant with no extra fetch. Idempotent (safe to call every open).
-        function initProfileSubtabs(subtabsId, postsListId, mediaGridId) {
+        function initProfileSubtabs(subtabsId, postsListId, mediaGridId, savedListId) {
             const wrap = document.getElementById(subtabsId);
             if (!wrap || wrap.dataset.bound) return;
             wrap.dataset.bound = 'true';
@@ -14558,13 +14562,39 @@
                     triggerHaptic(10);
                     wrap.querySelectorAll('.profile-subtab-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    const showPosts = btn.dataset.subtab === 'posts';
+                    const subtab = btn.dataset.subtab;
                     const postsList = document.getElementById(postsListId);
                     const mediaGrid = document.getElementById(mediaGridId);
-                    if (postsList) postsList.style.display = showPosts ? '' : 'none';
-                    if (mediaGrid) mediaGrid.style.display = showPosts ? 'none' : '';
+                    const savedList = savedListId ? document.getElementById(savedListId) : null;
+                    if (postsList) postsList.style.display = subtab === 'posts' ? '' : 'none';
+                    if (mediaGrid) mediaGrid.style.display = subtab === 'media' ? '' : 'none';
+                    if (savedList) {
+                        savedList.style.display = subtab === 'saved' ? '' : 'none';
+                        if (subtab === 'saved') buildProfileSavedList(savedList);
+                    }
                 });
             });
+        }
+
+        // Renders the "Saved" tab of my own profile — every post I've bookmarked via
+        // saved_posts/{me}/{postId}, newest first. Purely private: this list is only ever
+        // built for my own profile sheet, never for another user's. Posts not yet present in
+        // cachedPosts (e.g. still loading) are simply skipped; the listener at
+        // saved_posts/{uid} plus the normal feed cache will fill in on the next rebuild.
+        function buildProfileSavedList(listEl) {
+            if (!listEl) return;
+            const savedIds = Object.keys(cachedSavedPosts || {}).filter(id => cachedSavedPosts[id]);
+            const items = savedIds
+                .map(postId => [postId, cachedPosts[postId]])
+                .filter(([, post]) => !!post)
+                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+            listEl.innerHTML = '';
+            if (!items.length) {
+                listEl.innerHTML = '<div class="profile-posts-empty">No saved posts yet.</div>';
+                return;
+            }
+            items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
         }
 
         // Renders the full "Posts" tab of a profile — every post by this user (text-only posts

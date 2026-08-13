@@ -6893,38 +6893,39 @@
         window.addEventListener('resize', () => requestAnimationFrame(updateNavIndicator));
 
         // --- TAB-LEVEL DEVICE BACK BUTTON HANDLING ---
-        // Switching bottom-nav/header tabs (Home, Chats, Calls, Following, Groups) assigns
-        // window.location.hash directly, which is a *push* by default browser behavior — every
-        // tab switch adds a new entry to the history stack. Over a normal session that piles up
-        // (Home -> Chats -> Contacts -> Home -> Chats ...), so the device back button would have
-        // to walk back through every tab ever visited before it could exit the app, even while
-        // the person is looking straight at the Home/Feeds tab. goToTab() tracks how many of
-        // those entries have piled up since Home was last active and, when navigating back to
-        // Home, unwinds them in one shot via history.go() instead of pushing yet another entry
-        // on top. That keeps Home sitting at the root of the stack, so a single device back press
-        // from Home has nothing left to pop and the app closes — exactly like a fresh page —
-        // while a back press from any other tab just steps back (to Home or a prior tab) without
-        // ever closing the app.
-        let tabNavDepth = 0;
+        // Requested behavior: device back button on the Feed/Discover (Home) tab closes the app;
+        // from any other tab it goes straight to the Feed tab, in a single press, regardless of
+        // how many tabs were hopped through to get there.
+        //
+        // Home always sits at the root of the browser history stack (the boot entry). Any other
+        // tab occupies exactly ONE entry on top of that — hopping between two non-Home tabs
+        // swaps that single entry's hash via replaceState instead of pushing a new one, so the
+        // stack never gets more than one level deep. That guarantees: a back press from a
+        // non-Home tab always pops directly to the Home entry (one hop, whichever tab you were
+        // on), and a back press from Home — which has nothing pushed behind it — falls through to
+        // the native default and exits the app, exactly like a fresh page with no history.
+        let onNonHomeTab = false;
         function goToTab(tabId) {
             const current = window.location.hash.replace('#', '') || 'tab-status';
             if (current === tabId) return;
             if (tabId === 'tab-status') {
-                if (tabNavDepth > 0) {
-                    history.go(-tabNavDepth);
-                    tabNavDepth = 0;
+                if (onNonHomeTab) {
+                    onNonHomeTab = false;
+                    history.back(); // pops the single non-Home entry, landing back on Home
                     return; // the resulting popstate/hashchange finishes the switch
                 }
-                tabNavDepth = 0;
+                history.replaceState(null, '', '#tab-status');
+            } else if (onNonHomeTab) {
+                history.replaceState(null, '', '#' + tabId); // swap in place, stay one level deep
             } else {
-                tabNavDepth++;
+                history.pushState(null, '', '#' + tabId); // first hop away from Home
+                onNonHomeTab = true;
             }
-            window.location.hash = tabId;
+            handleHashChange(); // replaceState/pushState don't fire hashchange themselves
         }
         window.addEventListener('popstate', () => {
             const hash = window.location.hash.replace('#', '');
-            if (hash === 'tab-status') { tabNavDepth = 0; }
-            else if (hash.startsWith('tab-') && tabNavDepth > 0) { tabNavDepth--; }
+            if (hash === 'tab-status' || !hash.startsWith('tab-')) { onNonHomeTab = false; }
         });
 
         function initTabs() {

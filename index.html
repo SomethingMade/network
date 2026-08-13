@@ -6892,12 +6892,47 @@
         }
         window.addEventListener('resize', () => requestAnimationFrame(updateNavIndicator));
 
+        // --- TAB-LEVEL DEVICE BACK BUTTON HANDLING ---
+        // Switching bottom-nav/header tabs (Home, Chats, Calls, Following, Groups) assigns
+        // window.location.hash directly, which is a *push* by default browser behavior — every
+        // tab switch adds a new entry to the history stack. Over a normal session that piles up
+        // (Home -> Chats -> Contacts -> Home -> Chats ...), so the device back button would have
+        // to walk back through every tab ever visited before it could exit the app, even while
+        // the person is looking straight at the Home/Feeds tab. goToTab() tracks how many of
+        // those entries have piled up since Home was last active and, when navigating back to
+        // Home, unwinds them in one shot via history.go() instead of pushing yet another entry
+        // on top. That keeps Home sitting at the root of the stack, so a single device back press
+        // from Home has nothing left to pop and the app closes — exactly like a fresh page —
+        // while a back press from any other tab just steps back (to Home or a prior tab) without
+        // ever closing the app.
+        let tabNavDepth = 0;
+        function goToTab(tabId) {
+            const current = window.location.hash.replace('#', '') || 'tab-status';
+            if (current === tabId) return;
+            if (tabId === 'tab-status') {
+                if (tabNavDepth > 0) {
+                    history.go(-tabNavDepth);
+                    tabNavDepth = 0;
+                    return; // the resulting popstate/hashchange finishes the switch
+                }
+                tabNavDepth = 0;
+            } else {
+                tabNavDepth++;
+            }
+            window.location.hash = tabId;
+        }
+        window.addEventListener('popstate', () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash === 'tab-status') { tabNavDepth = 0; }
+            else if (hash.startsWith('tab-') && tabNavDepth > 0) { tabNavDepth--; }
+        });
+
         function initTabs() {
             const navItems = document.querySelectorAll('.nav-item[data-tab]');
             navItems.forEach(item => {
                 item.addEventListener('click', () => {
                     triggerHaptic(12);
-                    window.location.hash = item.getAttribute('data-tab');
+                    goToTab(item.getAttribute('data-tab'));
                 });
             });
             // Reels isn't a persistent tab-content like the others — it's the same full-screen
@@ -6947,7 +6982,7 @@
                         return;
                     }
                     if (filter === 'groups') {
-                        window.location.hash = 'tab-groups';
+                        goToTab('tab-groups');
                         return;
                     }
 
@@ -7107,7 +7142,7 @@
         document.getElementById('setting-blocked-contacts').addEventListener('click', () => {
             settingsSheetOverlay.classList.remove('active');
             profileSheetOverlay.classList.remove('active');
-            window.location.hash = 'tab-contacts';
+            goToTab('tab-contacts');
             const blockedSubtabBtn = document.querySelector('#contacts-sub-tabs button[data-subtab="blocked"]');
             if (blockedSubtabBtn) blockedSubtabBtn.click();
         });
@@ -12021,7 +12056,7 @@
             }
             closeNotificationsSheet();
             if (notif.postId) {
-                window.location.hash = 'tab-status';
+                goToTab('tab-status');
                 goToPostInFeed(notif.postId);
             } else if (notif.type === 'follow' && notif.fromUid) {
                 openUserProfileSheet(notif.fromUid);
@@ -12478,10 +12513,10 @@
             btn.addEventListener('click', openNotificationsSheet);
         });
         document.querySelectorAll('.js-header-chats-btn').forEach(btn => {
-            btn.addEventListener('click', () => { window.location.hash = 'tab-chats'; });
+            btn.addEventListener('click', () => { goToTab('tab-chats'); });
         });
         document.querySelectorAll('.js-header-groups-btn').forEach(btn => {
-            btn.addEventListener('click', () => { window.location.hash = 'tab-groups'; });
+            btn.addEventListener('click', () => { goToTab('tab-groups'); });
         });
         document.getElementById('btn-close-notifs-sheet').addEventListener('click', closeNotificationsSheet);
         document.getElementById('notifications-sheet-overlay').addEventListener('click', (e) => {
@@ -13906,7 +13941,7 @@
         }
         document.getElementById('fab-new-post').addEventListener('click', openPostComposer);
         document.getElementById('fab-new-chat').addEventListener('click', () => {
-            window.location.hash = 'tab-contacts';
+            goToTab('tab-contacts');
         });
         document.getElementById('post-composer-close').addEventListener('click', () => history.back());
 

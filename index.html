@@ -4251,12 +4251,12 @@
                     </svg>
                     <span>Reels</span>
                 </div>
-                <div class="nav-item" data-tab="tab-calls">
+                <div class="nav-item" id="nav-search-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                        <path class="icon-fill" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.6 6.6l2.2-2.2c.28-.28.69-.36 1.05-.24 1.13.38 2.34.58 3.6.58.55 0 1 .45 1 1v3.34c0 .55-.45 1-1 1C9.4 20.87 3.13 14.6 2.1 6.93a1 1 0 0 1 1-1H6.5c.55 0 1 .45 1 1 0 1.26.2 2.47.58 3.6.11.36.03.77-.25 1.05l-1.21 1.21z"/>
+                        <circle class="icon-line" cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.8"/>
+                        <line class="icon-line" x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="1.8"/>
                     </svg>
-                    <span>Calls</span>
+                    <span>Search</span>
                 </div>
                 <div class="nav-item" data-tab="tab-contacts">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -4346,7 +4346,7 @@
                                 <h1>Home</h1>
                             </div>
                             <div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" data-search-list="discover-grid-scroll" title="Search">
+                                <div class="search-icon-btn js-search-open" id="home-search-icon-btn" data-search-list="discover-grid-scroll" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="notif-bell-btn js-notif-bell" title="Notifications">
@@ -6677,7 +6677,7 @@
 
         // Shared by handleHashChange (to animate the right direction) and the swipe gesture below
         // (to know what "next" and "previous" mean) — left-to-right, matching the nav bar order.
-        const TAB_ORDER = ['tab-status', 'tab-chats', 'tab-calls', 'tab-groups', 'tab-contacts'];
+        const TAB_ORDER = ['tab-status', 'tab-chats', 'tab-groups', 'tab-contacts'];
         let previousActiveTabHash = null;
 
         function handleHashChange(isInitialSync) {
@@ -6960,6 +6960,18 @@
                     reelsNavBtn.classList.add('active');
                     requestAnimationFrame(updateNavIndicator);
                     openReelViewerFromNav();
+                });
+            }
+            // Search isn't a persistent tab-content either — tapping it just opens the same
+            // full-screen search overlay used by the header search icons elsewhere (see
+            // initFullscreenSearch/js-search-open), borrowing Home's search bar + results list,
+            // so there's no separate search UI to build or keep in sync.
+            const searchNavBtn = document.getElementById('nav-search-btn');
+            if (searchNavBtn) {
+                searchNavBtn.addEventListener('click', () => {
+                    triggerHaptic(12);
+                    const homeSearchBtn = document.getElementById('home-search-icon-btn');
+                    if (homeSearchBtn) homeSearchBtn.click();
                 });
             }
             const fabAddFriend = document.getElementById('fab-add-friend');

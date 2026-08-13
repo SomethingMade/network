@@ -6506,7 +6506,7 @@
             if (!overlay || !inputSlot || !body || !backBtn) return;
 
             let movedBox = null, boxParent = null, boxNext = null;
-            let movedLists = []; // [{el, parent, next}]
+            let movedLists = []; // [{el, parent, next, scrollTop}]
             let movedDropdown = null, dropdownParent = null, dropdownNext = null;
 
             function openFullscreenSearch(btn) {
@@ -6524,9 +6524,17 @@
                 listIds.forEach(id => {
                     const el = document.getElementById(id);
                     if (!el) return;
-                    movedLists.push({ el, parent: el.parentNode, next: el.nextSibling });
+                    // #discover-grid-scroll (and possibly others) get their overflow forced to
+                    // "visible" by search-fullscreen-body's CSS while parked in here, which stops
+                    // them being a scroll container at all — so the scrollTop they carried in
+                    // their real tab doesn't survive the round trip on its own. Save it here and
+                    // reapply in restoreMovedNodes() once it's back where overflow:auto applies
+                    // again, so closing search doesn't leave the feed snapped back to the top.
+                    movedLists.push({ el, parent: el.parentNode, next: el.nextSibling, scrollTop: el.scrollTop });
                     body.appendChild(el);
                 });
+
+                pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the search sheet
 
                 // Some search bars (e.g. Discover) carry a history/results panel that's normally
                 // an absolutely-positioned dropdown anchored to the input. Pull it out into the
@@ -6566,9 +6574,10 @@
                     else boxParent.appendChild(movedBox);
                     movedBox = null;
                 }
-                movedLists.forEach(({ el, parent, next }) => {
+                movedLists.forEach(({ el, parent, next, scrollTop }) => {
                     if (next) parent.insertBefore(el, next);
                     else parent.appendChild(el);
+                    holdScrollPosition(el, scrollTop);
                 });
                 movedLists = [];
             }
@@ -6621,6 +6630,36 @@
                 if (performance.now() - start < LOCK_MS) requestAnimationFrame(tick);
             }
             discoverScroll.scrollTop = 0;
+            requestAnimationFrame(tick);
+        }
+
+        // Same class of problem as lockFeedScrollToTop above, but for putting a saved position
+        // back instead of forcing 0 — used when a moved list (e.g. #discover-grid-scroll) is
+        // returned from the search overlay. A single assignment right after the move can still
+        // lose to something that settles just after (the feed re-render that clearing the search
+        // input triggers, images/videos finishing layout, a Firebase listener repainting the
+        // list), so hold the target for a short window and back off the moment the person
+        // actually touches/scrolls it themselves.
+        function holdScrollPosition(el, targetScrollTop, ms) {
+            if (!el) return;
+            const HOLD_MS = ms || 1000;
+            const start = performance.now();
+            let released = false;
+
+            const release = () => {
+                released = true;
+                el.removeEventListener('touchstart', release);
+                el.removeEventListener('wheel', release);
+            };
+            el.addEventListener('touchstart', release, { once: true, passive: true });
+            el.addEventListener('wheel', release, { once: true, passive: true });
+
+            function tick() {
+                if (released) return;
+                if (el.scrollTop !== targetScrollTop) el.scrollTop = targetScrollTop;
+                if (performance.now() - start < HOLD_MS) requestAnimationFrame(tick);
+            }
+            el.scrollTop = targetScrollTop;
             requestAnimationFrame(tick);
         }
 
@@ -11990,6 +12029,7 @@
         }
 
         function openNotificationsSheet() {
+            pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the sheet
             document.getElementById('notifications-sheet-overlay').classList.add('active');
             exitNotifSelectionMode();
         }

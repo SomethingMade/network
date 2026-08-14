@@ -20872,7 +20872,7 @@
             }
         }
 
-        async function queueFileUpload(file, kind, isViewOnce) {
+        async function queueFileUpload(file, kind, isViewOnce, caption) {
             const user = auth.currentUser;
             const chatUid = activeChatUid;
             if (!user || !chatUid || !file) return;
@@ -20951,6 +20951,7 @@
                             msgPayload.mediaMimeType = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
                         }
                         previewText = isVideo ? '🎥 Video' : '📷 Photo';
+                        if (caption) previewText = caption;
                     } else {
                         const { url: cUrl, type } = await uploadToCloudinary(file);
                         url = cUrl;
@@ -20965,6 +20966,10 @@
                     if (capturedReplyCtx.text) capturedReplyCtx.text = await encryptForPeer(chatUid, capturedReplyCtx.text);
                     msgPayload.replyToMessage = capturedReplyCtx;
                 }
+                // Caption typed in the "add a caption" sheet before sending — encrypted the same
+                // way as a regular text message, since DM media/text are both end-to-end
+                // encrypted per-peer (see encryptForPeer / encryptFileForPeer above).
+                if (caption) msgPayload.text = await encryptForPeer(chatUid, caption);
 
                 previewText = await encryptForPeer(chatUid, previewText);
 
@@ -20999,22 +21004,31 @@
                     notify('Only the group owner can post in this group', 'error');
                     return;
                 }
-                openGroupMediaCaptionQueue(files);
+                openMediaCaptionQueue(files, 'group');
                 return;
             }
 
             if (!activeChatUid) return;
             const wasViewOnce = kind === 'media' && viewOnceArmed;
+            // Regular (non-view-once) photos/videos in a DM get the same "add a caption before
+            // sending" prompt groups already have, via the shared caption-queue flow below.
+            // Documents and view-once media skip the prompt and send immediately, same as before.
+            if (kind === 'media' && !wasViewOnce) {
+                openMediaCaptionQueue(files, 'dm');
+                return;
+            }
             files.forEach(file => { queueFileUpload(file, kind, wasViewOnce); });
             if (wasViewOnce) disarmViewOnce();
         }
 
-        // --- GROUP MEDIA WITH CAPTIONS (Firebase Storage) ---
+        // --- MEDIA WITH CAPTIONS (shared by DM and group sends) ---
         let groupMediaQueue = [];
+        let mediaCaptionTarget = 'group'; // 'group' or 'dm' — decides which send function fires
         let currentGroupMediaCaptionFile = null;
         let currentGroupMediaCaptionUrl = '';
 
-        function openGroupMediaCaptionQueue(files) {
+        function openMediaCaptionQueue(files, target) {
+            mediaCaptionTarget = target;
             groupMediaQueue = files.slice();
             processNextGroupMediaCaption();
         }
@@ -21064,8 +21078,15 @@
         document.getElementById('btn-send-group-media-caption').addEventListener('click', async () => {
             const file = currentGroupMediaCaptionFile;
             const caption = document.getElementById('group-media-caption-input').value.trim();
+            const target = mediaCaptionTarget;
             closeGroupMediaCaptionSheet();
-            if (file) await sendGroupMediaMessage(file, caption);
+            if (file) {
+                if (target === 'dm') {
+                    await queueFileUpload(file, 'media', false, caption);
+                } else {
+                    await sendGroupMediaMessage(file, caption);
+                }
+            }
             processNextGroupMediaCaption();
         });
 

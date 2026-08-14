@@ -13224,6 +13224,22 @@
             const user = auth.currentUser;
             if (!user) return;
             const isBusiness = e.target.checked;
+
+            // Switching from Business back to Personal has real consequences (loses the gold
+            // badge, drops out of business features like publishing ads, and re-locks the
+            // username if the one-time change was already used) — confirm before doing it.
+            if (!isBusiness) {
+                const confirmed = await showCustomModal(
+                    'Switch to Personal Account?',
+                    "You'll lose your gold verified badge and business features (like publishing ads). If you've already used your one-time username change, your username will be locked again. You can switch back to Business anytime.",
+                    true
+                );
+                if (!confirmed) {
+                    e.target.checked = true;
+                    return;
+                }
+            }
+
             document.getElementById('business-account-pill').style.display = isBusiness ? 'inline-block' : 'none';
             try {
                 await update(ref(database, `users/${user.uid}`), { isBusinessAccount: isBusiness });

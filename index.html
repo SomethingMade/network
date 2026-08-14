@@ -8338,10 +8338,43 @@
         // burn the daily quota; move it into Remote Config later if that becomes a problem, no
         // other code here needs to change to do that.
         const CURRENTS_API_KEY = 'AZZOie9hyFShgrAVkPXG9MNNgLtACTCgu_BwDtYIdKlaZulH';
-        let cachedNewsArticles = [];
-        let newsArticlesFetchedAt = 0;
+        const NEWS_CACHE_STORAGE_KEY = 'xoxa_news_cache_v1';
+        const NEWS_CACHE_MS = 24 * 60 * 60 * 1000; // 24h — persisted to localStorage so a page
+        // refresh reuses the same headlines instead of re-hitting the API; only expires and
+        // re-fetches once a full day has passed since the last successful fetch.
         let newsFetchInFlight = null;
-        const NEWS_CACHE_MS = 20 * 60 * 1000;
+
+        // Seed the in-memory cache from localStorage on load, so the very first call to
+        // fetchNewsHeadlines() after a refresh can serve straight from disk with no network call.
+        function loadNewsCacheFromStorage() {
+            try {
+                const raw = localStorage.getItem(NEWS_CACHE_STORAGE_KEY);
+                if (!raw) return { articles: [], fetchedAt: 0 };
+                const parsed = JSON.parse(raw);
+                if (!parsed || !Array.isArray(parsed.articles) || typeof parsed.fetchedAt !== 'number') {
+                    return { articles: [], fetchedAt: 0 };
+                }
+                return parsed;
+            } catch (e) {
+                console.warn('loadNewsCacheFromStorage failed:', e);
+                return { articles: [], fetchedAt: 0 };
+            }
+        }
+        const _initialNewsCache = loadNewsCacheFromStorage();
+        let cachedNewsArticles = _initialNewsCache.articles;
+        let newsArticlesFetchedAt = _initialNewsCache.fetchedAt;
+
+        function saveNewsCacheToStorage() {
+            try {
+                localStorage.setItem(NEWS_CACHE_STORAGE_KEY, JSON.stringify({
+                    articles: cachedNewsArticles,
+                    fetchedAt: newsArticlesFetchedAt
+                }));
+            } catch (e) {
+                // Storage full/unavailable (e.g. private browsing) — fine to just stay in-memory.
+                console.warn('saveNewsCacheToStorage failed:', e);
+            }
+        }
 
         async function fetchNewsHeadlines() {
             if (Date.now() - newsArticlesFetchedAt < NEWS_CACHE_MS && cachedNewsArticles.length) return cachedNewsArticles;
@@ -8371,6 +8404,7 @@
                     if (articles.length) {
                         cachedNewsArticles = articles;
                         newsArticlesFetchedAt = Date.now();
+                        saveNewsCacheToStorage();
                     } else {
                         // Currents returns thin/empty results occasionally on the free plan —
                         // don't cache an empty result as if it were a real 20-minute answer, so

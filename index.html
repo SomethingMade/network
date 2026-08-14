@@ -18787,29 +18787,44 @@
             }));
         }
 
-        // Loads this device's keypair from IndexedDB, generating + publishing a new one on first use.
+        // Loads this device's keypair from IndexedDB, generating + publishing a new one on first
+        // use. Memoizes the in-flight promise (not just the resolved result) so concurrent
+        // callers on a fresh session — e.g. decrypting chat-list previews while a send is also
+        // in flight — all await the SAME generate-and-publish instead of racing to each generate
+        // and publish their own keypair, which would leave `myE2EKeypair` pointing at whichever
+        // one finished last while other in-flight encrypt/decrypt calls used a different one.
+        let myKeypairPromise = null;
         async function getMyKeypair() {
             if (myE2EKeypair) return myE2EKeypair;
             const user = auth.currentUser;
             if (!user) return null;
+            if (myKeypairPromise) return myKeypairPromise;
+
+            myKeypairPromise = (async () => {
+                try {
+                    const stored = await idbGet('keys', 'keypair-' + user.uid);
+                    if (stored && stored.publicKey && stored.privateKey) {
+                        myE2EKeypair = stored;
+                        return myE2EKeypair;
+                    }
+                } catch (e) { /* fall through to generate a fresh one */ }
+
+                const keypair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+                myE2EKeypair = keypair;
+                try { await idbSet('keys', 'keypair-' + user.uid, keypair); } catch (e) { /* best-effort persistence */ }
+                try {
+                    const publicJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey);
+                    await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
+                } catch (e) { /* peers just can't encrypt to us yet if this fails */ }
+
+                return myE2EKeypair;
+            })();
 
             try {
-                const stored = await idbGet('keys', 'keypair-' + user.uid);
-                if (stored && stored.publicKey && stored.privateKey) {
-                    myE2EKeypair = stored;
-                    return myE2EKeypair;
-                }
-            } catch (e) { /* fall through to generate a fresh one */ }
-
-            const keypair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
-            myE2EKeypair = keypair;
-            try { await idbSet('keys', 'keypair-' + user.uid, keypair); } catch (e) { /* best-effort persistence */ }
-            try {
-                const publicJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey);
-                await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
-            } catch (e) { /* peers just can't encrypt to us yet if this fails */ }
-
-            return myE2EKeypair;
+                return await myKeypairPromise;
+            } finally {
+                myKeypairPromise = null;
+            }
         }
 
         // Watches a peer's published public key for changes (they got a new device, cleared
@@ -18939,21 +18954,40 @@
         // openDocumentExternally / the video & image viewers. Cached per mediaURL so a file
         // already resolved once in the open thread isn't re-fetched/re-decrypted on every
         // re-render (the DM messages listener re-renders the whole list on any change).
+        // Self-heals the same way decryptForPeer does: if decryption fails with whatever shared
+        // key we have cached (most commonly because the peer's key rotated — new device, cleared
+        // storage, etc. — after we cached it), drop the cache and retry once against whatever
+        // public key is currently published before giving up.
         const decryptedMediaUrlCache = {};
         async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType) {
             if (decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
-            const key = await deriveSharedKey(peerUid);
-            if (!key) return null;
-            try {
+
+            const tryWithKey = async (key) => {
                 const res = await fetch(mediaURL);
                 const buf = await res.arrayBuffer();
                 const iv = new Uint8Array(buf.slice(0, 12));
                 const cipherBuf = buf.slice(12);
                 const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
-                const url = URL.createObjectURL(new Blob([plainBuf], { type: mimeType || 'application/octet-stream' }));
-                decryptedMediaUrlCache[mediaURL] = url;
-                return url;
-            } catch (e) { return null; }
+                return new Blob([plainBuf], { type: mimeType || 'application/octet-stream' });
+            };
+
+            const key = await deriveSharedKey(peerUid);
+            if (!key) return null;
+            let blob;
+            try {
+                blob = await tryWithKey(key);
+            } catch (e) {
+                const freshKey = await deriveSharedKey(peerUid, true);
+                if (!freshKey) return null;
+                try {
+                    blob = await tryWithKey(freshKey);
+                } catch (e2) {
+                    return null;
+                }
+            }
+            const url = URL.createObjectURL(blob);
+            decryptedMediaUrlCache[mediaURL] = url;
+            return url;
         }
 
         // --- PASSPHRASE/PIN-ENCRYPTED KEY BACKUP (solves "new device = lost history") ---

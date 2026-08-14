@@ -2024,7 +2024,29 @@
 
         /* Per-bubble timestamp, group verified badge, and seen/sent tick marks */
         .msg-meta-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 4px; }
-        .msg-bubble.media .msg-meta-wrap, .msg-bubble.sticker .msg-meta-wrap { padding: 4px 10px 6px; margin-top: 0; }
+        /* Bare media/sticker (no caption) — meta-wrap is the media's very next sibling, so
+           overlay it directly on the bottom-right corner as a small dark scrim pill, the way
+           WhatsApp/Instagram do. This keeps the whole bubble a single, cleanly rounded shape
+           (see the tail-corner radius on .msg-media-img/.msg-sticker-img below) instead of a
+           rounded photo with a separate flat-cornered timestamp strip glued underneath it, and
+           it guarantees the time stays legible over any photo since it always sits on its own
+           dark scrim regardless of the image's own colors. */
+        .msg-bubble.media .msg-media-wrap + .msg-meta-wrap,
+        .msg-bubble.sticker .msg-sticker-img + .msg-meta-wrap {
+            position: absolute; right: 8px; bottom: 8px; margin: 0; padding: 3px 8px;
+            background: rgba(0,0,0,0.45); border-radius: 10px; z-index: 2;
+        }
+        .msg-bubble.media .msg-media-wrap + .msg-meta-wrap .msg-time,
+        .msg-bubble.sticker .msg-sticker-img + .msg-meta-wrap .msg-time { color: rgba(255,255,255,0.95); }
+        .msg-bubble.media .msg-media-wrap + .msg-meta-wrap .msg-ticks,
+        .msg-bubble.sticker .msg-sticker-img + .msg-meta-wrap .msg-ticks { color: rgba(255,255,255,0.85); }
+        .msg-bubble.media .msg-media-wrap + .msg-meta-wrap .msg-ticks.seen,
+        .msg-bubble.sticker .msg-sticker-img + .msg-meta-wrap .msg-ticks.seen { color: #4FC3F7; }
+
+        /* Media WITH a caption — meta-wrap follows the caption text instead of the media
+           directly, so the selector above doesn't match; it stays in normal flow below the
+           caption, right-aligned like a text bubble's timestamp. */
+        .msg-bubble.media .msg-media-caption + .msg-meta-wrap { padding: 0 10px 8px; margin-top: -2px; }
         .msg-time { font-size: 11px; color: var(--msg-in-time); }
         .msg-bubble.in .msg-time { color: var(--msg-in-time); }
         .msg-bubble.out .msg-time { color: var(--msg-out-time); }

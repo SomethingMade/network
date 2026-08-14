@@ -2013,6 +2013,17 @@
         .msg-media-img { pointer-events: auto; }
         .msg-media-video { cursor: default; }
         .msg-media-wrap { position: relative; }
+        /* Encrypted DM photo, still being fetched + decrypted client-side. */
+        .msg-media-wrap.media-decrypting .msg-media-img,
+        .msg-media-wrap.media-decrypting .msg-media-video { min-height: 160px; animation: mediaDecryptPulse 1.1s ease-in-out infinite; }
+        @keyframes mediaDecryptPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+        .msg-media-wrap.media-decrypt-failed .msg-media-img,
+        .msg-media-wrap.media-decrypt-failed .msg-media-video { min-height: 100px; }
+        .msg-media-wrap.media-decrypt-failed::after {
+            content: '🔒 Couldn\'t decrypt photo';
+            position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary); font-size: 13px; font-weight: 600; text-align: center; padding: 0 16px;
+        }
         .msg-media-save-btn {
             position: absolute;
             top: 8px;
@@ -6375,14 +6386,29 @@
         // Downloads a document to the user's device instead of opening/previewing it. The `download`
         // attribute alone is ignored by browsers for cross-origin URLs (like Cloudinary), so we fetch
         // the file as a blob first, same approach as downloadMediaFile.
-        async function openDocumentExternally(url, fileName) {
+        async function openDocumentExternally(url, fileName, encryptedForPeerUid, mimeType) {
             if (!url) return;
             const finalName = fileName || `document-${Date.now()}`;
             try {
                 showLoading();
-                const res = await fetch(url, { mode: 'cors' });
-                if (!res.ok) throw new Error('Fetch failed');
-                const blob = await res.blob();
+                let blob;
+                if (encryptedForPeerUid) {
+                    // Ciphertext lives at `url` — fetch + decrypt via the shared key for this
+                    // thread rather than downloading it as-is.
+                    const key = await deriveSharedKey(encryptedForPeerUid);
+                    if (!key) throw new Error('No shared key to decrypt this document yet');
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('Fetch failed');
+                    const buf = await res.arrayBuffer();
+                    const iv = new Uint8Array(buf.slice(0, 12));
+                    const cipherBuf = buf.slice(12);
+                    const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+                    blob = new Blob([plainBuf], { type: mimeType || 'application/octet-stream' });
+                } else {
+                    const res = await fetch(url, { mode: 'cors' });
+                    if (!res.ok) throw new Error('Fetch failed');
+                    blob = await res.blob();
+                }
                 const blobUrl = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = blobUrl;
@@ -6394,6 +6420,10 @@
                 notify('Saved to your device');
             } catch (err) {
                 console.error('openDocumentExternally error:', err);
+                if (encryptedForPeerUid) {
+                    notify("Couldn't decrypt that document", 'error');
+                    return;
+                }
                 // Fallback for browsers that block the cross-origin fetch: open it directly
                 // so the user can use the browser/OS save option.
                 window.open(url, '_blank', 'noopener,noreferrer');
@@ -18578,15 +18608,19 @@
         // For a given pair of users, both sides derive the SAME AES-256-GCM key via
         // ECDH(myPrivateKey, theirPublicKey) === ECDH(theirPrivateKey, myPublicKey) — the
         // standard Diffie-Hellman property. That shared key encrypts every message text in
-        // that 1:1 thread; the server only ever stores ciphertext.
+        // that 1:1 thread, and (see encryptFileForPeer/decryptMediaUrlForPeer below) the raw
+        // bytes of any photo sent in it; the server only ever stores ciphertext.
         //
         // Known, intentional limitations:
         //  - Static-static ECDH, not a full Signal-style double ratchet — no forward secrecy
         //    (a single leaked device key can decrypt that thread's whole history).
         //  - Keys are per-device: logging in on a new device generates a new keypair, so that
         //    device can decrypt future messages but not history encrypted for the old device.
-        //  - Message TEXT is end-to-end encrypted. Media (photos/videos/voice notes/documents/
-        //    stickers) still goes through the existing upload flow unencrypted.
+        //  - Message TEXT and PHOTOS/VIDEOS/VOICE NOTES/DOCUMENTS are end-to-end encrypted.
+        //    GIFs and stickers still go through the existing upload flow unencrypted, as do
+        //    view-once photos/videos (their own separate protection model). Encrypted media
+        //    forwarded to a different thread can't be re-encrypted for the new recipient yet,
+        //    so forwards of encrypted media will fail to decrypt on the other end.
         //  - Group chats and the AI assistant thread are intentionally not encrypted.
         const E2E_PREFIX = '\u27e6e2e1\u27e7';
         let myE2EKeypair = null;
@@ -18746,6 +18780,45 @@
                     return '🔒 Unable to decrypt message';
                 }
             }
+        }
+
+        // Encrypts a photo File's raw bytes for a 1:1 thread with peerUid, ahead of upload.
+        // Output blob layout is [12-byte IV][AES-GCM ciphertext] — deliberately opaque, so
+        // Firebase Storage (and anyone without the shared key) only ever sees noise, never a
+        // decodable image. Falls back to uploading the original file unencrypted if a shared
+        // key can't be derived yet (e.g. the peer hasn't published a public key), same
+        // fallback behavior as encryptForPeer for text.
+        async function encryptFileForPeer(peerUid, file) {
+            const key = await deriveSharedKey(peerUid);
+            if (!key) return { blob: file, encrypted: false };
+            try {
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const fileBuf = await file.arrayBuffer();
+                const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, fileBuf);
+                return { blob: new Blob([iv, new Uint8Array(cipherBuf)]), encrypted: true };
+            } catch (e) { return { blob: file, encrypted: false }; }
+        }
+
+        // Downloads + decrypts an encrypted DM media file (photo, video, voice note, or
+        // document), returning a local blob: URL suitable for use as a src/href, or passed to
+        // openDocumentExternally / the video & image viewers. Cached per mediaURL so a file
+        // already resolved once in the open thread isn't re-fetched/re-decrypted on every
+        // re-render (the DM messages listener re-renders the whole list on any change).
+        const decryptedMediaUrlCache = {};
+        async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType) {
+            if (decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
+            const key = await deriveSharedKey(peerUid);
+            if (!key) return null;
+            try {
+                const res = await fetch(mediaURL);
+                const buf = await res.arrayBuffer();
+                const iv = new Uint8Array(buf.slice(0, 12));
+                const cipherBuf = buf.slice(12);
+                const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
+                const url = URL.createObjectURL(new Blob([plainBuf], { type: mimeType || 'application/octet-stream' }));
+                decryptedMediaUrlCache[mediaURL] = url;
+                return url;
+            } catch (e) { return null; }
         }
 
         // --- PASSPHRASE/PIN-ENCRYPTED KEY BACKUP (solves "new device = lost history") ---
@@ -20086,9 +20159,21 @@
                             mediaWrap.className = 'msg-media-wrap';
                             const img = document.createElement('img');
                             img.className = 'msg-media-img';
-                            img.src = msg.mediaURL;
                             img.alt = 'Photo';
-                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            if (msg.mediaEncrypted) {
+                                // Ciphertext lives at msg.mediaURL — decrypt it locally before it
+                                // ever touches an <img> src. Shows a soft placeholder until ready.
+                                mediaWrap.classList.add('media-decrypting');
+                                decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType).then(localUrl => {
+                                    if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
+                                    img.src = localUrl;
+                                    mediaWrap.classList.remove('media-decrypting');
+                                    img.addEventListener('click', () => openImageViewer(localUrl));
+                                });
+                            } else {
+                                img.src = msg.mediaURL;
+                                img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            }
                             mediaWrap.appendChild(img);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
@@ -20103,18 +20188,34 @@
                             mediaWrap.className = 'msg-media-wrap';
                             const vid = document.createElement('video');
                             vid.className = 'msg-media-video';
-                            vid.src = msg.mediaURL;
                             vid.preload = 'metadata';
                             vid.playsInline = true;
                             vid.muted = true;
-                            vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
-                            mediaWrap.appendChild(vid);
-                            primeVideoPosterFrame(vid);
                             const playHint = document.createElement('div');
                             playHint.className = 'msg-media-play-hint';
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
-                            playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            mediaWrap.appendChild(vid);
                             mediaWrap.appendChild(playHint);
+                            if (msg.mediaEncrypted) {
+                                // Ciphertext lives at msg.mediaURL — decrypt it locally before it
+                                // ever touches a <video> src (no Cloudinary poster available for
+                                // encrypted uploads, so primeVideoPosterFrame falls back to its
+                                // client-side seek once the decrypted src is set).
+                                mediaWrap.classList.add('media-decrypting');
+                                decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType).then(localUrl => {
+                                    if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
+                                    vid.src = localUrl;
+                                    mediaWrap.classList.remove('media-decrypting');
+                                    primeVideoPosterFrame(vid);
+                                    vid.addEventListener('click', () => openVideoViewer(localUrl));
+                                    playHint.addEventListener('click', () => openVideoViewer(localUrl));
+                                });
+                            } else {
+                                vid.src = msg.mediaURL;
+                                vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                                playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                                primeVideoPosterFrame(vid);
+                            }
                             attachVideoLoadingOverlay(mediaWrap, vid, playHint);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
@@ -20138,9 +20239,23 @@
                                     <span class="msg-voice-time">${formatVoiceTime(msg.duration || 0)}</span>
                                 </div>`;
                             const playBtn = card.querySelector('.msg-voice-play-btn');
-                            playBtn.addEventListener('click', () => toggleVoicePlayback(playBtn, msg.mediaURL, bubble));
                             const waveformEl = card.querySelector('.msg-voice-waveform');
-                            waveformEl.addEventListener('click', (e) => seekVoicePlayback(e, waveformEl, bubble, msg.mediaURL, playBtn));
+                            // Encrypted voice notes are decrypted lazily, on first tap, rather
+                            // than eagerly for every bubble in the thread — resolvePlaybackUrl
+                            // caches the result so replaying/seeking afterwards is instant.
+                            const resolvePlaybackUrl = () => msg.mediaEncrypted
+                                ? decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType)
+                                : Promise.resolve(msg.mediaURL);
+                            playBtn.addEventListener('click', async () => {
+                                const resolvedUrl = await resolvePlaybackUrl();
+                                if (!resolvedUrl) { notify("Couldn't decrypt voice note", 'error'); return; }
+                                toggleVoicePlayback(playBtn, resolvedUrl, bubble);
+                            });
+                            waveformEl.addEventListener('click', async (e) => {
+                                const resolvedUrl = await resolvePlaybackUrl();
+                                if (!resolvedUrl) { notify("Couldn't decrypt voice note", 'error'); return; }
+                                seekVoicePlayback(e, waveformEl, bubble, resolvedUrl, playBtn);
+                            });
                             bubble.appendChild(card);
                         } else if (msg.mediaType === 'call') {
                             const isOutgoing = msg.senderUid === user.uid;
@@ -20175,7 +20290,7 @@
                                     <span class="msg-doc-name">${msg.fileName || 'Document'}</span>
                                     <span class="msg-doc-size">${formatFileSize(msg.fileSize)}</span>
                                 </div>`;
-                            card.addEventListener('click', () => openDocumentExternally(msg.mediaURL, msg.fileName));
+                            card.addEventListener('click', () => openDocumentExternally(msg.mediaURL, msg.fileName, msg.mediaEncrypted ? otherUid : null, msg.mediaMimeType));
                             bubble.appendChild(card);
                         } else if (msg.text) {
                             const textEl = document.createElement('div');
@@ -20678,25 +20793,46 @@
                 let previewText;
 
                 if (kind === 'document') {
+                    // Documents in a 1:1 DM are end-to-end encrypted before upload — same
+                    // scheme as photos/videos (see encryptFileForPeer above).
+                    const { blob, encrypted } = await encryptFileForPeer(chatUid, file);
                     const safeName = (file.name || 'document').replace(/[^a-zA-Z0-9.\-_]/g, '_');
                     const storagePath = `documents/${threadId}/${Date.now()}_${safeName}`;
-                    url = await uploadToFirebaseStorage(file, storagePath);
+                    url = await uploadToFirebaseStorage(blob, storagePath);
                     msgPayload.mediaURL = url;
                     msgPayload.mediaType = 'document';
                     msgPayload.fileName = file.name;
                     msgPayload.fileSize = file.size;
+                    if (encrypted) {
+                        msgPayload.mediaEncrypted = true;
+                        msgPayload.mediaMimeType = file.type || 'application/octet-stream';
+                    }
                     previewText = '📄 ' + file.name;
                 } else {
-                    const { url: cUrl, type } = await uploadToCloudinary(file);
-                    url = cUrl;
-                    msgPayload.mediaURL = url;
-                    msgPayload.mediaType = type === 'video' ? 'video' : 'image';
-                    if (applyViewOnce) {
+                    if (!applyViewOnce) {
+                        // Regular (non-view-once) photos and videos in a 1:1 DM are end-to-end
+                        // encrypted before upload — see encryptFileForPeer above. View-once
+                        // media keeps using the Cloudinary path below since it already has its
+                        // own one-time-view protection.
+                        const { blob, encrypted } = await encryptFileForPeer(chatUid, file);
+                        const safeName = (file.name || (isVideo ? 'video' : 'photo')).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                        const storagePath = `dm_media/${threadId}/${Date.now()}_${safeName}`;
+                        url = await uploadToFirebaseStorage(blob, storagePath);
+                        msgPayload.mediaURL = url;
+                        msgPayload.mediaType = isVideo ? 'video' : 'image';
+                        if (encrypted) {
+                            msgPayload.mediaEncrypted = true;
+                            msgPayload.mediaMimeType = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+                        }
+                        previewText = isVideo ? '🎥 Video' : '📷 Photo';
+                    } else {
+                        const { url: cUrl, type } = await uploadToCloudinary(file);
+                        url = cUrl;
+                        msgPayload.mediaURL = url;
+                        msgPayload.mediaType = type === 'video' ? 'video' : 'image';
                         msgPayload.viewOnce = true;
                         msgPayload.viewOnceViewed = false;
                         previewText = msgPayload.mediaType === 'video' ? '🔒 Video (view once)' : '🔒 Photo (view once)';
-                    } else {
-                        previewText = msgPayload.mediaType === 'video' ? '🎥 Video' : '📷 Photo';
                     }
                 }
                 if (capturedReplyCtx) {
@@ -21044,18 +21180,29 @@
             };
 
             try {
-                const { url, duration } = await uploadToCloudinary(blob);
+                // Voice notes in a 1:1 DM are end-to-end encrypted before upload, same as
+                // photos/videos/documents (see encryptFileForPeer above) — except view-once
+                // notes, which keep using the Cloudinary path below since they already have
+                // their own one-time-view protection. Ciphertext isn't decodable audio, so
+                // Cloudinary's transcoding/duration detection can't run on encrypted notes
+                // anyway — fallbackDuration (timed client-side while recording) is used instead.
                 const threadId = threadIdFor(user.uid, chatUid);
                 const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaType: 'audio' };
 
-                const msgPayload = {
-                    senderUid: user.uid,
-                    createdAt: Date.now(),
-                    mediaURL: url,
-                    mediaType: 'audio',
-                    duration: duration || fallbackDuration || 0
-                };
-                if (isViewOnce) {
+                if (!isViewOnce) {
+                    const { blob: encBlob, encrypted } = await encryptFileForPeer(chatUid, blob);
+                    const storagePath = `dm_media/${threadId}/${Date.now()}_voice.bin`;
+                    msgPayload.mediaURL = await uploadToFirebaseStorage(encBlob, storagePath);
+                    msgPayload.duration = fallbackDuration || 0;
+                    if (encrypted) {
+                        msgPayload.mediaEncrypted = true;
+                        msgPayload.mediaMimeType = blob.type || 'audio/webm';
+                    }
+                } else {
+                    const { url, duration } = await uploadToCloudinary(blob);
+                    msgPayload.mediaURL = url;
+                    msgPayload.duration = duration || fallbackDuration || 0;
                     msgPayload.viewOnce = true;
                     msgPayload.viewOnceViewed = false;
                 }

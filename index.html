@@ -7371,6 +7371,14 @@
             try { if (navigator.vibrate) navigator.vibrate(ms); } catch (err) { /* no-op */ }
         }
 
+        // Distinct short double-buzz for an incoming DM/group message — separate from the light
+        // typing tap above so it reads as a deliberate "you got a message" cue. Still respects
+        // the Haptic Feedback setting (and no-ops safely where the Vibration API isn't
+        // available) since it goes through triggerHaptic().
+        function vibrateForNewMessage() {
+            triggerHaptic([30, 40, 30]);
+        }
+
         // Light tap-buzz while typing a message, comment, or story reply anywhere in the app.
         // Delegated on document (rather than wired per-input) so it keeps working for inputs
         // that get rebuilt/re-queried across chat switches, and stays a single, easy-to-find
@@ -8261,6 +8269,7 @@
                             icon: icon || "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
                             badge: "https://i.postimg.cc/Bv3sQWxd/1783111354171.png",
                             tag: groupId ? ('group-' + groupId) : (chatUid ? ('chat-' + chatUid) : 'new-message'),
+                            vibrate: [30, 40, 30],
                             data: { url: url || '/', uid: chatUid, groupId: groupId, senderName: title || 'Someone' },
                             actions: [
                                 { action: 'reply', title: 'Reply', type: 'text', placeholder: 'Type a message…' },
@@ -21666,11 +21675,16 @@
                 updateGroupsUnreadBadge(totalGroupUnread);
 
                 if (userChatsInitialized) {
+                    let anyNewGroupMessage = false;
                     Object.keys(cachedGroupChatsMeta).forEach(groupId => {
                         const newCount = cachedGroupChatsMeta[groupId].unreadCount || 0;
                         const oldCount = (prevGroupChatsMeta[groupId] && prevGroupChatsMeta[groupId].unreadCount) || 0;
-                        if (newCount > oldCount) maybeShowInAppBannerForGroup(groupId, cachedGroupChatsMeta[groupId]);
+                        if (newCount > oldCount) {
+                            anyNewGroupMessage = true;
+                            maybeShowInAppBannerForGroup(groupId, cachedGroupChatsMeta[groupId]);
+                        }
                     });
+                    if (anyNewGroupMessage) vibrateForNewMessage();
                 }
                 previousGroupChatsMeta = JSON.parse(JSON.stringify(cachedGroupChatsMeta));
 
@@ -21751,7 +21765,7 @@
                         const oldCount = (prevUserChatsData[chatUid] && prevUserChatsData[chatUid].unreadCount) || 0;
                         return newCount > oldCount;
                     });
-                    if (newlyIncoming.length) playNotificationBlip();
+                    if (newlyIncoming.length) { playNotificationBlip(); vibrateForNewMessage(); }
                     newlyIncoming.forEach(chatUid => maybeShowInAppBannerForDM(chatUid, cachedUserChatsData[chatUid]));
                 }
 

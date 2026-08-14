@@ -848,6 +848,12 @@
         .feed-composer-audience:hover { background: var(--bg-alt); }
         .feed-composer-audience svg { flex-shrink: 0; }
         .feed-composer-audience.followers-only { color: var(--primary-blue); background: rgba(var(--primary-rgb), 0.1); }
+        .feed-composer-ad-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px 50px; padding: 10px 14px; border-radius: 14px; background: rgba(212, 160, 23, 0.08); border: 1px solid rgba(212, 160, 23, 0.3); }
+        .feed-composer-ad-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #B8860B; }
+        .feed-composer-ad-panel { margin: 8px 0 2px 50px; padding: 12px 14px; border-radius: 14px; background: var(--bg-input); display: flex; flex-direction: column; gap: 8px; }
+        .feed-composer-ad-panel-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+        .feed-composer-ad-cta-select, .feed-composer-ad-url-input { width: 100%; border: none; background: var(--bg-alt); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; font-family: inherit; color: var(--text-primary); box-sizing: border-box; }
+        .feed-composer-ad-url-input::placeholder { color: var(--text-secondary); }
         .feed-composer-preview { position: relative; margin-top: 10px; }
         .feed-composer-preview-main { position: relative; border-radius: 14px; overflow: hidden; background: #000; height: min(58vh, 480px); display: flex; align-items: center; justify-content: center; }
         .feed-composer-preview-main img,
@@ -1082,6 +1088,9 @@
         .feed-link-preview-img { width: 100%; max-height: 260px; object-fit: cover; display: block; background: var(--bg-input); }
         .feed-link-preview-url { display: block; padding: 8px 12px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-search-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px 20px; display: none; }
+        .feed-post-ad-cta { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0 60px; width: calc(100% - 60px); padding: 10px 14px; border-radius: 12px; background: var(--bg-alt); border: 1.5px solid var(--border-color); color: var(--text-primary); font-size: 13.5px; font-weight: 700; text-decoration: none; box-sizing: border-box; }
+        .feed-post-ad-cta:hover { background: var(--bg-input); }
+        .feed-post-ad-cta svg { flex-shrink: 0; }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
         .feed-composer-music-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; }
@@ -3219,6 +3228,29 @@
                     <svg class="feed-composer-audience-icon" id="feed-composer-audience-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                     <span id="feed-composer-audience-label">Everyone</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="feed-composer-ad-toggle-row" id="feed-composer-ad-toggle-row" style="display:none;">
+                    <div class="feed-composer-ad-toggle-label">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a2 2 0 0 0 2 2h1l4 4V5L6 9H5a2 2 0 0 0-2 2z"></path><path d="M15 8a4 4 0 0 1 0 8"></path><path d="M18 5a8 8 0 0 1 0 14"></path></svg>
+                        <span>Publish as an Ad</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="feed-composer-ad-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="feed-composer-ad-panel" id="feed-composer-ad-panel" style="display:none;">
+                    <span class="feed-composer-ad-panel-label">Ad details</span>
+                    <select id="feed-composer-ad-cta" class="feed-composer-ad-cta-select">
+                        <option value="Learn More">Learn More</option>
+                        <option value="Shop Now">Shop Now</option>
+                        <option value="Sign Up">Sign Up</option>
+                        <option value="Contact Us">Contact Us</option>
+                        <option value="Download">Download</option>
+                        <option value="Book Now">Book Now</option>
+                        <option value="Get Offer">Get Offer</option>
+                    </select>
+                    <input type="url" id="feed-composer-ad-url" class="feed-composer-ad-url-input" placeholder="Destination link, e.g. https://yourbusiness.com" autocomplete="off">
                 </div>
                 <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
                 <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
@@ -8386,6 +8418,7 @@
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
+        let feedComposerIsAd = false; // true while "Publish as an Ad" is toggled on (business accounts only)
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
         function canViewPost(post) {
@@ -8434,7 +8467,11 @@
             const badgeEl = card.querySelector('.x-post-headline .name-badge');
             if (badgeEl) badgeEl.innerHTML = verifiedBadgeFor(uid, uid === AI_UID);
             const businessPillEl = card.querySelector('.feed-post-business-pill');
-            if (businessPillEl) businessPillEl.style.display = profile.isBusinessAccount ? '' : 'none';
+            if (businessPillEl) {
+                const isAdPost = card.dataset.isAd === '1';
+                businessPillEl.style.display = (isAdPost || profile.isBusinessAccount) ? '' : 'none';
+                businessPillEl.textContent = isAdPost ? 'Sponsored' : 'Business';
+            }
             const usernameEl = card.querySelector('.x-post-username');
             if (usernameEl) usernameEl.textContent = profile.username ? '@' + profile.username : '';
             const avatarCol = card.querySelector('.x-post-avatar-col');
@@ -9826,6 +9863,10 @@
             const audienceBtn = document.getElementById('feed-composer-audience-btn');
             const audienceIcon = document.getElementById('feed-composer-audience-icon');
             const audienceLabel = document.getElementById('feed-composer-audience-label');
+            const adToggle = document.getElementById('feed-composer-ad-toggle');
+            const adPanel = document.getElementById('feed-composer-ad-panel');
+            const adCtaSelect = document.getElementById('feed-composer-ad-cta');
+            const adUrlInput = document.getElementById('feed-composer-ad-url');
             const musicBtnText = document.getElementById('feed-composer-music-btn-text');
             const musicClearBtn = document.getElementById('feed-composer-music-clear');
             const attachLabel = document.querySelector('label.feed-composer-attach[for="feed-composer-file"]');
@@ -9873,6 +9914,10 @@
                 }
                 if (feedComposerPollActive) {
                     submitBtn.disabled = !pollIsValid();
+                    return;
+                }
+                if (feedComposerIsAd && !adUrlInput.value.trim()) {
+                    submitBtn.disabled = true;
                     return;
                 }
                 const hasContent = (input.value && input.value.trim().length > 0) || feedComposerImages.length > 0 || !!feedComposerVideo;
@@ -10198,6 +10243,25 @@
             });
             updateComposerAudienceUI();
 
+            // --- "Publish as an Ad" (business accounts only, see openPostComposer for the
+            // row's visibility gating). Toggling it swaps the composer into ad mode: the submit
+            // button/placeholder relabel and the ad panel (CTA button + destination link) opens.
+            function updateComposerAdUI() {
+                adPanel.style.display = feedComposerIsAd ? 'flex' : 'none';
+                submitBtn.textContent = feedComposerIsAd ? 'Publish Ad' : 'Post';
+                input.placeholder = feedComposerIsAd ? "Write your ad copy…" : "What's on your mind? Type @ to tag someone";
+            }
+            function normalizeAdUrl(url) {
+                if (!url) return '';
+                return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+            }
+            adToggle.addEventListener('change', (e) => {
+                feedComposerIsAd = e.target.checked;
+                updateComposerAdUI();
+                refreshSubmitState();
+            });
+            adUrlInput.addEventListener('input', refreshSubmitState);
+
             submitBtn.addEventListener('click', async () => {
                 const text = input.value.trim();
                 if (text.length > FEED_POST_MAX_CHARS) {
@@ -10215,6 +10279,14 @@
                 const u = auth.currentUser;
                 if (!u) return;
                 const myProfile = cachedUsers[u.uid] || { name: u.displayName || 'You', photoURL: u.photoURL || '' };
+                // Ad mode is only honored for genuine business accounts, even if client-side
+                // toggle state somehow says otherwise — mirror this check in your Firebase
+                // security rules too, since this file can't enforce it server-side on its own.
+                const isAdSubmit = feedComposerIsAd && !!myProfile.isBusinessAccount;
+                if (feedComposerIsAd && !adUrlInput.value.trim()) {
+                    notify('Add a destination link for your ad', 'error');
+                    return;
+                }
 
                 // Snapshot everything the composer needs before it's cleared/closed below —
                 // the actual write happens in the background after this handler returns.
@@ -10223,6 +10295,9 @@
                 const pendingMusic = feedComposerMusic;
                 const pendingVisibility = feedComposerVisibility;
                 const pendingTaggedUids = new Set(composerTaggedUids);
+                const pendingIsAd = isAdSubmit;
+                const pendingAdCta = adCtaSelect.value;
+                const pendingAdUrl = normalizeAdUrl(adUrlInput.value.trim());
 
                 // Close the composer and reset it right away — posting happens in the
                 // background behind a thin top-of-screen progress bar (see
@@ -10231,6 +10306,11 @@
                 updateComposerTagsUI();
                 feedComposerVisibility = 'everyone';
                 updateComposerAudienceUI();
+                feedComposerIsAd = false;
+                adToggle.checked = false;
+                adUrlInput.value = '';
+                adCtaSelect.selectedIndex = 0;
+                updateComposerAdUI();
                 input.value = '';
                 input.style.height = 'auto';
                 updateCharCount();
@@ -10275,6 +10355,9 @@
                         linkPreview: linkPreview,
                         mentions: mentionedUids.size ? mentionsMap : null,
                         visibility: pendingVisibility === 'followers' ? 'followers' : 'everyone',
+                        isAd: pendingIsAd || null,
+                        adCta: pendingIsAd ? pendingAdCta : null,
+                        adUrl: pendingIsAd ? pendingAdUrl : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
                         commentCount: 0
@@ -11333,6 +11416,7 @@
             const likedByMe = !!myReactionEmoji;
             const savedByMe = !!cachedSavedPosts[originalId];
             const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
+            card.dataset.isAd = post.isAd ? '1' : '0';
             card.dataset.uid = post.uid || '';
             card.dataset.fallbackName = post.name || 'User';
             card.dataset.fallbackPhoto = post.photoURL || '';
@@ -11396,6 +11480,11 @@
                     <span class="feed-link-preview-url">${escapeHtmlForPost(post.linkPreview.url.replace(/^https?:\/\//i, ''))}</span>
                 </a>` : '';
             const pollHtml = post.poll ? buildFeedPollHtml(post.poll, myUid) : '';
+            const adCtaHtml = (post.isAd && post.adUrl) ? `
+                <a class="feed-post-ad-cta" href="${escapeHtmlForPost(post.adUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
+                    <span>${escapeHtmlForPost(post.adCta || 'Learn More')}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </a>` : '';
             const taggedUids = post.mentions ? Object.keys(post.mentions).filter(uid => uid !== post.uid) : [];
             const taggedHtml = taggedUids.length ? `
                 <div class="feed-post-tagged-row">
@@ -11434,6 +11523,7 @@
                 </div>
                 ${imageHtml}
                 ${videoHtml}
+                ${adCtaHtml}
                 <div class="feed-post-reactors" style="display:none;">
                     <div class="feed-post-reactors-avatars"></div>
                     <span class="feed-post-reactors-label"></span>
@@ -14298,6 +14388,26 @@
         function openPostComposer() {
             window.location.hash = 'post-composer';
             postComposerOverlay.classList.add('active');
+            // The "Publish as an Ad" row is business-accounts-only — re-check on every open
+            // rather than once at page load, since the account can switch to/from Business
+            // at any time from Settings.
+            const adRow = document.getElementById('feed-composer-ad-toggle-row');
+            if (adRow) {
+                const myUid = auth.currentUser && auth.currentUser.uid;
+                const canAd = !!(myUid && cachedUsers[myUid] && cachedUsers[myUid].isBusinessAccount);
+                adRow.style.display = canAd ? 'flex' : 'none';
+                if (!canAd && feedComposerIsAd) {
+                    // Business status was switched off with an ad draft in progress — fall back
+                    // to posting it as a normal post instead of silently dropping the draft.
+                    feedComposerIsAd = false;
+                    const adToggleEl = document.getElementById('feed-composer-ad-toggle');
+                    const adPanelEl = document.getElementById('feed-composer-ad-panel');
+                    const submitBtnEl = document.getElementById('feed-composer-submit');
+                    if (adToggleEl) adToggleEl.checked = false;
+                    if (adPanelEl) adPanelEl.style.display = 'none';
+                    if (submitBtnEl) submitBtnEl.textContent = 'Post';
+                }
+            }
             const input = document.getElementById('feed-composer-input');
             if (input) setTimeout(() => input.focus(), 200);
         }

@@ -2515,6 +2515,10 @@
         @media (max-width: 768px) { .image-viewer-nav.visible { display: none; } }
         .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; }
         .image-viewer-counter.visible { display: block; }
+        .image-viewer-dots { position: absolute; bottom: 14px; left: 0; right: 0; display: none; justify-content: center; align-items: center; gap: 6px; z-index: 2; pointer-events: none; }
+        .image-viewer-dots.visible { display: flex; }
+        .image-viewer-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); transition: 0.2s ease; }
+        .image-viewer-dots .dot.active { background: #fff; width: 14px; border-radius: 3px; }
         .image-viewer-post-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: space-around; background: #000; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,0.08); }
         .image-viewer-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 12px; border-radius: 20px; transition: background 0.15s ease, color 0.15s ease; }
         .image-viewer-post-action-btn:hover { background: rgba(255,255,255,0.08); }
@@ -5159,6 +5163,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
             <div class="image-viewer-counter" id="image-viewer-counter"></div>
+            <div class="image-viewer-dots" id="image-viewer-dots"></div>
         </div>
         <div class="image-viewer-post-actions" id="image-viewer-post-actions" style="display:none;">
             <button type="button" class="image-viewer-post-action-btn" id="image-viewer-like-btn">
@@ -5675,6 +5680,7 @@
             document.getElementById('image-viewer-prev').classList.toggle('visible', isGallery);
             document.getElementById('image-viewer-next').classList.toggle('visible', isGallery);
             document.getElementById('image-viewer-counter').classList.toggle('visible', isGallery);
+            renderImageViewerDots();
             updateImageViewerPostBarVisibility();
             overlay.classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
@@ -5724,6 +5730,24 @@
             const post = cachedPosts[currentViewerPostId];
             if (post) openPostOptions(currentViewerPostId, post, null);
         });
+        // Builds the bottom dot indicators when the viewer is opened on a multi-image gallery
+        // (mirrors the feed's .x-media-carousel-dots), one dot per image, active dot marking
+        // currentViewerIndex. Rebuilt on open since gallery length can change between posts.
+        function renderImageViewerDots() {
+            const dotsEl = document.getElementById('image-viewer-dots');
+            const isGallery = Array.isArray(currentViewerGallery) && currentViewerGallery.length > 1;
+            dotsEl.classList.toggle('visible', isGallery);
+            if (!isGallery) { dotsEl.innerHTML = ''; return; }
+            dotsEl.innerHTML = currentViewerGallery.map((_, idx) =>
+                `<span class="dot${idx === currentViewerIndex ? ' active' : ''}"></span>`
+            ).join('');
+        }
+        function updateImageViewerDots() {
+            const dotsEl = document.getElementById('image-viewer-dots');
+            dotsEl.querySelectorAll('.dot').forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === currentViewerIndex);
+            });
+        }
         function renderImageViewerFrame(url, hideSave) {
             currentViewerImageUrl = url;
             const imgEl = document.getElementById('image-viewer-img');
@@ -5744,6 +5768,7 @@
             currentViewerIndex = (currentViewerIndex + delta + len) % len;
             currentViewerPostId = currentViewerGalleryPostIds ? (currentViewerGalleryPostIds[currentViewerIndex] || null) : currentViewerPostId;
             renderImageViewerFrame(currentViewerGallery[currentViewerIndex]);
+            updateImageViewerDots();
             updateImageViewerPostBarVisibility();
         }
         document.getElementById('image-viewer-prev').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(-1); });

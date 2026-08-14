@@ -2108,7 +2108,32 @@
         .msg-media-save-btn:hover { background: rgba(0,0,0,0.75); }
         .msg-media-save-btn:active { transform: scale(0.92); }
         .msg-media-save-btn svg { width: 16px; height: 16px; }
-        .msg-media-caption { padding: 8px 4px 2px; font-size: 14px; color: var(--text-primary); word-break: break-word; }
+        .msg-media-caption { padding: 8px 12px 2px; font-size: 14px; color: var(--text-primary); word-break: break-word; }
+        /* Captioned media bubble: instead of a rounded photo with a separate flat-cornered
+           caption strip floating underneath it, treat image+caption as ONE pill-shaped bubble —
+           same silhouette as a text bubble (20px corners, tail corner clipped to 4px). The
+           outer bubble owns the rounding via overflow:hidden and a background color; the image
+           itself goes square so it butts flush against the caption below with no seam. */
+        .msg-bubble.media:has(.msg-media-caption) {
+            background: var(--msg-out-bg) !important;
+            box-shadow: var(--shadow-bubble-out);
+            border-radius: 20px;
+            border-bottom-right-radius: 4px;
+            overflow: hidden;
+        }
+        .msg-bubble.media.in:has(.msg-media-caption) {
+            background: var(--msg-in-bg) !important;
+            box-shadow: var(--shadow-bubble);
+            border-bottom-left-radius: 4px;
+            border-bottom-right-radius: 20px;
+        }
+        .msg-bubble.media:has(.msg-media-caption) .msg-media-img,
+        .msg-bubble.media:has(.msg-media-caption) .msg-media-video {
+            border-radius: 0 !important;
+        }
+        .msg-bubble.media:has(.msg-media-caption) .msg-media-caption + .msg-meta-wrap {
+            padding: 0 12px 10px;
+        }
         .msg-media-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: none; opacity: 1; transition: opacity 0.15s ease; }
         .msg-media-play-hint.hidden { opacity: 0; pointer-events: none; }
         .msg-media-video { pointer-events: auto; }
@@ -2654,8 +2679,8 @@
         .reel-item-actions { position: absolute; right: 10px; bottom: 22px; display: flex; flex-direction: column; align-items: center; gap: 20px; z-index: 2; }
         .reel-item-action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: #fff; cursor: pointer; font-size: 11px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-action-btn svg { width: 27px; height: 27px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
-        .reel-item-action-btn.liked { color: var(--danger-red, #ef4444); }
-        .reel-item-action-btn.liked svg { color: var(--danger-red, #ef4444); }
+        .reel-item-action-btn.liked { color: #fff; }
+        .reel-item-action-btn.liked svg { color: #fff; }
         .reel-item-action-btn.reposted { color: var(--success-green, #34C759); }
         .reel-item-action-btn.reposted svg { color: var(--success-green, #34C759); }
         .reel-item-view-stat { cursor: default; }
@@ -5728,6 +5753,10 @@
         }
 
         let currentViewerImageUrl = '';
+        // Bumped on every open/close so a delayed src-clear from a just-closed viewer (see
+        // closeImageViewer) can tell it's stale and skip itself if the viewer was reopened
+        // again in the meantime.
+        let imageViewerCycleToken = 0;
         let currentViewerGallery = null;
         let currentViewerGalleryPostIds = null;
         let currentViewerIndex = 0;
@@ -5741,6 +5770,7 @@
         // each image in the gallery belongs to a different post — stepping through updates the bar.
         function openImageViewer(url, hideSave, gallery, startIndex, postId, galleryPostIds) {
             if (!url) return;
+            imageViewerCycleToken++;
             const isGallery = Array.isArray(gallery) && gallery.length > 1;
             currentViewerGallery = isGallery ? gallery : null;
             currentViewerGalleryPostIds = (isGallery && Array.isArray(galleryPostIds)) ? galleryPostIds : null;
@@ -5879,12 +5909,22 @@
         function closeImageViewer() {
             const overlay = document.getElementById('image-viewer-overlay');
             overlay.classList.remove('active', 'privacy-blur', 'above-sheet');
-            document.getElementById('image-viewer-img').src = '';
             currentViewerImageUrl = '';
             currentViewerGallery = null;
             currentViewerGalleryPostIds = null;
             currentViewerIndex = 0;
             currentViewerPostId = null;
+            // Don't clear the <img> src right away — the overlay is still fading out (opacity
+            // transition, ~0.25s) and sits on top of the feed underneath. An empty src paints
+            // instantly, so the browser's broken-image icon + "Full image" alt text flashes
+            // through the overlay for that whole fade instead of the photo dissolving cleanly
+            // into the feed. Wait for the fade to finish, and bail if the viewer was reopened
+            // in the meantime (token changed) so a fast re-open never gets its image wiped.
+            const myToken = imageViewerCycleToken;
+            setTimeout(() => {
+                if (imageViewerCycleToken !== myToken) return;
+                document.getElementById('image-viewer-img').src = '';
+            }, 300);
         }
         document.getElementById('image-viewer-close').addEventListener('click', () => {
             if (window.location.hash === '#image-viewer') { history.back(); }

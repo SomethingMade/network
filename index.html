@@ -2078,8 +2078,9 @@
         @keyframes mediaDecryptPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
         .msg-media-wrap.media-decrypt-failed .msg-media-img,
         .msg-media-wrap.media-decrypt-failed .msg-media-video { min-height: 100px; }
+        .msg-media-wrap.media-decrypt-failed { cursor: pointer; }
         .msg-media-wrap.media-decrypt-failed::after {
-            content: '🔒 Couldn\'t decrypt photo';
+            content: '🔒 Couldn\'t decrypt · tap to retry';
             position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
             color: var(--text-secondary); font-size: 13px; font-weight: 600; text-align: center; padding: 0 16px;
         }
@@ -18959,11 +18960,30 @@
         // storage, etc. — after we cached it), drop the cache and retry once against whatever
         // public key is currently published before giving up.
         const decryptedMediaUrlCache = {};
-        async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType) {
-            if (decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
+        // bypassCache lets a manual "tap to retry" re-attempt from scratch instead of reusing
+        // a previously-cached failure path — used by the retry handlers on the image/video
+        // bubbles below.
+        async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType, bypassCache) {
+            if (!bypassCache && decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
 
+            // Fetching the ciphertext bytes (unlike an <img>/<video> src, which just renders
+            // whatever the URL points to) requires reading the response in JS, which means this
+            // fetch is subject to CORS. Firebase Storage buckets have no CORS policy configured
+            // by default, so a perfectly valid, correctly-encrypted file can fail here with a
+            // generic "Failed to fetch" — that's NOT a key/crypto problem, and retrying the key
+            // derivation (below) won't fix it. If every encrypted photo/video/voice
+            // note/document fails to decrypt (not just old ones from a rotated key), configure
+            // CORS on the Storage bucket: `gsutil cors set cors.json gs://<your-bucket>`
+            // allowing GET from your app's origin.
+            let fetchFailedForReasonOtherThanKey = false;
             const tryWithKey = async (key) => {
-                const res = await fetch(mediaURL);
+                let res;
+                try {
+                    res = await fetch(mediaURL);
+                } catch (networkOrCorsErr) {
+                    fetchFailedForReasonOtherThanKey = true;
+                    throw networkOrCorsErr;
+                }
                 const buf = await res.arrayBuffer();
                 const iv = new Uint8Array(buf.slice(0, 12));
                 const cipherBuf = buf.slice(12);
@@ -18971,12 +18991,16 @@
                 return new Blob([plainBuf], { type: mimeType || 'application/octet-stream' });
             };
 
-            const key = await deriveSharedKey(peerUid);
+            const key = await deriveSharedKey(peerUid, bypassCache);
             if (!key) return null;
             let blob;
             try {
                 blob = await tryWithKey(key);
             } catch (e) {
+                // Skip the wasted key-rotation retry when we already know the fetch itself
+                // failed (network/CORS) — a fresh key can't fix that, and re-deriving/re-fetching
+                // just delays the failure state showing up.
+                if (fetchFailedForReasonOtherThanKey) return null;
                 const freshKey = await deriveSharedKey(peerUid, true);
                 if (!freshKey) return null;
                 try {
@@ -20332,13 +20356,23 @@
                             if (msg.mediaEncrypted) {
                                 // Ciphertext lives at msg.mediaURL — decrypt it locally before it
                                 // ever touches an <img> src. Shows a soft placeholder until ready.
-                                mediaWrap.classList.add('media-decrypting');
-                                decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType).then(localUrl => {
-                                    if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
-                                    img.src = localUrl;
-                                    mediaWrap.classList.remove('media-decrypting');
-                                    img.addEventListener('click', () => openImageViewer(localUrl));
+                                // Tapping a failed decrypt retries from scratch (bypassCache) —
+                                // most failures here are a transient fetch/CORS issue rather than
+                                // a real key mismatch, see decryptMediaUrlForPeer above.
+                                const attemptImageDecrypt = (bypassCache) => {
+                                    mediaWrap.classList.remove('media-decrypt-failed');
+                                    mediaWrap.classList.add('media-decrypting');
+                                    decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType, bypassCache).then(localUrl => {
+                                        mediaWrap.classList.remove('media-decrypting');
+                                        if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
+                                        img.src = localUrl;
+                                        img.addEventListener('click', () => openImageViewer(localUrl));
+                                    });
+                                };
+                                mediaWrap.addEventListener('click', (e) => {
+                                    if (mediaWrap.classList.contains('media-decrypt-failed')) { e.stopPropagation(); attemptImageDecrypt(true); }
                                 });
+                                attemptImageDecrypt(false);
                             } else {
                                 img.src = msg.mediaURL;
                                 img.addEventListener('click', () => openImageViewer(msg.mediaURL));
@@ -20370,15 +20404,25 @@
                                 // ever touches a <video> src (no Cloudinary poster available for
                                 // encrypted uploads, so primeVideoPosterFrame falls back to its
                                 // client-side seek once the decrypted src is set).
-                                mediaWrap.classList.add('media-decrypting');
-                                decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType).then(localUrl => {
-                                    if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
-                                    vid.src = localUrl;
-                                    mediaWrap.classList.remove('media-decrypting');
-                                    primeVideoPosterFrame(vid);
-                                    vid.addEventListener('click', () => openVideoViewer(localUrl));
-                                    playHint.addEventListener('click', () => openVideoViewer(localUrl));
+                                // Tapping a failed decrypt retries from scratch (bypassCache) —
+                                // most failures here are a transient fetch/CORS issue rather than
+                                // a real key mismatch, see decryptMediaUrlForPeer above.
+                                const attemptVideoDecrypt = (bypassCache) => {
+                                    mediaWrap.classList.remove('media-decrypt-failed');
+                                    mediaWrap.classList.add('media-decrypting');
+                                    decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType, bypassCache).then(localUrl => {
+                                        mediaWrap.classList.remove('media-decrypting');
+                                        if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
+                                        vid.src = localUrl;
+                                        primeVideoPosterFrame(vid);
+                                        vid.addEventListener('click', () => openVideoViewer(localUrl));
+                                        playHint.addEventListener('click', () => openVideoViewer(localUrl));
+                                    });
+                                };
+                                mediaWrap.addEventListener('click', (e) => {
+                                    if (mediaWrap.classList.contains('media-decrypt-failed')) { e.stopPropagation(); attemptVideoDecrypt(true); }
                                 });
+                                attemptVideoDecrypt(false);
                             } else {
                                 vid.src = msg.mediaURL;
                                 vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));

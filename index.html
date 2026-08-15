@@ -3397,6 +3397,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="18" y1="8" x2="23" y2="13"></line><line x1="23" y1="8" x2="18" y2="13"></line></svg>
                     <span>Unfollow</span>
                 </button>
+                <button class="msg-option-btn with-icon" id="btn-post-not-interested">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line></svg>
+                    <span>Not Interested</span>
+                </button>
                 <button class="msg-option-btn with-icon" id="btn-post-edit">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>
                     <span>Edit Post</span>
@@ -8433,8 +8437,12 @@
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
         function canViewPost(post) {
-            if (!post || post.visibility !== 'followers') return true;
+            if (!post) return true;
             const user = auth.currentUser;
+            // "Not Interested" hides a person's posts from my own feed only (not a real block —
+            // doesn't affect messaging, following, or what THEY can see of me).
+            if (post.uid && user && post.uid !== user.uid && cachedNotInterested[post.uid]) return false;
+            if (post.visibility !== 'followers') return true;
             if (!user) return false;
             if (post.uid === user.uid) return true;
             return !!(post.uid && cachedContacts[post.uid]);
@@ -10493,6 +10501,19 @@
                     notify('Failed to unfollow', 'error');
                 }
             });
+            document.getElementById('btn-post-not-interested').addEventListener('click', async () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
+                if (!activePostOptions) return;
+                const { post } = activePostOptions;
+                if (!post.uid) return;
+                const authorName = (cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'this user';
+                try {
+                    await markNotInterested(post.uid);
+                    notify(`You won't see posts from ${authorName} anymore`);
+                } catch (e) {
+                    notify('Failed to update', 'error');
+                }
+            });
             document.getElementById('btn-post-edit').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) enterPostEditMode(activePostOptions.postId, activePostOptions.post, activePostOptions.card);
@@ -10570,6 +10591,7 @@
             const isFollowingAuthor = !!(post.uid && cachedContacts[post.uid]);
             document.getElementById('btn-post-message').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-unfollow').style.display = (!isOwn && isFollowingAuthor) ? 'block' : 'none';
+            document.getElementById('btn-post-not-interested').style.display = !isOwn ? 'block' : 'none';
             // A repost wrapper has no text of its own, so there's nothing to edit.
             document.getElementById('btn-post-edit').style.display = (isOwn && !isRepost) ? 'block' : 'none';
             // Pinning is a verified-only perk, and only meaningful for a post that actually shows
@@ -14246,6 +14268,39 @@
             await update(ref(database), updates);
         }
 
+        // --- NOT INTERESTED (private per-viewer feed hide, not a block) ---
+        async function markNotInterested(targetUid) {
+            const user = auth.currentUser;
+            if (!user || !targetUid || targetUid === user.uid) return;
+            cachedNotInterested[targetUid] = true; // optimistic, so the DOM sweep below sees it immediately
+            removeHiddenAuthorCardsFromFeed();
+            await update(ref(database, `not_interested/${user.uid}`), { [targetUid]: true });
+        }
+
+        // Sweeps every currently-rendered feed card and pulls out any whose author is on the
+        // not-interested list — covers both the initial write (optimistic) and the listener
+        // picking up the same change (or a change made on another device) afterwards.
+        function removeHiddenAuthorCardsFromFeed() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return;
+            let removedAny = false;
+            list.querySelectorAll('.feed-post-card').forEach(card => {
+                const postId = card.dataset.postId;
+                const post = postId && cachedPosts[postId];
+                if (post && post.uid && cachedNotInterested[post.uid]) {
+                    const vid = card.querySelector('.feed-post-video');
+                    if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
+                    const postImg = card.querySelector('.x-media-grid-item img');
+                    if (postImg && feedMusicAutoplayObserver) feedMusicAutoplayObserver.unobserve(postImg);
+                    if (feedImpressionObserver) feedImpressionObserver.unobserve(card);
+                    if (card.__impressionTimer) clearTimeout(card.__impressionTimer);
+                    card.remove();
+                    removedAny = true;
+                }
+            });
+            if (removedAny) updateFeedEmptyState();
+        }
+
         async function addFriendByRawInput(rawInput) {
             const user = auth.currentUser;
             if(!rawInput || !user) return;
@@ -17030,6 +17085,7 @@
         let cachedContacts = {};
         let cachedFollowers = {};
         let cachedBlocked = {};
+        let cachedNotInterested = {}; // authorUid -> true, from not_interested/{me} — private feed hide list
         
         let theyBlockedMeActive = false;
         let activeChatBlockListenerRef = null;
@@ -22014,6 +22070,15 @@
                 renderContactsLists();
                 updateBlockUI();
                 renderDiscoverGridIfActive();
+            });
+
+            // not_interested/{me}/{authorUid}=true — a private, one-way "hide this person's
+            // posts from my feed" list. Unlike blocking it doesn't affect messaging/following
+            // and the other person is never notified. canViewPost() consults this too, so any
+            // post (existing or newly arriving) from a hidden author is filtered client-side.
+            onValue(ref(database, `not_interested/${user.uid}`), (snap) => {
+                cachedNotInterested = snap.exists() ? snap.val() : {};
+                removeHiddenAuthorCardsFromFeed();
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {

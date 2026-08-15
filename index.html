@@ -3892,9 +3892,17 @@
                     <div class="wa-row-icon chip-blue"><svg viewBox="0 0 22 22" fill="currentColor" stroke="none"><path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg></div>
                     <div class="wa-row-body">
                         <span class="wa-row-title">Trial Verified Badge</span>
-                        <span class="wa-row-sub" id="trial-badge-status">Get the blue badge free for 14 days</span>
+                        <span class="wa-row-sub" id="trial-badge-status">Try the full Verified Badge free for 14 days</span>
                     </div>
                     <button type="button" id="btn-trial-badge" class="wa-row-btn">Start Trial</button>
+                </div>
+                <div class="wa-list-row" id="buy-verified-badge-row">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 22 22" fill="currentColor" stroke="none"><path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Get Verified <span class="group-badge-pill gold-business" id="paid-verified-pill" style="display:none; margin-left:6px; background:rgba(10,132,255,0.15); color:#0A84FF;">Verified</span></span>
+                        <span class="wa-row-sub" id="buy-verified-badge-status">A permanent blue badge on your personal account — R19.99 once-off</span>
+                    </div>
+                    <button type="button" id="btn-buy-verified-badge" class="wa-row-btn">Buy · R19.99</button>
                 </div>
             </div>
 
@@ -5407,6 +5415,9 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <!-- Paystack Inline (client-side card-collection popup) — used to sell the paid Verified
+         Badge for personal accounts (see PAYSTACK_PUBLIC_KEY / buyVerifiedBadge). -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -7956,38 +7967,68 @@
         // Default "About" text given to every new account until they set their own, matching
         // the placeholder already shown in the profile-editing field.
         const DEFAULT_ABOUT = "Hey there! I'm using Xoxa";
-        const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#7C4DFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
+        const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#0A84FF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
-        // Same seal shape as VERIFIED_BADGE_SVG but rendered in --success-green. Shown next to the
-        // name of any user who has more than FOLLOWERS_BADGE_THRESHOLD followers (see verifiedBadgeFor).
-        const FRIENDS_BADGE_SVG = '<svg class="verified-badge friends-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="10+ Followers"><path fill="#0A84FF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
+        // Reaching FOLLOWERS_BADGE_THRESHOLD organically earns the same blue Verified Badge below —
+        // there's no separate look for it, same as trial/purchase (see verifiedBadgeFor).
         const FRIENDS_BADGE_THRESHOLD = 5000;
-        // One-time, 14-day trial that grants the blue badge regardless of follower count.
+        // One-time, 14-day trial that grants the same blue Verified Badge as a purchase would,
+        // regardless of follower count — a taste of the real thing, not a lesser look-alike.
         const TRIAL_BADGE_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
+
+        // --- PAID VERIFIED BADGE (personal accounts) ---
+        // A permanent blue badge (VERIFIED_BADGE_SVG) any personal account can buy outright for
+        // R19.99, independent of the free 14-day trial and of follower count. Business accounts
+        // already get the gold badge for free, so the purchase option is hidden for them.
+        //
+        // Payment is collected client-side via Paystack Inline (https://js.paystack.co/v1/inline.js,
+        // loaded in <head>) — the standard no-backend way to take card payments, safe to run with
+        // just a public key since Paystack's own hosted iframe handles the card details.
+        //
+        // IMPORTANT — set this to your real Paystack public key before going live:
+        const PAYSTACK_PUBLIC_KEY = 'pk_test_REPLACE_WITH_YOUR_PAYSTACK_PUBLIC_KEY';
+        const VERIFIED_BADGE_PRICE_ZAR = 19.99;
+        // Paystack amounts are in the smallest currency unit (cents, for ZAR).
+        const VERIFIED_BADGE_PRICE_CENTS = Math.round(VERIFIED_BADGE_PRICE_ZAR * 100);
+        //
+        // SECURITY NOTE: Paystack's success callback below only tells THIS browser that a charge
+        // went through — it's still the client that writes paidVerifiedAt to the database, the
+        // same trust model this file already uses for the free trial badge and Business Account
+        // toggle. That's fine for a low-stakes cosmetic badge, but nothing stops someone from
+        // forging that write via devtools without ever paying. To close that gap for real money,
+        // verify the `reference` server-side (a Cloud Function calling Paystack's Verify
+        // Transaction endpoint with your SECRET key) and have that function — not the client —
+        // set paidVerifiedAt, then lock users/$uid/paidVerifiedAt to admin-only writes in your
+        // Firebase security rules.
 
         // Same seal shape again but rendered in gold. Shown next to the name of any user who has
         // switched their personal account to a Business Account (see verifiedBadgeFor).
         const BUSINESS_BADGE_SVG = '<svg class="verified-badge business-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Business Account"><path fill="#D4A017" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
-        // Returns the badge markup (or '') for a given uid: purple for Goza AI, gold for a Business
-        // Account, otherwise green once that user has more than FRIENDS_BADGE_THRESHOLD followers.
+        // Returns the badge markup (or '') for a given uid. There are only two badges in the app:
+        // gold for a Business Account, and blue (VERIFIED_BADGE_SVG) for everyone else who's
+        // verified — Goza AI, a purchased or trial Verified Badge, or reaching
+        // FRIENDS_BADGE_THRESHOLD followers organically. Same blue badge, no matter which path
+        // got them there.
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
             const profile = cachedUsers[uid];
             if (profile && profile.isBusinessAccount) return BUSINESS_BADGE_SVG;
-            if (profile && profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return FRIENDS_BADGE_SVG;
-            if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return FRIENDS_BADGE_SVG;
+            if (profile && profile.paidVerifiedAt) return VERIFIED_BADGE_SVG;
+            if (profile && profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return VERIFIED_BADGE_SVG;
+            if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return VERIFIED_BADGE_SVG;
             return '';
         }
 
         // Boolean counterpart to verifiedBadgeFor, for gating verified-only features (rather than
-        // rendering a badge): true for AI, a Business Account, or the Friends/Reach tier (5k+
-        // followers or an active 14-day trial).
+        // rendering a badge): true for AI, a Business Account, a purchased or trial Verified Badge,
+        // or reaching FRIENDS_BADGE_THRESHOLD followers organically.
         function isVerifiedUid(uid) {
             if (uid === AI_UID) return true;
             const profile = cachedUsers[uid];
             if (!profile) return false;
             if (profile.isBusinessAccount) return true;
+            if (profile.paidVerifiedAt) return true;
             if (profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return true;
             if ((profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return true;
             return false;
@@ -10210,6 +10251,7 @@
                         renderComposerPreview();
                         notify('A photo failed to upload — remove it or try again', 'error');
                     }
+                    err.__composerMediaError = true;
                     throw err;
                 });
                 return entry.promise;
@@ -10242,6 +10284,7 @@
                         renderComposerPreview();
                         notify('Video failed to upload — remove it or try again', 'error');
                     }
+                    err.__composerMediaError = true;
                     throw err;
                 });
                 return entry.promise;
@@ -10484,7 +10527,10 @@
                         createNotification(uid, { type: 'mention', postId: newPostRef.key, text });
                     });
                 } catch (e) {
-                    notify('Failed to post', 'error');
+                    // If a photo/video upload was the cause, uploadComposerImageEntry/
+                    // uploadComposerVideoEntry already showed a specific toast about it —
+                    // don't pile a generic one on top.
+                    if (!e || !e.__composerMediaError) notify('Failed to post', 'error');
                 } finally {
                     hideGlobalUploadProgress();
                 }
@@ -13293,6 +13339,7 @@
                 document.getElementById('business-account-pill').style.display = myProfile.isBusinessAccount ? 'inline-block' : 'none';
 
                 refreshTrialBadgeUI(myProfile);
+                refreshVerifiedBadgePurchaseUI(myProfile);
 
                 renderProfileSuggestedFriends();
                 buildProfilePostsList(document.getElementById('my-profile-posts-list'), user.uid);
@@ -13302,14 +13349,15 @@
             }
         }
 
-        // --- Trial Verified Badge: one-time, free 14-day activation of the blue badge
-        // (see TRIAL_BADGE_DURATION_MS / verifiedBadgeFor), independent of follower count.
+        // --- Trial Verified Badge: one-time, free 14-day activation of the same blue badge a
+        // purchase grants (see TRIAL_BADGE_DURATION_MS / verifiedBadgeFor), independent of follower
+        // count. Same badge, same verified-only perks (isVerifiedUid) — trial just isn't permanent.
         function refreshTrialBadgeUI(myProfile) {
             const statusEl = document.getElementById('trial-badge-status');
             const btn = document.getElementById('btn-trial-badge');
             const activatedAt = myProfile.trialBadgeActivatedAt || null;
             if (!activatedAt) {
-                statusEl.textContent = 'Get the blue badge free for 14 days';
+                statusEl.textContent = 'Try the full Verified Badge free for 14 days';
                 btn.textContent = 'Start Trial';
                 btn.disabled = false;
                 btn.style.display = 'inline-flex';
@@ -13347,6 +13395,85 @@
             }
         });
 
+        // --- Paid Verified Badge (see PAYSTACK_PUBLIC_KEY / verifiedBadgeFor for background) ---
+        // Business accounts already have a badge (gold, free), so the purchase row is only
+        // relevant — and only shown — for personal accounts that haven't already bought it.
+        function refreshVerifiedBadgePurchaseUI(myProfile) {
+            const row = document.getElementById('buy-verified-badge-row');
+            const statusEl = document.getElementById('buy-verified-badge-status');
+            const pill = document.getElementById('paid-verified-pill');
+            const btn = document.getElementById('btn-buy-verified-badge');
+            if (myProfile.isBusinessAccount) {
+                row.style.display = 'none';
+                return;
+            }
+            row.style.display = 'flex';
+            if (myProfile.paidVerifiedAt) {
+                statusEl.textContent = "You've bought the permanent blue Verified Badge";
+                pill.style.display = 'inline-block';
+                btn.style.display = 'none';
+            } else {
+                statusEl.textContent = `A permanent blue badge on your personal account — R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)} once-off`;
+                pill.style.display = 'none';
+                btn.style.display = 'inline-flex';
+                btn.disabled = false;
+                btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
+            }
+        }
+
+        document.getElementById('btn-buy-verified-badge').addEventListener('click', () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const myProfile = cachedUsers[user.uid] || {};
+            if (myProfile.paidVerifiedAt || myProfile.isBusinessAccount) return;
+
+            if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('REPLACE_WITH_YOUR')) {
+                showCustomModal('Payments Not Set Up', "The app owner hasn't connected a payment provider yet, so badge purchases aren't available right now.");
+                return;
+            }
+            if (typeof PaystackPop === 'undefined') {
+                notify('Payment system failed to load. Check your connection and try again.', 'error');
+                return;
+            }
+            const email = user.email || `${user.uid}@xoxa.app`;
+            const btn = document.getElementById('btn-buy-verified-badge');
+            btn.disabled = true;
+            btn.textContent = 'Opening…';
+
+            const handler = PaystackPop.setup({
+                key: PAYSTACK_PUBLIC_KEY,
+                email: email,
+                amount: VERIFIED_BADGE_PRICE_CENTS,
+                currency: 'ZAR',
+                ref: `xoxa_verified_${user.uid}_${Date.now()}`,
+                metadata: { uid: user.uid, product: 'verified_badge' },
+                callback: (response) => {
+                    // See the SECURITY NOTE on PAYSTACK_PUBLIC_KEY above — for production, hand
+                    // response.reference to a Cloud Function that verifies it with Paystack
+                    // before writing paidVerifiedAt, rather than trusting the client directly.
+                    (async () => {
+                        try {
+                            await update(ref(database, `users/${user.uid}`), {
+                                paidVerifiedAt: serverTimestamp(),
+                                paidVerifiedRef: response.reference
+                            });
+                            notify("You're verified! Your blue badge is live.");
+                            refreshVerifiedBadgePurchaseUI({ ...myProfile, paidVerifiedAt: Date.now() });
+                        } catch (err) {
+                            notify('Payment succeeded, but we could not update your badge — contact support.', 'error');
+                            btn.disabled = false;
+                            btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
+                        }
+                    })();
+                },
+                onClose: () => {
+                    btn.disabled = false;
+                    btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
+                }
+            });
+            handler.openIframe();
+        });
+
         btnProfileNavEls.forEach(btn => btn.addEventListener('click', openProfileSheet));
 
         // --- Business Account toggle: writes isBusinessAccount to the user's public profile so the
@@ -13382,6 +13509,7 @@
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
                 document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
                 document.getElementById('btn-set-username').textContent = isBusiness ? 'Update Username' : 'Set Username (one-time)';
+                refreshVerifiedBadgePurchaseUI({ ...myProfile, isBusinessAccount: isBusiness });
             } catch (err) {
                 e.target.checked = !isBusiness;
                 document.getElementById('business-account-pill').style.display = !isBusiness ? 'inline-block' : 'none';

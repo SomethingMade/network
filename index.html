@@ -869,6 +869,14 @@
         .feed-composer-preview-main img,
         .feed-composer-preview-main video { width: 100%; height: 100%; object-fit: contain; display: block; }
         .feed-composer-preview-remove { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,0.55); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; cursor: pointer; z-index: 2; }
+        /* Shown over a media item's preview/thumb while it uploads in the background — the
+           composer stays fully usable (typing, posting) while this spins, see the fileInput
+           'change' handler which no longer blocks on the upload finishing. */
+        .feed-composer-uploading-badge { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); z-index: 1; }
+        .feed-composer-uploading-badge .spinner { width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: feedComposerSpin 0.8s linear infinite; }
+        .feed-composer-thumb .feed-composer-uploading-badge .spinner { width: 16px; height: 16px; border-width: 2px; }
+        @keyframes feedComposerSpin { to { transform: rotate(360deg); } }
+        .feed-composer-thumb.upload-error, .feed-composer-preview-main.upload-error { outline: 2px solid var(--danger-red); outline-offset: -2px; }
         .feed-composer-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
         .feed-composer-attach { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; }
         #feed-composer-submit { background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 8px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: opacity 0.2s ease; }
@@ -8428,8 +8436,8 @@
         let feedListenersAttached = false;
         let cachedPosts = {};
         let cachedSavedPosts = {}; // postId -> true, from saved_posts/{me} — private, mine only
-        let feedComposerImages = []; // array of uploaded image URLs (max FEED_MAX_IMAGES), mutually exclusive with video
-        let feedComposerVideo = null; // { url } or null, mutually exclusive with images
+        let feedComposerImages = []; // array of {previewUrl, url, uploading, promise, error}, max FEED_MAX_IMAGES, mutually exclusive with video. url is null until the background upload resolves; previewUrl (a local blob URL, or the same remote url for GIFs) is shown immediately either way.
+        let feedComposerVideo = null; // {previewUrl, url, uploading, promise, thumbnailUrl, error} or null; mutually exclusive with images
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
@@ -9874,6 +9882,7 @@
             const submitBtn = document.getElementById('feed-composer-submit');
             const fileInput = document.getElementById('feed-composer-file');
             const preview = document.getElementById('feed-composer-preview');
+            const previewMain = document.getElementById('feed-composer-preview-main');
             const previewImage = document.getElementById('feed-composer-preview-image');
             const previewVideo = document.getElementById('feed-composer-preview-video');
             const previewRemove = document.getElementById('feed-composer-preview-remove');
@@ -10033,25 +10042,51 @@
                     thumbStrip.innerHTML = '';
                     previewImage.style.display = 'none';
                     previewImage.src = '';
-                    previewVideo.src = feedComposerVideo.url;
+                    previewVideo.src = feedComposerVideo.previewUrl;
                     previewVideo.style.display = 'block';
                     previewRemove.style.display = 'flex';
                     musicBtn.style.display = 'flex';
                     preview.style.display = 'block';
+                    previewMain.classList.toggle('upload-error', !!feedComposerVideo.error);
+                    let badge = previewMain.querySelector('.feed-composer-uploading-badge');
+                    if (feedComposerVideo.uploading) {
+                        if (!badge) {
+                            badge = document.createElement('div');
+                            badge.className = 'feed-composer-uploading-badge';
+                            badge.innerHTML = '<div class="spinner"></div>';
+                            previewMain.appendChild(badge);
+                        }
+                    } else if (badge) {
+                        badge.remove();
+                    }
                 } else if (feedComposerImages.length) {
                     previewVideo.style.display = 'none';
                     previewVideo.pause();
                     previewVideo.src = '';
                     if (feedComposerActiveIdx >= feedComposerImages.length) feedComposerActiveIdx = feedComposerImages.length - 1;
                     if (feedComposerActiveIdx < 0) feedComposerActiveIdx = 0;
-                    previewImage.src = feedComposerImages[feedComposerActiveIdx];
+                    const activeItem = feedComposerImages[feedComposerActiveIdx];
+                    previewImage.src = activeItem.previewUrl;
                     previewImage.style.display = 'block';
                     previewRemove.style.display = 'flex';
+                    previewMain.classList.toggle('upload-error', !!activeItem.error);
+                    let mainBadge = previewMain.querySelector('.feed-composer-uploading-badge');
+                    if (activeItem.uploading) {
+                        if (!mainBadge) {
+                            mainBadge = document.createElement('div');
+                            mainBadge.className = 'feed-composer-uploading-badge';
+                            mainBadge.innerHTML = '<div class="spinner"></div>';
+                            previewMain.appendChild(mainBadge);
+                        }
+                    } else if (mainBadge) {
+                        mainBadge.remove();
+                    }
                     if (feedComposerImages.length > 1) {
                         thumbStrip.style.display = 'flex';
-                        thumbStrip.innerHTML = feedComposerImages.map((url, idx) => `
-                            <div class="feed-composer-thumb ${idx === feedComposerActiveIdx ? 'active' : ''}" data-idx="${idx}">
-                                <img src="${url}" alt="">
+                        thumbStrip.innerHTML = feedComposerImages.map((item, idx) => `
+                            <div class="feed-composer-thumb ${idx === feedComposerActiveIdx ? 'active' : ''} ${item.error ? 'upload-error' : ''}" data-idx="${idx}">
+                                <img src="${item.previewUrl}" alt="">
+                                ${item.uploading ? '<div class="feed-composer-uploading-badge"><div class="spinner"></div></div>' : ''}
                                 <span class="feed-composer-thumb-remove" data-idx="${idx}">&times;</span>
                             </div>
                         `).join('');
@@ -10065,6 +10100,7 @@
                             btn.addEventListener('click', (e) => {
                                 e.stopPropagation();
                                 const idx = parseInt(btn.dataset.idx, 10);
+                                revokeComposerImagePreview(feedComposerImages[idx]);
                                 feedComposerImages.splice(idx, 1);
                                 if (feedComposerActiveIdx > idx || feedComposerActiveIdx >= feedComposerImages.length) {
                                     feedComposerActiveIdx = Math.max(0, feedComposerActiveIdx - 1);
@@ -10085,7 +10121,20 @@
                 }
             }
 
+            // Local blob: URLs (used for instant previews while a file uploads in the
+            // background) need to be released once they're no longer shown, or repeated
+            // selections leak memory for the life of the page.
+            function revokeComposerImagePreview(item) {
+                if (item && item.previewUrl && item.previewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(item.previewUrl);
+                }
+            }
+
             function clearComposerMedia() {
+                feedComposerImages.forEach(revokeComposerImagePreview);
+                if (feedComposerVideo && feedComposerVideo.previewUrl && feedComposerVideo.previewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(feedComposerVideo.previewUrl);
+                }
                 feedComposerImages = [];
                 feedComposerVideo = null;
                 feedComposerMusic = null;
@@ -10100,6 +10149,9 @@
                 previewVideo.style.display = 'none';
                 previewVideo.pause();
                 previewVideo.src = '';
+                const badge = previewMain.querySelector('.feed-composer-uploading-badge');
+                if (badge) badge.remove();
+                previewMain.classList.remove('upload-error');
             }
 
             input.addEventListener('input', () => {
@@ -10114,25 +10166,91 @@
             const FEED_MAX_IMAGES = 10;
 
             // Bridge for the shared GIF picker sheet (defined outside this closure) to hand a
-            // chosen GIF back to the post composer.
+            // chosen GIF back to the post composer. GIFs are hosted URLs already, so there's
+            // no upload step — the item just starts (and stays) in the "done" state.
             window.addEventListener('composer-gif-selected', (e) => {
                 if (feedComposerPollActive) return;
                 const url = e.detail && e.detail.url;
                 if (!url) return;
-                feedComposerVideo = null;
+                clearComposerVideoOnly();
                 if (feedComposerImages.length >= FEED_MAX_IMAGES) {
                     notify(`You can add up to ${FEED_MAX_IMAGES} images/GIFs`, 'error');
                     return;
                 }
-                feedComposerImages.push(url);
+                feedComposerImages.push({ previewUrl: url, url, uploading: false, promise: Promise.resolve(url) });
                 feedComposerActiveIdx = feedComposerImages.length - 1;
                 renderComposerPreview();
                 refreshSubmitState();
             });
 
-            fileInput.addEventListener('change', async () => {
+            function clearComposerVideoOnly() {
+                if (feedComposerVideo && feedComposerVideo.previewUrl && feedComposerVideo.previewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(feedComposerVideo.previewUrl);
+                }
+                feedComposerVideo = null;
+            }
+
+            // Uploads a single already-staged image entry in the background. The entry is
+            // already visible (via its local blob preview + spinner badge) before this ever
+            // runs, so nothing in the composer — typing, posting, adding more media — waits
+            // on it. On success the entry's `url` is filled in and the spinner clears; on
+            // failure the entry is flagged so submit can catch it.
+            function uploadComposerImageEntry(entry, file, uid) {
+                const safeName = (file.name || 'image').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const path = `posts/${uid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+                entry.promise = uploadToFirebaseStorage(file, path).then((url) => {
+                    entry.url = url;
+                    entry.uploading = false;
+                    if (feedComposerImages.includes(entry)) renderComposerPreview();
+                    return url;
+                }).catch((err) => {
+                    entry.uploading = false;
+                    entry.error = true;
+                    if (feedComposerImages.includes(entry)) {
+                        renderComposerPreview();
+                        notify('A photo failed to upload — remove it or try again', 'error');
+                    }
+                    throw err;
+                });
+                return entry.promise;
+            }
+
+            function uploadComposerVideoEntry(entry, file, uid) {
+                entry.promise = (async () => {
+                    const safeName = (file.name || 'video').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                    const videoPath = `posts/${uid}/${Date.now()}_${safeName}`;
+                    const url = await uploadToFirebaseStorage(file, videoPath);
+                    // Best-effort poster frame — a post video without one just falls back
+                    // to the existing in-browser onloadedmetadata seek at render time.
+                    let thumbnailUrl = null;
+                    try {
+                        const thumbBlob = await generateVideoThumbnailBlob(file);
+                        const thumbPath = `posts/${uid}/${Date.now()}_thumb.jpg`;
+                        thumbnailUrl = await uploadToFirebaseStorage(thumbBlob, thumbPath);
+                    } catch (thumbErr) {
+                        // Non-fatal — post still works without a stored thumbnail.
+                    }
+                    entry.url = url;
+                    entry.thumbnailUrl = thumbnailUrl;
+                    entry.uploading = false;
+                    if (feedComposerVideo === entry) renderComposerPreview();
+                    return url;
+                })().catch((err) => {
+                    entry.uploading = false;
+                    entry.error = true;
+                    if (feedComposerVideo === entry) {
+                        renderComposerPreview();
+                        notify('Video failed to upload — remove it or try again', 'error');
+                    }
+                    throw err;
+                });
+                return entry.promise;
+            }
+
+            fileInput.addEventListener('change', () => {
                 if (feedComposerPollActive) { fileInput.value = ''; return; }
                 const files = Array.from(fileInput.files || []);
+                fileInput.value = '';
                 if (!files.length) return;
 
                 const videoFile = files.find(f => f.type.startsWith('video/'));
@@ -10141,38 +10259,19 @@
                     // any images already staged (or other files in this same selection) are dropped.
                     if (videoFile.size > FEED_MAX_VIDEO_BYTES) {
                         notify(`Videos must be under ${Math.round(FEED_MAX_VIDEO_BYTES / (1024 * 1024))}MB`, 'error');
-                        fileInput.value = '';
                         return;
                     }
-                    try {
-                        submitBtn.disabled = true;
-                        submitBtn.textContent = 'Uploading...';
-                        const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
-                        const safeName = (videoFile.name || 'video').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                        const videoPath = `posts/${uid}/${Date.now()}_${safeName}`;
-                        const url = await uploadToFirebaseStorage(videoFile, videoPath);
-                        // Best-effort poster frame — a post video without one just falls back
-                        // to the existing in-browser onloadedmetadata seek at render time.
-                        let thumbnailUrl = null;
-                        try {
-                            const thumbBlob = await generateVideoThumbnailBlob(videoFile);
-                            const thumbPath = `posts/${uid}/${Date.now()}_thumb.jpg`;
-                            thumbnailUrl = await uploadToFirebaseStorage(thumbBlob, thumbPath);
-                        } catch (thumbErr) {
-                            // Non-fatal — post still works without a stored thumbnail.
-                        }
-                        feedComposerImages = [];
-                        feedComposerVideo = { url, thumbnailUrl };
-                        feedComposerMusic = null;
-                        updateComposerMusicChip();
-                        renderComposerPreview();
-                    } catch (e) {
-                        notify('Failed to upload media');
-                    } finally {
-                        submitBtn.textContent = 'Post';
-                        fileInput.value = '';
-                        refreshSubmitState();
-                    }
+                    feedComposerImages.forEach(revokeComposerImagePreview);
+                    feedComposerImages = [];
+                    clearComposerVideoOnly();
+                    feedComposerMusic = null;
+                    updateComposerMusicChip();
+                    const entry = { previewUrl: URL.createObjectURL(videoFile), url: null, uploading: true, thumbnailUrl: null, promise: null };
+                    feedComposerVideo = entry;
+                    renderComposerPreview(); // instant preview + spinner, no waiting on the network
+                    refreshSubmitState();
+                    const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
+                    uploadComposerVideoEntry(entry, videoFile, uid).catch(() => {});
                     return;
                 }
 
@@ -10180,7 +10279,6 @@
                 const room = FEED_MAX_IMAGES - feedComposerImages.length;
                 if (room <= 0) {
                     notify(`You can add up to ${FEED_MAX_IMAGES} photos`, 'error');
-                    fileInput.value = '';
                     return;
                 }
                 const toUpload = files.slice(0, room);
@@ -10188,29 +10286,18 @@
                 const oversized = toUpload.find(f => f.size > FEED_MAX_IMAGE_BYTES);
                 if (oversized) {
                     notify(`Photos must be under ${Math.round(FEED_MAX_IMAGE_BYTES / (1024 * 1024))}MB`, 'error');
-                    fileInput.value = '';
                     return;
                 }
-                feedComposerVideo = null;
-                try {
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = 'Uploading...';
-                    const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
-                    for (const file of toUpload) {
-                        const safeName = (file.name || 'image').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                        const path = `posts/${uid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-                        const url = await uploadToFirebaseStorage(file, path);
-                        feedComposerImages.push(url);
-                    }
-                    feedComposerActiveIdx = feedComposerImages.length - 1;
-                    renderComposerPreview();
-                } catch (e) {
-                    notify('Failed to upload media');
-                } finally {
-                    submitBtn.textContent = 'Post';
-                    fileInput.value = '';
-                    refreshSubmitState();
-                }
+                clearComposerVideoOnly();
+                const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
+                toUpload.forEach((file) => {
+                    const entry = { previewUrl: URL.createObjectURL(file), url: null, uploading: true, promise: null };
+                    feedComposerImages.push(entry);
+                    uploadComposerImageEntry(entry, file, uid).catch(() => {});
+                });
+                feedComposerActiveIdx = feedComposerImages.length - 1;
+                renderComposerPreview(); // instant previews + spinners; uploads finish in the background
+                refreshSubmitState();
             });
 
             // Camera capture reuses the exact same upload/validation pipeline as the regular
@@ -10343,6 +10430,18 @@
 
                 showGlobalUploadProgress();
                 try {
+                    // Selecting a photo/video kicks off its upload in the background the moment
+                    // it's picked (see uploadComposerImageEntry/uploadComposerVideoEntry) — most
+                    // of the time it has already finished by the time someone finishes typing a
+                    // caption and hits Post. If it hasn't, this just waits on the same promise
+                    // instead of the composer ever blocking on it.
+                    const resolvedImageUrls = pendingImages.length
+                        ? await Promise.all(pendingImages.map(item => item.promise))
+                        : [];
+                    const resolvedVideo = pendingVideo
+                        ? { url: await pendingVideo.promise, thumbnailUrl: pendingVideo.thumbnailUrl }
+                        : null;
+
                     // Union of people typed as @mentions and people picked via the Tag People sheet.
                     const mentionedUids = new Set([...extractMentionedUids(text), ...pendingTaggedUids]);
                     const mentionsMap = {};
@@ -10352,7 +10451,7 @@
                     // fetch a link preview (image + title) to attach so it renders as a card
                     // under the text, like other social feeds do for pasted links.
                     let linkPreview = null;
-                    const firstUrl = (!pendingImages.length && !pendingVideo) ? extractFirstUrlFromText(text) : null;
+                    const firstUrl = (!resolvedImageUrls.length && !resolvedVideo) ? extractFirstUrlFromText(text) : null;
                     if (firstUrl) {
                         linkPreview = await fetchLinkPreview(firstUrl);
                     }
@@ -10365,11 +10464,11 @@
                         text: text,
                         // imageUrl is kept (mirroring the first photo) so anything still reading the
                         // old single-image field — e.g. legacy posts, previews — keeps working.
-                        imageUrl: pendingImages.length ? pendingImages[0] : null,
-                        imageUrls: pendingImages.length ? pendingImages : null,
-                        videoUrl: pendingVideo ? pendingVideo.url : null,
-                        videoThumbnail: pendingVideo ? (pendingVideo.thumbnailUrl || null) : null,
-                        music: ((pendingImages.length || pendingVideo) && pendingMusic) ? pendingMusic : null,
+                        imageUrl: resolvedImageUrls.length ? resolvedImageUrls[0] : null,
+                        imageUrls: resolvedImageUrls.length ? resolvedImageUrls : null,
+                        videoUrl: resolvedVideo ? resolvedVideo.url : null,
+                        videoThumbnail: resolvedVideo ? (resolvedVideo.thumbnailUrl || null) : null,
+                        music: ((resolvedImageUrls.length || resolvedVideo) && pendingMusic) ? pendingMusic : null,
                         poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         linkPreview: linkPreview,
                         mentions: mentionedUids.size ? mentionsMap : null,

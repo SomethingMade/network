@@ -463,15 +463,22 @@
         body.neumorphic-theme #loading-overlay { background: #FFFFFF !important; box-shadow: none !important; }
 
         /* Pressed-in "well" surfaces — text inputs and the OTP boxes read as
-           carved into the surface rather than sitting on top of it. */
+           carved into the surface rather than sitting on top of it. The actual
+           chat textarea (#chat-view-input) stays transparent/borderless as in
+           every other theme — its visible pill is the .chat-input-wrap div that
+           wraps it (textarea + sticker/GIF buttons together), so the carved-in
+           shadow goes on that wrapper, not the textarea, or the pill would show
+           as a rectangle nested inside a pill instead of one seamless pill. */
         body.neumorphic-theme .pill-input,
         body.neumorphic-theme .otp-box,
         body.neumorphic-theme .wa-row-select,
-        body.neumorphic-theme .chat-view-input-row input,
-        body.neumorphic-theme .chat-view-input-row textarea {
+        body.neumorphic-theme .chat-input-wrap {
             background: var(--bg-input) !important;
             border: none !important;
             box-shadow: inset 3px 3px 6px #c1c8d1, inset -3px -3px 6px #ffffff;
+        }
+        body.neumorphic-theme .chat-input-action-btn:hover {
+            background: var(--bg-hover) !important;
         }
 
         /* Raised buttons/icons that compress into the pressed-in shadow on tap. */
@@ -3213,7 +3220,9 @@
         .msg-call-text { display: flex; flex-direction: column; }
         .msg-call-title { font-size: 14px; font-weight: 500; }
         .msg-call-title.missed { color: var(--danger-red); }
-        .msg-call-sub { font-size: 12px; color: var(--text-secondary); }
+        .msg-call-sub { font-size: 12px; }
+        .msg-bubble.in .msg-call-sub { color: var(--msg-in-time); }
+        .msg-bubble.out .msg-call-sub { color: var(--msg-out-time); }
 
         .msg-link { color: var(--link-color); font-weight: 600; text-decoration: underline; word-break: break-all; }
         .msg-bubble.out .msg-link { color: inherit; text-decoration-color: rgba(255,255,255,0.6); }
@@ -5702,6 +5711,21 @@
 
         const BUBBLE_COLOR_PRESETS = ['default', '#25D366', '#8E44AD', '#FF6B6B', '#FF9F43', '#00B4D8', '#2C3E50'];
 
+        // Picks readable white-ish or dark-ish text/time/tick colors for whatever
+        // custom bubble color the user picks, so a chosen bubble background is never
+        // paired with the theme's own out-bubble text color (which may be tuned for
+        // a very different default background, e.g. a light neumorphic bubble vs. a
+        // dark purple swatch) and end up unreadable.
+        function contrastColorsFor(hex) {
+            let h = (hex || '').replace('#', '');
+            if (h.length === 3) h = h.split('').map(c => c + c).join('');
+            const r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return lum > 0.6
+                ? { text: '#111111', time: 'rgba(0,0,0,0.55)', tick: 'rgba(0,0,0,0.5)' }
+                : { text: '#FFFFFF', time: 'rgba(255,255,255,0.8)', tick: 'rgba(255,255,255,0.75)' };
+        }
+
         function currentBubbleColorValue() {
             const user = auth.currentUser;
             if (!user) return 'default';
@@ -5716,8 +5740,15 @@
             if (!messagesEl) return;
             if (!value || value === 'default') {
                 messagesEl.style.removeProperty('--msg-out-bg');
+                messagesEl.style.removeProperty('--msg-out-text');
+                messagesEl.style.removeProperty('--msg-out-time');
+                messagesEl.style.removeProperty('--msg-out-tick');
             } else {
                 messagesEl.style.setProperty('--msg-out-bg', value);
+                const { text, time, tick } = contrastColorsFor(value);
+                messagesEl.style.setProperty('--msg-out-text', text);
+                messagesEl.style.setProperty('--msg-out-time', time);
+                messagesEl.style.setProperty('--msg-out-tick', tick);
             }
         }
 

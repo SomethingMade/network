@@ -6839,6 +6839,21 @@
             return `${days}d ago`;
         }
 
+        // Every element rendered with formatTime() carries its raw timestamp in
+        // data-rel-ts so it can be re-labelled here on a timer, instead of staying
+        // stuck on whatever "Xm ago" it happened to say at render time until the
+        // next full re-render. Also nudges the active chat's "Last seen" line, which
+        // uses the same relative-time text but isn't a simple span swap.
+        function refreshRelativeTimestamps() {
+            document.querySelectorAll('[data-rel-ts]').forEach(el => {
+                const ts = Number(el.dataset.relTs);
+                if (!ts) return;
+                el.textContent = formatTime(ts);
+            });
+            if (typeof updateActiveChatStatus === 'function') updateActiveChatStatus();
+        }
+        setInterval(refreshRelativeTimestamps, 30000);
+
         function formatClockTime(timestamp) {
             if (!timestamp) return '';
             const d = new Date(timestamp);
@@ -8904,7 +8919,11 @@
                 </div>
             `;
             card.querySelector('.name').textContent = article.source || 'News';
-            card.querySelector('.time').textContent = article.publishedAt ? formatTime(article.publishedAt) : '';
+            const newsTimeEl = card.querySelector('.time');
+            if (newsTimeEl) {
+                if (article.publishedAt) { newsTimeEl.textContent = formatTime(article.publishedAt); newsTimeEl.dataset.relTs = article.publishedAt; }
+                else { newsTimeEl.textContent = ''; }
+            }
             card.querySelector('.feed-post-text').textContent = article.title || '';
             if (article.url) {
                 const openArticle = () => window.open(article.url, '_blank', 'noopener');
@@ -9142,7 +9161,7 @@
                 <div class="feed-comment-body">
                     <div class="feed-comment-header-row">
                         <span class="name"></span>
-                        <span class="time">${formatTime(comment.timestamp)}</span>
+                        <span class="time" data-rel-ts="${comment.timestamp}">${formatTime(comment.timestamp)}</span>
                     </div>
                     <div class="feed-comment-text"></div>
                 </div>
@@ -11875,7 +11894,7 @@
                                 <span class="name"></span>
                                 <span class="name-badge"></span>
                                 <span class="feed-post-business-pill group-badge-pill gold-business" style="display:none;">Business</span>
-                                <span class="time">${formatTime(post.timestamp)}${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
+                                <span class="time"><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span>${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
                             </div>
                             ${menuBtnHtml}
                         </div>
@@ -12377,7 +12396,7 @@
                     ${comment.replyToName ? `<span class="feed-comment-reply-tag"></span>` : ''}
                     <div class="feed-comment-header-row">
                         <span class="name"></span>
-                        <span class="time">${formatTime(comment.timestamp)}</span>
+                        <span class="time" data-rel-ts="${comment.timestamp}">${formatTime(comment.timestamp)}</span>
                         ${comment.pinned ? '<span class="pinned-tag">· Pinned</span>' : ''}
                     </div>
                     <div class="feed-comment-text"></div>
@@ -12800,7 +12819,7 @@
                     ${feedAvatarHtml({ name: notif.fromName, photoURL: notif.fromPhotoURL })}
                     <div class="notif-item-body">
                         <div class="notif-item-text"></div>
-                        <div class="notif-item-time">${formatTime(notif.timestamp)}</div>
+                        <div class="notif-item-time" data-rel-ts="${notif.timestamp}">${formatTime(notif.timestamp)}</div>
                     </div>
                     ${(!notif.read && !notifSelectionMode) ? '<div class="notif-item-dot"></div>' : ''}
                 `;
@@ -14383,7 +14402,7 @@
                         ${thumbHtml}
                         <div class="wa-insights-post-body">
                             <div class="wa-insights-post-text">${escapeHtmlForPost(snippet)}</div>
-                            <div class="wa-insights-post-date">${formatTime(post.timestamp)}</div>
+                            <div class="wa-insights-post-date" data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</div>
                         </div>
                         <div class="wa-insights-post-views">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
@@ -17027,7 +17046,9 @@
             }
 
             const captionEl = document.getElementById('story-viewer-caption');
-            document.getElementById('story-viewer-timestamp').textContent = formatTime(current.createdAt);
+            const storyTimestampEl = document.getElementById('story-viewer-timestamp');
+            storyTimestampEl.textContent = formatTime(current.createdAt);
+            storyTimestampEl.dataset.relTs = current.createdAt;
             if (current.caption) {
                 captionEl.innerHTML = linkifyHashtags(current.caption);
                 captionEl.style.display = 'block';
@@ -17283,7 +17304,7 @@
                     const row = document.createElement('div');
                     row.className = 'story-viewers-list-item';
                     const avatarHtml = `<div class="avatar" style="background-image:url('${photoURL}');"></div>`;
-                    row.innerHTML = `${avatarHtml}<div class="sv-info"><span class="sv-name">${name}</span><span class="sv-time">${formatTime(v.viewedAt || Date.now())}</span></div>`;
+                    row.innerHTML = `${avatarHtml}<div class="sv-info"><span class="sv-name">${name}</span><span class="sv-time" data-rel-ts="${v.viewedAt || Date.now()}">${formatTime(v.viewedAt || Date.now())}</span></div>`;
                     listEl.appendChild(row);
                 });
             }

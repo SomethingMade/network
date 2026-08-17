@@ -740,6 +740,10 @@
            not just its own default (100002) — it's placed after profile-bottom-sheet-overlay
            in the DOM, so equal z-index still paints it above when both are open. */
         #user-info-sheet-overlay { z-index: 100010; }
+        /* Followers/Following list is opened from inside either the profile sheet or the
+           user-info sheet, so it needs the same top tier as those — placed after both in
+           the DOM, so equal z-index still paints it above whichever is open underneath. */
+        #follow-list-sheet-overlay { z-index: 100010; }
         /* Content & Copyright Policy is opened from inside the Settings sheet, so it needs
            to clear settings-bottom-sheet-overlay's z-index too — it's placed after
            settings-bottom-sheet-overlay in the DOM, so equal z-index paints it above. */
@@ -852,6 +856,8 @@
 
         .tm-profile-stats { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 16px; }
         .tm-profile-stats b { font-weight: 700; color: var(--text-primary); }
+        .tm-profile-stat-link { cursor: pointer; border-radius: 6px; padding: 2px 1px; transition: opacity 0.15s ease; }
+        .tm-profile-stat-link:hover { opacity: 0.7; text-decoration: underline; }
 
         .tm-profile-actions { display: flex; gap: 10px; margin-bottom: 8px; }
         .tm-profile-actions .btn-pill { padding: 12px 20px; font-size: 14.5px; width: auto; flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; }
@@ -1096,6 +1102,7 @@
         .chat-item.call-selected { background: rgba(255, 69, 58, 0.1); border-radius: 12px; }
         .chat-item.calls-selection-mode .call-again-btn { display: none; }
         .notif-page-sheet { max-height: 80vh; display:flex; flex-direction:column; padding: 12px 0 0; }
+        .follow-list-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
         .notif-sheet-header { padding: 0 20px 12px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-sheet-header svg { flex-shrink: 0; }
         .notif-sheet-header svg:active { opacity: 0.6; }
@@ -3880,7 +3887,7 @@
                     <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                 </div>
 
-                <p id="my-profile-follow-stats" class="tm-profile-stats"><b id="my-profile-followers-count">0</b> followers &nbsp;·&nbsp; <b id="my-profile-following-count">0</b> following</p>
+                <p id="my-profile-follow-stats" class="tm-profile-stats"><span class="tm-profile-stat-link" data-follow-tab="followers"><b id="my-profile-followers-count">0</b> followers</span> &nbsp;·&nbsp; <span class="tm-profile-stat-link" data-follow-tab="following"><b id="my-profile-following-count">0</b> following</span></p>
 
                 <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
                     <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
@@ -3947,7 +3954,7 @@
                     </span>
                 </div>
 
-                <p class="tm-profile-stats"><b id="user-info-followers-count">0</b> followers &nbsp;·&nbsp; <b id="user-info-following-count">0</b> following</p>
+                <p class="tm-profile-stats"><span class="tm-profile-stat-link" data-follow-tab="followers"><b id="user-info-followers-count">0</b> followers</span> &nbsp;·&nbsp; <span class="tm-profile-stat-link" data-follow-tab="following"><b id="user-info-following-count">0</b> following</span></p>
 
                 <div class="tm-profile-actions">
                     <button type="button" id="btn-user-info-follow" class="btn-pill btn-primary">
@@ -3968,6 +3975,35 @@
                     <div class="profile-posts-list" id="user-info-posts-list"></div>
                     <div class="profile-media-grid" id="user-info-media-grid" style="display:none;"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- "Followers"/"Following" list, X-style — opened by tapping either stat on the profile
+         (my profile or someone else's). Shared by both: follow-list-target-uid decides whose
+         lists to show, and the two tabs switch between followers/following without reopening. -->
+    <div id="follow-list-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet notif-page-sheet">
+            <div class="notif-sheet-header">
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" id="btn-close-follow-list" class="tm-profile-back-btn" aria-label="Back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <span id="follow-list-name" class="follow-list-name"></span>
+                </div>
+            </div>
+            <div class="segmented-control follow-list-tabs" id="follow-list-tabs" style="margin: 0 14px 10px;">
+                <button type="button" data-follow-list-tab="followers">Followers</button>
+                <button type="button" data-follow-list-tab="following">Following</button>
+            </div>
+            <div class="discover-grid-scroll" style="padding: 0 14px 24px;">
+                <div class="discover-grid" id="follow-list-grid"></div>
+                <div class="discover-grid-empty" id="follow-list-empty" style="display:none;">
+                    <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+                    <p id="follow-list-empty-title">Nobody here yet</p>
+                    <span id="follow-list-empty-sub"></span>
+                </div>
+                <div class="spinner-sm" id="follow-list-spinner" style="margin: 30px auto;"></div>
             </div>
         </div>
     </div>
@@ -14739,6 +14775,8 @@
         // correction whenever the owner's own client is active — belt and suspenders.
         // NOTE: needs matching security rules:
         //   followers/$targetUid/$followerUid { ".write": "auth.uid === $followerUid" }
+        //   followers/$targetUid { ".read": "auth != null" }  (lets any signed-in user view someone's followers list)
+        //   contacts/$uid { ".read": "auth != null" }  (lets any signed-in user view someone's following list)
         //   users/$uid/followersCount { ".write": "auth != null" }  (written by OTHER users on follow/unfollow)
         async function followUser(targetUid) {
             const user = auth.currentUser;
@@ -15850,6 +15888,181 @@
                 notify(wasFollowing ? 'Could not unfollow this person' : 'Could not follow this person', 'error');
             } finally {
                 followBtn.disabled = false;
+            }
+        });
+
+        // --- FOLLOWERS / FOLLOWING LIST (X-style) ---
+        // Opened by tapping either stat on a profile — my own (profile-bottom-sheet-overlay)
+        // or someone else's (user-info-sheet-overlay). One shared sheet, tabs switch between
+        // the two lists without closing/reopening.
+        const followListSheet = document.getElementById('follow-list-sheet-overlay');
+        let followListTargetUid = null;
+        let followListActiveTab = 'followers';
+        let followListRequestId = 0; // guards against a slow fetch for a stale uid/tab landing after a newer one started
+
+        function followListRowHtml(uid) {
+            const profile = cachedUsers[uid] || {};
+            const name = profile.name || 'Xoxa User';
+            const isBusiness = !!profile.isBusinessAccount;
+            const isMe = auth.currentUser && uid === auth.currentUser.uid;
+            const following = !!cachedContacts[uid];
+            return `
+                <div class="discover-card" data-uid="${uid}">
+                    <div class="discover-card-avatar-wrap${isBusiness ? ' is-business' : ''}">
+                        ${feedAvatarHtml(profile, 'discover-card-avatar')}
+                    </div>
+                    <div class="discover-card-body">
+                        <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
+                        ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
+                        <p class="discover-card-bio">${profile.about ? escapeHtmlForPost(profile.about) : 'On Xoxa'}</p>
+                    </div>
+                    ${isMe ? '' : `<button type="button" class="discover-card-add-btn${following ? ' added' : ''}" data-uid="${uid}">${following ? 'Following' : 'Follow'}</button>`}
+                </div>
+            `;
+        }
+
+        // Resolves the uid list for the active tab. My own lists are already cached in memory
+        // (cachedContacts/cachedFollowers); anyone else's contacts/followers node needs
+        // ".read": "auth != null" on followers/$uid and contacts/$uid in the security rules
+        // (write stays locked to the owner) — see followUser above for the matching write rule.
+        // The try/catch below is kept as a safety net regardless, so a rules mismatch shows an
+        // empty state instead of a broken sheet.
+        async function fetchFollowListUids(uid, tab) {
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            if (uid === myUid) {
+                const source = tab === 'followers' ? cachedFollowers : cachedContacts;
+                return Object.keys(source).filter(u => u !== AI_UID && !cachedBlocked[u]);
+            }
+            const path = tab === 'followers' ? `followers/${uid}` : `contacts/${uid}`;
+            const snap = await get(ref(database, path));
+            return snap.exists() ? Object.keys(snap.val()).filter(u => u !== AI_UID) : [];
+        }
+
+        async function renderFollowList() {
+            const uid = followListTargetUid;
+            const tab = followListActiveTab;
+            if (!uid) return;
+            const myRequestId = ++followListRequestId;
+            const grid = document.getElementById('follow-list-grid');
+            const emptyState = document.getElementById('follow-list-empty');
+            const spinner = document.getElementById('follow-list-spinner');
+            grid.innerHTML = '';
+            emptyState.style.display = 'none';
+            spinner.style.display = 'block';
+
+            let uids = [];
+            let loadFailed = false;
+            try {
+                uids = await fetchFollowListUids(uid, tab);
+            } catch (err) {
+                loadFailed = true;
+            }
+            if (myRequestId !== followListRequestId) return; // a newer tab/profile switch superseded this fetch
+
+            spinner.style.display = 'none';
+            if (!uids.length) {
+                const profile = cachedUsers[uid] || {};
+                const isMe = auth.currentUser && uid === auth.currentUser.uid;
+                document.getElementById('follow-list-empty-title').textContent = loadFailed
+                    ? "This list isn't available"
+                    : (tab === 'followers' ? 'No followers yet' : 'Not following anyone yet');
+                document.getElementById('follow-list-empty-sub').textContent = loadFailed
+                    ? ''
+                    : (isMe
+                        ? (tab === 'followers' ? 'When people follow you, they\'ll show up here' : 'Accounts you follow will show up here')
+                        : `${profile.name || 'This person'} ${tab === 'followers' ? "doesn't have any followers yet" : "isn't following anyone yet"}`);
+                emptyState.style.display = 'flex';
+                return;
+            }
+            grid.innerHTML = uids.map(followListRowHtml).join('');
+        }
+
+        function openFollowListSheet(uid, tab) {
+            if (!uid) return;
+            followListTargetUid = uid;
+            followListActiveTab = tab === 'following' ? 'following' : 'followers';
+            const profile = cachedUsers[uid] || {};
+            const isMe = auth.currentUser && uid === auth.currentUser.uid;
+            document.getElementById('follow-list-name').textContent = isMe ? 'You' : (profile.name || 'Xoxa User');
+            document.querySelectorAll('#follow-list-tabs button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.followListTab === followListActiveTab);
+            });
+            followListSheet.classList.add('active');
+            renderFollowList();
+        }
+
+        function closeFollowListSheet() {
+            followListSheet.classList.remove('active');
+        }
+
+        document.getElementById('btn-close-follow-list').addEventListener('click', closeFollowListSheet);
+        followListSheet.addEventListener('click', (e) => {
+            if (e.target.id === 'follow-list-sheet-overlay') closeFollowListSheet();
+        });
+
+        document.getElementById('follow-list-tabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-follow-list-tab]');
+            if (!btn || btn.classList.contains('active')) return;
+            followListActiveTab = btn.dataset.followListTab;
+            document.querySelectorAll('#follow-list-tabs button').forEach(b => b.classList.toggle('active', b === btn));
+            renderFollowList();
+        });
+
+        // Follow/unfollow buttons and row taps (open that person's profile) inside the list —
+        // delegated since rows are rebuilt on every render.
+        document.getElementById('follow-list-grid').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.discover-card-add-btn');
+            if (!btn) {
+                const card = e.target.closest('.discover-card');
+                if (card && card.dataset.uid) {
+                    const uid = card.dataset.uid;
+                    const myUid = auth.currentUser && auth.currentUser.uid;
+                    closeFollowListSheet();
+                    if (uid === myUid) {
+                        closeUserInfoSheet();
+                        openProfileSheet({ preventDefault: () => {} });
+                    } else {
+                        openUserProfileSheet(uid);
+                    }
+                }
+                return;
+            }
+            if (btn.disabled) return;
+            const uid = btn.dataset.uid;
+            if (!uid) return;
+            const wasFollowing = !!cachedContacts[uid];
+            btn.disabled = true;
+            btn.textContent = wasFollowing ? 'Unfollowing...' : 'Following...';
+            try {
+                if (wasFollowing) {
+                    await unfollowUser(uid);
+                    btn.textContent = 'Follow';
+                    btn.classList.remove('added');
+                } else {
+                    await followUser(uid);
+                    btn.textContent = 'Following';
+                    btn.classList.add('added');
+                    notify("You're now following them!");
+                }
+            } catch (err) {
+                btn.textContent = wasFollowing ? 'Following' : 'Follow';
+                showCustomModal('Error', 'Could not update follow status.');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Tapping either stat (followers/following count) on a profile — mine or someone
+        // else's — opens the shared list sheet to that tab.
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('.tm-profile-stat-link');
+            if (!link) return;
+            const tab = link.dataset.followTab;
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            if (link.closest('#user-info-sheet-overlay')) {
+                if (userInfoSheetUid) openFollowListSheet(userInfoSheetUid, tab);
+            } else if (myUid) {
+                openFollowListSheet(myUid, tab);
             }
         });
 

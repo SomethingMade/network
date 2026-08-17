@@ -1212,7 +1212,8 @@
         .profile-subtab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; width: 100%; height: 3px; border-radius: 0; background: var(--primary-blue); }
         /* X/Twitter-style flat tab row: no pill fill, just a bottom-border indicator under the
            active tab's label, centered rather than spanning the full column width. */
-        .feed-subtabs { display: flex; border-bottom: 1px solid var(--border-color); margin: 0 0 6px; }
+        .feed-subtabs { display: flex; border-bottom: 1px solid var(--border-color); margin: 0 0 6px; position: sticky; top: 0; z-index: 5; background: var(--bg-base); transition: transform 0.25s ease; }
+        .feed-subtabs.subtabs-scroll-hidden { transform: translateY(-100%); }
         .feed-subtab-btn { flex: 1; text-align: center; padding: 14px 0 12px; border: none; background: none; color: var(--text-secondary); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; position: relative; transition: color 0.15s ease; }
         .feed-subtab-btn:hover { background: var(--bg-hover); }
         .feed-subtab-btn.active { color: var(--text-primary); }
@@ -15082,6 +15083,29 @@
                     lastScrollTop = current;
                 }, { passive: true });
             });
+        })();
+
+        // --- Reveal the For you/Following subtabs as soon as the person starts scrolling
+        // up, rather than making them scroll all the way back to the top of the feed. Same
+        // direction-based show/hide as the FAB and nav above, just applied to the sticky
+        // subtabs bar instead of translating it off-screen only on the way down. ---
+        (function initFeedSubtabsScrollHide() {
+            const scrollEl = document.getElementById('discover-grid-scroll');
+            const subtabs = document.getElementById('feed-subtabs');
+            if (!scrollEl || !subtabs) return;
+            let lastScrollTop = scrollEl.scrollTop;
+            const THRESHOLD = 6; // ignore tiny scroll jitter
+            scrollEl.addEventListener('scroll', () => {
+                const current = scrollEl.scrollTop;
+                const delta = current - lastScrollTop;
+                if (Math.abs(delta) < THRESHOLD) return;
+                if (delta > 0 && current > subtabs.offsetTop) {
+                    subtabs.classList.add('subtabs-scroll-hidden'); // scrolling down
+                } else {
+                    subtabs.classList.remove('subtabs-scroll-hidden'); // scrolling up — reveal immediately
+                }
+                lastScrollTop = current;
+            }, { passive: true });
         })();
 
         // --- GROUPS ---

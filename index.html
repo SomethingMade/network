@@ -934,9 +934,12 @@
         }
 
         /* Search — reuses the exact same full-screen-page (phone) / right-docked-panel
-           (tablet & desktop) mechanics as the Profile view above, just for its own overlay. */
+           (tablet & desktop) mechanics as the Profile view above, just for its own overlay.
+           The Followers/Following list shares this same full-view treatment (rather than
+           the default bottom-sheet) since it's a browsable list of people, not a quick
+           action sheet. */
         @media (max-width: 767px) {
-            #search-fullscreen-overlay {
+            #search-fullscreen-overlay, #follow-list-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -947,8 +950,8 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #search-fullscreen-overlay.active { pointer-events: auto; }
-            #search-fullscreen-overlay .bottom-sheet {
+            #search-fullscreen-overlay.active, #follow-list-sheet-overlay.active { pointer-events: auto; }
+            #search-fullscreen-overlay .bottom-sheet, #follow-list-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -960,17 +963,17 @@
                 transform: translateX(100%);
                 transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             }
-            #search-fullscreen-overlay.active .bottom-sheet { transform: translateX(0); }
+            #search-fullscreen-overlay.active .bottom-sheet, #follow-list-sheet-overlay.active .bottom-sheet { transform: translateX(0); }
         }
         @media (min-width: 768px) {
-            #search-fullscreen-overlay {
+            #search-fullscreen-overlay, #follow-list-sheet-overlay {
                 align-items: stretch;
                 justify-content: flex-end;
                 background: rgba(0, 0, 0, 0.08);
                 backdrop-filter: none;
                 -webkit-backdrop-filter: none;
             }
-            #search-fullscreen-overlay .bottom-sheet {
+            #search-fullscreen-overlay .bottom-sheet, #follow-list-sheet-overlay .bottom-sheet {
                 width: 400px;
                 max-width: 400px;
                 height: 100%;
@@ -982,7 +985,7 @@
                 transform: translateX(100%);
                 transition: transform 0.35s var(--ease-smooth);
             }
-            #search-fullscreen-overlay.active .bottom-sheet { transform: translateX(0); }
+            #search-fullscreen-overlay.active .bottom-sheet, #follow-list-sheet-overlay.active .bottom-sheet { transform: translateX(0); }
         }
         .feed-composer { background: var(--bg-alt); border-radius: 18px; padding: 14px 16px; margin: 12px 16px 4px; }
         .feed-composer-row { display: flex; gap: 10px; align-items: flex-start; position: relative; }
@@ -3980,23 +3983,23 @@
     </div>
 
     <!-- "Followers"/"Following" list, X-style — opened by tapping either stat on the profile
-         (my profile or someone else's). Shared by both: follow-list-target-uid decides whose
-         lists to show, and the two tabs switch between followers/following without reopening. -->
+         (my profile or someone else's). Full-view like the Search overlay (not a bottom
+         sheet) since it's a browsable list, not a quick action. Shared by both profile
+         surfaces: follow-list-target-uid decides whose lists to show, and the tabs (styled
+         like the feed's For You/Following row) switch lists without reopening. -->
     <div id="follow-list-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet notif-page-sheet">
-            <div class="notif-sheet-header">
-                <div style="display:flex; align-items:center; gap:4px;">
-                    <button type="button" id="btn-close-follow-list" class="tm-profile-back-btn" aria-label="Back">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <span id="follow-list-name" class="follow-list-name"></span>
-                </div>
+        <div class="bottom-sheet" style="display:flex; flex-direction:column; padding:0 !important;">
+            <div class="search-fullscreen-header">
+                <button type="button" id="btn-close-follow-list" class="tm-profile-back-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span id="follow-list-name" class="follow-list-name"></span>
             </div>
-            <div class="segmented-control follow-list-tabs" id="follow-list-tabs" style="margin: 0 14px 10px;">
-                <button type="button" data-follow-list-tab="followers">Followers</button>
-                <button type="button" data-follow-list-tab="following">Following</button>
+            <div class="feed-subtabs" id="follow-list-tabs">
+                <button type="button" class="feed-subtab-btn active" data-follow-list-tab="followers">Followers</button>
+                <button type="button" class="feed-subtab-btn" data-follow-list-tab="following">Following</button>
             </div>
-            <div class="discover-grid-scroll" style="padding: 0 14px 24px;">
+            <div class="discover-grid-scroll" style="flex:1; padding: 0 14px 24px;">
                 <div class="discover-grid" id="follow-list-grid"></div>
                 <div class="discover-grid-empty" id="follow-list-empty" style="display:none;">
                     <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>

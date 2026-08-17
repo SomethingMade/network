@@ -1565,12 +1565,20 @@
         .profile-website-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
         .profile-website-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .wa-suggested-section { margin-bottom: 22px; }
-        .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; }
+        .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
         .profile-suggested-scroll::-webkit-scrollbar { display: none; }
-        .profile-suggested-card { flex: 0 0 116px; background: var(--bg-alt); border-radius: 16px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; }
-        .profile-suggested-card .avatar { width: 54px; height: 54px; font-size: 19px; margin-bottom: 8px; }
-        .profile-suggested-card h4 { font-size: 13px; font-weight: 700; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 2px; display: flex; align-items: center; justify-content: center; gap: 2px; }
-        .profile-suggested-username { font-size: 11.5px; color: var(--text-secondary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 10px; }
+        .profile-suggested-card { position: relative; flex: 0 0 132px; scroll-snap-align: start; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 18px; padding: 16px 12px 12px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease; }
+        .profile-suggested-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        .profile-suggested-card.is-dismissing { opacity: 0; transform: scale(0.85); pointer-events: none; }
+        .profile-suggested-card-dismiss { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--bg-hover); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; z-index: 2; transition: background 0.15s ease, color 0.15s ease; }
+        .profile-suggested-card-dismiss:hover { background: var(--border-color); color: var(--text-primary); }
+        .profile-suggested-card-dismiss svg { width: 12px; height: 12px; }
+        .profile-suggested-avatar-ring { width: 62px; height: 62px; border-radius: 50%; padding: 2.5px; background: var(--gradient-brand); margin-bottom: 10px; flex-shrink: 0; }
+        .profile-suggested-card .avatar { width: 100%; height: 100%; font-size: 19px; margin-bottom: 0; border: 2.5px solid var(--bg-alt); box-sizing: border-box; }
+        .profile-suggested-card h4 { font-size: 13.5px; font-weight: 700; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 2px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+        .profile-suggested-username { font-size: 11.5px; color: var(--text-secondary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+        .profile-suggested-meta { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; }
+        .profile-suggested-meta svg { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.75; }
         .profile-suggested-card .discover-card-add-btn { width: 100%; padding: 7px 0; font-size: 12px; }
         .wa-field-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; font-weight: 500; padding: 0; }
         .wa-field-input::placeholder { color: var(--text-secondary); font-weight: 400; }
@@ -2885,7 +2893,10 @@
 
         /* "Who to follow"-style widget sprinkled between posts in the Discover feed, X-style */
         .discover-suggest-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; margin: 4px 0 14px; overflow: hidden; }
-        .discover-suggest-card-header { font-size: 14.5px; font-weight: 700; color: var(--text-primary); padding: 13px 14px 2px; }
+        .discover-suggest-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 14px 2px; }
+        .discover-suggest-card-header-text { display: flex; align-items: center; gap: 7px; }
+        .discover-suggest-card-header-text svg { width: 17px; height: 17px; color: var(--primary-blue); flex-shrink: 0; }
+        .discover-suggest-card-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
         .discover-suggest-card .discover-card { background: transparent; border-bottom: 1px solid var(--border-color); padding: 10px 14px; }
         .discover-suggest-card .discover-card:last-of-type { border-bottom: none; }
         .discover-suggest-card .profile-suggested-scroll { padding: 4px 14px 14px; }
@@ -9257,6 +9268,41 @@
             );
         }
 
+        // People dismissed from a "People you may know" / "Suggested Friends" card via its
+        // × button. Kept out of every suggestion surface (feed widget, profile row) and
+        // persisted so a dismissal sticks across sessions instead of reappearing on reload.
+        const DISMISSED_SUGGESTIONS_KEY = 'xoxaDismissedSuggestions';
+        let dismissedSuggestionUids = new Set();
+        try { dismissedSuggestionUids = new Set(JSON.parse(localStorage.getItem(DISMISSED_SUGGESTIONS_KEY) || '[]')); } catch (e) { /* storage unavailable */ }
+
+        function getSuggestableUsers() {
+            return getDiscoverableUsers().filter(uid => !dismissedSuggestionUids.has(uid));
+        }
+
+        function dismissSuggestion(uid) {
+            dismissedSuggestionUids.add(uid);
+            try { localStorage.setItem(DISMISSED_SUGGESTIONS_KEY, JSON.stringify([...dismissedSuggestionUids])); } catch (e) { /* storage full/unavailable — skip persisting */ }
+        }
+
+        // Fades and shrinks a suggestion card out, then removes it — used when its × is
+        // tapped. If that empties the row (feed widget or profile section), the whole
+        // block is removed/hidden too instead of leaving an empty shell behind.
+        function dismissSuggestionCard(cardEl) {
+            if (!cardEl) return;
+            const uid = cardEl.dataset.uid;
+            if (uid) dismissSuggestion(uid);
+            cardEl.classList.add('is-dismissing');
+            setTimeout(() => {
+                const scroll = cardEl.closest('.profile-suggested-scroll');
+                cardEl.remove();
+                if (!scroll || scroll.querySelector('.profile-suggested-card')) return;
+                const wrap = scroll.closest('.discover-suggest-card');
+                if (wrap) { wrap.remove(); return; }
+                const section = scroll.closest('#profile-suggested-section');
+                if (section) section.style.display = 'none';
+            }, 180);
+        }
+
         // Keeps card order stable within a render pass but reshuffles when the seed changes
         // (on explicit refresh), so the grid doesn't jump around on every unrelated re-render.
         function shuffleWithSeed(arr, seed) {
@@ -9574,22 +9620,37 @@
         // Builds one "who to follow"-style card (a handful of suggested people) to weave into
         // the posts feed — horizontally scrollable, same card/button styling as the Suggested
         // Friends row on the Profile sheet (see renderProfileSuggestedFriends).
+        function suggestedPersonCardHtml(uid) {
+            const profile = cachedUsers[uid] || {};
+            const name = profile.name || 'Xoxa User';
+            const followers = profile.followersCount || 0;
+            return `
+                <div class="profile-suggested-card" data-uid="${uid}">
+                    <button type="button" class="profile-suggested-card-dismiss" data-uid="${uid}" title="Not interested" aria-label="Dismiss suggestion">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                    <div class="profile-suggested-avatar-ring">${feedAvatarHtml(profile)}</div>
+                    <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                    ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Xoxa</span>'}
+                    ${followers > 0 ? `<span class="profile-suggested-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>${formatProfileCount(followers)} followers</span>` : '<span class="profile-suggested-meta" style="margin-bottom:14px;"></span>'}
+                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+                </div>
+            `;
+        }
+
         function buildSuggestionCard(uids) {
             const wrap = document.createElement('div');
             wrap.className = 'discover-suggest-card';
-            const cards = uids.map(uid => {
-                const profile = cachedUsers[uid] || {};
-                const name = profile.name || 'Xoxa User';
-                return `
-                    <div class="profile-suggested-card" data-uid="${uid}">
-                        ${feedAvatarHtml(profile)}
-                        <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
-                        ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Xoxa</span>'}
-                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+            const cards = uids.map(uid => suggestedPersonCardHtml(uid)).join('');
+            wrap.innerHTML = `
+                <div class="discover-suggest-card-header">
+                    <div class="discover-suggest-card-header-text">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <span class="discover-suggest-card-title">People you may know</span>
                     </div>
-                `;
-            }).join('');
-            wrap.innerHTML = `<div class="discover-suggest-card-header">People you may know</div><div class="profile-suggested-scroll">${cards}</div>`;
+                </div>
+                <div class="profile-suggested-scroll">${cards}</div>
+            `;
             return wrap;
         }
 
@@ -9601,7 +9662,7 @@
             if (!list) return;
             list.querySelectorAll('.discover-suggest-card').forEach(el => el.remove());
 
-            const pool = shuffleWithSeed(getDiscoverableUsers(), 'discover-sprinkle-' + discoverShuffleSeed);
+            const pool = shuffleWithSeed(getSuggestableUsers(), 'discover-sprinkle-' + discoverShuffleSeed);
             if (!pool.length) return;
 
             const postCards = Array.from(list.children).filter(el => el.classList.contains('feed-post-card'));
@@ -9628,6 +9689,11 @@
         // Follow buttons on the "People you may know" widgets woven into the feed (see
         // sprinkleSuggestedPeople above) — delegated on the list since cards are rebuilt often.
         document.getElementById('feed-posts-list').addEventListener('click', async (e) => {
+            const dismissBtn = e.target.closest('.profile-suggested-card-dismiss');
+            if (dismissBtn) {
+                dismissSuggestionCard(dismissBtn.closest('.profile-suggested-card'));
+                return;
+            }
             const btn = e.target.closest('.discover-card-add-btn');
             if (!btn) {
                 const card = e.target.closest('.profile-suggested-card');
@@ -13470,28 +13536,22 @@
             const scroll = document.getElementById('profile-suggested-scroll');
             if (!section || !scroll) return;
 
-            const uids = shuffleWithSeed(getDiscoverableUsers(), 'profile-suggested').slice(0, 12);
+            const uids = shuffleWithSeed(getSuggestableUsers(), 'profile-suggested').slice(0, 12);
             if (!uids.length) {
                 section.style.display = 'none';
                 scroll.innerHTML = '';
                 return;
             }
             section.style.display = 'block';
-            scroll.innerHTML = uids.map(uid => {
-                const profile = cachedUsers[uid] || {};
-                const name = profile.name || 'Xoxa User';
-                return `
-                    <div class="profile-suggested-card" data-uid="${uid}">
-                        ${feedAvatarHtml(profile)}
-                        <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
-                        ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Xoxa</span>'}
-                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
-                    </div>
-                `;
-            }).join('');
+            scroll.innerHTML = uids.map(uid => suggestedPersonCardHtml(uid)).join('');
         }
 
         document.getElementById('profile-suggested-scroll').addEventListener('click', async (e) => {
+            const dismissBtn = e.target.closest('.profile-suggested-card-dismiss');
+            if (dismissBtn) {
+                dismissSuggestionCard(dismissBtn.closest('.profile-suggested-card'));
+                return;
+            }
             const btn = e.target.closest('.discover-card-add-btn');
             if (!btn) {
                 const card = e.target.closest('.profile-suggested-card');

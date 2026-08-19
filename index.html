@@ -1229,6 +1229,18 @@
         .profile-subtab-btn:hover { background: var(--bg-hover); }
         .profile-subtab-btn.active { color: var(--text-primary); }
         .profile-subtab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; width: 100%; height: 3px; border-radius: 0; background: var(--primary-blue); }
+
+        /* ── PROFILE "REPLIES" SUBTAB ──
+           Each row shows which post the reply was made on (context line), then the comment
+           itself rendered with the same markup as a comment in the post's own comments sheet
+           (.feed-comment-item), so it looks identical to what you'd see there. Tapping a row
+           opens that post's comments sheet directly. */
+        .profile-reply-card { cursor: pointer; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; }
+        .profile-reply-card:hover { background: var(--bg-hover); }
+        .profile-reply-card:last-child { border-bottom: none; }
+        .profile-reply-card .feed-comment-item { padding: 6px 0 14px; }
+        .profile-reply-context { font-size: 12px; color: var(--text-secondary); padding: 12px 0 0 46px; }
+        .profile-reply-context b { color: var(--text-primary); font-weight: 600; }
         /* X/Twitter-style flat tab row: no pill fill, just a bottom-border indicator under the
            active tab's label, centered rather than spanning the full column width. */
         .feed-subtabs { display: flex; border-bottom: 1px solid var(--border-color); margin: 0 0 6px; position: sticky; top: 0; z-index: 5; background: var(--bg-base); transition: transform 0.25s ease; }
@@ -3933,10 +3945,12 @@
                 <div class="wa-profile-media-section tm-profile-media-section" id="my-profile-media-section">
                     <div class="profile-subtabs" id="my-profile-subtabs">
                         <button type="button" class="profile-subtab-btn active" data-subtab="posts">Posts</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="replies">Replies</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="media">Media</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="saved">Saved</button>
                     </div>
                     <div class="profile-posts-list" id="my-profile-posts-list"></div>
+                    <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
                     <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
                 </div>
@@ -4006,9 +4020,11 @@
                 <div class="wa-profile-media-section tm-profile-media-section" id="user-info-media-section">
                     <div class="profile-subtabs" id="user-info-subtabs">
                         <button type="button" class="profile-subtab-btn active" data-subtab="posts">Posts</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="replies">Replies</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="media">Media</button>
                     </div>
                     <div class="profile-posts-list" id="user-info-posts-list"></div>
+                    <div class="profile-posts-list" id="user-info-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="user-info-media-grid" style="display:none;"></div>
                 </div>
             </div>
@@ -12664,6 +12680,15 @@
                 await update(ref(database, `postComments/${postId}`), updates);
                 await update(ref(database, `posts/${postId}`), { commentCount: increment(-idsToRemove.length) });
 
+                // Mirror the removal in the Replies-tab index. Replies under this comment may
+                // belong to other users, so each is only cleared from its own author's index.
+                const replyIndexUpdates = {};
+                idsToRemove.forEach(id => {
+                    const authorUid = allComments[id] && allComments[id].uid;
+                    if (authorUid) replyIndexUpdates[`userReplies/${authorUid}/${id}`] = null;
+                });
+                if (Object.keys(replyIndexUpdates).length) update(ref(database), replyIndexUpdates);
+
                 if (activeReplyToComment && idsToRemove.includes(activeReplyToComment.id)) setReplyToComment(null);
             } catch (err) {
                 notify('Could not delete comment', 'error');
@@ -12706,6 +12731,17 @@
             }
             await set(newCommentRef, newComment);
             await update(ref(database, `posts/${postId}`), { commentCount: increment(1) });
+
+            // Denormalized index powering the profile "Replies" tab (see buildProfileRepliesList)
+            // — keeps the reply's own text/gif alongside a pointer back to the post, so that tab
+            // can render without an extra fetch per comment.
+            const replyIndexEntry = { postId, text, timestamp: serverTimestamp() };
+            if (gifUrl) replyIndexEntry.gifUrl = gifUrl;
+            if (replyTarget) {
+                replyIndexEntry.parentId = replyTarget.id;
+                replyIndexEntry.replyToName = replyTarget.name;
+            }
+            set(ref(database, `userReplies/${user.uid}/${newCommentRef.key}`), replyIndexEntry);
 
             // Notification preview text falls back to a label for GIF-only comments (empty
             // `text` would otherwise read as "commented: " with nothing after it).
@@ -13708,7 +13744,9 @@
                 renderProfileSuggestedFriends();
                 buildProfilePostsList(document.getElementById('my-profile-posts-list'), user.uid);
                 buildProfileMediaGrid(document.getElementById('my-profile-media-grid'), user.uid);
-                initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list');
+                const myProfileSubtabsEl = document.getElementById('my-profile-subtabs');
+                if (myProfileSubtabsEl) myProfileSubtabsEl.dataset.uid = user.uid;
+                initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list', 'my-profile-replies-list');
                 profileSheetOverlay.classList.add('active');
             }
         }
@@ -14737,6 +14775,7 @@
                 remove(ref(database, 'user_group_chats/' + uid)),
                 remove(ref(database, 'notifications/' + uid)),
                 remove(ref(database, 'saved_posts/' + uid)),
+                remove(ref(database, 'userReplies/' + uid)),
                 remove(ref(database, 'call_log/' + uid)),
                 remove(ref(database, 'stories/' + uid)),
             ];
@@ -15720,9 +15759,13 @@
         // just swaps which of the two pre-built containers is visible — both are already
         // populated by buildProfilePostsList/buildProfileMediaGrid whenever the sheet opens, so
         // switching tabs is instant with no extra fetch. Idempotent (safe to call every open).
-        function initProfileSubtabs(subtabsId, postsListId, mediaGridId, savedListId) {
+        function initProfileSubtabs(subtabsId, postsListId, mediaGridId, savedListId, repliesListId) {
             const wrap = document.getElementById(subtabsId);
-            if (!wrap || wrap.dataset.bound) return;
+            if (!wrap) return;
+            // uid can change between opens (a different user's profile each time user-info-sheet
+            // is opened), so it's refreshed on every profile render below rather than only at
+            // bind-time — the click handler always reads whatever's currently on the dataset.
+            if (wrap.dataset.bound) return;
             wrap.dataset.bound = 'true';
             wrap.querySelectorAll('.profile-subtab-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -15734,11 +15777,16 @@
                     const postsList = document.getElementById(postsListId);
                     const mediaGrid = document.getElementById(mediaGridId);
                     const savedList = savedListId ? document.getElementById(savedListId) : null;
+                    const repliesList = repliesListId ? document.getElementById(repliesListId) : null;
                     if (postsList) postsList.style.display = subtab === 'posts' ? '' : 'none';
                     if (mediaGrid) mediaGrid.style.display = subtab === 'media' ? '' : 'none';
                     if (savedList) {
                         savedList.style.display = subtab === 'saved' ? '' : 'none';
                         if (subtab === 'saved') buildProfileSavedList(savedList);
+                    }
+                    if (repliesList) {
+                        repliesList.style.display = subtab === 'replies' ? '' : 'none';
+                        if (subtab === 'replies') buildProfileRepliesList(repliesList, wrap.dataset.uid);
                     }
                 });
             });
@@ -15763,6 +15811,74 @@
                 return;
             }
             items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
+        }
+
+        // Renders the "Replies" tab of a profile (own or someone else's) — every comment this
+        // user has left on a post, newest first, sourced from the userReplies/{uid} index that
+        // submitActiveComment writes alongside each comment. That index is denormalized (holds
+        // the reply text itself, not just an id) so this tab doesn't need to fetch every source
+        // comment individually — it only needs each reply's parent post from cachedPosts for
+        // context, and skips any reply whose post isn't cached yet (mirrors buildProfileSavedList).
+        async function buildProfileRepliesList(listEl, uid) {
+            if (!listEl) return;
+            if (!uid) { listEl.innerHTML = ''; return; }
+            listEl.innerHTML = '<div class="profile-posts-empty">Loading…</div>';
+
+            let repliesObj = {};
+            try {
+                const snap = await get(ref(database, `userReplies/${uid}`));
+                if (snap.exists()) repliesObj = snap.val();
+            } catch (e) {
+                listEl.innerHTML = '<div class="profile-posts-empty">No replies yet.</div>';
+                return;
+            }
+
+            const items = Object.keys(repliesObj)
+                .map(commentId => [commentId, repliesObj[commentId]])
+                .filter(([, reply]) => reply && reply.postId && cachedPosts[reply.postId])
+                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+            listEl.innerHTML = '';
+            if (!items.length) {
+                listEl.innerHTML = '<div class="profile-posts-empty">No replies yet.</div>';
+                return;
+            }
+            items.forEach(([commentId, reply]) => listEl.appendChild(buildProfileReplyCard(commentId, reply, uid)));
+        }
+
+        // Single row in the Replies tab: a "Replying to <post author>" context line above the
+        // comment, rendered with the same .feed-comment-item markup used in the post's own
+        // comments sheet. Tapping anywhere on the row opens that post's comments directly.
+        function buildProfileReplyCard(commentId, reply, uid) {
+            const post = cachedPosts[reply.postId];
+            const postAuthor = (post && cachedUsers[post.uid] && cachedUsers[post.uid].name) || 'a post';
+            const commenter = cachedUsers[uid] || {};
+            const displayName = commenter.name || reply.name || 'User';
+            const displayPhoto = commenter.photoURL || reply.photoURL || '';
+
+            const card = document.createElement('div');
+            card.className = 'profile-reply-card';
+            card.dataset.postId = reply.postId;
+            card.innerHTML = `
+                <div class="profile-reply-context">↪ Replying to <b></b></div>
+                <div class="feed-comment-item">
+                    ${feedAvatarHtml({ name: displayName, photoURL: displayPhoto })}
+                    <div class="feed-comment-body">
+                        ${reply.replyToName ? `<span class="feed-comment-reply-tag">↪ Replying to ${escapeHtmlForPost(reply.replyToName)}</span>` : ''}
+                        <div class="feed-comment-header-row">
+                            <span class="name"></span>
+                            <span class="time" data-rel-ts="${reply.timestamp}">${formatTime(reply.timestamp)}</span>
+                        </div>
+                        <div class="feed-comment-text"></div>
+                        ${reply.gifUrl ? `<img class="feed-comment-gif" src="${reply.gifUrl}" alt="GIF" loading="lazy">` : ''}
+                    </div>
+                </div>
+            `;
+            card.querySelector('.profile-reply-context b').textContent = postAuthor;
+            card.querySelector('.name').innerHTML = escapeHtmlForPost(displayName) + verifiedBadgeFor(uid, uid === AI_UID);
+            card.querySelector('.feed-comment-text').innerHTML = reply.text ? linkifyHashtags(reply.text) : '';
+            card.addEventListener('click', () => openPostComments(reply.postId));
+            return card;
         }
 
         // Renders the full "Posts" tab of a profile — every post by this user (text-only posts
@@ -15920,7 +16036,9 @@
             }
             buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
             buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
-            initProfileSubtabs('user-info-subtabs', 'user-info-posts-list', 'user-info-media-grid');
+            const userInfoSubtabsEl = document.getElementById('user-info-subtabs');
+            if (userInfoSubtabsEl) userInfoSubtabsEl.dataset.uid = uid;
+            initProfileSubtabs('user-info-subtabs', 'user-info-posts-list', 'user-info-media-grid', null, 'user-info-replies-list');
             userInfoSheet.classList.add('active');
             if (window.location.hash !== '#user-info') window.location.hash = 'user-info';
         }

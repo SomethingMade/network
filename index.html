@@ -867,13 +867,19 @@
         .wa-cover-photo-block .tm-profile-back-btn:hover,
         .wa-cover-photo-block .tm-profile-icon-btn:hover { background: rgba(0,0,0,0.55); }
 
-        .tm-profile-content { padding: 4px 20px 32px; flex: 1; }
+        .tm-profile-content { padding: 58px 20px 32px; flex: 1; }
 
-        /* Avatar row overlaps the bottom-left edge of the cover photo, X-style, but with
-           a squircle (rounded-square) avatar instead of a circle to keep it visually
-           distinct. Sits full-width so any header/action buttons stay right-aligned. */
-        .tm-profile-avatar-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: -44px; position: relative; z-index: 3; margin-bottom: 10px; }
-        .tm-profile-id { min-width: 0; margin-top: 10px; }
+        /* Avatar sits inside a relative-positioned wrapper that also holds the cover
+           photo (.tm-profile-cover-wrap below), and is absolutely positioned so it
+           overlaps the bottom-left edge of the cover, X-style, with a squircle
+           (rounded-square) shape instead of a circle to read as visually distinct.
+           Using position:absolute (rather than a negative margin pulling it up in
+           normal flow) keeps it out of the bottom sheet's own scrollable flow — a
+           negative margin there gets clipped by the sheet's overflow-y:auto instead
+           of rendering the overlap. */
+        .tm-profile-cover-wrap { position: relative; }
+        .tm-profile-avatar-row { position: absolute; left: 0; bottom: -48px; z-index: 3; }
+        .tm-profile-id { min-width: 0; }
         .tm-profile-name { font-size: 24px; font-weight: 800; color: var(--text-primary); line-height: 1.2; margin: 0 0 4px; letter-spacing: -0.3px; word-break: break-word; }
         .tm-profile-username { font-size: 14.5px; font-weight: 500; color: var(--text-secondary); margin: 0; }
         .tm-profile-avatar.avatar-circle { width: 92px; height: 92px; flex-shrink: 0; border-radius: 26%; background-color: var(--border-color); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700; border: 3px solid var(--bg-surface); box-shadow: var(--shadow-soft); cursor: pointer; }
@@ -3126,7 +3132,7 @@
             .sheet-avatar-upload .camera-badge { width: 28px; height: 28px; }
             .wa-cover-photo-block { height: 128px; margin: 0 -18px; }
             .wa-avatar-block-overlap { margin-top: -40px; }
-            .tm-profile-avatar-row { margin-top: -38px; }
+            .tm-profile-avatar-row { bottom: -42px; }
             .tm-profile-avatar-row .sheet-avatar-upload,
             .tm-profile-avatar-row .sheet-avatar-upload .avatar-circle { width: 80px; height: 80px; }
             .chat-view-avatar { width: 36px; height: 36px; }
@@ -3916,27 +3922,27 @@
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
 
-            <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
-                <div class="tm-profile-header">
-                    <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <div class="tm-profile-cover-wrap">
+                <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
+                    <div class="tm-profile-header">
+                        <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                         </button>
-                        <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                        </button>
-                        <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                            </button>
+                            <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            </button>
+                            <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
+                        </div>
                     </div>
+                    <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                    <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
                 </div>
-                <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
-                <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
-            </div>
-            <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
 
-            <div class="tm-profile-content">
                 <div class="tm-profile-avatar-row">
                     <div class="sheet-avatar-upload" id="sheet-avatar-upload">
                         <div class="avatar-circle" id="profile-avatar-preview"></div>
@@ -3945,7 +3951,9 @@
                     </div>
                 </div>
                 <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+            </div>
 
+            <div class="tm-profile-content">
                 <div class="tm-profile-id">
                     <div class="tm-profile-editable-row">
                         <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
@@ -4002,19 +4010,21 @@
     <div id="user-info-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
-            <div class="wa-cover-photo-block" id="user-info-cover-photo">
-                <div class="tm-profile-header">
-                    <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
+            <div class="tm-profile-cover-wrap">
+                <div class="wa-cover-photo-block" id="user-info-cover-photo">
+                    <div class="tm-profile-header">
+                        <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tm-profile-avatar-row">
+                    <div class="avatar-circle tm-profile-avatar" id="user-info-avatar"></div>
                 </div>
             </div>
 
             <div class="tm-profile-content">
-                <div class="tm-profile-avatar-row">
-                    <div class="avatar-circle tm-profile-avatar" id="user-info-avatar"></div>
-                </div>
-
                 <div class="tm-profile-id">
                     <h1 id="user-info-name" class="tm-profile-name">Name</h1>
                     <p id="user-info-username" class="tm-profile-username">@username</p>

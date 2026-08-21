@@ -858,12 +858,25 @@
         .tm-profile-icon-btn:hover { background: var(--bg-hover); }
         .tm-profile-icon-btn svg { width: 20px; height: 20px; }
 
+        /* When the header sits on top of the cover photo (see .wa-cover-photo-block
+           .tm-profile-header below), its buttons need their own scrim so they stay
+           legible over an arbitrary photo instead of relying on the page background. */
+        .wa-cover-photo-block .tm-profile-header { position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: 10px 10px 0; }
+        .wa-cover-photo-block .tm-profile-back-btn,
+        .wa-cover-photo-block .tm-profile-icon-btn { background: rgba(0,0,0,0.4); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        .wa-cover-photo-block .tm-profile-back-btn:hover,
+        .wa-cover-photo-block .tm-profile-icon-btn:hover { background: rgba(0,0,0,0.55); }
+
         .tm-profile-content { padding: 4px 20px 32px; flex: 1; }
-        .tm-profile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-        .tm-profile-id { min-width: 0; }
+
+        /* Avatar row overlaps the bottom-left edge of the cover photo, X-style, but with
+           a squircle (rounded-square) avatar instead of a circle to keep it visually
+           distinct. Sits full-width so any header/action buttons stay right-aligned. */
+        .tm-profile-avatar-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: -44px; position: relative; z-index: 3; margin-bottom: 10px; }
+        .tm-profile-id { min-width: 0; margin-top: 10px; }
         .tm-profile-name { font-size: 24px; font-weight: 800; color: var(--text-primary); line-height: 1.2; margin: 0 0 4px; letter-spacing: -0.3px; word-break: break-word; }
         .tm-profile-username { font-size: 14.5px; font-weight: 500; color: var(--text-secondary); margin: 0; }
-        .tm-profile-avatar.avatar-circle { width: 92px; height: 92px; flex-shrink: 0; border-radius: 50%; background-color: var(--border-color); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700; border: 1.5px solid var(--nav-active-black); box-shadow: none; cursor: pointer; }
+        .tm-profile-avatar.avatar-circle { width: 92px; height: 92px; flex-shrink: 0; border-radius: 26%; background-color: var(--border-color); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700; border: 3px solid var(--bg-surface); box-shadow: var(--shadow-soft); cursor: pointer; }
 
         .tm-profile-bio { font-size: 15px; line-height: 1.5; color: var(--text-primary); margin: 0 0 4px; white-space: pre-wrap; }
         .tm-profile-link { display: block; font-size: 15px; color: var(--primary-blue); text-decoration: none; margin-bottom: 12px; word-break: break-word; font-weight: 600; }
@@ -907,9 +920,11 @@
 
         /* Own-profile avatar sits in the same spot as Contact Info's tm-profile-avatar,
            but keeps the upload/camera-badge behavior of .sheet-avatar-upload — this just
-           resizes it down from the 96px settings-sheet default to match. */
-        .tm-profile-top .sheet-avatar-upload { width: 92px; height: 92px; margin: 0; flex-shrink: 0; }
-        .tm-profile-top .sheet-avatar-upload .avatar-circle { width: 92px; height: 92px; border: 1.5px solid var(--nav-active-black); box-shadow: none; }
+           resizes it down from the 96px settings-sheet default to match, and squares off
+           the corners into a squircle so it reads differently from a plain circle. */
+        .tm-profile-avatar-row .sheet-avatar-upload { width: 92px; height: 92px; margin: 0; flex-shrink: 0; }
+        .tm-profile-avatar-row .sheet-avatar-upload .avatar-circle { width: 92px; height: 92px; border-radius: 26%; border: 3px solid var(--bg-surface); box-shadow: var(--shadow-soft); }
+        .tm-profile-avatar-row .sheet-avatar-upload .camera-badge { border-radius: 50%; }
 
         /* ── PROFILE VIEW AS SIDEBAR (tablet & desktop) ──
            On screens wide enough for the app's list/chat panes (≥768px), both the
@@ -1586,8 +1601,11 @@
 
         .wa-avatar-block { display: flex; justify-content: center; margin-bottom: 22px; }
 
-        /* Cover photo banner shown above the avatar on profile sheets */
-        .wa-cover-photo-block { position: relative; height: 130px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
+        /* Cover photo banner shown above the avatar on profile sheets. Falls back to the
+           brand gradient when the user has no coverPhotoURL set, so this stays visible
+           (not display:none) on every profile — own and others' — instead of only
+           rendering once a photo happens to be set. */
+        .wa-cover-photo-block { position: relative; height: 150px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
         .sheet-cover-upload { cursor: pointer; }
         .sheet-cover-upload .sheet-upload-spinner { border-radius: 0; }
         .sheet-cover-upload.uploading .sheet-upload-spinner { display: flex; }
@@ -3106,8 +3124,11 @@
             .sheet-avatar-upload { width: 80px; height: 80px; }
             .sheet-avatar-upload .avatar-circle, .wa-avatar-block .avatar-circle { width: 80px; height: 80px; }
             .sheet-avatar-upload .camera-badge { width: 28px; height: 28px; }
-            .wa-cover-photo-block { height: 110px; margin: 0 -18px; }
+            .wa-cover-photo-block { height: 128px; margin: 0 -18px; }
             .wa-avatar-block-overlap { margin-top: -40px; }
+            .tm-profile-avatar-row { margin-top: -38px; }
+            .tm-profile-avatar-row .sheet-avatar-upload,
+            .tm-profile-avatar-row .sheet-avatar-upload .avatar-circle { width: 80px; height: 80px; }
             .chat-view-avatar { width: 36px; height: 36px; }
 
             /* Header / nav / profile buttons */
@@ -3896,40 +3917,40 @@
             <div class="sheet-handle"></div>
 
             <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
+                <div class="tm-profile-header">
+                    <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        </button>
+                        <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                        </button>
+                        <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
+                    </div>
+                </div>
                 <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
                 <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
             </div>
             <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
 
-            <div class="tm-profile-header">
-                <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    </button>
-                    <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
-                    <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
-                </div>
-            </div>
-
             <div class="tm-profile-content">
-                <div class="tm-profile-top">
-                    <div class="tm-profile-id">
-                        <div class="tm-profile-editable-row">
-                            <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
-                            <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
-                        </div>
-                    </div>
+                <div class="tm-profile-avatar-row">
                     <div class="sheet-avatar-upload" id="sheet-avatar-upload">
                         <div class="avatar-circle" id="profile-avatar-preview"></div>
                         <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
                         <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
                     </div>
-                    <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                </div>
+                <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+
+                <div class="tm-profile-id">
+                    <div class="tm-profile-editable-row">
+                        <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
+                        <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                    </div>
                 </div>
 
                 <div class="tm-profile-editable-row">
@@ -3981,21 +4002,22 @@
     <div id="user-info-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
-            <div class="wa-cover-photo-block" id="user-info-cover-photo" style="display:none;"></div>
-
-            <div class="tm-profile-header">
-                <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
+            <div class="wa-cover-photo-block" id="user-info-cover-photo">
+                <div class="tm-profile-header">
+                    <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                </div>
             </div>
 
             <div class="tm-profile-content">
-                <div class="tm-profile-top">
-                    <div class="tm-profile-id">
-                        <h1 id="user-info-name" class="tm-profile-name">Name</h1>
-                        <p id="user-info-username" class="tm-profile-username">@username</p>
-                    </div>
+                <div class="tm-profile-avatar-row">
                     <div class="avatar-circle tm-profile-avatar" id="user-info-avatar"></div>
+                </div>
+
+                <div class="tm-profile-id">
+                    <h1 id="user-info-name" class="tm-profile-name">Name</h1>
+                    <p id="user-info-username" class="tm-profile-username">@username</p>
                 </div>
 
                 <p id="user-info-about" class="tm-profile-bio">—</p>
@@ -14160,6 +14182,14 @@
         document.getElementById('sheet-cover-upload').addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('profile-cover-input').click();
+        });
+
+        // The back/insights/settings/save buttons now live inside the cover photo block
+        // (so they can float over it as an overlay), which means clicks on them would
+        // otherwise bubble up to the handler above and wrongly open the cover file picker.
+        // Stop that bubbling at the header level before it reaches the cover.
+        document.querySelectorAll('.wa-cover-photo-block .tm-profile-header').forEach(header => {
+            header.addEventListener('click', (e) => e.stopPropagation());
         });
 
         document.getElementById('profile-cover-input').addEventListener('change', async (e) => {

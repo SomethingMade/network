@@ -3074,10 +3074,9 @@
                 transition: transform 0.25s ease;
             }
             .side-nav.nav-scroll-hidden { transform: translateY(100%); }
-            /* Reels has its own bottom-nav icon (unlike the other full-screen viewers —
-               stories, status, images — which open contextually), so it should read as a
-               tab you stay inside: keep the bar visible above the reel content instead of
-               covering it. */
+            /* Reels no longer has its own bottom-nav tab — every entry point now passes
+               fullscreen:true (see openReelViewer), so this bottom:60px case is just a
+               defensive fallback and shouldn't normally be hit. */
             #reel-viewer-overlay { bottom: 60px; }
             /* Opened from a feed post's expand button (not the Reels tab) — cover the
                full screen instead of leaving the reserved nav-bar strip at the bottom,
@@ -4897,14 +4896,13 @@
                     </svg>
                     <span>Home</span>
                 </div>
-                <div class="nav-item" id="nav-reels-btn">
+                <div class="nav-item" data-tab="tab-chats">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <rect class="icon-line" x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/>
-                        <polygon class="icon-line" points="10 8.5 16 12 10 15.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/>
-                        <rect class="icon-fill" x="2" y="4" width="20" height="16" rx="3"/>
-                        <polygon points="9.5 8 16.5 12 9.5 16" fill="var(--bg-surface)"/>
+                        <polyline class="icon-line" points="2 6 12 13 22 6" stroke="currentColor" stroke-width="1.8"/>
+                        <path class="icon-fill" fill-rule="evenodd" d="M2 6.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6.5l-10 6.5z"/>
                     </svg>
-                    <span>Reels</span>
+                    <span>Messages</span>
                 </div>
                 <div class="nav-item" id="nav-search-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -6692,22 +6690,12 @@
             track.querySelectorAll('.reel-item').forEach(el => reelObserver.observe(el));
 
             const overlay = document.getElementById('reel-viewer-overlay');
-            // Opened from the bottom-nav Reels tab: leave the nav bar visible below it (it
-            // reads as a tab you stay inside). Opened from a feed post's expand button: this
-            // is a one-off video view, not the Reels tab, so it should cover the full screen
-            // like the plain video/image viewers do — otherwise the reserved nav-bar strip at
-            // the bottom can end up showing whatever's behind it instead of the nav bar.
+            // Always opened from a feed post's expand button now (Reels has no bottom-nav
+            // slot anymore) — cover the full screen like the plain video/image viewers do,
+            // instead of leaving the reserved nav-bar strip at the bottom.
             overlay.classList.toggle('reel-viewer-fullscreen', !!(opts && opts.fullscreen));
             overlay.classList.add('active');
             if (window.location.hash !== '#reel-viewer') window.location.hash = 'reel-viewer';
-        }
-
-        // Entry point for the bottom-nav Reels icon — no specific post to start from, so it
-        // just grabs a shuffled pull of whatever video posts exist across the app right now.
-        function openReelViewerFromNav() {
-            const ids = getShuffledVideoPostIds([]);
-            if (!ids.length) { notify('No reels to show yet', 'error'); return; }
-            openReelViewer(ids[0]);
         }
 
         function closeReelViewer() {
@@ -7715,20 +7703,6 @@
                     goToTab(item.getAttribute('data-tab'));
                 });
             });
-            // Reels isn't a persistent tab-content like the others — it's the same full-screen
-            // overlay opened from a post's expand button, just entered here without a specific
-            // starting post. Handled separately from the data-tab items above since there's no
-            // "tab-reels" screen for handleHashChange to switch to.
-            const reelsNavBtn = document.getElementById('nav-reels-btn');
-            if (reelsNavBtn) {
-                reelsNavBtn.addEventListener('click', () => {
-                    triggerHaptic(12);
-                    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-                    reelsNavBtn.classList.add('active');
-                    requestAnimationFrame(updateNavIndicator);
-                    openReelViewerFromNav();
-                });
-            }
             // Search isn't a persistent tab-content either — tapping it just opens the same
             // full-screen search overlay used by the header search icons elsewhere (see
             // initFullscreenSearch/js-search-open), borrowing Home's search bar + results list,
@@ -7737,8 +7711,8 @@
             if (searchNavBtn) {
                 searchNavBtn.addEventListener('click', () => {
                     triggerHaptic(12);
-                    // Reels opens as its own full-screen overlay above the rest of the UI (see
-                    // openReelViewerFromNav) — the search overlay opened below sits at a lower
+                    // Reels can still be open full-screen (from a feed post's expand button —
+                    // see openReelViewer) — the search overlay opened below sits at a lower
                     // z-index, so without this it would open invisibly underneath the reel
                     // viewer. Close it first, same way its own close button does (history.back(),
                     // which routes through handleHashChange -> closeReelViewer()).
@@ -18058,10 +18032,10 @@
             } else if (badge) { badge.remove(); }
         }
 
-        // Chats no longer lives in the bottom nav — its unread dot now lives on the header
-        // icon (present on all three tab headers), so this toggles every instance at once.
-        // Also rings the header avatar itself (all five tab headers, via [data-profile-trigger])
-        // so unread messages are visible even from tabs that don't show the chats icon.
+        // The chats unread dot shows on both the header icon (present on all tab headers)
+        // and the bottom-nav Messages tab, so this toggles every instance at once. Also
+        // rings the header avatar itself (all tab headers, via [data-profile-trigger]) so
+        // unread messages are visible even from tabs that don't show the chats icon.
         function updateHeaderChatsBadge(count) {
             document.querySelectorAll('.js-header-chats-badge').forEach(badge => {
                 badge.classList.toggle('show', count > 0);
@@ -18069,6 +18043,7 @@
             document.querySelectorAll('[data-profile-trigger]').forEach(avatar => {
                 avatar.classList.toggle('has-unread-messages', count > 0);
             });
+            updateNavBadge('tab-chats', count);
         }
 
         function updateTotalUnreadBadge(count) {

@@ -2142,6 +2142,47 @@
         .segmented-control { display: flex; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 50px; padding: 4px; margin-bottom: 16px; }
         .segmented-control button { flex: 1; border: none; background: transparent; padding: 10px; border-radius: 50px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: 0.2s; }
         .segmented-control button.active { background: var(--gradient-brand); color: white; }
+
+        /* ── COMMUNITY (Groups/Pages) TAB — X/Twitter-style redesign ──
+           Swaps the filled pill switcher for the same flat underline-tab row used by
+           .feed-subtabs / .profile-subtabs elsewhere, so Groups/Pages reads consistently
+           with the rest of the app's X-style tab pattern. Scoped to #groups-sub-tabs only
+           — #contacts-sub-tabs keeps the original pill look untouched. */
+        #groups-sub-tabs { background: none; border: none; border-radius: 0; padding: 0; margin-bottom: 0; border-bottom: 1px solid var(--border-color); }
+        #groups-sub-tabs button { padding: 12px 0 10px; border-radius: 0; font-size: 14.5px; font-weight: 700; position: relative; }
+        #groups-sub-tabs button:hover { background: var(--bg-hover); }
+        #groups-sub-tabs button.active { background: none; color: var(--text-primary); }
+        #groups-sub-tabs button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--primary-blue); }
+
+        /* "My Groups"/"My Pages" — flat, edge-to-edge rows with a hairline divider (X's
+           joined-communities list) instead of the floating rounded chat-item card, and a
+           rounded-square avatar to read as a community icon rather than a person's DP. */
+        #my-groups-list-container.chat-list-container, #my-pages-list-container.chat-list-container { padding: 0; }
+        #groups-subtab-panel .chat-item, #pages-subtab-panel .chat-item {
+            border-radius: 0; margin-bottom: 0; padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #groups-subtab-panel .chat-item:hover, #pages-subtab-panel .chat-item:hover { transform: none; }
+        #groups-subtab-panel .chat-item::before, #pages-subtab-panel .chat-item::before { display: none; }
+        #groups-subtab-panel .chat-item .avatar, #groups-subtab-panel .chat-item .chat-avatar-ring,
+        #pages-subtab-panel .chat-item .avatar, #pages-subtab-panel .chat-item .chat-avatar-ring { border-radius: 14px; }
+        #groups-subtab-panel .chat-item .chat-preview h3, #pages-subtab-panel .chat-item .chat-preview h3 { font-size: 15px; font-weight: 700; }
+        #groups-subtab-panel .chat-item .chat-preview p, #pages-subtab-panel .chat-item .chat-preview p { display: flex; align-items: center; gap: 4px; white-space: normal; }
+        #groups-subtab-panel .chat-item .chat-preview p svg, #pages-subtab-panel .chat-item .chat-preview p svg { flex-shrink: 0; opacity: 0.7; }
+        #groups-subtab-panel .chat-item .chat-preview p span, #pages-subtab-panel .chat-item .chat-preview p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* "Discover" — bordered rounded cards (X's Explore-communities look), distinct
+           from the flat joined list above so new communities read as suggestions to browse. */
+        #discover-groups-list-container .chat-item, #discover-pages-list-container .chat-item {
+            border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 10px;
+            padding: 14px; transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        #discover-groups-list-container .chat-item:hover, #discover-pages-list-container .chat-item:hover {
+            border-color: var(--primary-blue); background: var(--bg-hover);
+        }
+        #discover-groups-list-container .chat-item .btn-add-contact, #discover-pages-list-container .chat-item .btn-add-contact {
+            padding: 7px 18px; font-size: 13px; font-weight: 700; border-radius: 50px;
+        }
         .contact-action-btn { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-color); background: transparent; cursor: pointer; transition: 0.2s; }
         .contact-action-btn.danger { color: var(--danger-red); border-color: rgba(255, 69, 58, 0.3); }
         .contact-action-btn.danger:hover { background: rgba(255, 69, 58, 0.1); }
@@ -16021,6 +16062,10 @@
             return `${group.name}${groupVerifiedBadge(group)}`;
         }
 
+        // Small "people" glyph used to prefix member-count meta lines in the Community tab,
+        // matching X's style of pairing a compact icon with follower/member counts.
+        const COMMUNITY_MEMBERS_ICON_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+
         function renderMyGroupItem(groupId, group, container, metaData) {
             const item = document.createElement('div');
             item.className = 'chat-item' + (groupId === activeGroupId ? ' active-chat' : '');
@@ -16029,10 +16074,12 @@
             const defaultPreviewText = `${memberCount} member${memberCount === 1 ? '' : 's'} · ${group.isPublic ? 'Public' : 'Private'}`;
 
             let snippetText = defaultPreviewText;
+            let showMemberIcon = true;
             let metaHtml = '';
             if (metaData && metaData.timestamp) {
                 const senderPrefix = auth.currentUser && metaData.senderUid === auth.currentUser.uid ? 'You: ' : (metaData.senderName ? `${metaData.senderName}: ` : '');
                 snippetText = `${senderPrefix}${metaData.text || ''}`;
+                showMemberIcon = false;
                 const d = new Date(metaData.timestamp);
                 const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
                 const badgeHtml = (metaData.unreadCount && metaData.unreadCount > 0) ? `<div class="unread-badge">${metaData.unreadCount}</div>` : '';
@@ -16043,7 +16090,7 @@
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
                     <h3>${groupNameLabel(group)}</h3>
-                    <p>${snippetText}</p>
+                    <p>${showMemberIcon ? COMMUNITY_MEMBERS_ICON_SVG : ''}<span>${snippetText}</span></p>
                 </div>
                 ${metaHtml}
             `;
@@ -16075,7 +16122,7 @@
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
                     <h3>${groupNameLabel(group)}</h3>
-                    <p>${memberCount} member${memberCount === 1 ? '' : 's'}</p>
+                    <p>${COMMUNITY_MEMBERS_ICON_SVG}<span>${memberCount} member${memberCount === 1 ? '' : 's'}</span></p>
                 </div>
             `;
             const btn = document.createElement('button');

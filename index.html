@@ -1895,7 +1895,7 @@
 
         /* Left Pane: Sidebar Nav */
         .side-nav { border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 24px 0; gap: 28px; background: var(--bg-surface); z-index: 10; position: relative; }
-        /* Reserves the centre grid column for #fab-new-post on mobile so the four
+        /* Reserves the centre grid column for #fab-nav-action on mobile so the four
            tab icons sit with equal gaps around it. Not part of the desktop sidebar
            layout (fab there is a free-floating corner button), so hidden by default
            and only switched on inside the mobile nav grid below. */
@@ -3090,10 +3090,12 @@
             .chat-view-back { display: block; }
             .fab-add { position: fixed; bottom: calc(78px + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
 
-            /* New Post/upload button: centered INSIDE the bottom navigation.
-               It is intentionally larger than the other nav icons while staying
+            /* Primary nav-bar action button: centered INSIDE the bottom navigation.
+               Its icon and behavior change per active tab (New Post on Home, New Chat
+               on Messages) instead of separate floating buttons scattered per tab. It
+               is intentionally larger than the other nav icons while staying
                completely within the 60px navigation bar. */
-            #fab-new-post {
+            #fab-nav-action {
                 left: 50%;
                 right: auto;
                 bottom: calc(env(safe-area-inset-bottom) + 3px);
@@ -3107,12 +3109,15 @@
                 transform: translateX(-50%);
                 box-shadow: 0 5px 16px rgba(var(--primary-rgb), 0.32);
             }
-            #fab-new-post:hover {
+            #fab-nav-action:hover {
                 transform: translateX(-50%) scale(1.04);
             }
-            #fab-new-post.fab-scroll-hidden {
+            #fab-nav-action.fab-scroll-hidden {
                 transform: translateX(-50%) translateY(140%);
             }
+            /* The chat-bubble SVG reads visually smaller than the bold "+" glyph at the
+               same box size, so nudge it down to match the plus sign's optical weight. */
+            #fab-nav-action.fab-nav-action-chat svg { width: 24px; height: 24px; }
         }
 
         /* ── SMALL-SCREEN TUNING (narrow phones: iPhone SE, small Android, standard iPhones, etc.) ── */
@@ -3186,7 +3191,7 @@
 
             /* Floating add button & scroll-to-bottom */
             .fab-add { width: 50px; height: 50px; font-size: 26px; }
-            #fab-new-post { width: 54px; height: 54px; min-width: 54px; min-height: 54px; font-size: 34px; }
+            #fab-nav-action { width: 54px; height: 54px; min-width: 54px; min-height: 54px; font-size: 34px; }
             .scroll-to-bottom-btn { width: 34px; height: 34px; right: 16px; }
 
             /* Chat conversation view */
@@ -5397,8 +5402,10 @@
                 </div>
 
                 <button type="button" class="fab-add" id="fab-add-friend" title="Follow Someone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6"></path><path d="M22 11h-6"></path></svg></button>
-                <button type="button" class="fab-add" id="fab-new-post" title="New Post">+</button>
-                <button type="button" class="fab-add" id="fab-new-chat" title="Start Chatting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>
+                <!-- Single primary nav-bar action button: icon and click behavior swap
+                     per active tab (New Post on Home, New Chat on Messages) via
+                     updateFabNavAction() instead of separate floating buttons. -->
+                <button type="button" class="fab-add" id="fab-nav-action" title="New Post">+</button>
             </aside>
 
             <main class="workspace-pane">
@@ -7710,14 +7717,7 @@
                 const fabAddFriend = document.getElementById('fab-add-friend');
                 if (fabAddFriend) fabAddFriend.style.display = (hash === 'tab-contacts') ? 'flex' : 'none';
 
-                const fabNewPost = document.getElementById('fab-new-post');
-                if (fabNewPost) {
-                    fabNewPost.style.display = (hash === 'tab-status') ? 'flex' : 'none';
-                    fabNewPost.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
-                }
-
-                const fabNewChat = document.getElementById('fab-new-chat');
-                if (fabNewChat) fabNewChat.style.display = (hash === 'tab-chats') ? 'flex' : 'none';
+                updateFabNavAction(hash);
 
                 const sideNavEl = document.querySelector('.side-nav');
                 if (sideNavEl) sideNavEl.classList.remove('nav-scroll-hidden'); // always start visible on tab entry
@@ -7905,16 +7905,7 @@
                 const currentHash = window.location.hash.replace('#', '');
                 fabAddFriend.style.display = (currentHash === 'tab-contacts') ? 'flex' : 'none';
             }
-            const fabNewPost = document.getElementById('fab-new-post');
-            if (fabNewPost) {
-                const currentHash = window.location.hash.replace('#', '') || 'tab-status';
-                fabNewPost.style.display = (currentHash === 'tab-status') ? 'flex' : 'none';
-            }
-            const fabNewChat = document.getElementById('fab-new-chat');
-            if (fabNewChat) {
-                const currentHash = window.location.hash.replace('#', '') || 'tab-status';
-                fabNewChat.style.display = (currentHash === 'tab-chats') ? 'flex' : 'none';
-            }
+            updateFabNavAction(window.location.hash.replace('#', '') || 'tab-status');
             requestAnimationFrame(updateNavIndicator);
         }
         initTabs();
@@ -15860,16 +15851,44 @@
         function closePostComposer() {
             postComposerOverlay.classList.remove('active');
         }
-        document.getElementById('fab-new-post').addEventListener('click', openPostComposer);
-        document.getElementById('fab-new-chat').addEventListener('click', () => {
-            goToTab('tab-contacts');
+
+        // Single nav-bar action button whose icon/behavior swaps with the active tab
+        // (New Post on Home, New Chat on Messages) instead of separate floating
+        // buttons per tab. Called on every tab switch — see updateFabNavAction below.
+        const CHAT_BUBBLE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+        function updateFabNavAction(hash) {
+            const fab = document.getElementById('fab-nav-action');
+            if (!fab) return;
+            if (hash === 'tab-chats') {
+                fab.style.display = 'flex';
+                fab.title = 'Start Chatting';
+                fab.innerHTML = CHAT_BUBBLE_SVG;
+                fab.classList.add('fab-nav-action-chat');
+                fab.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
+            } else if (hash === 'tab-status') {
+                fab.style.display = 'flex';
+                fab.title = 'New Post';
+                fab.innerHTML = '+';
+                fab.classList.remove('fab-nav-action-chat');
+                fab.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
+            } else {
+                fab.style.display = 'none';
+            }
+        }
+        document.getElementById('fab-nav-action').addEventListener('click', () => {
+            const hash = window.location.hash.replace('#', '') || 'tab-status';
+            if (hash === 'tab-chats') {
+                goToTab('tab-contacts');
+            } else {
+                openPostComposer();
+            }
         });
         document.getElementById('post-composer-close').addEventListener('click', () => history.back());
 
-        // --- Hide the "New Post" FAB while scrolling down the feed, show it again on scroll up ---
+        // --- Hide the nav-bar action button while scrolling down the feed, show it again on scroll up ---
         (function initFabScrollHide() {
             const scrollEl = document.getElementById('discover-grid-scroll');
-            const fab = document.getElementById('fab-new-post');
+            const fab = document.getElementById('fab-nav-action');
             if (!scrollEl || !fab) return;
             let lastScrollTop = scrollEl.scrollTop; // match actual position, not an assumed 0
             const THRESHOLD = 6; // ignore tiny scroll jitter

@@ -3923,7 +3923,15 @@
             <div style="padding: 16px 20px 4px;">
                 <textarea id="job-apply-message" class="pill-textarea" placeholder="Add a short message to the business (optional)" maxlength="500" autocomplete="off"></textarea>
             </div>
-            <div style="padding: 4px 20px 24px;">
+            <div style="padding: 12px 20px 4px;">
+                <input type="file" id="job-apply-cv-input" accept=".pdf,.doc,.docx" style="display:none;">
+                <button type="button" id="btn-job-apply-attach-cv" style="width:100%; display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; border:1px dashed var(--border-color); background:var(--bg-alt); color:var(--text-secondary); font-size:13.5px; font-weight:600; cursor:pointer; text-align:left;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span id="job-apply-cv-filename" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">Attach CV (PDF or Word, optional)</span>
+                    <svg id="btn-job-apply-cv-remove" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none; flex-shrink:0;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div style="padding: 12px 20px 24px;">
                 <button type="button" id="btn-submit-job-application" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Submit Application</button>
             </div>
         </div>
@@ -13423,19 +13431,63 @@
         // --- Apply to a job ---
         let jobApplyTargetId = null;
 
+        // CV attached to the application currently being filled out in the apply sheet.
+        // Cleared whenever the sheet opens/closes so a stale file can't leak into the
+        // next job someone applies to.
+        let jobApplyCvFile = null;
+        const JOB_CV_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+
+        function resetJobApplyCvPicker() {
+            jobApplyCvFile = null;
+            document.getElementById('job-apply-cv-input').value = '';
+            document.getElementById('job-apply-cv-filename').textContent = 'Attach CV (PDF or Word, optional)';
+            document.getElementById('btn-job-apply-cv-remove').style.display = 'none';
+        }
+
         function openJobApplySheet(jobId) {
             const job = cachedJobs[jobId];
             if (!job) return;
             jobApplyTargetId = jobId;
             document.getElementById('job-apply-title').textContent = job.title || 'this role';
             document.getElementById('job-apply-message').value = '';
+            resetJobApplyCvPicker();
             document.getElementById('job-apply-sheet-overlay').classList.add('active');
         }
 
         function closeJobApplySheet() {
             document.getElementById('job-apply-sheet-overlay').classList.remove('active');
             jobApplyTargetId = null;
+            resetJobApplyCvPicker();
         }
+
+        document.getElementById('btn-job-apply-attach-cv').addEventListener('click', (e) => {
+            if (e.target.closest('#btn-job-apply-cv-remove')) return;
+            document.getElementById('job-apply-cv-input').click();
+        });
+
+        document.getElementById('btn-job-apply-cv-remove').addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetJobApplyCvPicker();
+        });
+
+        document.getElementById('job-apply-cv-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const validExt = /\.(pdf|doc|docx)$/i.test(file.name);
+            if (!validExt) {
+                notify('CV must be a PDF or Word document', 'error');
+                e.target.value = '';
+                return;
+            }
+            if (file.size > JOB_CV_MAX_BYTES) {
+                notify('CV must be under 10MB', 'error');
+                e.target.value = '';
+                return;
+            }
+            jobApplyCvFile = file;
+            document.getElementById('job-apply-cv-filename').textContent = file.name;
+            document.getElementById('btn-job-apply-cv-remove').style.display = 'block';
+        });
 
         async function submitJobApplication() {
             const user = auth.currentUser;
@@ -13447,13 +13499,28 @@
 
             const myProfile = cachedUsers[user.uid] || {};
             const message = document.getElementById('job-apply-message').value.trim().slice(0, 500);
+            const submitBtn = document.getElementById('btn-submit-job-application');
+            const cvFile = jobApplyCvFile;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = cvFile ? 'Uploading CV…' : 'Submitting…';
             try {
+                let cvURL = '';
+                let cvName = '';
+                if (cvFile) {
+                    const safeName = cvFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    cvURL = await uploadToFirebaseStorage(cvFile, `job_cvs/${jobId}/${user.uid}/${Date.now()}_${safeName}`);
+                    cvName = cvFile.name;
+                }
+
                 await update(ref(database), {
                     [`jobApplications/${jobId}/${user.uid}`]: {
                         uid: user.uid,
                         name: myProfile.name || user.displayName || 'User',
                         photoURL: myProfile.photoURL || user.photoURL || '',
                         message,
+                        cvURL,
+                        cvName,
                         timestamp: serverTimestamp()
                     },
                     [`users/${user.uid}/myJobApplications/${jobId}`]: {
@@ -13470,6 +13537,9 @@
             } catch (err) {
                 console.error('submitJobApplication failed', err);
                 notify("Couldn't submit application", 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
             }
         }
 
@@ -13494,6 +13564,7 @@
                         <div class="applicant-item-body">
                             <div class="applicant-item-name">${app.name || 'User'}${verifiedBadgeFor(app.uid, false)}</div>
                             ${app.message ? `<div class="applicant-item-msg">${escapeHtmlForPost(app.message)}</div>` : ''}
+                            ${app.cvURL ? `<a href="${app.cvURL}" target="_blank" rel="noopener noreferrer" class="applicant-item-cv" onclick="event.stopPropagation();" style="display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:12.5px; font-weight:700; color:var(--primary-blue); text-decoration:none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>${escapeHtmlForPost(app.cvName || 'View CV')}</a>` : ''}
                             <div class="applicant-item-time">${formatTime(app.timestamp)}</div>
                         </div>
                     </div>`).join('');

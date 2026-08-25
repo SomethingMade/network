@@ -866,6 +866,17 @@
         }
 
         .tm-profile-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 30px 4px 30px; flex-shrink: 0; }
+        /* Once the profile/user-info sheet has finished its slide-in animation, this strips the
+           lingering CSS transform off .bottom-sheet (translateX/Y(0) is still a transform, not
+           "none", and a transformed scroll container breaks position:sticky in some WebViews —
+           which is why the cover photo was scrolling away instead of staying pinned). Toggled by
+           a MutationObserver watching the 'active' class (see bindSheetSettleObserver), so the
+           slide-out close animation still works: 'sheet-settled' is stripped the instant 'active'
+           is removed, restoring the transform so it has something to animate back out on. */
+        #profile-bottom-sheet-overlay.sheet-settled .bottom-sheet,
+        #user-info-sheet-overlay.sheet-settled .bottom-sheet {
+            transform: none !important;
+        }
         .tm-profile-back-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent; color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s ease, transform 0.15s ease; }
         .tm-profile-back-btn:hover { background: var(--bg-hover); }
         .tm-profile-back-btn:active { transform: scale(0.92); }
@@ -902,7 +913,7 @@
            of rendering the overlap. A soft gradient ring rendered behind the avatar
            (::before) gives it a bit of lift where it crosses the card's rounded edge. */
         .tm-profile-cover-wrap { position: relative; }
-        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -48px; z-index: 3; will-change: opacity; }
+        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -48px; z-index: 6; will-change: opacity; }
         .tm-profile-avatar-row::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: var(--gradient-brand); opacity: 0.9; z-index: -1; }
 
         /* Insights/Settings sit inline with Save on the header's right side (all three
@@ -14238,7 +14249,24 @@
         // hard-clipped once scroll carries it under the pinned cover. Instead we fade its
         // opacity out smoothly over FADE_DISTANCE px of scroll, X/Twitter-profile style, so it
         // disappears gracefully before it would visually collide with the cover photo.
-        function setupProfileCoverScrollFade(overlayEl) {
+        // Watches an overlay's 'active' class and toggles 'sheet-settled' on it: added ~360ms
+        // after 'active' appears (once the slide-in transition has finished), removed the
+        // instant 'active' disappears (so the slide-out transition has a transform to animate).
+        // See the .sheet-settled CSS rule for why this exists.
+        function bindSheetSettleObserver(overlayEl) {
+            if (!overlayEl || overlayEl.dataset.settleBound) return;
+            overlayEl.dataset.settleBound = '1';
+            let settleTimer = null;
+            new MutationObserver(() => {
+                clearTimeout(settleTimer);
+                if (overlayEl.classList.contains('active')) {
+                    settleTimer = setTimeout(() => overlayEl.classList.add('sheet-settled'), 360);
+                } else {
+                    overlayEl.classList.remove('sheet-settled');
+                }
+            }).observe(overlayEl, { attributes: true, attributeFilter: ['class'] });
+        }
+        bindSheetSettleObserver(profileSheetOverlay);
             if (!overlayEl) return;
             const scrollEl = overlayEl.querySelector('.bottom-sheet');
             const avatarRow = overlayEl.querySelector('.tm-profile-avatar-row');
@@ -16608,6 +16636,7 @@
         // View another user's profile (avatar, name, username, about)
         const userInfoSheet = document.getElementById('user-info-sheet-overlay');
         let userInfoSheetUid = null;
+        bindSheetSettleObserver(userInfoSheet);
 
         function openUserProfileSheet(uid) {
             if (!uid || uid === AI_UID) return;

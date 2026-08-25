@@ -753,6 +753,10 @@
            (z-index 100008, see image-viewer-post-menu-btn), so it needs to clear that too,
            not just the default bottom-sheet layer (100002). */
         #post-options-sheet-overlay { z-index: 100010; }
+        /* Repost options (Repost vs Quote) can also be opened from inside the image/reel
+           viewer (image-viewer-repost-btn / reel-repost-btn), same reasoning as Post Options
+           just above. */
+        #repost-options-sheet-overlay { z-index: 100010; }
         /* Search can be opened while the Reels full-screen overlay (z-index 100007) is up
            (see nav-search-btn handler, which closes Reels first) — kept above it as a safety
            net so search is never rendered invisibly underneath. */
@@ -1030,7 +1034,7 @@
         .feed-composer { background: var(--bg-alt); border-radius: 18px; padding: 14px 16px; margin: 12px 16px 4px; }
         .feed-composer-row { display: flex; gap: 10px; align-items: flex-start; position: relative; }
         .feed-composer-row .avatar { background-color: var(--primary-blue); background-size: cover; background-position: center; border-radius: 50%; }
-        #feed-composer-input { flex: 1; resize: none; border: none; background: transparent; outline: none; font-family: inherit; font-size: 14.5px; color: var(--text-primary); padding-top: 8px; max-height: 120px; }
+        #feed-composer-input, #quote-composer-input { flex: 1; resize: none; border: none; background: transparent; outline: none; font-family: inherit; font-size: 14.5px; color: var(--text-primary); padding-top: 8px; max-height: 120px; }
         #feed-composer-input::placeholder { color: var(--text-secondary); }
         .feed-composer-charcount { text-align: right; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-top: 4px; }
         .feed-composer-charcount.warn { color: #FF9F0A; }
@@ -1060,8 +1064,8 @@
         .feed-composer-thumb.upload-error, .feed-composer-preview-main.upload-error { outline: 2px solid var(--danger-red); outline-offset: -2px; }
         .feed-composer-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
         .feed-composer-attach { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; }
-        #feed-composer-submit { background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 8px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: opacity 0.2s ease; }
-        #feed-composer-submit:not(:disabled) { opacity: 1; pointer-events: auto; }
+        #feed-composer-submit, #quote-composer-submit { background: var(--gradient-brand); color: #fff; border: none; border-radius: var(--radius-pill); padding: 8px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; opacity: 0.4; pointer-events: none; transition: opacity 0.2s ease; }
+        #feed-composer-submit:not(:disabled), #quote-composer-submit:not(:disabled) { opacity: 1; pointer-events: auto; }
 
         /* Thin top-of-screen bar shown while a post uploads after the composer has already
            closed (see submitFeedPost/showGlobalUploadProgress) — an indeterminate sliding
@@ -1079,12 +1083,18 @@
         /* ── NEW POST COMPOSER (full-screen, X-style) ── */
         .post-composer-overlay { position: fixed; inset: 0; z-index: 100001; display: none; flex-direction: column; background: var(--bg-surface); }
         .post-composer-overlay.active { display: flex; }
+        /* Unlike the main post composer, the quote composer can be opened from inside the
+           image/reel viewer (repost → Quote) or a bottom sheet, both of which sit well above
+           the base composer z-index — so it always needs to render on top regardless of what
+           it was opened from. */
+        #quote-composer-overlay { z-index: 100015; }
         .post-composer-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top)); border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
         .post-composer-close { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-alt); color: var(--text-primary); cursor: pointer; border: none; padding: 0; flex-shrink: 0; }
         .post-composer-close svg { width: 17px; height: 17px; }
         .post-composer-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
         .post-composer-overlay .feed-composer { background: transparent; margin: 0; padding: 16px; }
         .post-composer-overlay #feed-composer-input { font-size: 17px; min-height: 110px; padding-top: 6px; }
+        .post-composer-overlay #quote-composer-input { font-size: 17px; min-height: 90px; padding-top: 6px; }
         .post-composer-overlay .feed-composer-actions { border-top: 1px solid var(--border-color); margin-top: 14px; padding-top: 14px; justify-content: flex-start; }
         .post-composer-overlay .feed-composer-attach-row { gap: 14px; }
         .post-composer-overlay .feed-composer-attach { gap: 0; width: 38px; height: 38px; justify-content: center; border-radius: 50%; flex-shrink: 0; position: relative; }
@@ -1450,24 +1460,20 @@
         .feed-repost-banner { display:flex; align-items:center; gap:8px; padding: 12px 16px 0; font-size:12.5px; font-weight:600; color: var(--text-secondary); cursor:pointer; }
         .feed-repost-banner svg { width:15px; height:15px; flex-shrink:0; }
         .feed-repost-banner:hover { color: var(--text-primary); }
-        .repost-composer-original { margin: 0 16px 14px; padding: 14px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-alt); }
-        .repost-composer-original-label { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px; text-transform:uppercase; letter-spacing:.04em; }
-        .repost-composer-original-card { border:1px solid var(--border-color); border-radius:14px; background:var(--bg-surface); overflow:hidden; }
-        .repost-composer-original-card .x-post-row { padding:12px 12px 0; }
-        .repost-composer-original-card .feed-post-body { padding:10px 12px 0; }
-        .repost-composer-original-card .feed-post-text { font-size:14px; }
-        .repost-composer-original-card .repost-preview-media { width:100%; max-height:320px; object-fit:cover; display:block; }
-        .repost-composer-original-card .repost-preview-text { padding:0 12px 12px; color:var(--text-primary); white-space:pre-wrap; font-size:14px; line-height:1.45; }
-        .repost-composer-original-card .repost-preview-author { display:flex; align-items:center; gap:9px; padding:12px 12px 0; font-size:13px; font-weight:700; }
-        .repost-composer-original-card .repost-preview-author .avatar { width:32px; height:32px; }
-        .repost-composer-original-card .repost-preview-images { display:grid; grid-template-columns:repeat(2,1fr); gap:3px; margin-top:10px; }
-        .repost-composer-original-card .repost-preview-images img { width:100%; height:150px; object-fit:cover; display:block; }
-        .repost-commentary { margin: 0 16px 10px 16px; padding: 0 0 12px; border-bottom:1px solid var(--border-color); }
-        .repost-commentary-text { font-size:15px; line-height:1.45; color:var(--text-primary); white-space:pre-wrap; margin-bottom:10px; }
-        .repost-commentary-images { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; overflow:hidden; border-radius:14px; }
-        .repost-commentary-images img { width:100%; height:180px; object-fit:cover; display:block; }
-        .repost-commentary-video { width:100%; max-height:480px; border-radius:14px; background:#000; display:block; }
-        @media (max-width:600px) { .repost-commentary-images img { height:150px; } .repost-composer-original-card .repost-preview-images img { height:120px; } }
+        /* Embedded original-post preview shown inside a quote repost — both the compact
+           read-only version rendered in the feed (buildQuoteEmbedHtmlInner/fillQuoteEmbed)
+           and the static preview shown while composing one (quote-composer-embed-preview). */
+        .quote-embed-card { border: 1px solid var(--border-color); border-radius: 14px; padding: 10px 12px; margin-top: 10px; cursor: pointer; transition: background 0.15s; overflow: hidden; }
+        .quote-embed-card:hover { background: var(--bg-hover); }
+        .quote-embed-card-static { cursor: default; margin-top: 12px; }
+        .quote-embed-card-static:hover { background: none; }
+        .quote-embed-loading { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+        .quote-embed-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .quote-embed-header .avatar.quote-embed-avatar { width: 18px; height: 18px; flex-shrink: 0; }
+        .quote-embed-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+        .quote-embed-time { font-size: 12.5px; color: var(--text-secondary); }
+        .quote-embed-text { font-size: 13.5px; line-height: 1.4; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+        .quote-embed-thumb { display: block; width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-top: 8px; }
         .feed-post-view-stat { cursor: default; }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
@@ -2969,7 +2975,7 @@
            — reached when the viewer was itself opened from another bottom sheet, e.g. a profile's
            media grid. syncSheetAboveViewer() adds this class in that case so the sheet still ends
            up on top instead of rendering behind the still-visible viewer. */
-        #post-comments-sheet-overlay.above-viewer, #post-options-sheet-overlay.above-viewer { z-index: 100013; }
+        #post-comments-sheet-overlay.above-viewer, #post-options-sheet-overlay.above-viewer, #repost-options-sheet-overlay.above-viewer { z-index: 100013; }
         /* GIF picker can itself be opened from inside the Comments sheet (comment target),
            which may already be sitting in the .above-viewer tier above — same fix, one tier up. */
         #gif-picker-sheet-overlay.above-viewer { z-index: 100014; }
@@ -3603,11 +3609,9 @@
             <button type="button" class="post-composer-close" id="post-composer-close" title="Close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <span id="post-composer-title" style="font-size:16px;font-weight:700;">New Post</span>
             <button type="button" id="feed-composer-submit" disabled>Post</button>
         </div>
         <div class="post-composer-body">
-            <div class="repost-composer-original" id="repost-composer-original" style="display:none;"></div>
             <div class="feed-composer" id="feed-composer">
                 <div class="feed-composer-row">
                     <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
@@ -3692,6 +3696,41 @@
                     <input type="file" id="feed-composer-file" accept="image/*,video/*" multiple style="display:none;">
                     <input type="file" id="feed-composer-camera" accept="image/*,video/*" capture="environment" style="display:none;">
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-composer-overlay" id="quote-composer-overlay">
+        <div class="post-composer-header">
+            <button type="button" class="post-composer-close" id="quote-composer-close" title="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <button type="button" id="quote-composer-submit" disabled>Post</button>
+        </div>
+        <div class="post-composer-body">
+            <div class="feed-composer" id="quote-composer">
+                <div class="feed-composer-row">
+                    <div class="avatar" id="quote-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
+                    <textarea id="quote-composer-input" placeholder="Add a comment!" rows="1" maxlength="500" autocomplete="off"></textarea>
+                </div>
+                <div class="feed-composer-charcount" id="quote-composer-charcount" style="display:none;"></div>
+                <div class="quote-embed-card quote-embed-card-static" id="quote-composer-embed-preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="repost-options-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div style="display:flex; flex-direction:column;">
+                <button class="msg-option-btn with-icon" id="btn-repost-plain">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                    <span>Repost</span>
+                </button>
+                <button class="msg-option-btn with-icon" id="btn-repost-quote" style="border-bottom:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>
+                    <span>Quote</span>
+                </button>
             </div>
         </div>
     </div>
@@ -6512,11 +6551,9 @@
         document.getElementById('image-viewer-comment-btn').addEventListener('click', () => {
             if (currentViewerPostId) openPostComments(currentViewerPostId);
         });
-        document.getElementById('image-viewer-repost-btn').addEventListener('click', async (e) => {
+        document.getElementById('image-viewer-repost-btn').addEventListener('click', (e) => {
             if (!currentViewerPostId) return;
-            const btn = e.currentTarget;
-            btn.disabled = true;
-            try { await toggleRepostPost(currentViewerPostId); } finally { btn.disabled = false; }
+            onRepostButtonTap(currentViewerPostId, e.currentTarget);
         });
         document.getElementById('image-viewer-post-menu-btn').addEventListener('click', () => {
             if (!currentViewerPostId) return;
@@ -6880,10 +6917,9 @@
             const commentBtn = itemEl.querySelector('.reel-comment-btn');
             if (commentBtn) commentBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(postId); });
             const repostBtn = itemEl.querySelector('.reel-repost-btn');
-            if (repostBtn) repostBtn.addEventListener('click', async (e) => {
+            if (repostBtn) repostBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                repostBtn.disabled = true;
-                try { await toggleRepostPost(postId); } finally { repostBtn.disabled = false; }
+                onRepostButtonTap(postId, repostBtn);
             });
         }
 
@@ -9128,7 +9164,6 @@
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
         let feedComposerIsAd = false; // true while "Publish as an Ad" is toggled on (business accounts only)
-        let activeRepostComposerOriginalId = null; // original post being quoted/reposted in the composer
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
         function canViewPost(post) {
@@ -11152,7 +11187,6 @@
                 const pendingIsAd = isAdSubmit;
                 const pendingAdCta = adCtaSelect.value;
                 const pendingAdUrl = normalizeAdUrl(adUrlInput.value.trim());
-                const pendingRepostOriginalId = activeRepostComposerOriginalId;
 
                 // Close the composer and reset it right away — posting happens in the
                 // background behind a thin top-of-screen progress bar (see
@@ -11203,44 +11237,6 @@
                     const firstUrl = (!resolvedImageUrls.length && !resolvedVideo) ? extractFirstUrlFromText(text) : null;
                     if (firstUrl) {
                         linkPreview = await fetchLinkPreview(firstUrl);
-                    }
-
-                    if (pendingRepostOriginalId) {
-                        const repostOriginal = cachedPosts[pendingRepostOriginalId] || (await get(ref(database, `posts/${pendingRepostOriginalId}`))).val();
-                        if (!repostOriginal) throw new Error('Original post not found');
-                        if (repostOriginal.uid === u.uid) {
-                            notify("You can't repost your own post", 'error');
-                            return;
-                        }
-                        const repostRef = push(ref(database, 'posts'));
-                        await set(repostRef, {
-                            uid: u.uid,
-                            name: myProfile.name || u.displayName || 'User',
-                            photoURL: myProfile.photoURL || u.photoURL || '',
-                            text: text,
-                            imageUrl: resolvedImageUrls.length ? resolvedImageUrls[0] : null,
-                            imageUrls: resolvedImageUrls.length ? resolvedImageUrls : null,
-                            videoUrl: resolvedVideo ? resolvedVideo.url : null,
-                            videoThumbnail: resolvedVideo ? (resolvedVideo.thumbnailUrl || null) : null,
-                            music: ((resolvedImageUrls.length || resolvedVideo) && pendingMusic) ? pendingMusic : null,
-                            linkPreview: linkPreview,
-                            mentions: mentionedUids.size ? mentionsMap : null,
-                            visibility: pendingVisibility === 'followers' ? 'followers' : 'everyone',
-                            repostOf: pendingRepostOriginalId,
-                            timestamp: serverTimestamp(),
-                            likeCount: 0,
-                            commentCount: 0
-                        });
-                        await update(ref(database, `posts/${pendingRepostOriginalId}`), {
-                            [`reposts/${u.uid}`]: repostRef.key,
-                            repostCount: increment(1)
-                        });
-                        mentionedUids.forEach((uid) => {
-                            createNotification(uid, { type: 'mention', postId: repostRef.key, text });
-                        });
-                        createNotification(repostOriginal.uid, { type: 'repost', postId: pendingRepostOriginalId, text: text || repostOriginal.text || '' });
-                        notify('Reposted');
-                        return;
                     }
 
                     const newPostRef = push(ref(database, 'posts'));
@@ -12247,6 +12243,54 @@
             }
         }
 
+        // Compact read-only preview of the original post, embedded below a quote repost's own
+        // text (see submitQuoteRepost / buildFeedPostCard). Tapping it opens the original.
+        function buildQuoteEmbedHtmlInner(originalId, post) {
+            const liveAuthor = cachedUsers[post.uid] || {};
+            const name = escapeHtmlForPost(liveAuthor.name || post.name || 'User');
+            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || post.name, photoURL: liveAuthor.photoURL || post.photoURL }, 'quote-embed-avatar');
+            const text = post.text ? linkifyHashtags(post.text) : '';
+            const images = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+            const thumbUrl = images.length ? images[0] : (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+            return `
+                <div class="quote-embed-header">
+                    ${avatarHtml}
+                    <span class="quote-embed-name">${name}</span>
+                    <span class="quote-embed-time"><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span></span>
+                </div>
+                ${text ? `<div class="quote-embed-text">${text}</div>` : ''}
+                ${thumbUrl ? `<img class="quote-embed-thumb" src="${thumbUrl}" alt="">` : ''}
+            `;
+        }
+        // Fills a quote repost card's embedded original-post preview, fetching the original
+        // from Firebase if it isn't already cached (e.g. it fell outside the paginated feed
+        // window) — same not-found/error fallback pattern as a plain repost's hydrateRepostCard,
+        // just patched into the existing card instead of replacing the whole thing, since a
+        // quote's own content (text/likes/comments) doesn't depend on the original loading.
+        async function fillQuoteEmbed(card, originalId) {
+            const embedEl = card.querySelector('.quote-embed-card');
+            if (!embedEl) return;
+            let originalPost = cachedPosts[originalId];
+            if (!originalPost) {
+                embedEl.innerHTML = `<div class="quote-embed-loading">Loading post…</div>`;
+                try {
+                    const snap = await get(ref(database, `posts/${originalId}`));
+                    originalPost = snap.exists() ? snap.val() : null;
+                    if (originalPost) cachedPosts[originalId] = originalPost;
+                } catch (e) { originalPost = null; }
+                if (!card.isConnected) return;
+                if (!originalPost) {
+                    embedEl.innerHTML = `<div class="quote-embed-loading">This post is no longer available.</div>`;
+                    return;
+                }
+            }
+            embedEl.innerHTML = buildQuoteEmbedHtmlInner(originalId, originalPost);
+            embedEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPostComments(originalId);
+            });
+        }
+
         // Builds the poll block for a feed post card. Options are rendered as clickable bars —
         // percentage fill and label text are re-applied after innerHTML is set (same pattern
         // as the music chip) so option text is never interpolated raw into the HTML string.
@@ -12316,70 +12360,38 @@
             if (totalEl) totalEl.textContent = `${total} vote${total === 1 ? '' : 's'}`;
         }
 
-        function buildRepostComposerOriginalHtml(originalId) {
-            const original = cachedPosts[originalId];
-            if (!original) return '<div class="repost-composer-original-label">Original post</div><div class="empty-msg" style="margin:8px 0;">Loading original post…</div>';
-            const author = cachedUsers[original.uid] || {};
-            const name = escapeHtmlForPost(author.name || original.name || 'User');
-            const avatar = feedAvatarHtml({ name: author.name || original.name, photoURL: author.photoURL || original.photoURL });
-            const text = original.text ? `<div class="repost-preview-text">${linkifyHashtags(original.text)}</div>` : '';
-            const images = (original.imageUrls && original.imageUrls.length) ? original.imageUrls : (original.imageUrl ? [original.imageUrl] : []);
-            const imageHtml = images.length ? `<div class="repost-preview-images">${images.map(url => `<img src="${escapeHtmlForPost(url)}" alt="">`).join('')}</div>` : '';
-            const videoHtml = original.videoUrl ? `<video class="repost-preview-media" src="${escapeHtmlForPost(original.videoUrl)}" ${original.videoThumbnail ? `poster="${escapeHtmlForPost(original.videoThumbnail)}"` : ''} controls playsinline preload="metadata"></video>` : '';
-            return `<div class="repost-composer-original-label">${repostArrowsSvg()} <span>Original post</span></div><div class="repost-composer-original-card"><div class="repost-preview-author">${avatar}<span>${name}</span></div>${text}${imageHtml}${videoHtml}</div>`;
-        }
-
-        function openRepostComposer(originalId) {
-            const original = cachedPosts[originalId];
-            if (!original) { notify('Post not found', 'error'); return; }
-            activeRepostComposerOriginalId = originalId;
-            const title = document.getElementById('post-composer-title');
-            const submit = document.getElementById('feed-composer-submit');
-            const originalWrap = document.getElementById('repost-composer-original');
-            const adRow = document.getElementById('feed-composer-ad-toggle-row');
-            if (title) title.textContent = 'Repost';
-            if (submit) submit.textContent = 'Repost';
-            if (adRow) adRow.style.display = 'none';
-            if (originalWrap) {
-                originalWrap.innerHTML = buildRepostComposerOriginalHtml(originalId);
-                originalWrap.style.display = 'block';
-            }
-            window.location.hash = 'post-composer';
-            postComposerOverlay.classList.add('active');
-            const input = document.getElementById('feed-composer-input');
-            if (input) {
-                input.placeholder = 'Add your thoughts…';
-                setTimeout(() => input.focus(), 200);
-            }
-        }
-
-        function resetRepostComposerMode() {
-            activeRepostComposerOriginalId = null;
-            const title = document.getElementById('post-composer-title');
-            const submit = document.getElementById('feed-composer-submit');
-            const originalWrap = document.getElementById('repost-composer-original');
-            if (title) title.textContent = 'New Post';
-            if (submit) submit.textContent = 'Post';
-            if (originalWrap) { originalWrap.innerHTML = ''; originalWrap.style.display = 'none'; }
-        }
-
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
 
-            // A repost is a wrapper post that points at the original via repostOf. Any text/photo/video
-            // added by the reposter lives on the wrapper and is shown above the original post. Engagement
-            // buttons continue to target the true original, so the original post remains the shared source.
+            // A plain repost is a lightweight wrapper post (no text/media of its own, see
+            // toggleRepostPost) that just points at the original via repostOf. It's rendered
+            // using the ORIGINAL post's full content/id — likes, comments, saves, and further
+            // reposts all target the original — with a small "reposted by" banner (built from
+            // the wrapper itself) on top. The wrapper's own id/object are kept as postId/
+            // wrapperPost purely for card lifecycle and for edit/delete (deleting a repost just
+            // undoes the repost, see deletePost).
+            //
+            // A QUOTE repost also has repostOf, but carries its own text (see
+            // submitQuoteRepost) — it's a genuinely new, distinct post with its own likes/
+            // comments/reposts, rendered as itself with a small embedded preview card of the
+            // original tacked on below the text (see buildQuoteEmbedHtml), rather than being
+            // swapped out for the original's content.
             const wrapperPost = post;
             const isRepost = !!wrapperPost.repostOf;
+            const isQuote = isRepost && !!(wrapperPost.text && wrapperPost.text.trim());
             const originalId = isRepost ? wrapperPost.repostOf : postId;
+            // targetId is what likes/comments/saves/reposts on THIS card act on: the original
+            // post for a plain repost (the card shows the original's content), or the wrapper
+            // itself for a quote (it has its own content) or a normal post.
+            const targetId = (isRepost && !isQuote) ? originalId : postId;
 
             const card = document.createElement('div');
             card.className = 'feed-post-card';
             card.dataset.postId = postId;
-            card.dataset.contentPostId = originalId;
+            card.dataset.contentPostId = targetId;
 
-            if (isRepost) {
+            if (isRepost && !isQuote) {
                 post = cachedPosts[originalId];
                 if (!post) {
                     card.innerHTML = buildRepostBannerHtml(wrapperPost) + `<p class="empty-msg" style="margin:16px 0 20px;">Loading post…</p>`;
@@ -12391,7 +12403,7 @@
             const isOwn = !!(myUid && post.uid === myUid);
             const myReactionEmoji = (post.reactions && myUid) ? post.reactions[myUid] : null;
             const likedByMe = !!myReactionEmoji;
-            const savedByMe = !!cachedSavedPosts[originalId];
+            const savedByMe = !!cachedSavedPosts[targetId];
             const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
             card.dataset.isAd = post.isAd ? '1' : '0';
             card.dataset.uid = post.uid || '';
@@ -12473,14 +12485,8 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                 </button>`;
 
-            const repostCommentaryText = isRepost && wrapperPost.text ? `<div class="repost-commentary-text"></div>` : '';
-            const repostCommentaryImages = isRepost ? ((wrapperPost.imageUrls && wrapperPost.imageUrls.length) ? wrapperPost.imageUrls : (wrapperPost.imageUrl ? [wrapperPost.imageUrl] : [])) : [];
-            const repostCommentaryMedia = repostCommentaryImages.length ? `<div class="repost-commentary-images">${repostCommentaryImages.map(url => `<img src="${escapeHtmlForPost(url)}" alt="">`).join('')}</div>` : (isRepost && wrapperPost.videoUrl ? `<video class="repost-commentary-video" src="${escapeHtmlForPost(wrapperPost.videoUrl)}" ${wrapperPost.videoThumbnail ? `poster="${escapeHtmlForPost(wrapperPost.videoThumbnail)}"` : ''} controls playsinline preload="metadata"></video>` : '');
-            const repostCommentaryHtml = isRepost && (repostCommentaryText || repostCommentaryMedia) ? `<div class="repost-commentary">${repostCommentaryText}${repostCommentaryMedia}</div>` : '';
-
             card.innerHTML = `
-                ${isRepost ? buildRepostBannerHtml(wrapperPost) : ''}
-                ${repostCommentaryHtml}
+                ${(isRepost && !isQuote) ? buildRepostBannerHtml(wrapperPost) : ''}
                 <div class="x-post-row">
                     <div class="x-post-avatar-col">
                         ${avatarHtml}
@@ -12503,6 +12509,7 @@
                     ${taggedHtml}
                     ${pollHtml}
                     ${linkPreviewHtml}
+                    ${isQuote ? `<div class="quote-embed-card" data-quote-original-id="${originalId}"></div>` : ''}
                 </div>
                 ${imageHtml}
                 ${videoHtml}
@@ -12540,13 +12547,10 @@
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);
             renderPostReactors(card, post);
-            if (isRepost) bindRepostBannerClick(card);
+            if (isRepost && !isQuote) bindRepostBannerClick(card);
+            if (isQuote) fillQuoteEmbed(card, originalId);
             getFeedImpressionObserver().observe(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
-            if (isRepost && repostCommentaryText && wrapperPost.text) {
-                const commentaryEl = card.querySelector('.repost-commentary-text');
-                if (commentaryEl) commentaryEl.innerHTML = linkifyHashtags(wrapperPost.text);
-            }
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
                 musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
@@ -12562,7 +12566,7 @@
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const idx = parseInt(btn.dataset.pollOption, 10);
-                        voteOnPoll(originalId, idx);
+                        voteOnPoll(targetId, idx);
                     });
                 });
             }
@@ -12597,14 +12601,13 @@
                 });
             });
 
-            bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), originalId);
-            card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(originalId));
-            card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(originalId); });
+            bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), targetId);
+            card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(targetId));
+            card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(targetId); });
             const repostBtn = card.querySelector('.feed-repost-btn');
-            if (repostBtn) repostBtn.addEventListener('click', async (e) => {
+            if (repostBtn) repostBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                repostBtn.disabled = true;
-                try { await toggleRepostPost(originalId); } finally { repostBtn.disabled = false; }
+                onRepostButtonTap(targetId, repostBtn);
             });
             card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
                 imgEl.addEventListener('click', (e) => {
@@ -12617,7 +12620,7 @@
                     if (card.closest('.bottom-sheet-overlay.active')) {
                         document.getElementById('image-viewer-overlay').classList.add('above-sheet');
                     }
-                    openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10), originalId);
+                    openImageViewer(imgEl.src, false, postImages, parseInt(imgEl.dataset.idx, 10), targetId);
                 });
             });
             // Swipeable multi-image carousel: update the "N/total" badge and active dot as the
@@ -12654,7 +12657,7 @@
                 if (card.closest('.bottom-sheet-overlay.active')) {
                     document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
                 }
-                openReelViewer(originalId, { fullscreen: true });
+                openReelViewer(targetId, { fullscreen: true });
             });
             const popoutBtn = card.querySelector('.feed-video-popout-btn');
             if (popoutBtn) popoutBtn.addEventListener('click', (e) => {
@@ -12724,7 +12727,6 @@
 
             const myExistingRepostKey = (originalPost.reposts && originalPost.reposts[user.uid]) || null;
 
-            // Tapping Repost again removes the existing repost, preserving the current toggle behavior.
             if (myExistingRepostKey) {
                 try {
                     await remove(ref(database, `posts/${myExistingRepostKey}`));
@@ -12743,10 +12745,168 @@
                 return;
             }
 
-            // First tap now opens the quote/repost composer. The actual repost is created only
-            // after the user submits their optional text/photo/video.
-            openRepostComposer(originalId);
+            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+            const newRepostRef = push(ref(database, 'posts'));
+            await set(newRepostRef, {
+                uid: user.uid,
+                name: myProfile.name || user.displayName || 'User',
+                photoURL: myProfile.photoURL || user.photoURL || '',
+                repostOf: originalId,
+                timestamp: serverTimestamp(),
+                likeCount: 0,
+                commentCount: 0
+            });
+            await update(ref(database, `posts/${originalId}`), {
+                [`reposts/${user.uid}`]: newRepostRef.key,
+                repostCount: increment(1)
+            });
+            createNotification(originalPost.uid, { type: 'repost', postId: originalId, text: originalPost.text || '' });
+            notify('Reposted');
         }
+
+        // --- REPOST vs QUOTE (X-style) ---
+        // Tapping a repost button: if this post is already reposted (plain or quoted) by me,
+        // the icon is already in its "reposted" state and tapping again just undoes it, same
+        // as before. Otherwise, offer a choice between a plain Repost and a Quote.
+        function onRepostButtonTap(postId, btn) {
+            if (!auth.currentUser) { notify('Please log in to repost', 'error'); return; }
+            if (btn && btn.classList.contains('reposted')) {
+                btn.disabled = true;
+                toggleRepostPost(postId).finally(() => { btn.disabled = false; });
+                return;
+            }
+            openRepostOptionsSheet(postId);
+        }
+
+        let pendingRepostOriginalId = null;
+
+        function openRepostOptionsSheet(originalId) {
+            const cachedOriginal = cachedPosts[originalId];
+            if (cachedOriginal && auth.currentUser && cachedOriginal.uid === auth.currentUser.uid) {
+                notify("You can't repost your own post", 'error');
+                return;
+            }
+            pendingRepostOriginalId = originalId;
+            const overlay = document.getElementById('repost-options-sheet-overlay');
+            syncSheetAboveViewer(overlay);
+            overlay.classList.add('active');
+        }
+        function closeRepostOptionsSheet() {
+            document.getElementById('repost-options-sheet-overlay').classList.remove('active', 'above-viewer');
+        }
+        document.getElementById('btn-repost-plain').addEventListener('click', () => {
+            const id = pendingRepostOriginalId;
+            closeRepostOptionsSheet();
+            if (id) toggleRepostPost(id);
+        });
+        document.getElementById('btn-repost-quote').addEventListener('click', () => {
+            const id = pendingRepostOriginalId;
+            closeRepostOptionsSheet();
+            if (id) openQuoteComposer(id);
+        });
+        document.getElementById('repost-options-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'repost-options-sheet-overlay') closeRepostOptionsSheet();
+        });
+
+        // --- QUOTE REPOST COMPOSER ---
+        // A quote is just a repost wrapper (see toggleRepostPost/submitQuoteRepost) that also
+        // carries its own `text` — see buildFeedPostCard's isQuote branch for how that's
+        // rendered back out (own content + a small embedded preview of the original).
+        let activeQuoteOriginalId = null;
+
+        async function openQuoteComposer(originalId) {
+            const user = auth.currentUser;
+            if (!user) return;
+            let originalPost = cachedPosts[originalId];
+            if (!originalPost) {
+                try {
+                    const snap = await get(ref(database, `posts/${originalId}`));
+                    originalPost = snap.exists() ? snap.val() : null;
+                } catch (e) { originalPost = null; }
+            }
+            if (!originalPost) { notify('Post not found', 'error'); return; }
+            if (originalPost.uid === user.uid) { notify("You can't repost your own post", 'error'); return; }
+
+            activeQuoteOriginalId = originalId;
+            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+            const avatarEl = document.getElementById('quote-composer-avatar');
+            if (avatarEl) avatarEl.outerHTML = feedAvatarHtml(myProfile).replace('class="avatar', 'id="quote-composer-avatar" class="avatar');
+            const input = document.getElementById('quote-composer-input');
+            input.value = '';
+            input.style.height = 'auto';
+            document.getElementById('quote-composer-submit').disabled = true;
+            document.getElementById('quote-composer-charcount').style.display = 'none';
+            document.getElementById('quote-composer-embed-preview').innerHTML = buildQuoteEmbedHtmlInner(originalId, originalPost);
+
+            document.getElementById('quote-composer-overlay').classList.add('active');
+            setTimeout(() => input.focus(), 60);
+        }
+        function closeQuoteComposer() {
+            document.getElementById('quote-composer-overlay').classList.remove('active');
+            activeQuoteOriginalId = null;
+        }
+        async function submitQuoteRepost() {
+            const user = auth.currentUser;
+            const originalId = activeQuoteOriginalId;
+            if (!user || !originalId) return;
+            const input = document.getElementById('quote-composer-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const originalPost = cachedPosts[originalId];
+            if (!originalPost) { notify('Post not found', 'error'); closeQuoteComposer(); return; }
+
+            const submitBtn = document.getElementById('quote-composer-submit');
+            submitBtn.disabled = true;
+            try {
+                const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+                const newRepostRef = push(ref(database, 'posts'));
+                await set(newRepostRef, {
+                    uid: user.uid,
+                    name: myProfile.name || user.displayName || 'User',
+                    photoURL: myProfile.photoURL || user.photoURL || '',
+                    repostOf: originalId,
+                    text,
+                    timestamp: serverTimestamp(),
+                    likeCount: 0,
+                    commentCount: 0
+                });
+                await update(ref(database, `posts/${originalId}`), {
+                    [`reposts/${user.uid}`]: newRepostRef.key,
+                    repostCount: increment(1)
+                });
+                createNotification(originalPost.uid, { type: 'repost', postId: originalId, text: originalPost.text || '' });
+                notify('Quoted');
+                closeQuoteComposer();
+            } catch (e) {
+                notify('Could not post quote', 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+        document.getElementById('quote-composer-submit').addEventListener('click', submitQuoteRepost);
+        document.getElementById('quote-composer-close').addEventListener('click', closeQuoteComposer);
+        (function initQuoteComposerInput() {
+            const input = document.getElementById('quote-composer-input');
+            const charCount = document.getElementById('quote-composer-charcount');
+            const submitBtn = document.getElementById('quote-composer-submit');
+            const MAX_CHARS = parseInt(input.getAttribute('maxlength'), 10) || 500;
+            input.addEventListener('input', () => {
+                const len = input.value.length;
+                const remaining = MAX_CHARS - len;
+                if (remaining > 60) {
+                    charCount.style.display = 'none';
+                } else {
+                    charCount.style.display = 'block';
+                    charCount.textContent = `${remaining}`;
+                    charCount.classList.toggle('limit', remaining < 0);
+                    charCount.classList.toggle('warn', remaining >= 0 && remaining <= 30);
+                }
+                submitBtn.disabled = input.value.trim().length === 0 || remaining < 0;
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+            });
+        })();
 
         // Spawns a little staggered burst of hearts that puff up off the like button and fade —
         // fired once, optimistically, right on tap (doesn't wait on the Firebase round trip) so
@@ -15976,7 +16136,6 @@
         // compose button behaves elsewhere in the app.
         const postComposerOverlay = document.getElementById('post-composer-overlay');
         function openPostComposer() {
-            resetRepostComposerMode();
             window.location.hash = 'post-composer';
             postComposerOverlay.classList.add('active');
             // The "Publish as an Ad" row is business-accounts-only — re-check on every open
@@ -16004,9 +16163,6 @@
         }
         function closePostComposer() {
             postComposerOverlay.classList.remove('active');
-            resetRepostComposerMode();
-            const input = document.getElementById('feed-composer-input');
-            if (input) input.placeholder = 'What\'s on your mind? Type @ to tag someone';
         }
 
         // Single nav-bar action button whose icon/behavior swaps with the active tab

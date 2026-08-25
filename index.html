@@ -12,6 +12,49 @@
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     </script>
+    <script>
+        // ── OFFLINE DETECTION ──
+        // Toggles #offline-overlay based on navigator.onLine + online/offline events.
+        // Runs as early as possible (before body parses) so a cold load with no
+        // connection shows our branded overlay instead of nothing/blank while the
+        // rest of the app fails to boot. Paired with offline-sw.js, which lets a
+        // repeat visit load from cache and hit this same code path instead of the
+        // browser's native "Web page not available" error screen.
+        function __updateOfflineUI() {
+            const el = document.getElementById('offline-overlay');
+            if (!el) return;
+            const isOffline = !navigator.onLine;
+            el.classList.toggle('active', isOffline);
+            el.setAttribute('aria-hidden', isOffline ? 'false' : 'true');
+        }
+        window.addEventListener('online', __updateOfflineUI);
+        window.addEventListener('offline', __updateOfflineUI);
+        document.addEventListener('DOMContentLoaded', () => {
+            __updateOfflineUI();
+            const retryBtn = document.getElementById('offline-retry-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    if (navigator.onLine) {
+                        location.reload();
+                    } else {
+                        retryBtn.textContent = 'Still offline…';
+                        setTimeout(() => { retryBtn.textContent = 'Retry'; }, 1200);
+                    }
+                });
+            }
+        });
+
+        // Register the app-shell caching service worker so that a page load with
+        // zero connectivity can still be served from cache (requires at least one
+        // prior successful visit to have happened while online).
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./offline-sw.js').catch(() => {
+                    // Non-fatal: app still works online, just without the offline shell.
+                });
+            });
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haba.</title>
@@ -3360,6 +3403,54 @@
         .applock-forgot-link { color: var(--text-secondary); font-size: 12.5px; margin-top: 28px; text-decoration: underline; cursor: pointer; }
         @keyframes applockShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
         .pin-shake { animation: applockShake 0.5s ease; }
+        /* ── OFFLINE OVERLAY ──
+           Shown whenever the browser reports no network connection (navigator.onLine
+           false, or 'offline' event fires), and hidden the moment connectivity returns.
+           This replaces the browser's own native "Web page not available" error page,
+           which only appears because the request never got a chance to be intercepted —
+           see the offline-sw.js registration below for the cold-load case. */
+        #offline-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: var(--bg-base, #FFFFFF);
+            color: var(--text-primary, #111111);
+            text-align: center;
+            padding: 24px;
+        }
+        #offline-overlay.active { display: flex; }
+        #offline-overlay .offline-icon {
+            width: 64px;
+            height: 64px;
+            opacity: 0.7;
+        }
+        #offline-overlay h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+        #offline-overlay p {
+            font-size: 14px;
+            color: var(--text-secondary, #888888);
+            margin: 0;
+            max-width: 280px;
+        }
+        #offline-overlay button {
+            margin-top: 8px;
+            padding: 10px 24px;
+            border-radius: var(--radius-pill, 50px);
+            border: none;
+            background: var(--primary-blue, #111111);
+            color: var(--text-inverse, #FFFFFF);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -3367,6 +3458,17 @@
     <!-- Thin top-of-screen progress bar shown while a post uploads in the background after the
          composer closes (see submitFeedPost) — same idea as YouTube/GitHub's slim loading bar. -->
     <div id="global-upload-progress-bar" class="global-upload-progress-bar"></div>
+
+    <!-- Full-screen fallback shown when there's no network connection at all. -->
+    <div id="offline-overlay" aria-hidden="true">
+        <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 18h.01M8.5 14.5a5 5 0 0 1 7 0M5 11a10 10 0 0 1 14 0M2 7.5a14 14 0 0 1 8-4M22 7.5a14 14 0 0 0-4.5-3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 2l20 20" stroke-linecap="round"/>
+        </svg>
+        <h2>You're offline</h2>
+        <p>Check your internet connection. Haba will reconnect automatically once you're back online.</p>
+        <button id="offline-retry-btn" type="button">Retry</button>
+    </div>
 
     <div id="loading-overlay" class="active">
         <div class="haba-mark" role="img" aria-label="Haba">

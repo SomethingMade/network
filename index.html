@@ -12,49 +12,6 @@
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     </script>
-    <script>
-        // ── OFFLINE DETECTION ──
-        // Toggles #offline-overlay based on navigator.onLine + online/offline events.
-        // Runs as early as possible (before body parses) so a cold load with no
-        // connection shows our branded overlay instead of nothing/blank while the
-        // rest of the app fails to boot. Paired with offline-sw.js, which lets a
-        // repeat visit load from cache and hit this same code path instead of the
-        // browser's native "Web page not available" error screen.
-        function __updateOfflineUI() {
-            const el = document.getElementById('offline-overlay');
-            if (!el) return;
-            const isOffline = !navigator.onLine;
-            el.classList.toggle('active', isOffline);
-            el.setAttribute('aria-hidden', isOffline ? 'false' : 'true');
-        }
-        window.addEventListener('online', __updateOfflineUI);
-        window.addEventListener('offline', __updateOfflineUI);
-        document.addEventListener('DOMContentLoaded', () => {
-            __updateOfflineUI();
-            const retryBtn = document.getElementById('offline-retry-btn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    if (navigator.onLine) {
-                        location.reload();
-                    } else {
-                        retryBtn.textContent = 'Still offline…';
-                        setTimeout(() => { retryBtn.textContent = 'Retry'; }, 1200);
-                    }
-                });
-            }
-        });
-
-        // Register the app-shell caching service worker so that a page load with
-        // zero connectivity can still be served from cache (requires at least one
-        // prior successful visit to have happened while online).
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./offline-sw.js').catch(() => {
-                    // Non-fatal: app still works online, just without the offline shell.
-                });
-            });
-        }
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haba.</title>
@@ -866,17 +823,6 @@
         }
 
         .tm-profile-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 30px 4px 30px; flex-shrink: 0; }
-        /* Once the profile/user-info sheet has finished its slide-in animation, this strips the
-           lingering CSS transform off .bottom-sheet (translateX/Y(0) is still a transform, not
-           "none", and a transformed scroll container breaks position:sticky in some WebViews —
-           which is why the cover photo was scrolling away instead of staying pinned). Toggled by
-           a MutationObserver watching the 'active' class (see bindSheetSettleObserver), so the
-           slide-out close animation still works: 'sheet-settled' is stripped the instant 'active'
-           is removed, restoring the transform so it has something to animate back out on. */
-        #profile-bottom-sheet-overlay.sheet-settled .bottom-sheet,
-        #user-info-sheet-overlay.sheet-settled .bottom-sheet {
-            transform: none !important;
-        }
         .tm-profile-back-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: transparent; color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: background 0.15s ease, transform 0.15s ease; }
         .tm-profile-back-btn:hover { background: var(--bg-hover); }
         .tm-profile-back-btn:active { transform: scale(0.92); }
@@ -913,7 +859,7 @@
            of rendering the overlap. A soft gradient ring rendered behind the avatar
            (::before) gives it a bit of lift where it crosses the card's rounded edge. */
         .tm-profile-cover-wrap { position: relative; }
-        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -48px; z-index: 6; will-change: opacity; }
+        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -48px; z-index: 3; }
         .tm-profile-avatar-row::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: var(--gradient-brand); opacity: 0.9; z-index: -1; }
 
         /* Insights/Settings sit inline with Save on the header's right side (all three
@@ -1675,15 +1621,15 @@
            brand gradient when the user has no coverPhotoURL set, so this stays visible
            (not display:none) on every profile — own and others' — instead of only
            rendering once a photo happens to be set. */
-        .wa-cover-photo-block { position: sticky; top: 0; z-index: 5; height: 172px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
+        .wa-cover-photo-block { position: relative; height: 172px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
         /* Subtle sheen so the banner reads as intentional even as a flat gradient
            fallback, and adds a touch of depth once a real cover photo is set too. */
         .wa-cover-photo-block::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 15% 0%, rgba(255,255,255,0.14), transparent 55%), linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.16) 100%); pointer-events: none; }
         .sheet-cover-upload { cursor: pointer; }
         .sheet-cover-upload .sheet-upload-spinner { border-radius: 0; }
         .sheet-cover-upload.uploading .sheet-upload-spinner { display: flex; }
-        .cover-camera-badge { position: absolute; bottom: 38px; right: 14px; z-index: 2; width: 34px; height: 34px; padding: 8px; box-sizing: border-box; border-radius: 50%; background: rgba(17,17,17,0.4); box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; border: none; color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); }
-        .cover-camera-badge svg { width: 100%; height: 100%; flex-shrink: 0; }
+        .cover-camera-badge { position: absolute; bottom: 38px; right: 14px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; background: rgba(17,17,17,0.4); box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; border: none; color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); }
+        .cover-camera-badge svg { width: 15px; height: 15px; }
         /* Pulls the avatar up so it overlaps the bottom edge of the cover photo, banner-style */
         .wa-avatar-block-overlap { margin-top: -48px; position: relative; z-index: 1; }
 
@@ -3309,7 +3255,7 @@
             .tm-profile-avatar.avatar-circle { width: 70px; height: 70px; }
             .tm-profile-content { margin-top: -20px; padding-top: 68px; border-radius: 22px 22px 0 0; }
             .tm-profile-name { font-size: 20px; }
-            .cover-camera-badge { bottom: 32px; width: 30px; height: 30px; padding: 8px; }
+            .cover-camera-badge { bottom: 32px; width: 30px; height: 30px; }
         }
 
         /* ── VOICE CALL OVERLAY ── */
@@ -3414,54 +3360,6 @@
         .applock-forgot-link { color: var(--text-secondary); font-size: 12.5px; margin-top: 28px; text-decoration: underline; cursor: pointer; }
         @keyframes applockShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
         .pin-shake { animation: applockShake 0.5s ease; }
-        /* ── OFFLINE OVERLAY ──
-           Shown whenever the browser reports no network connection (navigator.onLine
-           false, or 'offline' event fires), and hidden the moment connectivity returns.
-           This replaces the browser's own native "Web page not available" error page,
-           which only appears because the request never got a chance to be intercepted —
-           see the offline-sw.js registration below for the cold-load case. */
-        #offline-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            background: var(--bg-base, #FFFFFF);
-            color: var(--text-primary, #111111);
-            text-align: center;
-            padding: 24px;
-        }
-        #offline-overlay.active { display: flex; }
-        #offline-overlay .offline-icon {
-            width: 64px;
-            height: 64px;
-            opacity: 0.7;
-        }
-        #offline-overlay h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0;
-        }
-        #offline-overlay p {
-            font-size: 14px;
-            color: var(--text-secondary, #888888);
-            margin: 0;
-            max-width: 280px;
-        }
-        #offline-overlay button {
-            margin-top: 8px;
-            padding: 10px 24px;
-            border-radius: var(--radius-pill, 50px);
-            border: none;
-            background: var(--primary-blue, #111111);
-            color: var(--text-inverse, #FFFFFF);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
@@ -3469,17 +3367,6 @@
     <!-- Thin top-of-screen progress bar shown while a post uploads in the background after the
          composer closes (see submitFeedPost) — same idea as YouTube/GitHub's slim loading bar. -->
     <div id="global-upload-progress-bar" class="global-upload-progress-bar"></div>
-
-    <!-- Full-screen fallback shown when there's no network connection at all. -->
-    <div id="offline-overlay" aria-hidden="true">
-        <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 18h.01M8.5 14.5a5 5 0 0 1 7 0M5 11a10 10 0 0 1 14 0M2 7.5a14 14 0 0 1 8-4M22 7.5a14 14 0 0 0-4.5-3" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 2l20 20" stroke-linecap="round"/>
-        </svg>
-        <h2>You're offline</h2>
-        <p>Check your internet connection. Haba will reconnect automatically once you're back online.</p>
-        <button id="offline-retry-btn" type="button">Retry</button>
-    </div>
 
     <div id="loading-overlay" class="active">
         <div class="haba-mark" role="img" aria-label="Haba">
@@ -14244,46 +14131,6 @@
         let pendingPhotoURL = null;
         let pendingCoverURL = null;
 
-        // As the profile sheet scrolls, the cover photo (.wa-cover-photo-block) stays pinned
-        // via position:sticky (see CSS), but the avatar hangs below it and would otherwise get
-        // hard-clipped once scroll carries it under the pinned cover. Instead we fade its
-        // opacity out smoothly over FADE_DISTANCE px of scroll, X/Twitter-profile style, so it
-        // disappears gracefully before it would visually collide with the cover photo.
-        // Watches an overlay's 'active' class and toggles 'sheet-settled' on it: added ~360ms
-        // after 'active' appears (once the slide-in transition has finished), removed the
-        // instant 'active' disappears (so the slide-out transition has a transform to animate).
-        // See the .sheet-settled CSS rule for why this exists.
-        function bindSheetSettleObserver(overlayEl) {
-            if (!overlayEl || overlayEl.dataset.settleBound) return;
-            overlayEl.dataset.settleBound = '1';
-            let settleTimer = null;
-            new MutationObserver(() => {
-                clearTimeout(settleTimer);
-                if (overlayEl.classList.contains('active')) {
-                    settleTimer = setTimeout(() => overlayEl.classList.add('sheet-settled'), 360);
-                } else {
-                    overlayEl.classList.remove('sheet-settled');
-                }
-            }).observe(overlayEl, { attributes: true, attributeFilter: ['class'] });
-        }
-        bindSheetSettleObserver(profileSheetOverlay);
-            if (!overlayEl) return;
-            const scrollEl = overlayEl.querySelector('.bottom-sheet');
-            const avatarRow = overlayEl.querySelector('.tm-profile-avatar-row');
-            if (!scrollEl || !avatarRow) return;
-            const FADE_DISTANCE = 60;
-            const applyFade = () => {
-                const progress = Math.min(Math.max(scrollEl.scrollTop / FADE_DISTANCE, 0), 1);
-                avatarRow.style.opacity = String(1 - progress);
-                avatarRow.style.pointerEvents = progress >= 1 ? 'none' : '';
-            };
-            if (!overlayEl.dataset.coverFadeBound) {
-                overlayEl.dataset.coverFadeBound = '1';
-                scrollEl.addEventListener('scroll', applyFade, { passive: true });
-            }
-            applyFade();
-        }
-
         function updateAvatarUI(user) {
             if (!user) return;
             btnProfileNavEls.forEach(btnProfileImg => {
@@ -14379,9 +14226,6 @@
                 if (myProfileSubtabsEl) myProfileSubtabsEl.dataset.uid = user.uid;
                 initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list', 'my-profile-replies-list');
                 profileSheetOverlay.classList.add('active');
-                const profileScrollEl = profileSheetOverlay.querySelector('.bottom-sheet');
-                if (profileScrollEl) profileScrollEl.scrollTop = 0;
-                setupProfileCoverScrollFade(profileSheetOverlay);
             }
         }
 
@@ -16636,7 +16480,6 @@
         // View another user's profile (avatar, name, username, about)
         const userInfoSheet = document.getElementById('user-info-sheet-overlay');
         let userInfoSheetUid = null;
-        bindSheetSettleObserver(userInfoSheet);
 
         function openUserProfileSheet(uid) {
             if (!uid || uid === AI_UID) return;
@@ -16684,9 +16527,6 @@
             if (userInfoSubtabsEl) userInfoSubtabsEl.dataset.uid = uid;
             initProfileSubtabs('user-info-subtabs', 'user-info-posts-list', 'user-info-media-grid', null, 'user-info-replies-list');
             userInfoSheet.classList.add('active');
-            const userInfoScrollEl = userInfoSheet.querySelector('.bottom-sheet');
-            if (userInfoScrollEl) userInfoScrollEl.scrollTop = 0;
-            setupProfileCoverScrollFade(userInfoSheet);
             if (window.location.hash !== '#user-info') window.location.hash = 'user-info';
         }
 

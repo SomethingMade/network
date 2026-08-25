@@ -8413,6 +8413,29 @@
                 };
             });
         }
+
+        // Client-side stand-in for Cloudinary's server-reported video duration: loads just the
+        // video's metadata (no full download) and reads its duration. Used when uploading video
+        // to Firebase Storage, which — unlike Cloudinary — doesn't inspect/report media metadata.
+        // Best-effort: resolves null instead of rejecting so a duration miss never blocks an upload.
+        function getClientVideoDuration(file) {
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                const objectUrl = URL.createObjectURL(file);
+                video.src = objectUrl;
+                const cleanup = () => URL.revokeObjectURL(objectUrl);
+                video.onloadedmetadata = () => {
+                    const duration = isFinite(video.duration) ? video.duration : null;
+                    cleanup();
+                    resolve(duration);
+                };
+                video.onerror = () => {
+                    cleanup();
+                    resolve(null);
+                };
+            });
+        }
         const functionsClient = getFunctions(app);
         
         // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
@@ -14677,7 +14700,8 @@
             const wrapper = document.getElementById('sheet-avatar-upload');
             wrapper.classList.add('uploading');
             try {
-                const { url } = await uploadToCloudinary(file);
+                const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const url = await uploadToFirebaseStorage(file, `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingPhotoURL = url;
                 const preview = document.getElementById('profile-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
@@ -14720,7 +14744,9 @@
             const wrapper = document.getElementById('sheet-cover-upload');
             wrapper.classList.add('uploading');
             try {
-                const { url } = await uploadToCloudinary(file);
+                const user = auth.currentUser;
+                const safeName = (file.name || 'cover').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const url = await uploadToFirebaseStorage(file, `cover_photos/${user ? user.uid : 'unknown'}/${Date.now()}_${safeName}`);
                 pendingCoverURL = url;
                 wrapper.style.backgroundImage = `url('${url}')`;
             } catch (err) {
@@ -17817,7 +17843,10 @@
             try {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    const { url, type, duration } = await uploadToCloudinary(file);
+                    const type = file.type.startsWith('video/') ? 'video' : 'image';
+                    const safeName = (file.name || type).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                    const url = await uploadToFirebaseStorage(file, `stories/${user.uid}/${Date.now()}_${i}_${safeName}`);
+                    const duration = type === 'video' ? await getClientVideoDuration(file) : null;
                     const newRef = push(ref(database, `stories/${user.uid}`));
                     await set(newRef, {
                         mediaURL: url,

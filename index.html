@@ -7556,6 +7556,12 @@
             }
 
             if (hash.startsWith('tab-')) {
+                // Feed videos/music live in the Home tab's persistent DOM (tabs are shown/hidden
+                // via CSS classes, not unmounted), so leaving for a different tab needs the same
+                // explicit stop pauseAllAppMedia() already does for the search sheet, notifications,
+                // etc. — otherwise a feed video (and its audio) keeps playing behind whichever tab
+                // is now on screen.
+                if (previousActiveTabHash !== hash) pauseAllAppMedia();
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab', 'tab-slide-in-left', 'tab-slide-in-right'));
                 
@@ -14188,6 +14194,7 @@
 
         function openProfileSheet(e) {
             e.preventDefault();
+            pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const user = auth.currentUser;
             if (user) {
                 document.getElementById('profile-name').value = user.displayName || "";
@@ -16483,6 +16490,7 @@
 
         function openUserProfileSheet(uid) {
             if (!uid || uid === AI_UID) return;
+            pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const profile = cachedUsers[uid] || {};
             userInfoSheetUid = uid;
             const coverEl = document.getElementById('user-info-cover-photo');

@@ -510,14 +510,6 @@
 
         body.neumorphic-theme ::-webkit-scrollbar-thumb { background: #c1c8d1; }
 
-        /* Message bubbles: since --msg-in-bg/--msg-out-bg above match the page
-           background exactly, .msg-bubble.in/.out (which already paint with
-           var(--shadow-bubble)/var(--shadow-bubble-out)) read as raised for
-           received messages and pressed-in for sent ones — sent vs received
-           stays obvious even though neither bubble has a distinct fill color. */
-        body.neumorphic-theme .msg-bubble.in::after,
-        body.neumorphic-theme .msg-bubble.out::after { display: none; }
-
         /* ══════════════════ /NEUMORPHIC THEME ══════════════════ */
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
@@ -2270,7 +2262,7 @@
         .scroll-to-bottom-btn.has-unread .unread-dot { display: block; }
         
         @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .msg-bubble { max-width: 68%; padding: 8px 16px 9px 16px; border-radius: 20px; font-size: 14px; line-height: 1.4; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; }
+        .msg-bubble { max-width: 68%; padding: 8px 14px 9px 14px; border-radius: 20px; font-size: 14px; line-height: 1.45; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; }
         .date-separator { display: flex; justify-content: center; align-self: center; margin: 4px 0 8px; }
         .chat-favourite-star { vertical-align: middle; margin: 0 3px; position: relative; top: -1px; }
         .date-separator span { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 14px; box-shadow: var(--shadow-bubble); letter-spacing: 0.1px; }
@@ -2279,23 +2271,13 @@
         .msg-bubble.out { align-self: flex-end; background: var(--msg-out-bg); color: var(--msg-out-text); box-shadow: var(--shadow-bubble-out); }
         .msg-bubble.media.in, .msg-bubble.sticker.in { border-bottom-left-radius: 0; }
         .msg-bubble.media.out, .msg-bubble.sticker.out { border-bottom-right-radius: 0; }
-        /* Pointy speech-bubble tail (text bubbles only — media/sticker bubbles keep their
-           flat-corner "tail-less" shape since a colored triangle reads oddly against a photo).
-           The bubble itself is now fully rounded on all four corners; the tail is a small
-           triangle glued to the bottom-left (in) / bottom-right (out) corner, matching each
-           bubble's own themed color so it re-colors automatically with every theme/bubble-color. */
-        .msg-bubble.in:not(.media):not(.sticker)::after,
-        .msg-bubble.out:not(.media):not(.sticker)::after {
-            content: ''; position: absolute; bottom: 0; width: 12px; height: 16px;
-        }
-        .msg-bubble.in:not(.media):not(.sticker)::after {
-            left: -11px; background: var(--msg-in-bg);
-            clip-path: polygon(100% 0, 100% 100%, 0 100%);
-        }
-        .msg-bubble.out:not(.media):not(.sticker)::after {
-            right: -11px; background: var(--msg-out-bg);
-            clip-path: polygon(0 0, 0 100%, 100% 100%);
-        }
+        /* Modern "smart corner" shape — no protruding triangle tail (the old pointy speech-
+           bubble look). Instead, the corner nearest the sender's avatar tapers down to a small
+           4px radius while the other three stay fully rounded, the same soft-taper language
+           media/sticker bubbles already use below — so every bubble type now reads as one
+           consistent, tailless shape. */
+        .msg-bubble.in:not(.media):not(.sticker) { border-bottom-left-radius: 4px; }
+        .msg-bubble.out:not(.media):not(.sticker) { border-bottom-right-radius: 4px; }
         
         .msg-bubble.media { max-width: 75%; min-width: 200px; padding: 0; background: transparent !important; border-radius: 0; box-shadow: none; }
         .read-receipt { align-self: flex-end; font-size: 11px; color: var(--text-secondary); margin-top: -4px; padding-right: 6px; display: flex; align-items: center; gap: 4px; }

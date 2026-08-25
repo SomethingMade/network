@@ -1450,6 +1450,24 @@
         .feed-repost-banner { display:flex; align-items:center; gap:8px; padding: 12px 16px 0; font-size:12.5px; font-weight:600; color: var(--text-secondary); cursor:pointer; }
         .feed-repost-banner svg { width:15px; height:15px; flex-shrink:0; }
         .feed-repost-banner:hover { color: var(--text-primary); }
+        .repost-composer-original { margin: 0 16px 14px; padding: 14px; border: 1px solid var(--border-color); border-radius: 18px; background: var(--bg-alt); }
+        .repost-composer-original-label { display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px; text-transform:uppercase; letter-spacing:.04em; }
+        .repost-composer-original-card { border:1px solid var(--border-color); border-radius:14px; background:var(--bg-surface); overflow:hidden; }
+        .repost-composer-original-card .x-post-row { padding:12px 12px 0; }
+        .repost-composer-original-card .feed-post-body { padding:10px 12px 0; }
+        .repost-composer-original-card .feed-post-text { font-size:14px; }
+        .repost-composer-original-card .repost-preview-media { width:100%; max-height:320px; object-fit:cover; display:block; }
+        .repost-composer-original-card .repost-preview-text { padding:0 12px 12px; color:var(--text-primary); white-space:pre-wrap; font-size:14px; line-height:1.45; }
+        .repost-composer-original-card .repost-preview-author { display:flex; align-items:center; gap:9px; padding:12px 12px 0; font-size:13px; font-weight:700; }
+        .repost-composer-original-card .repost-preview-author .avatar { width:32px; height:32px; }
+        .repost-composer-original-card .repost-preview-images { display:grid; grid-template-columns:repeat(2,1fr); gap:3px; margin-top:10px; }
+        .repost-composer-original-card .repost-preview-images img { width:100%; height:150px; object-fit:cover; display:block; }
+        .repost-commentary { margin: 0 16px 10px 16px; padding: 0 0 12px; border-bottom:1px solid var(--border-color); }
+        .repost-commentary-text { font-size:15px; line-height:1.45; color:var(--text-primary); white-space:pre-wrap; margin-bottom:10px; }
+        .repost-commentary-images { display:grid; grid-template-columns:repeat(2,1fr); gap:4px; overflow:hidden; border-radius:14px; }
+        .repost-commentary-images img { width:100%; height:180px; object-fit:cover; display:block; }
+        .repost-commentary-video { width:100%; max-height:480px; border-radius:14px; background:#000; display:block; }
+        @media (max-width:600px) { .repost-commentary-images img { height:150px; } .repost-composer-original-card .repost-preview-images img { height:120px; } }
         .feed-post-view-stat { cursor: default; }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
@@ -3585,9 +3603,11 @@
             <button type="button" class="post-composer-close" id="post-composer-close" title="Close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
+            <span id="post-composer-title" style="font-size:16px;font-weight:700;">New Post</span>
             <button type="button" id="feed-composer-submit" disabled>Post</button>
         </div>
         <div class="post-composer-body">
+            <div class="repost-composer-original" id="repost-composer-original" style="display:none;"></div>
             <div class="feed-composer" id="feed-composer">
                 <div class="feed-composer-row">
                     <div class="avatar" id="feed-composer-avatar" style="width:40px; height:40px; flex-shrink:0;"></div>
@@ -9108,6 +9128,7 @@
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
         let feedComposerIsAd = false; // true while "Publish as an Ad" is toggled on (business accounts only)
+        let activeRepostComposerOriginalId = null; // original post being quoted/reposted in the composer
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
         function canViewPost(post) {
@@ -11131,6 +11152,7 @@
                 const pendingIsAd = isAdSubmit;
                 const pendingAdCta = adCtaSelect.value;
                 const pendingAdUrl = normalizeAdUrl(adUrlInput.value.trim());
+                const pendingRepostOriginalId = activeRepostComposerOriginalId;
 
                 // Close the composer and reset it right away — posting happens in the
                 // background behind a thin top-of-screen progress bar (see
@@ -11181,6 +11203,44 @@
                     const firstUrl = (!resolvedImageUrls.length && !resolvedVideo) ? extractFirstUrlFromText(text) : null;
                     if (firstUrl) {
                         linkPreview = await fetchLinkPreview(firstUrl);
+                    }
+
+                    if (pendingRepostOriginalId) {
+                        const repostOriginal = cachedPosts[pendingRepostOriginalId] || (await get(ref(database, `posts/${pendingRepostOriginalId}`))).val();
+                        if (!repostOriginal) throw new Error('Original post not found');
+                        if (repostOriginal.uid === u.uid) {
+                            notify("You can't repost your own post", 'error');
+                            return;
+                        }
+                        const repostRef = push(ref(database, 'posts'));
+                        await set(repostRef, {
+                            uid: u.uid,
+                            name: myProfile.name || u.displayName || 'User',
+                            photoURL: myProfile.photoURL || u.photoURL || '',
+                            text: text,
+                            imageUrl: resolvedImageUrls.length ? resolvedImageUrls[0] : null,
+                            imageUrls: resolvedImageUrls.length ? resolvedImageUrls : null,
+                            videoUrl: resolvedVideo ? resolvedVideo.url : null,
+                            videoThumbnail: resolvedVideo ? (resolvedVideo.thumbnailUrl || null) : null,
+                            music: ((resolvedImageUrls.length || resolvedVideo) && pendingMusic) ? pendingMusic : null,
+                            linkPreview: linkPreview,
+                            mentions: mentionedUids.size ? mentionsMap : null,
+                            visibility: pendingVisibility === 'followers' ? 'followers' : 'everyone',
+                            repostOf: pendingRepostOriginalId,
+                            timestamp: serverTimestamp(),
+                            likeCount: 0,
+                            commentCount: 0
+                        });
+                        await update(ref(database, `posts/${pendingRepostOriginalId}`), {
+                            [`reposts/${u.uid}`]: repostRef.key,
+                            repostCount: increment(1)
+                        });
+                        mentionedUids.forEach((uid) => {
+                            createNotification(uid, { type: 'mention', postId: repostRef.key, text });
+                        });
+                        createNotification(repostOriginal.uid, { type: 'repost', postId: pendingRepostOriginalId, text: text || repostOriginal.text || '' });
+                        notify('Reposted');
+                        return;
                     }
 
                     const newPostRef = push(ref(database, 'posts'));
@@ -12256,17 +12316,60 @@
             if (totalEl) totalEl.textContent = `${total} vote${total === 1 ? '' : 's'}`;
         }
 
+        function buildRepostComposerOriginalHtml(originalId) {
+            const original = cachedPosts[originalId];
+            if (!original) return '<div class="repost-composer-original-label">Original post</div><div class="empty-msg" style="margin:8px 0;">Loading original post…</div>';
+            const author = cachedUsers[original.uid] || {};
+            const name = escapeHtmlForPost(author.name || original.name || 'User');
+            const avatar = feedAvatarHtml({ name: author.name || original.name, photoURL: author.photoURL || original.photoURL });
+            const text = original.text ? `<div class="repost-preview-text">${linkifyHashtags(original.text)}</div>` : '';
+            const images = (original.imageUrls && original.imageUrls.length) ? original.imageUrls : (original.imageUrl ? [original.imageUrl] : []);
+            const imageHtml = images.length ? `<div class="repost-preview-images">${images.map(url => `<img src="${escapeHtmlForPost(url)}" alt="">`).join('')}</div>` : '';
+            const videoHtml = original.videoUrl ? `<video class="repost-preview-media" src="${escapeHtmlForPost(original.videoUrl)}" ${original.videoThumbnail ? `poster="${escapeHtmlForPost(original.videoThumbnail)}"` : ''} controls playsinline preload="metadata"></video>` : '';
+            return `<div class="repost-composer-original-label">${repostArrowsSvg()} <span>Original post</span></div><div class="repost-composer-original-card"><div class="repost-preview-author">${avatar}<span>${name}</span></div>${text}${imageHtml}${videoHtml}</div>`;
+        }
+
+        function openRepostComposer(originalId) {
+            const original = cachedPosts[originalId];
+            if (!original) { notify('Post not found', 'error'); return; }
+            activeRepostComposerOriginalId = originalId;
+            const title = document.getElementById('post-composer-title');
+            const submit = document.getElementById('feed-composer-submit');
+            const originalWrap = document.getElementById('repost-composer-original');
+            const adRow = document.getElementById('feed-composer-ad-toggle-row');
+            if (title) title.textContent = 'Repost';
+            if (submit) submit.textContent = 'Repost';
+            if (adRow) adRow.style.display = 'none';
+            if (originalWrap) {
+                originalWrap.innerHTML = buildRepostComposerOriginalHtml(originalId);
+                originalWrap.style.display = 'block';
+            }
+            window.location.hash = 'post-composer';
+            postComposerOverlay.classList.add('active');
+            const input = document.getElementById('feed-composer-input');
+            if (input) {
+                input.placeholder = 'Add your thoughts…';
+                setTimeout(() => input.focus(), 200);
+            }
+        }
+
+        function resetRepostComposerMode() {
+            activeRepostComposerOriginalId = null;
+            const title = document.getElementById('post-composer-title');
+            const submit = document.getElementById('feed-composer-submit');
+            const originalWrap = document.getElementById('repost-composer-original');
+            if (title) title.textContent = 'New Post';
+            if (submit) submit.textContent = 'Post';
+            if (originalWrap) { originalWrap.innerHTML = ''; originalWrap.style.display = 'none'; }
+        }
+
         function buildFeedPostCard(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
 
-            // A repost is a lightweight wrapper post (no text/media of its own, see
-            // toggleRepostPost) that just points at the original via repostOf. It's rendered
-            // using the ORIGINAL post's full content/id — likes, comments, saves, and further
-            // reposts all target the original — with a small "reposted by" banner (built from
-            // the wrapper itself) on top. The wrapper's own id/object are kept as postId/
-            // wrapperPost purely for card lifecycle and for edit/delete (deleting a repost just
-            // undoes the repost, see deletePost).
+            // A repost is a wrapper post that points at the original via repostOf. Any text/photo/video
+            // added by the reposter lives on the wrapper and is shown above the original post. Engagement
+            // buttons continue to target the true original, so the original post remains the shared source.
             const wrapperPost = post;
             const isRepost = !!wrapperPost.repostOf;
             const originalId = isRepost ? wrapperPost.repostOf : postId;
@@ -12370,8 +12473,14 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                 </button>`;
 
+            const repostCommentaryText = isRepost && wrapperPost.text ? `<div class="repost-commentary-text"></div>` : '';
+            const repostCommentaryImages = isRepost ? ((wrapperPost.imageUrls && wrapperPost.imageUrls.length) ? wrapperPost.imageUrls : (wrapperPost.imageUrl ? [wrapperPost.imageUrl] : [])) : [];
+            const repostCommentaryMedia = repostCommentaryImages.length ? `<div class="repost-commentary-images">${repostCommentaryImages.map(url => `<img src="${escapeHtmlForPost(url)}" alt="">`).join('')}</div>` : (isRepost && wrapperPost.videoUrl ? `<video class="repost-commentary-video" src="${escapeHtmlForPost(wrapperPost.videoUrl)}" ${wrapperPost.videoThumbnail ? `poster="${escapeHtmlForPost(wrapperPost.videoThumbnail)}"` : ''} controls playsinline preload="metadata"></video>` : '');
+            const repostCommentaryHtml = isRepost && (repostCommentaryText || repostCommentaryMedia) ? `<div class="repost-commentary">${repostCommentaryText}${repostCommentaryMedia}</div>` : '';
+
             card.innerHTML = `
                 ${isRepost ? buildRepostBannerHtml(wrapperPost) : ''}
+                ${repostCommentaryHtml}
                 <div class="x-post-row">
                     <div class="x-post-avatar-col">
                         ${avatarHtml}
@@ -12434,6 +12543,10 @@
             if (isRepost) bindRepostBannerClick(card);
             getFeedImpressionObserver().observe(card);
             if (textHtml) card.querySelector('.feed-post-text').innerHTML = linkifyHashtags(post.text);
+            if (isRepost && repostCommentaryText && wrapperPost.text) {
+                const commentaryEl = card.querySelector('.repost-commentary-text');
+                if (commentaryEl) commentaryEl.innerHTML = linkifyHashtags(wrapperPost.text);
+            }
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
                 musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
@@ -12611,6 +12724,7 @@
 
             const myExistingRepostKey = (originalPost.reposts && originalPost.reposts[user.uid]) || null;
 
+            // Tapping Repost again removes the existing repost, preserving the current toggle behavior.
             if (myExistingRepostKey) {
                 try {
                     await remove(ref(database, `posts/${myExistingRepostKey}`));
@@ -12629,23 +12743,9 @@
                 return;
             }
 
-            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
-            const newRepostRef = push(ref(database, 'posts'));
-            await set(newRepostRef, {
-                uid: user.uid,
-                name: myProfile.name || user.displayName || 'User',
-                photoURL: myProfile.photoURL || user.photoURL || '',
-                repostOf: originalId,
-                timestamp: serverTimestamp(),
-                likeCount: 0,
-                commentCount: 0
-            });
-            await update(ref(database, `posts/${originalId}`), {
-                [`reposts/${user.uid}`]: newRepostRef.key,
-                repostCount: increment(1)
-            });
-            createNotification(originalPost.uid, { type: 'repost', postId: originalId, text: originalPost.text || '' });
-            notify('Reposted');
+            // First tap now opens the quote/repost composer. The actual repost is created only
+            // after the user submits their optional text/photo/video.
+            openRepostComposer(originalId);
         }
 
         // Spawns a little staggered burst of hearts that puff up off the like button and fade —
@@ -15876,6 +15976,7 @@
         // compose button behaves elsewhere in the app.
         const postComposerOverlay = document.getElementById('post-composer-overlay');
         function openPostComposer() {
+            resetRepostComposerMode();
             window.location.hash = 'post-composer';
             postComposerOverlay.classList.add('active');
             // The "Publish as an Ad" row is business-accounts-only — re-check on every open
@@ -15903,6 +16004,9 @@
         }
         function closePostComposer() {
             postComposerOverlay.classList.remove('active');
+            resetRepostComposerMode();
+            const input = document.getElementById('feed-composer-input');
+            if (input) input.placeholder = 'What\'s on your mind? Type @ to tag someone';
         }
 
         // Single nav-bar action button whose icon/behavior swaps with the active tab

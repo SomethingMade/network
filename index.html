@@ -4004,6 +4004,31 @@
         </div>
     </div>
 
+    <!-- Comments sheet for Communities feed posts — same pattern as news-comments-sheet-overlay:
+         community messages aren't real posts/{postId} entries, so they get their own parallel
+         data model (communityPostEngagement/{msgId} for likes/comment counts,
+         communityPostComments/{msgId} for the flat comment list) reusing the exact same
+         .feed-comment-item/.feed-comment-input-row markup and styling. -->
+    <div id="community-comments-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 85vh; display:flex; flex-direction:column; padding: 10px 0 0;">
+            <div class="sheet-handle" id="community-comments-sheet-handle" style="cursor:pointer;" title="Close"></div>
+            <div style="padding: 0 20px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid var(--border-color);">
+                <span style="width:19px;"></span>
+                <h3 style="margin:0; font-size:15.5px; font-weight:700;">Comments</h3>
+                <span style="width:19px;"></span>
+            </div>
+            <div id="community-comments-list" style="flex:1; overflow-y:auto; padding: 4px 20px;"></div>
+            <div id="community-comments-empty" style="display:none; text-align:center; color: var(--text-secondary); font-size:13px; padding: 24px 0;">No comments yet. Say something!</div>
+            <div class="feed-comment-input-row">
+                <div class="avatar" id="community-comment-input-avatar" style="width:32px; height:32px; flex-shrink:0;"></div>
+                <input type="text" id="community-comment-input" placeholder="Add a comment..." maxlength="500" autocomplete="off">
+                <button type="button" id="btn-send-community-comment" disabled title="Send">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="gif-picker-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 72vh; display:flex; flex-direction:column; padding: 10px 0 0;">
             <div class="sheet-handle" id="gif-picker-sheet-handle" style="cursor:pointer;" title="Close"></div>
@@ -11462,6 +11487,20 @@
                 if (e.key === 'Enter') { e.preventDefault(); submitActiveNewsComment(); }
             });
 
+            document.getElementById('community-comments-sheet-handle').addEventListener('click', closeCommunityComments);
+            document.getElementById('community-comments-sheet-overlay').addEventListener('click', (e) => {
+                if (e.target.id === 'community-comments-sheet-overlay') closeCommunityComments();
+            });
+            const communityCommentInput = document.getElementById('community-comment-input');
+            const communityCommentSendBtn = document.getElementById('btn-send-community-comment');
+            communityCommentInput.addEventListener('input', () => {
+                communityCommentSendBtn.disabled = communityCommentInput.value.trim().length === 0;
+            });
+            communityCommentSendBtn.addEventListener('click', submitActiveCommunityComment);
+            communityCommentInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); submitActiveCommunityComment(); }
+            });
+
             const commentInput = document.getElementById('post-comment-input');
             const commentSendBtn = document.getElementById('btn-send-comment');
             commentInput.addEventListener('input', () => {
@@ -16737,25 +16776,11 @@
             loadCommunityFeed();
         });
 
-        // Post feed source: every community that exists (regardless of membership/ownership),
-        // filtered only by the active category chip ('All' meaning no filter). Both the Home
-        // and Explore subtabs read from this — the subtabs no longer gate which communities'
-        // posts are eligible, only the separate "communities to join" strip below still uses
-        // the membership-based getCommunityIdsForSubtab('explore').
-        function getAllCommunityIdsForFeed() {
-            let ids = Object.keys(cachedGroups).filter(gid => !!cachedGroups[gid]);
-            if (activeCommunityCategory !== 'All') {
-                ids = ids.filter(gid => (cachedGroups[gid].category || 'General') === activeCommunityCategory);
-            }
-            return ids;
-        }
-
         // Home = communities I've joined; Explore = public communities available to browse
         // (includes ones already joined — those just render with a "Joined" badge instead of
         // a Join button, see renderDiscoverGroupItem) — filtered by the active category chip,
-        // 'All' meaning no filter.
-        // (Now used only for the "communities to join" suggestion strip on Explore — the post
-        // feed itself pulls from getAllCommunityIdsForFeed so every community's posts show up.)
+        // 'All' meaning no filter. Both the post feed (loadCommunityFeed) and the "communities
+        // to join" suggestion strip on Explore read from this.
         function getCommunityIdsForSubtab(subtab) {
             const user = auth.currentUser;
             if (!user) return [];
@@ -16834,9 +16859,9 @@
             const category = activeCommunityCategory;
             const key = communityFeedContextKey(subtab, category);
             const container = document.getElementById('communities-feed-container');
-            // Home shows posts from every community; Explore is scoped to public communities
-            // the person hasn't joined yet — the ones actually meant for discovery/joining.
-            const communityIds = subtab === 'explore' ? getCommunityIdsForSubtab('explore') : getAllCommunityIdsForFeed();
+            // Home shows posts only from communities the person has joined; Explore is scoped to
+            // public communities they haven't joined yet — the ones actually meant for discovery.
+            const communityIds = getCommunityIdsForSubtab(subtab);
 
             renderExploreGroupsSection();
 
@@ -17057,21 +17082,186 @@
         // naming the community it's from (tap → open that community's chat), then the sender +
         // content, matching the look of a real feed post minus the like/repost/save actions —
         // those track engagement on actual `posts`, which these chat-message-backed cards aren't.
+        // --- COMMUNITIES FEED POST ENGAGEMENT (like/comment) ---
+        // Group thread messages aren't real posts/{postId} entries, so — same reasoning as the
+        // news-card engagement model above — they get their own parallel data model:
+        // communityPostEngagement/{msgId} for likes/comment counts, communityPostComments/{msgId}
+        // for the flat comment list, reusing the exact same feed-post-card/.feed-comment-item
+        // markup and styling as real posts and news cards.
+        const communityEngagementCache = {};
+
+        // Scoped by groupId + the message's own push key, so ids never collide across groups.
+        function communityMsgEngagementId(msg) {
+            return `${msg.groupId}_${msg.key}`;
+        }
+
+        function patchCommunityPostCardCounts(msgId, data) {
+            const user = auth.currentUser;
+            const likedByMe = !!(user && data.likes && data.likes[user.uid]);
+            document.querySelectorAll(`.community-post-card[data-msg-id="${msgId}"]`).forEach(card => {
+                const likeBtn = card.querySelector('.feed-like-btn');
+                const likeIconEl = card.querySelector('.feed-like-icon-default');
+                if (likeBtn) likeBtn.classList.toggle('liked', likedByMe);
+                if (likeIconEl) likeIconEl.setAttribute('fill', likedByMe ? 'currentColor' : 'none');
+                const likeCountEl = card.querySelector('.feed-like-count');
+                if (likeCountEl) likeCountEl.textContent = data.likeCount || 0;
+                const commentCountEl = card.querySelector('.feed-comment-count');
+                if (commentCountEl) commentCountEl.textContent = data.commentCount || 0;
+            });
+        }
+
+        async function fetchCommunityEngagement(msgId) {
+            if (communityEngagementCache[msgId]) return communityEngagementCache[msgId];
+            try {
+                const snap = await get(ref(database, `communityPostEngagement/${msgId}`));
+                const data = snap.exists() ? snap.val() : {};
+                communityEngagementCache[msgId] = data;
+                return data;
+            } catch (err) {
+                return {};
+            }
+        }
+
+        async function toggleCommunityLike(msgId) {
+            const user = auth.currentUser;
+            if (!user) { notify('Please log in to like', 'error'); return; }
+            triggerHaptic(15);
+            const data = communityEngagementCache[msgId] || (communityEngagementCache[msgId] = {});
+            const alreadyLiked = !!(data.likes && data.likes[user.uid]);
+
+            data.likes = data.likes || {};
+            if (alreadyLiked) { delete data.likes[user.uid]; } else { data.likes[user.uid] = true; }
+            data.likeCount = Math.max(0, (data.likeCount || 0) + (alreadyLiked ? -1 : 1));
+            patchCommunityPostCardCounts(msgId, data);
+
+            try {
+                await update(ref(database, `communityPostEngagement/${msgId}`), {
+                    [`likes/${user.uid}`]: alreadyLiked ? null : true,
+                    likeCount: increment(alreadyLiked ? -1 : 1)
+                });
+            } catch (err) {
+                if (alreadyLiked) { data.likes[user.uid] = true; } else { delete data.likes[user.uid]; }
+                data.likeCount = Math.max(0, (data.likeCount || 0) + (alreadyLiked ? 1 : -1));
+                patchCommunityPostCardCounts(msgId, data);
+                notify('Could not update like', 'error');
+            }
+        }
+
+        // --- COMMUNITIES FEED COMMENTS SHEET ---
+        let activeCommunityCommentsMsgId = null;
+        let communityCommentsUnsub = null;
+
+        function openCommunityComments(msgId) {
+            activeCommunityCommentsMsgId = msgId;
+            const overlay = document.getElementById('community-comments-sheet-overlay');
+            syncSheetAboveViewer(overlay);
+            overlay.classList.add('active');
+            const input = document.getElementById('community-comment-input');
+            input.value = '';
+            document.getElementById('btn-send-community-comment').disabled = true;
+
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || { name: user.displayName, photoURL: user.photoURL }) : {};
+            const inputAvatar = document.getElementById('community-comment-input-avatar');
+            if (inputAvatar) inputAvatar.outerHTML = feedAvatarHtml(myProfile).replace('class="avatar', 'id="community-comment-input-avatar" class="avatar');
+
+            if (communityCommentsUnsub) { communityCommentsUnsub(); communityCommentsUnsub = null; }
+            const commentsRef = ref(database, `communityPostComments/${msgId}`);
+            communityCommentsUnsub = onValue(commentsRef, (snap) => {
+                renderCommunityComments(snap.exists() ? snap.val() : {});
+            });
+        }
+
+        function closeCommunityComments() {
+            document.getElementById('community-comments-sheet-overlay').classList.remove('active', 'above-viewer');
+            if (communityCommentsUnsub) { communityCommentsUnsub(); communityCommentsUnsub = null; }
+            activeCommunityCommentsMsgId = null;
+        }
+
+        function buildCommunityCommentEl(commentId, comment) {
+            const item = document.createElement('div');
+            item.className = 'feed-comment-item';
+            const liveCommenter = cachedUsers[comment.uid] || {};
+            const displayName = liveCommenter.name || comment.name || 'User';
+            const displayPhoto = liveCommenter.photoURL || comment.photoURL;
+            item.innerHTML = `
+                ${feedAvatarHtml({ name: displayName, photoURL: displayPhoto })}
+                <div class="feed-comment-body">
+                    <div class="feed-comment-header-row">
+                        <span class="name"></span>
+                        <span class="time" data-rel-ts="${comment.timestamp}">${formatTime(comment.timestamp)}</span>
+                    </div>
+                    <div class="feed-comment-text"></div>
+                </div>
+            `;
+            item.querySelector('.name').innerHTML = escapeHtmlForPost(displayName) + verifiedBadgeFor(comment.uid, comment.uid === AI_UID);
+            item.querySelector('.feed-comment-text').innerHTML = comment.text ? linkifyHashtags(comment.text) : '';
+            return item;
+        }
+
+        function renderCommunityComments(commentsObj) {
+            const list = document.getElementById('community-comments-list');
+            const emptyEl = document.getElementById('community-comments-empty');
+            list.innerHTML = '';
+            const entries = Object.entries(commentsObj).sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+            emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
+            entries.forEach(([commentId, comment]) => list.appendChild(buildCommunityCommentEl(commentId, comment)));
+            list.scrollTop = list.scrollHeight;
+        }
+
+        async function submitActiveCommunityComment() {
+            const msgId = activeCommunityCommentsMsgId;
+            if (!msgId) return;
+            const user = auth.currentUser;
+            if (!user) { notify('Please log in to comment', 'error'); return; }
+            const input = document.getElementById('community-comment-input');
+            const text = input.value.trim();
+            if (!text) return;
+            if (text.length > 500) { notify('Comments are limited to 500 characters', 'error'); return; }
+            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'User', photoURL: user.photoURL || '' };
+
+            input.value = '';
+            document.getElementById('btn-send-community-comment').disabled = true;
+
+            const newCommentRef = push(ref(database, `communityPostComments/${msgId}`));
+            await set(newCommentRef, {
+                uid: user.uid,
+                name: myProfile.name || user.displayName || 'User',
+                photoURL: myProfile.photoURL || user.photoURL || '',
+                text: text,
+                timestamp: serverTimestamp()
+            });
+            await update(ref(database, `communityPostEngagement/${msgId}`), { commentCount: increment(1) });
+
+            const data = communityEngagementCache[msgId] || (communityEngagementCache[msgId] = {});
+            data.commentCount = (data.commentCount || 0) + 1;
+            patchCommunityPostCardCounts(msgId, data);
+        }
+
         function buildCommunityPostCard(msg) {
             const group = cachedGroups[msg.groupId] || {};
             const sender = cachedUsers[msg.senderUid] || {};
+            const msgId = communityMsgEngagementId(msg);
             const card = document.createElement('div');
             card.className = 'feed-post-card community-post-card';
             card.dataset.groupId = msg.groupId;
+            card.dataset.msgId = msgId;
             card.dataset.communityName = (group.name || '').toLowerCase();
 
-            let mediaHtml = '';
-            if (msg.mediaURL && msg.mediaType === 'image') {
-                mediaHtml = `<div class="community-post-media"><img src="${msg.mediaURL}" alt="" loading="lazy"></div>`;
-            } else if (msg.mediaURL && msg.mediaType === 'video') {
-                const poster = cloudinaryVideoThumbnail(msg.mediaURL, 1);
-                mediaHtml = `<div class="community-post-media">${poster ? `<img src="${poster}" alt="" loading="lazy">` : ''}<div class="community-post-media-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>`;
-            }
+            const postImages = msg.mediaURL && msg.mediaType === 'image' ? [msg.mediaURL] : [];
+            const imageHtml = postImages.length ? `
+                <div class="x-media-grid" data-count="1">
+                    <div class="x-media-carousel-track">
+                        <div class="x-media-grid-item"><img src="${postImages[0]}" data-idx="0" alt=""></div>
+                    </div>
+                </div>` : '';
+            const videoHtml = (msg.mediaURL && msg.mediaType === 'video') ? `
+                <div class="feed-post-video-wrap">
+                    <video class="feed-post-video" src="${msg.mediaURL}" ${(() => { const t = cloudinaryVideoThumbnail(msg.mediaURL, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop></video>
+                    <button type="button" class="feed-video-center-btn" aria-label="Play">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                    </button>
+                </div>` : '';
 
             card.innerHTML = `
                 <div class="community-post-byline">
@@ -17093,9 +17283,55 @@
                 <div class="feed-post-body">
                     ${msg.text ? `<p class="feed-post-text">${linkifyHashtags(msg.text)}</p>` : ''}
                 </div>
-                ${mediaHtml}
+                ${imageHtml}
+                ${videoHtml}
+                <div class="feed-post-actions">
+                    <div class="feed-post-actions-left">
+                        <button type="button" class="feed-post-action-btn feed-like-btn">
+                            <svg class="feed-like-icon-default" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
+                            <span class="feed-like-count">0</span>
+                        </button>
+                        <button type="button" class="feed-post-action-btn feed-comment-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                            <span class="feed-comment-count">0</span>
+                        </button>
+                    </div>
+                </div>
             `;
             card.addEventListener('click', () => openGroupChatView(msg.groupId));
+
+            const videoWrap = card.querySelector('.feed-post-video-wrap');
+            if (videoWrap) {
+                const video = videoWrap.querySelector('.feed-post-video');
+                const centerBtn = videoWrap.querySelector('.feed-video-center-btn');
+                video.muted = true;
+                centerBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (video.paused) {
+                        document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (v !== video && !v.paused) v.pause(); });
+                        video.play().catch(() => {});
+                        centerBtn.classList.add('hidden');
+                    } else {
+                        video.pause();
+                        centerBtn.classList.remove('hidden');
+                    }
+                });
+                video.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            if (communityEngagementCache[msgId]) patchCommunityPostCardCounts(msgId, communityEngagementCache[msgId]);
+            fetchCommunityEngagement(msgId).then((data) => patchCommunityPostCardCounts(msgId, data));
+
+            const likeBtn = card.querySelector('.feed-like-btn');
+            likeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleCommunityLike(msgId);
+            });
+            card.querySelector('.feed-comment-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openCommunityComments(msgId);
+            });
+
             return card;
         }
 

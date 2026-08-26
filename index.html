@@ -2200,7 +2200,7 @@
 
         /* Horizontally-scrolling category filter chips (Sports/Technology/Art/...), same
            pill-with-border look whether they're filtering the feed here or picking a category
-           in the Create Group modal (.category-picker-chips reuses this class). */
+           in the Create Community modal (.category-picker-chips reuses this class). */
         .community-category-chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; -ms-overflow-style: none; }
         .community-category-chips::-webkit-scrollbar { display: none; }
         .community-category-chip { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; transition: 0.15s; white-space: nowrap; }
@@ -2230,7 +2230,7 @@
         .community-post-media-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); }
         .community-post-media-play svg { width: 46px; height: 46px; color: #fff; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.4)); }
 
-        /* Category picker in the Create Group modal — same chip look as the feed filter above. */
+        /* Category picker in the Create Community modal — same chip look as the feed filter above. */
         .category-picker-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
         .contact-action-btn { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-color); background: transparent; cursor: pointer; transition: 0.2s; }
         .contact-action-btn.danger { color: var(--danger-red); border-color: rgba(255, 69, 58, 0.3); }
@@ -3802,9 +3802,9 @@
 
     <div id="create-group-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
-            <h3>Create a Group</h3>
-            <p>Give your group a name and choose who can join.</p>
-            <input type="text" id="group-name-input" class="pill-input" placeholder="Group name" autocomplete="off">
+            <h3>Create a Community</h3>
+            <p>Give your community a name and choose who can join.</p>
+            <input type="text" id="group-name-input" class="pill-input" placeholder="Community name" autocomplete="off">
             <input type="text" id="group-description-input" class="pill-input" placeholder="Description (optional)" autocomplete="off">
             <div class="segmented-control">
                 <button type="button" id="btn-group-public" class="active" data-value="public">Public</button>
@@ -5439,7 +5439,7 @@
                                 <h1>Communities</h1>
                             </div>
                             <div class="chat-header-icons">
-                                <svg id="btn-create-group" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Create Group"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                                <svg id="btn-create-group" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Create Community"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu-groups" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-groups">
@@ -16560,6 +16560,8 @@
             const item = document.createElement('div');
             item.className = 'chat-item';
             item.dataset.groupId = groupId;
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', () => openGroupChatView(groupId));
             const memberCount = group.members ? Object.keys(group.members).length : 0;
             const user = auth.currentUser;
             const alreadyJoined = !!(user && group.members && group.members[user.uid]);
@@ -17337,7 +17339,7 @@
             return card;
         }
 
-        // Create Group modal
+        // Create Community modal
         const createGroupModal = document.getElementById('create-group-modal-overlay');
         let selectedGroupVisibility = 'public';
         let selectedGroupCategory = 'General';
@@ -17383,7 +17385,7 @@
             const user = auth.currentUser;
             const name = document.getElementById('group-name-input').value.trim();
             const description = document.getElementById('group-description-input').value.trim();
-            if (!name || !user) { notify('Please enter a group name', 'error'); return; }
+            if (!name || !user) { notify('Please enter a community name', 'error'); return; }
 
             showLoading();
             try {
@@ -17398,10 +17400,10 @@
                     members: { [user.uid]: true }
                 });
                 createGroupModal.classList.remove('active');
-                notify('Group created!');
+                notify('Community created!');
                 openGroupChatView(newGroupRef.key);
             } catch (err) {
-                showCustomModal('Error', 'Could not create the group.');
+                showCustomModal('Error', 'Could not create the community.');
             } finally { hideLoading(); }
         });
 

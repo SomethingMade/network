@@ -15770,8 +15770,8 @@
                 .map(([id, post]) => ({ ...post, postId: id }));
             const myMedia = myPosts.filter(post => post.imageUrl || post.videoUrl);
             const totalImpressions = myPosts.reduce((sum, post) => sum + (post.impressionCount || 0), 0);
-            const myGroupsCount = Object.keys(cachedGroups).filter(gid => {
-                const g = cachedGroups[gid];
+            const myGroupsCount = Object.keys(cachedCommunities).filter(gid => {
+                const g = cachedCommunities[gid];
                 return g && g.members && g.members[user.uid] && !g.isBusinessPage;
             }).length;
             const myContactsCount = Object.keys(cachedContacts).length;
@@ -16451,7 +16451,7 @@
         })();
 
         // --- GROUPS ---
-        let cachedGroups = {};
+        let cachedCommunities = {};
         let cachedGroupChatsMeta = {};
         let cachedGroupInvites = {};
         let activeGroupId = null;
@@ -16589,10 +16589,10 @@
                 btn.disabled = true;
                 btn.textContent = 'Joining...';
                 try {
-                    await set(ref(database, `groups/${groupId}/members/${user.uid}`), true);
-                    if (cachedGroups[groupId]) {
-                        cachedGroups[groupId].members = cachedGroups[groupId].members || {};
-                        cachedGroups[groupId].members[user.uid] = true;
+                    await set(ref(database, `communities/${groupId}/members/${user.uid}`), true);
+                    if (cachedCommunities[groupId]) {
+                        cachedCommunities[groupId].members = cachedCommunities[groupId].members || {};
+                        cachedCommunities[groupId].members[user.uid] = true;
                     }
                     notify(`You joined ${group.name}`);
                     item.remove();
@@ -16608,10 +16608,10 @@
             container.appendChild(item);
         }
 
-        // Refreshes anything in the Communities tab that depends on cachedGroups/cachedGroupChatsMeta:
+        // Refreshes anything in the Communities tab that depends on cachedCommunities/cachedGroupChatsMeta:
         // the group-invites banner and the active group chat header (if one's open). The post
         // feed itself (see loadCommunityFeed) is deliberately NOT refetched here on every data
-        // tick — cachedGroups/cachedGroupChatsMeta change constantly (any group's metadata, any
+        // tick — cachedCommunities/cachedGroupChatsMeta change constantly (any group's metadata, any
         // new message anywhere), and reloading the feed on each of those would reshuffle posts
         // and blow away the person's scroll position while they're mid-read. The feed is only
         // fetched the first time a given Home/Explore + category view is visited this session
@@ -16621,10 +16621,10 @@
             const user = auth.currentUser;
             if (!user) return;
 
-            if (activeGroupId && cachedGroups[activeGroupId]) {
-                document.getElementById('chat-view-name').innerHTML = groupNameLabel(cachedGroups[activeGroupId]);
-                applyGroupAvatarToElement(document.getElementById('chat-view-avatar'), cachedGroups[activeGroupId]);
-                updateGroupPostingUI(cachedGroups[activeGroupId]);
+            if (activeGroupId && cachedCommunities[activeGroupId]) {
+                document.getElementById('chat-view-name').innerHTML = groupNameLabel(cachedCommunities[activeGroupId]);
+                applyGroupAvatarToElement(document.getElementById('chat-view-avatar'), cachedCommunities[activeGroupId]);
+                updateGroupPostingUI(cachedCommunities[activeGroupId]);
             }
 
             if (document.getElementById('tab-groups').classList.contains('active-tab')) {
@@ -16674,7 +16674,7 @@
                     if (!user) return;
                     acceptBtn.disabled = true;
                     try {
-                        await set(ref(database, `groups/${groupId}/members/${user.uid}`), true);
+                        await set(ref(database, `communities/${groupId}/members/${user.uid}`), true);
                         await remove(ref(database, `group_invites/${user.uid}/${groupId}`));
                         notify(`Joined ${invite.groupName}`);
                     } catch (err) {
@@ -16784,27 +16784,27 @@
         function getCommunityIdsForSubtab(subtab) {
             const user = auth.currentUser;
             if (!user) return [];
-            let ids = Object.keys(cachedGroups).filter(gid => {
-                const g = cachedGroups[gid];
+            let ids = Object.keys(cachedCommunities).filter(gid => {
+                const g = cachedCommunities[gid];
                 if (!g) return false;
                 const isMember = !!(g.members && g.members[user.uid]);
                 return subtab === 'home' ? isMember : g.isPublic;
             });
             if (activeCommunityCategory !== 'All') {
-                ids = ids.filter(gid => (cachedGroups[gid].category || 'General') === activeCommunityCategory);
+                ids = ids.filter(gid => (cachedCommunities[gid].category || 'General') === activeCommunityCategory);
             }
             // TEMP DIAGNOSTIC — remove once the Home-tab-shows-no-communities issue is confirmed
             // fixed. Logs exactly why a group did or didn't qualify, so a mismatch between what
             // the Chats list shows and what Communities Home shows can be pinpointed from the
-            // browser console instead of guessed at blind. Also covers Explore: if cachedGroups
+            // browser console instead of guessed at blind. Also covers Explore: if cachedCommunities
             // is non-empty but Explore still comes back empty, this shows whether that's because
             // every group is private, or because you're already a member of all the public ones.
             if (subtab === 'home' || subtab === 'explore') {
-                const totalGroups = Object.keys(cachedGroups).length;
+                const totalGroups = Object.keys(cachedCommunities).length;
                 console.log(`[communities-debug] subtab=${subtab} uid=${user.uid} totalGroupsInCache=${totalGroups} matches=${ids.length}`);
                 if (totalGroups > 0) {
-                    Object.keys(cachedGroups).forEach(gid => {
-                        const g = cachedGroups[gid] || {};
+                    Object.keys(cachedCommunities).forEach(gid => {
+                        const g = cachedCommunities[gid] || {};
                         const memberKeys = g.members ? Object.keys(g.members) : [];
                         console.log(`[communities-debug] group ${gid} name="${g.name}" isPublic=${g.isPublic} category=${g.category} memberUidsPresent=${JSON.stringify(memberKeys)} amIListed=${memberKeys.includes(user.uid)}`);
                     });
@@ -16821,7 +16821,7 @@
         // button (renderDiscoverGroupItem). Hidden entirely on Home or once there's nothing to
         // suggest. Kept as its own function (rather than folded into the post-feed pipeline)
         // so it can be refreshed independently — e.g. from renderGroupsLists() whenever
-        // cachedGroups changes — without touching or reshuffling the post feed underneath it.
+        // cachedCommunities changes — without touching or reshuffling the post feed underneath it.
         function ensureExploreGroupsSectionEl() {
             const container = document.getElementById('communities-feed-container');
             if (!container) return null;
@@ -16848,10 +16848,10 @@
                 section.innerHTML = '';
                 return;
             }
-            const sorted = ids.slice().sort((a, b) => (cachedGroups[b].createdAt || 0) - (cachedGroups[a].createdAt || 0));
+            const sorted = ids.slice().sort((a, b) => (cachedCommunities[b].createdAt || 0) - (cachedCommunities[a].createdAt || 0));
             section.style.display = '';
             section.innerHTML = '<div class="group-section-title">Communities to join</div>';
-            sorted.forEach(gid => renderDiscoverGroupItem(gid, cachedGroups[gid], section));
+            sorted.forEach(gid => renderDiscoverGroupItem(gid, cachedCommunities[gid], section));
         }
 
         async function loadCommunityFeed() {
@@ -16994,7 +16994,7 @@
                     const batchIds = ctx.remainingGroupIds.splice(0, COMMUNITY_FEED_GROUPS_PER_BATCH);
                     const results = await Promise.all(batchIds.map(async (gid) => {
                         try {
-                            const snap = await get(query(ref(database, `group_threads/${gid}/messages`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            const snap = await get(query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
                             if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
                             const entries = [];
                             let oldest = Infinity;
@@ -17015,7 +17015,7 @@
                     const results = await Promise.all(eligibleIds.map(async (gid) => {
                         const cursor = ctx.groupCursors[gid];
                         try {
-                            const snap = await get(query(ref(database, `group_threads/${gid}/messages`), orderByChild('createdAt'), endAt(cursor - 1), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            const snap = await get(query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), endAt(cursor - 1), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
                             if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
                             const entries = [];
                             let oldest = Infinity;
@@ -17083,7 +17083,9 @@
         // content, matching the look of a real feed post minus the like/repost/save actions —
         // those track engagement on actual `posts`, which these chat-message-backed cards aren't.
         // --- COMMUNITIES FEED POST ENGAGEMENT (like/comment) ---
-        // Group thread messages aren't real posts/{postId} entries, so — same reasoning as the
+        // Community posts live at communities/{id}/posts (mirrored from group_threads at send
+        // time, see sendGroupMessage/sendGroupMediaMessage) but aren't real posts/{postId}
+        // entries, so — same reasoning as the
         // news-card engagement model above — they get their own parallel data model:
         // communityPostEngagement/{msgId} for likes/comment counts, communityPostComments/{msgId}
         // for the flat comment list, reusing the exact same feed-post-card/.feed-comment-item
@@ -17239,7 +17241,7 @@
         }
 
         function buildCommunityPostCard(msg) {
-            const group = cachedGroups[msg.groupId] || {};
+            const group = cachedCommunities[msg.groupId] || {};
             const sender = cachedUsers[msg.senderUid] || {};
             const msgId = communityMsgEngagementId(msg);
             const card = document.createElement('div');
@@ -17385,7 +17387,7 @@
 
             showLoading();
             try {
-                const newGroupRef = push(ref(database, 'groups'));
+                const newGroupRef = push(ref(database, 'communities'));
                 await set(newGroupRef, {
                     name: name,
                     description: description || '',
@@ -17429,7 +17431,7 @@
                     if (directSnap.exists()) inviteeUid = rawInput;
                 }
 
-                const group = cachedGroups[activeGroupId];
+                const group = cachedCommunities[activeGroupId];
                 if (!inviteeUid) {
                     notify('Username not found', 'error');
                 } else if (inviteeUid === user.uid) {
@@ -17501,7 +17503,7 @@
 
         document.getElementById('btn-group-info').addEventListener('click', () => {
             if (!activeGroupId) return;
-            const group = cachedGroups[activeGroupId];
+            const group = cachedCommunities[activeGroupId];
             if (!group) return;
 
             document.getElementById('group-info-title').innerHTML = groupNameLabel(group);
@@ -17561,14 +17563,14 @@
 
         document.getElementById('group-only-owner-post-toggle').addEventListener('change', async (e) => {
             const user = auth.currentUser;
-            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
             if (!user || !group || !activeGroupId || group.ownerUid !== user.uid) {
                 e.target.checked = !!(group && group.onlyOwnerCanPost);
                 return;
             }
             const value = e.target.checked;
             try {
-                await update(ref(database, `groups/${activeGroupId}`), { onlyOwnerCanPost: value });
+                await update(ref(database, `communities/${activeGroupId}`), { onlyOwnerCanPost: value });
                 notify(value ? 'Only you can post in this group now' : 'All members can post now');
             } catch (err) {
                 e.target.checked = !value;
@@ -17578,7 +17580,7 @@
 
         document.getElementById('btn-convert-business-page').addEventListener('click', async () => {
             const user = auth.currentUser;
-            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
             if (!user || !group || !activeGroupId || group.ownerUid !== user.uid) return;
 
             const confirmed = await showCustomModal(
@@ -17589,7 +17591,7 @@
             if (!confirmed) return;
 
             try {
-                await update(ref(database, `groups/${activeGroupId}`), { isBusinessPage: true, onlyOwnerCanPost: true });
+                await update(ref(database, `communities/${activeGroupId}`), { isBusinessPage: true, onlyOwnerCanPost: true });
                 notify('Your group is now a verified Business Page!');
             } catch (err) {
                 notify('Could not convert this group to a Business Page', 'error');
@@ -18165,7 +18167,7 @@
         groupAvatarUpload.addEventListener('click', (e) => {
             e.preventDefault();
             const user = auth.currentUser;
-            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
             if (!canEditGroupPhoto(group, user ? user.uid : null)) return;
             groupPhotoInput.click();
         });
@@ -18174,14 +18176,14 @@
             e.preventDefault();
             const file = e.target.files[0];
             const user = auth.currentUser;
-            const group = activeGroupId ? cachedGroups[activeGroupId] : null;
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
             if (!file || !user || !group || !activeGroupId) return;
             if (!canEditGroupPhoto(group, user.uid)) return;
 
             groupAvatarUpload.classList.add('uploading');
             try {
                 const { url } = await uploadToCloudinary(file);
-                await update(ref(database, `groups/${activeGroupId}`), { photoURL: url });
+                await update(ref(database, `communities/${activeGroupId}`), { photoURL: url });
                 groupAvatarPreview.style.backgroundImage = `url('${url}')`;
                 groupAvatarPreview.textContent = "";
                 notify('Group photo updated');
@@ -18195,13 +18197,13 @@
         document.getElementById('btn-leave-group').addEventListener('click', async () => {
             const user = auth.currentUser;
             if (!user || !activeGroupId) return;
-            const group = cachedGroups[activeGroupId];
+            const group = cachedCommunities[activeGroupId];
             if (group && group.ownerUid === user.uid) {
                 notify("As the owner, you can't leave. Delete the group instead.", 'error');
                 return;
             }
             try {
-                await remove(ref(database, `groups/${activeGroupId}/members/${user.uid}`));
+                await remove(ref(database, `communities/${activeGroupId}/members/${user.uid}`));
                 groupInfoSheet.classList.remove('active');
                 notify('You left the group');
                 history.back();
@@ -18212,7 +18214,7 @@
 
         function openGroupChatView(groupId) {
             const user = auth.currentUser;
-            const group = cachedGroups[groupId];
+            const group = cachedCommunities[groupId];
             if (!user || !group) return;
 
             activeGroupId = groupId;
@@ -18456,7 +18458,7 @@
             const text = input.value.trim();
             if (!text || !activeGroupId || !user) return;
 
-            const group = cachedGroups[activeGroupId] || {};
+            const group = cachedCommunities[activeGroupId] || {};
             if (!canPostInGroup(group, user.uid)) {
                 notify('Only the group owner can post in this group', 'error');
                 return;
@@ -18475,6 +18477,9 @@
                 const newMsgKey = push(ref(database, `group_threads/${activeGroupId}/messages`)).key;
                 const updates = {};
                 updates[`group_threads/${activeGroupId}/messages/${newMsgKey}`] = msgPayload;
+                // Mirror into communities/{id}/posts so the Communities feed (loadMoreCommunityPosts)
+                // has a dedicated posts node to read from, decoupled from group_threads chat history.
+                updates[`communities/${activeGroupId}/posts/${newMsgKey}`] = msgPayload;
 
                 const memberIds = group.members ? Object.keys(group.members) : [];
                 memberIds.forEach(memberUid => {
@@ -18513,7 +18518,7 @@
             const previewUrl = selectedChatGif.previewUrl;
 
             if (activeGroupId) {
-                const group = cachedGroups[activeGroupId] || {};
+                const group = cachedCommunities[activeGroupId] || {};
                 if (!canPostInGroup(group, user.uid)) {
                     notify('Only the group owner can post in this group', 'error');
                     return;
@@ -18593,7 +18598,7 @@
             const previewText = `🎵 ${music.trackName}`;
 
             if (activeGroupId) {
-                const group = cachedGroups[activeGroupId] || {};
+                const group = cachedCommunities[activeGroupId] || {};
                 if (!canPostInGroup(group, user.uid)) {
                     notify('Only the group owner can post in this group', 'error');
                     return;
@@ -21421,7 +21426,7 @@
 
         async function startOrJoinGroupCall(groupId) {
             const user = auth.currentUser;
-            const group = cachedGroups[groupId];
+            const group = cachedCommunities[groupId];
             if (!user || !group) return;
             if (groupCallId === groupId) { document.getElementById('group-call-overlay').classList.add('active'); return; }
             if (groupCallId || callId) { notify('You are already on a call', 'error'); return; }
@@ -21670,7 +21675,7 @@
             const user = auth.currentUser;
             if (!user) return;
             try {
-                const group = cachedGroups[groupId] || {};
+                const group = cachedCommunities[groupId] || {};
                 const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
                 const newMsgKey = push(ref(database, `group_threads/${groupId}/messages`)).key;
                 const msgPayload = { senderUid: user.uid, senderName, createdAt: Date.now(), mediaType: 'group_call', callStatus: kind, callDuration: durationSec || 0 };
@@ -23912,7 +23917,7 @@
 
             if (activeGroupId) {
                 const groupId = activeGroupId;
-                const group = cachedGroups[groupId];
+                const group = cachedCommunities[groupId];
                 if (!group || !canPostInGroup(group, user.uid)) {
                     notify('Only the group owner can post in this group', 'error');
                     return;
@@ -24091,7 +24096,7 @@
 
             if (activeGroupId) {
                 if (kind !== 'media') return;
-                const group = cachedGroups[activeGroupId];
+                const group = cachedCommunities[activeGroupId];
                 const user = auth.currentUser;
                 if (!group || !user || !canPostInGroup(group, user.uid)) {
                     notify('Only the group owner can post in this group', 'error');
@@ -24186,7 +24191,7 @@
         async function sendGroupMediaMessage(file, caption) {
             const user = auth.currentUser;
             const groupId = activeGroupId;
-            const group = groupId ? cachedGroups[groupId] : null;
+            const group = groupId ? cachedCommunities[groupId] : null;
             if (!user || !group || !groupId || !file) return;
             if (!canPostInGroup(group, user.uid)) {
                 notify('Only the group owner can post in this group', 'error');
@@ -24222,7 +24227,7 @@
 
             try {
                 const safeName = (file.name || 'media').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const storagePath = `groups/${groupId}/${Date.now()}_${safeName}`;
+                const storagePath = `communities/${groupId}/${Date.now()}_${safeName}`;
                 const url = await uploadToFirebaseStorage(file, storagePath);
 
                 const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'Someone';
@@ -24238,6 +24243,9 @@
                 const newMsgKey = push(ref(database, `group_threads/${groupId}/messages`)).key;
                 const updates = {};
                 updates[`group_threads/${groupId}/messages/${newMsgKey}`] = msgPayload;
+                // Mirror into communities/{id}/posts so the Communities feed (loadMoreCommunityPosts)
+                // has a dedicated posts node to read from, decoupled from group_threads chat history.
+                updates[`communities/${groupId}/posts/${newMsgKey}`] = msgPayload;
 
                 const previewText = caption || (isVideo ? '🎥 Video' : '📷 Photo');
                 const memberIds = group.members ? Object.keys(group.members) : [];
@@ -24736,12 +24744,29 @@
                 if (userChatsInitialized) renderChatListFromCache();
             });
 
-            onValue(ref(database, "groups"), (snap) => {
-                cachedGroups = snap.exists() ? snap.val() : {};
+            onValue(ref(database, "communities"), (snap) => {
+                cachedCommunities = snap.exists() ? snap.val() : {};
                 renderGroupsLists();
                 if (userChatsInitialized) renderChatListFromCache();
                 renderCallList(cachedCallLogEntries); // group names/photos may have just arrived
             });
+
+            // ONE-TIME CLEANUP — communities now live under the "communities" node (see the
+            // onValue above) instead of the old "groups" node, and community posts are read
+            // from communities/{id}/posts instead of group_threads/{id}/messages. The old
+            // "groups" node is no longer read anywhere in the app, but it isn't deleted
+            // automatically here since that's destructive and irreversible. Run
+            // window.wipeOldGroupsNode() once from the console (as an authenticated user with
+            // write access to the DB root) when you're ready to actually delete it.
+            window.wipeOldGroupsNode = async function () {
+                if (!confirm('This will permanently delete the old "groups" node from the database. Continue?')) return;
+                try {
+                    await remove(ref(database, 'groups'));
+                    console.log('[cleanup] old "groups" node removed.');
+                } catch (err) {
+                    console.error('[cleanup] failed to remove old "groups" node:', err);
+                }
+            };
 
             watchCallLog();
 
@@ -24916,7 +24941,7 @@
                     const meta = chats[chatUid];
                     if (meta && isE2EPayload(meta.text)) meta.text = await decryptForPeer(chatUid, meta.text);
                 }));
-                const myGroupIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].members && cachedGroups[gid].members[user.uid]);
+                const myGroupIds = Object.keys(cachedCommunities).filter(gid => cachedCommunities[gid].members && cachedCommunities[gid].members[user.uid]);
 
                 // "All" shows both direct chats and the groups the user belongs to, merged
                 // and sorted together by most recent activity — same as the Groups tab list,
@@ -24928,7 +24953,7 @@
                 });
                 myGroupIds.forEach(gid => {
                     const meta = cachedGroupChatsMeta[gid];
-                    const timestamp = (meta && meta.timestamp) || cachedGroups[gid].createdAt || 0;
+                    const timestamp = (meta && meta.timestamp) || cachedCommunities[gid].createdAt || 0;
                     combinedEntries.push({ type: 'group', id: gid, timestamp });
                 });
                 combinedEntries.sort((a, b) => b.timestamp - a.timestamp);
@@ -24939,7 +24964,7 @@
                     combinedEntries.forEach(entry => {
                         if (entry.type === 'group') {
                             const groupMeta = cachedGroupChatsMeta[entry.id];
-                            renderMyGroupItem(entry.id, cachedGroups[entry.id], chatList, groupMeta);
+                            renderMyGroupItem(entry.id, cachedCommunities[entry.id], chatList, groupMeta);
                             if (groupMeta && groupMeta.unreadCount > 0) totalUnread += groupMeta.unreadCount;
                             return;
                         }

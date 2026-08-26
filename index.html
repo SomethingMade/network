@@ -2166,46 +2166,40 @@
         .segmented-control button { flex: 1; border: none; background: transparent; padding: 10px; border-radius: 50px; font-size: 14px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: 0.2s; }
         .segmented-control button.active { background: var(--gradient-brand); color: white; }
 
-        /* ── COMMUNITY (Groups/Pages) TAB — X/Twitter-style redesign ──
-           Swaps the filled pill switcher for the same flat underline-tab row used by
-           .feed-subtabs / .profile-subtabs elsewhere, so Groups/Pages reads consistently
-           with the rest of the app's X-style tab pattern. Scoped to #groups-sub-tabs only
-           — #contacts-sub-tabs keeps the original pill look untouched. */
-        #groups-sub-tabs { background: none; border: none; border-radius: 0; padding: 0; margin-bottom: 0; border-bottom: 1px solid var(--border-color); }
-        #groups-sub-tabs button { padding: 12px 0 10px; border-radius: 0; font-size: 14.5px; font-weight: 700; position: relative; }
-        #groups-sub-tabs button:hover { background: var(--bg-hover); }
-        #groups-sub-tabs button.active { background: none; color: var(--text-primary); }
-        #groups-sub-tabs button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--primary-blue); }
+        /* ── COMMUNITIES TAB — X-style feed of posts pulled from group/page chat messages ──
+           Home/Explore uses the same flat underline-tab row as .feed-subtabs/.profile-subtabs
+           elsewhere, so it reads consistently with the rest of the app's X-style tab pattern. */
+        #communities-sub-tabs { background: none; border: none; border-radius: 0; padding: 0; margin-bottom: 0; border-bottom: 1px solid var(--border-color); }
+        #communities-sub-tabs button { padding: 12px 0 10px; border-radius: 0; font-size: 14.5px; font-weight: 700; position: relative; }
+        #communities-sub-tabs button:hover { background: var(--bg-hover); }
+        #communities-sub-tabs button.active { background: none; color: var(--text-primary); }
+        #communities-sub-tabs button.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--primary-blue); }
 
-        /* "My Groups"/"My Pages" — flat, edge-to-edge rows with a hairline divider (X's
-           joined-communities list) instead of the floating rounded chat-item card, and a
-           rounded-square avatar to read as a community icon rather than a person's DP. */
-        #my-groups-list-container.chat-list-container, #my-pages-list-container.chat-list-container { padding: 0; }
-        #groups-subtab-panel .chat-item, #pages-subtab-panel .chat-item {
-            border-radius: 0; margin-bottom: 0; padding: 12px 16px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        #groups-subtab-panel .chat-item:hover, #pages-subtab-panel .chat-item:hover { transform: none; }
-        #groups-subtab-panel .chat-item::before, #pages-subtab-panel .chat-item::before { display: none; }
-        #groups-subtab-panel .chat-item .avatar, #groups-subtab-panel .chat-item .chat-avatar-ring,
-        #pages-subtab-panel .chat-item .avatar, #pages-subtab-panel .chat-item .chat-avatar-ring { border-radius: 14px; }
-        #groups-subtab-panel .chat-item .chat-preview h3, #pages-subtab-panel .chat-item .chat-preview h3 { font-size: 15px; font-weight: 700; }
-        #groups-subtab-panel .chat-item .chat-preview p, #pages-subtab-panel .chat-item .chat-preview p { display: flex; align-items: center; gap: 4px; white-space: normal; }
-        #groups-subtab-panel .chat-item .chat-preview p svg, #pages-subtab-panel .chat-item .chat-preview p svg { flex-shrink: 0; opacity: 0.7; }
-        #groups-subtab-panel .chat-item .chat-preview p span, #pages-subtab-panel .chat-item .chat-preview p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Horizontally-scrolling category filter chips (Sports/Technology/Art/...), same
+           pill-with-border look whether they're filtering the feed here or picking a category
+           in the Create Group modal (.category-picker-chips reuses this class). */
+        .community-category-chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; -ms-overflow-style: none; }
+        .community-category-chips::-webkit-scrollbar { display: none; }
+        .community-category-chip { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; transition: 0.15s; white-space: nowrap; }
+        .community-category-chip:hover { background: var(--bg-hover); }
+        .community-category-chip.active { background: var(--text-primary); color: var(--bg-surface); border-color: var(--text-primary); }
 
-        /* "Discover" — bordered rounded cards (X's Explore-communities look), distinct
-           from the flat joined list above so new communities read as suggestions to browse. */
-        #discover-groups-list-container .chat-item, #discover-pages-list-container .chat-item {
-            border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 10px;
-            padding: 14px; transition: border-color 0.15s ease, background 0.15s ease;
-        }
-        #discover-groups-list-container .chat-item:hover, #discover-pages-list-container .chat-item:hover {
-            border-color: var(--primary-blue); background: var(--bg-hover);
-        }
-        #discover-groups-list-container .chat-item .btn-add-contact, #discover-pages-list-container .chat-item .btn-add-contact {
-            padding: 7px 18px; font-size: 13px; font-weight: 700; border-radius: 50px;
-        }
+        /* One community post card = one group/page chat message rendered feed-style. Reuses
+           .feed-post-card's body/text/avatar layout (see buildFeedPostCard) and adds a byline
+           row on top naming which community it came from, matching X's Community-feed look. */
+        .community-post-card { cursor: pointer; }
+        .community-post-card:active { background: var(--bg-hover); }
+        .community-post-byline { display: flex; align-items: center; gap: 6px; padding: 12px 16px 0; font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
+        .community-post-byline .avatar { width: 16px; height: 16px; flex-shrink: 0; border-radius: 4px; }
+        .community-post-byline-name { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+        .community-post-byline-cat { padding: 1px 8px; border-radius: 50px; background: var(--bg-hover); font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+        .community-post-media { position: relative; margin: 10px 16px 4px; border-radius: 14px; overflow: hidden; max-height: 260px; background: var(--bg-hover); }
+        .community-post-media img { display: block; width: 100%; max-height: 260px; object-fit: cover; }
+        .community-post-media-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); }
+        .community-post-media-play svg { width: 46px; height: 46px; color: #fff; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.4)); }
+
+        /* Category picker in the Create Group modal — same chip look as the feed filter above. */
+        .category-picker-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
         .contact-action-btn { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-color); background: transparent; cursor: pointer; transition: 0.2s; }
         .contact-action-btn.danger { color: var(--danger-red); border-color: rgba(255, 69, 58, 0.3); }
         .contact-action-btn.danger:hover { background: rgba(255, 69, 58, 0.1); }
@@ -3783,6 +3777,7 @@
                 <button type="button" id="btn-group-public" class="active" data-value="public">Public</button>
                 <button type="button" id="btn-group-private" data-value="private">Private</button>
             </div>
+            <div class="category-picker-chips" id="create-group-category-chips"></div>
             <div class="modal-actions">
                 <button type="button" id="btn-cancel-create-group" class="btn-pill btn-outline">Cancel</button>
                 <button type="button" id="btn-confirm-create-group" class="btn-pill btn-primary">Create</button>
@@ -5363,7 +5358,7 @@
                         <div class="chat-header-top">
                             <div class="chat-header-title-row">
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-                                <h1>Community</h1>
+                                <h1>Communities</h1>
                             </div>
                             <div class="chat-header-icons">
                                 <svg id="btn-create-group" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Create Group"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
@@ -5386,29 +5381,16 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="search-box">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="search" id="search-groups" placeholder="Search groups..." autocomplete="off" name="haba-search-groups" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                        <div class="segmented-control" id="communities-sub-tabs">
+                            <button type="button" class="active" data-subtab="home">Home</button>
+                            <button type="button" data-subtab="explore">Explore</button>
                         </div>
-                        <div class="segmented-control" id="groups-sub-tabs">
-                            <button type="button" class="active" data-subtab="groups">Groups</button>
-                            <button type="button" data-subtab="pages">Pages</button>
-                        </div>
+                        <div class="community-category-chips" id="community-category-chips"></div>
                     </div>
-                    <div id="groups-subtab-panel">
-                        <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
-                        <div class="group-section-title">My Groups</div>
-                        <div class="chat-list-container" id="my-groups-list-container" style="flex:none; max-height:40%;"></div>
-                        <div class="group-section-title">Discover Public Groups</div>
-                        <div class="chat-list-container" id="discover-groups-list-container"></div>
-                    </div>
-                    <div id="pages-subtab-panel" style="display:none;">
-                        <div class="group-section-title">My Pages</div>
-                        <div class="chat-list-container" id="my-pages-list-container" style="flex:none; max-height:40%;"></div>
-                        <div class="group-section-title">Discover Public Pages</div>
-                        <div class="chat-list-container" id="discover-pages-list-container"></div>
-                    </div>
+                    <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
+                    <div id="communities-feed-container"></div>
                 </div>
+
 
                 <div id="tab-calls" class="tab-content">
                     <div class="chat-header-area">
@@ -7629,14 +7611,7 @@
             }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
         })();
 
-        const groupSearchInput = document.getElementById('search-groups');
-        groupSearchInput.addEventListener('input', () => {
-            filterListItems(groupSearchInput, 'my-groups-list-container');
-            filterListItems(groupSearchInput, 'discover-groups-list-container');
-            filterListItems(groupSearchInput, 'my-pages-list-container');
-            filterListItems(groupSearchInput, 'discover-pages-list-container');
-        });
-
+        
         // Lands the Home feed at the top on entry and holds it there for a short window.
         // A single scrollTop=0 assignment isn't enough here: posts stream in asynchronously
         // from Firebase right after landing on the tab, and that content arriving above/within
@@ -7796,8 +7771,9 @@
                 if (hash === 'tab-chats' && isInitialSync !== true) {
                     updateChatsUnreadBadge(0);
                 }
-                if (hash === 'tab-groups' && isInitialSync !== true) {
-                    updateHeaderGroupsBadge(0);
+                if (hash === 'tab-groups') {
+                    if (isInitialSync !== true) updateHeaderGroupsBadge(0);
+                    loadCommunityFeed();
                 }
                 if(activeTab) {
                     activeTab.classList.add('active-tab');
@@ -16407,74 +16383,23 @@
             container.appendChild(item);
         }
 
+        // Refreshes anything in the Communities tab that depends on cachedGroups/cachedGroupChatsMeta:
+        // the group-invites banner, the active group chat header (if one's open), and — only when
+        // the Communities tab is actually the one on screen — the post feed itself (see
+        // loadCommunityFeed). Gated on visibility because a feed refresh means several Firebase
+        // reads (one per community), which isn't worth doing for a tab the user isn't looking at.
         function renderGroupsLists() {
             const user = auth.currentUser;
             if (!user) return;
-
-            const myContainer = document.getElementById('my-groups-list-container');
-            const discoverContainer = document.getElementById('discover-groups-list-container');
-            const myPagesContainer = document.getElementById('my-pages-list-container');
-            const discoverPagesContainer = document.getElementById('discover-pages-list-container');
-
-            // Cleanup old group typing listeners before re-rendering the list
-            Object.values(groupListTypingUnsubscribers).forEach(unsub => unsub());
-            groupListTypingUnsubscribers = {};
-
-            myContainer.innerHTML = '';
-            discoverContainer.innerHTML = '';
-            myPagesContainer.innerHTML = '';
-            discoverPagesContainer.innerHTML = '';
-
-            const myGroupIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].members && cachedGroups[gid].members[user.uid] && !cachedGroups[gid].isBusinessPage);
-            const discoverGroupIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].isPublic && !cachedGroups[gid].isBusinessPage && !(cachedGroups[gid].members && cachedGroups[gid].members[user.uid]));
-            const myPageIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].members && cachedGroups[gid].members[user.uid] && cachedGroups[gid].isBusinessPage);
-            const discoverPageIds = Object.keys(cachedGroups).filter(gid => cachedGroups[gid].isPublic && cachedGroups[gid].isBusinessPage && !(cachedGroups[gid].members && cachedGroups[gid].members[user.uid]));
-
-            if (myGroupIds.length === 0) {
-                myContainer.innerHTML = '<p class="empty-msg">You haven\'t joined any groups yet.</p>';
-            } else {
-                myGroupIds.sort((a, b) => {
-                    const bTime = (cachedGroupChatsMeta[b] && cachedGroupChatsMeta[b].timestamp) || cachedGroups[b].createdAt || 0;
-                    const aTime = (cachedGroupChatsMeta[a] && cachedGroupChatsMeta[a].timestamp) || cachedGroups[a].createdAt || 0;
-                    return bTime - aTime;
-                });
-                myGroupIds.forEach(gid => renderMyGroupItem(gid, cachedGroups[gid], myContainer, cachedGroupChatsMeta[gid]));
-            }
-
-            if (discoverGroupIds.length === 0) {
-                discoverContainer.innerHTML = '<p class="empty-msg">No public groups to discover right now.</p>';
-            } else {
-                discoverGroupIds.sort((a, b) => (cachedGroups[b].createdAt || 0) - (cachedGroups[a].createdAt || 0));
-                discoverGroupIds.forEach(gid => renderDiscoverGroupItem(gid, cachedGroups[gid], discoverContainer));
-            }
-
-            if (myPageIds.length === 0) {
-                myPagesContainer.innerHTML = '<p class="empty-msg">You haven\'t joined any business pages yet.</p>';
-            } else {
-                myPageIds.sort((a, b) => {
-                    const bTime = (cachedGroupChatsMeta[b] && cachedGroupChatsMeta[b].timestamp) || cachedGroups[b].createdAt || 0;
-                    const aTime = (cachedGroupChatsMeta[a] && cachedGroupChatsMeta[a].timestamp) || cachedGroups[a].createdAt || 0;
-                    return bTime - aTime;
-                });
-                myPageIds.forEach(gid => renderMyGroupItem(gid, cachedGroups[gid], myPagesContainer, cachedGroupChatsMeta[gid]));
-            }
-
-            if (discoverPageIds.length === 0) {
-                discoverPagesContainer.innerHTML = '<p class="empty-msg">No public business pages to discover right now.</p>';
-            } else {
-                discoverPageIds.sort((a, b) => (cachedGroups[b].createdAt || 0) - (cachedGroups[a].createdAt || 0));
-                discoverPageIds.forEach(gid => renderDiscoverGroupItem(gid, cachedGroups[gid], discoverPagesContainer));
-            }
-
-            filterListItems(groupSearchInput, 'my-groups-list-container');
-            filterListItems(groupSearchInput, 'discover-groups-list-container');
-            filterListItems(groupSearchInput, 'my-pages-list-container');
-            filterListItems(groupSearchInput, 'discover-pages-list-container');
 
             if (activeGroupId && cachedGroups[activeGroupId]) {
                 document.getElementById('chat-view-name').innerHTML = groupNameLabel(cachedGroups[activeGroupId]);
                 applyGroupAvatarToElement(document.getElementById('chat-view-avatar'), cachedGroups[activeGroupId]);
                 updateGroupPostingUI(cachedGroups[activeGroupId]);
+            }
+
+            if (document.getElementById('tab-groups').classList.contains('active-tab')) {
+                loadCommunityFeed();
             }
         }
 
@@ -16542,50 +16467,180 @@
             });
         }
 
-        document.getElementById('my-groups-list-container').addEventListener('click', (e) => {
-            const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
-            const card = e.target.closest('.chat-item');
-            if (card) openGroupChatView(card.dataset.groupId);
+        // --- COMMUNITIES TAB: X-style feed of posts pulled from group/page chat messages ---
+        // (see toggleRepostPost/buildFeedPostCard above for the unrelated, actual-post repost
+        // feature — this is a separate, lighter-weight feed built from existing group chat
+        // messages, per the product decision to reuse chat content rather than add a whole new
+        // "community post" data model.)
+        const COMMUNITY_CATEGORIES = ['All', 'Sports', 'Technology', 'Art', 'Entertainment', 'Gaming', 'News', 'General'];
+        let activeCommunitySubtab = 'home'; // 'home' (joined communities) | 'explore' (public, not yet joined)
+        let activeCommunityCategory = 'All';
+        let communityFeedLoadToken = 0; // bumped on every load so a slow, superseded fetch never overwrites a newer one
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function renderCommunityCategoryChips() {
+            const container = document.getElementById('community-category-chips');
+            container.innerHTML = COMMUNITY_CATEGORIES.map(cat =>
+                `<button type="button" class="community-category-chip${cat === activeCommunityCategory ? ' active' : ''}" data-category="${cat}">${cat}</button>`
+            ).join('');
+        }
+        renderCommunityCategoryChips();
+        document.getElementById('community-category-chips').addEventListener('click', (e) => {
+            const chip = e.target.closest('.community-category-chip');
+            if (!chip || chip.classList.contains('active')) return;
+            triggerHaptic(10);
+            activeCommunityCategory = chip.dataset.category;
+            document.querySelectorAll('.community-category-chip').forEach(c => c.classList.toggle('active', c === chip));
+            loadCommunityFeed();
         });
 
-        document.getElementById('discover-groups-list-container').addEventListener('click', (e) => {
-            const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); }
-        });
-
-        document.getElementById('my-pages-list-container').addEventListener('click', (e) => {
-            const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
-            const card = e.target.closest('.chat-item');
-            if (card) openGroupChatView(card.dataset.groupId);
-        });
-
-        document.getElementById('discover-pages-list-container').addEventListener('click', (e) => {
-            const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); }
-        });
-
-        document.getElementById('groups-sub-tabs').addEventListener('click', (e) => {
+        document.getElementById('communities-sub-tabs').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-subtab]');
-            if (!btn) return;
-            if (!btn.classList.contains('active')) triggerHaptic(10);
-            document.querySelectorAll('#groups-sub-tabs button').forEach(b => b.classList.remove('active'));
+            if (!btn || btn.classList.contains('active')) return;
+            triggerHaptic(10);
+            document.querySelectorAll('#communities-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            const subtab = btn.dataset.subtab;
-            document.getElementById('groups-subtab-panel').style.display = subtab === 'groups' ? 'block' : 'none';
-            document.getElementById('pages-subtab-panel').style.display = subtab === 'pages' ? 'block' : 'none';
+            activeCommunitySubtab = btn.dataset.subtab;
+            loadCommunityFeed();
         });
+
+        // Home = communities I've joined; Explore = public communities I haven't joined yet —
+        // filtered by the active category chip, 'All' meaning no filter.
+        function getCommunityIdsForSubtab(subtab) {
+            const user = auth.currentUser;
+            if (!user) return [];
+            let ids = Object.keys(cachedGroups).filter(gid => {
+                const g = cachedGroups[gid];
+                if (!g) return false;
+                const isMember = !!(g.members && g.members[user.uid]);
+                return subtab === 'home' ? isMember : (g.isPublic && !isMember);
+            });
+            if (activeCommunityCategory !== 'All') {
+                ids = ids.filter(gid => (cachedGroups[gid].category || 'General') === activeCommunityCategory);
+            }
+            return ids;
+        }
+
+        // Pulls a handful of recent messages from a random sample of eligible communities and
+        // interleaves them into one shuffled feed — the "random algorithm" the Explore/Home feed
+        // is built on. Capped on both ends (communities sampled, posts shown) to keep this to a
+        // reasonable number of reads.
+        async function loadCommunityFeed() {
+            const token = ++communityFeedLoadToken;
+            const container = document.getElementById('communities-feed-container');
+            const communityIds = getCommunityIdsForSubtab(activeCommunitySubtab);
+
+            if (communityIds.length === 0) {
+                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${activeCommunitySubtab === 'home' ? "Join some communities to see their posts here." : "No public communities to explore right now."}</p></div>`;
+                return;
+            }
+
+            container.innerHTML = `<p class="empty-msg" style="padding:40px 0;">Loading posts…</p>`;
+
+            const sampleIds = shuffleArray(communityIds.slice()).slice(0, 25);
+            const perGroupMessages = await Promise.all(sampleIds.map(async (gid) => {
+                try {
+                    const snap = await get(query(ref(database, `group_threads/${gid}/messages`), limitToLast(6)));
+                    if (!snap.exists()) return [];
+                    return Object.entries(snap.val())
+                        .map(([key, msg]) => ({ key, ...msg, groupId: gid }))
+                        .filter(msg => !msg.deleted && (msg.text || (msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video'))));
+                } catch (err) { return []; }
+            }));
+
+            if (token !== communityFeedLoadToken) return; // a newer load has since started — drop this one
+
+            let posts = shuffleArray(perGroupMessages.flat()).slice(0, 40);
+
+            if (posts.length === 0) {
+                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">No posts yet in ${activeCommunitySubtab === 'home' ? 'your communities' : 'these communities'}.</p></div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            posts.forEach(msg => container.appendChild(buildCommunityPostCard(msg)));
+        }
+
+        // Renders one group/page chat message as a feed-style post card: a small byline row
+        // naming the community it's from (tap → open that community's chat), then the sender +
+        // content, matching the look of a real feed post minus the like/repost/save actions —
+        // those track engagement on actual `posts`, which these chat-message-backed cards aren't.
+        function buildCommunityPostCard(msg) {
+            const group = cachedGroups[msg.groupId] || {};
+            const sender = cachedUsers[msg.senderUid] || {};
+            const card = document.createElement('div');
+            card.className = 'feed-post-card community-post-card';
+            card.dataset.groupId = msg.groupId;
+            card.dataset.communityName = (group.name || '').toLowerCase();
+
+            let mediaHtml = '';
+            if (msg.mediaURL && msg.mediaType === 'image') {
+                mediaHtml = `<div class="community-post-media"><img src="${msg.mediaURL}" alt="" loading="lazy"></div>`;
+            } else if (msg.mediaURL && msg.mediaType === 'video') {
+                const poster = cloudinaryVideoThumbnail(msg.mediaURL, 1);
+                mediaHtml = `<div class="community-post-media">${poster ? `<img src="${poster}" alt="" loading="lazy">` : ''}<div class="community-post-media-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div></div>`;
+            }
+
+            card.innerHTML = `
+                <div class="community-post-byline">
+                    ${groupAvatarHtml(group)}
+                    <span class="community-post-byline-name">${groupNameLabel(group)}</span>
+                    <span class="community-post-byline-cat">${group.category || 'General'}</span>
+                </div>
+                <div class="x-post-row">
+                    <div class="x-post-avatar-col">${feedAvatarHtml(sender)}</div>
+                    <div class="x-post-content-col">
+                        <div class="x-post-headline">
+                            <div class="x-post-headline-main">
+                                <span class="name">${escapeHtmlForPost(sender.name || 'Member')}</span>
+                                <span class="time"><span data-rel-ts="${msg.createdAt}">${formatTime(msg.createdAt)}</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feed-post-body">
+                    ${msg.text ? `<p class="feed-post-text">${linkifyHashtags(msg.text)}</p>` : ''}
+                </div>
+                ${mediaHtml}
+            `;
+            card.addEventListener('click', () => openGroupChatView(msg.groupId));
+            return card;
+        }
 
         // Create Group modal
         const createGroupModal = document.getElementById('create-group-modal-overlay');
         let selectedGroupVisibility = 'public';
+        let selectedGroupCategory = 'General';
+        // Same categories as the Communities feed filter chips, minus 'All' (a group must have
+        // one concrete category, unlike the feed filter which can show everything).
+        const CREATABLE_GROUP_CATEGORIES = COMMUNITY_CATEGORIES.filter(c => c !== 'All');
+        function renderCreateGroupCategoryChips() {
+            const container = document.getElementById('create-group-category-chips');
+            container.innerHTML = CREATABLE_GROUP_CATEGORIES.map(cat =>
+                `<button type="button" class="community-category-chip${cat === selectedGroupCategory ? ' active' : ''}" data-category="${cat}">${cat}</button>`
+            ).join('');
+        }
+        document.getElementById('create-group-category-chips').addEventListener('click', (e) => {
+            const chip = e.target.closest('.community-category-chip');
+            if (!chip) return;
+            selectedGroupCategory = chip.dataset.category;
+            document.querySelectorAll('#create-group-category-chips .community-category-chip').forEach(c => c.classList.toggle('active', c === chip));
+        });
         document.getElementById('btn-create-group').addEventListener('click', () => {
             document.getElementById('group-name-input').value = '';
             document.getElementById('group-description-input').value = '';
             selectedGroupVisibility = 'public';
             document.getElementById('btn-group-public').classList.add('active');
             document.getElementById('btn-group-private').classList.remove('active');
+            selectedGroupCategory = 'General';
+            renderCreateGroupCategoryChips();
             createGroupModal.classList.add('active');
         });
         document.getElementById('btn-cancel-create-group').addEventListener('click', () => {
@@ -16614,6 +16669,7 @@
                     name: name,
                     description: description || '',
                     isPublic: selectedGroupVisibility === 'public',
+                    category: selectedGroupCategory,
                     ownerUid: user.uid,
                     createdAt: Date.now(),
                     members: { [user.uid]: true }
@@ -19469,10 +19525,7 @@
 
         function highlightActiveChat() {
             document.querySelectorAll('#chat-list-container .chat-item, #contacts-list-container .chat-item').forEach(el => {
-                el.classList.toggle('active-chat', el.dataset.uid === activeChatUid);
-            });
-            document.querySelectorAll('#my-groups-list-container .chat-item, #my-pages-list-container .chat-item').forEach(el => {
-                el.classList.toggle('active-chat', el.dataset.groupId === activeGroupId);
+                el.classList.toggle('active-chat', el.dataset.uid === activeChatUid || el.dataset.groupId === activeGroupId);
             });
         }
 

@@ -2189,6 +2189,8 @@
            single vertical column and scroll independently of the fixed header/tabs above them. */
         #communities-feed-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; overflow-anchor: none; }
         #communities-feed-list { display: flex; flex-direction: column; }
+        #communities-explore-groups-list { display: flex; flex-direction: column; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); }
+        #communities-explore-groups-list .group-section-title { padding: 14px 4px 6px; }
 
         /* One community post card = one group/page chat message rendered feed-style. Reuses
            .feed-post-card's body/text/avatar layout (see buildFeedPostCard) and adds a byline
@@ -5395,7 +5397,7 @@
                         <div class="community-category-chips" id="community-category-chips"></div>
                     </div>
                     <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
-                    <div id="communities-feed-container"><div id="communities-feed-list"></div></div>
+                    <div id="communities-feed-container"><div id="communities-explore-groups-list" style="display:none;"></div><div id="communities-feed-list"></div></div>
                 </div>
 
 
@@ -16385,7 +16387,14 @@
                 btn.textContent = 'Joining...';
                 try {
                     await set(ref(database, `groups/${groupId}/members/${user.uid}`), true);
+                    if (cachedGroups[groupId]) {
+                        cachedGroups[groupId].members = cachedGroups[groupId].members || {};
+                        cachedGroups[groupId].members[user.uid] = true;
+                    }
                     notify(`You joined ${group.name}`);
+                    item.remove();
+                    const remainingItems = container.querySelectorAll('.chat-item').length;
+                    if (remainingItems === 0) renderExploreGroupsSection();
                 } catch (err) {
                     notify('Could not join this group', 'error');
                     btn.disabled = false;
@@ -16418,6 +16427,8 @@
             if (document.getElementById('tab-groups').classList.contains('active-tab')) {
                 if (!communityFeedContexts[communityFeedContextKey(activeCommunitySubtab, activeCommunityCategory)]) {
                     loadCommunityFeed();
+                } else {
+                    renderExploreGroupsSection();
                 }
             }
         }
@@ -16592,6 +16603,44 @@
         // Entry point for showing the Communities feed for whatever subtab/category is active.
         // If that exact view has already been loaded this session, just re-renders it from cache
         // (no network call); otherwise starts a fresh context and fetches its first page.
+        // Builds/re-uses the "communities to join" strip pinned above the post feed on the
+        // Explore subtab — public communities the person hasn't joined yet, each with a Join
+        // button (renderDiscoverGroupItem). Hidden entirely on Home or once there's nothing to
+        // suggest. Kept as its own function (rather than folded into the post-feed pipeline)
+        // so it can be refreshed independently — e.g. from renderGroupsLists() whenever
+        // cachedGroups changes — without touching or reshuffling the post feed underneath it.
+        function ensureExploreGroupsSectionEl() {
+            const container = document.getElementById('communities-feed-container');
+            if (!container) return null;
+            let el = document.getElementById('communities-explore-groups-list');
+            if (!el || el.parentElement !== container) {
+                el = document.createElement('div');
+                el.id = 'communities-explore-groups-list';
+                el.style.display = 'none';
+                container.insertBefore(el, container.firstChild);
+            }
+            return el;
+        }
+        function renderExploreGroupsSection() {
+            const section = ensureExploreGroupsSectionEl();
+            if (!section) return;
+            if (activeCommunitySubtab !== 'explore') {
+                section.style.display = 'none';
+                section.innerHTML = '';
+                return;
+            }
+            const ids = getCommunityIdsForSubtab('explore');
+            if (ids.length === 0) {
+                section.style.display = 'none';
+                section.innerHTML = '';
+                return;
+            }
+            const sorted = ids.slice().sort((a, b) => (cachedGroups[b].createdAt || 0) - (cachedGroups[a].createdAt || 0));
+            section.style.display = '';
+            section.innerHTML = '<div class="group-section-title">Communities to join</div>';
+            sorted.forEach(gid => renderDiscoverGroupItem(gid, cachedGroups[gid], section));
+        }
+
         async function loadCommunityFeed() {
             const subtab = activeCommunitySubtab;
             const category = activeCommunityCategory;
@@ -16599,9 +16648,13 @@
             const container = document.getElementById('communities-feed-container');
             const communityIds = getCommunityIdsForSubtab(subtab);
 
+            renderExploreGroupsSection();
+
             if (communityIds.length === 0) {
                 activeCommunityFeedCtx = null;
                 container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'Join some communities to see their posts here.' : 'No public communities to explore right now.'}</p></div>`;
+                ensureExploreGroupsSectionEl();
+                renderExploreGroupsSection();
                 return;
             }
 
@@ -16627,6 +16680,8 @@
             activeCommunityFeedCtx = ctx;
 
             container.innerHTML = '<div id="communities-feed-list"></div>';
+            ensureExploreGroupsSectionEl();
+            renderExploreGroupsSection();
             await loadMoreCommunityPosts(ctx);
         }
 
@@ -16635,6 +16690,8 @@
         function renderCommunityFeedFromContext(ctx) {
             const container = document.getElementById('communities-feed-container');
             container.innerHTML = '<div id="communities-feed-list"></div>';
+            ensureExploreGroupsSectionEl();
+            renderExploreGroupsSection();
             const list = document.getElementById('communities-feed-list');
             if (ctx.posts.length === 0) {
                 list.innerHTML = communityFeedEmptyStateHtml(ctx.subtab);

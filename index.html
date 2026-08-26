@@ -16779,20 +16779,16 @@
         });
 
         // Home = every public community's posts, visible to everyone regardless of membership
-        // (this is the actual Communities feed people read). Explore is just a discovery strip
-        // of public communities the person hasn't joined yet, each with a Join button (see
-        // renderDiscoverGroupItem) — it doesn't load a post feed of its own.
+        // (this is the actual Communities feed people read). Explore is a discovery strip of
+        // every public community — including ones already joined, which just render with a
+        // "Joined" badge instead of a Join button (see renderDiscoverGroupItem) — it doesn't
+        // load a post feed of its own.
         function getCommunityIdsForSubtab(subtab) {
             const user = auth.currentUser;
             if (!user) return [];
             let ids = Object.keys(cachedCommunities).filter(gid => {
                 const g = cachedCommunities[gid];
-                if (!g || !g.isPublic) return false;
-                if (subtab === 'explore') {
-                    const isMember = !!(g.members && g.members[user.uid]);
-                    return !isMember;
-                }
-                return true;
+                return !!(g && g.isPublic);
             });
             if (activeCommunityCategory !== 'All') {
                 ids = ids.filter(gid => (cachedCommunities[gid].category || 'General') === activeCommunityCategory);

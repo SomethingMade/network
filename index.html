@@ -2198,6 +2198,7 @@
         .community-category-chip { flex-shrink: 0; padding: 7px 16px; border-radius: 50px; font-size: 13.5px; font-weight: 700; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; transition: 0.15s; white-space: nowrap; }
         .community-category-chip:hover { background: var(--bg-hover); }
         .community-category-chip.active { background: var(--text-primary); color: var(--bg-surface); border-color: var(--text-primary); }
+        .community-joined-badge { flex-shrink: 0; padding: 6px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; color: var(--text-secondary); background: var(--bg-alt); border: 1px solid var(--border-color); }
 
         /* Scrollable vertical feed container — same scroll behavior as the Home feed's
            .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
@@ -16504,6 +16505,8 @@
             item.className = 'chat-item';
             item.dataset.groupId = groupId;
             const memberCount = group.members ? Object.keys(group.members).length : 0;
+            const user = auth.currentUser;
+            const alreadyJoined = !!(user && group.members && group.members[user.uid]);
             item.innerHTML = `
                 ${groupAvatarHtml(group)}
                 <div class="chat-preview">
@@ -16511,6 +16514,14 @@
                     <p>${COMMUNITY_MEMBERS_ICON_SVG}<span>${memberCount} member${memberCount === 1 ? '' : 's'}</span></p>
                 </div>
             `;
+            if (alreadyJoined) {
+                const badge = document.createElement('span');
+                badge.className = 'community-joined-badge';
+                badge.textContent = 'Joined';
+                item.appendChild(badge);
+                container.appendChild(item);
+                return;
+            }
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn-add-contact';
@@ -16680,7 +16691,7 @@
         // the person already has communities to draw from and the only reason the list is
         // empty is that nobody's posted in them yet.
         function communityFeedEmptyStateHtml(subtab) {
-            return `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'No posts yet in your communities. Send a message in one to get things started!' : 'No posts yet in these communities.'}</p></div>`;
+            return `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">No posts yet in these communities.</p></div>`;
         }
 
         function renderCommunityCategoryChips() {
@@ -16709,8 +16720,25 @@
             loadCommunityFeed();
         });
 
-        // Home = communities I've joined; Explore = public communities I haven't joined yet —
-        // filtered by the active category chip, 'All' meaning no filter.
+        // Post feed source: every community that exists (regardless of membership/ownership),
+        // filtered only by the active category chip ('All' meaning no filter). Both the Home
+        // and Explore subtabs read from this — the subtabs no longer gate which communities'
+        // posts are eligible, only the separate "communities to join" strip below still uses
+        // the membership-based getCommunityIdsForSubtab('explore').
+        function getAllCommunityIdsForFeed() {
+            let ids = Object.keys(cachedGroups).filter(gid => !!cachedGroups[gid]);
+            if (activeCommunityCategory !== 'All') {
+                ids = ids.filter(gid => (cachedGroups[gid].category || 'General') === activeCommunityCategory);
+            }
+            return ids;
+        }
+
+        // Home = communities I've joined; Explore = public communities available to browse
+        // (includes ones already joined — those just render with a "Joined" badge instead of
+        // a Join button, see renderDiscoverGroupItem) — filtered by the active category chip,
+        // 'All' meaning no filter.
+        // (Now used only for the "communities to join" suggestion strip on Explore — the post
+        // feed itself pulls from getAllCommunityIdsForFeed so every community's posts show up.)
         function getCommunityIdsForSubtab(subtab) {
             const user = auth.currentUser;
             if (!user) return [];
@@ -16718,7 +16746,7 @@
                 const g = cachedGroups[gid];
                 if (!g) return false;
                 const isMember = !!(g.members && g.members[user.uid]);
-                return subtab === 'home' ? isMember : (g.isPublic && !isMember);
+                return subtab === 'home' ? isMember : g.isPublic;
             });
             if (activeCommunityCategory !== 'All') {
                 ids = ids.filter(gid => (cachedGroups[gid].category || 'General') === activeCommunityCategory);
@@ -16789,13 +16817,15 @@
             const category = activeCommunityCategory;
             const key = communityFeedContextKey(subtab, category);
             const container = document.getElementById('communities-feed-container');
-            const communityIds = getCommunityIdsForSubtab(subtab);
+            // Home shows posts from every community; Explore is scoped to public communities
+            // the person hasn't joined yet — the ones actually meant for discovery/joining.
+            const communityIds = subtab === 'explore' ? getCommunityIdsForSubtab('explore') : getAllCommunityIdsForFeed();
 
             renderExploreGroupsSection();
 
             if (communityIds.length === 0) {
                 activeCommunityFeedCtx = null;
-                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'Join some communities to see their posts here.' : 'No public communities to explore right now.'}</p></div>`;
+                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'explore' ? 'No public communities to explore right now.' : 'No communities yet.'}</p></div>`;
                 ensureExploreGroupsSectionEl();
                 renderExploreGroupsSection();
                 return;

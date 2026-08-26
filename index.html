@@ -708,6 +708,17 @@
         .modal-actions { display: flex; gap: 12px; }
         .modal-actions button { flex: 1; }
 
+        /* ── DAILY STREAK ── */
+        .streak-badge-btn { display: flex; align-items: center; gap: 4px; padding: 5px 10px 5px 8px; border-radius: 50px; border: none; background: var(--bg-alt); color: var(--text-primary); font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0; font-family: inherit; }
+        .streak-badge-btn .streak-flame { font-size: 15px; line-height: 1; filter: grayscale(1) opacity(0.5); transition: filter 0.2s; }
+        .streak-badge-btn.streak-active .streak-flame { filter: none; }
+        .streak-modal-flame { font-size: 52px; line-height: 1; margin-bottom: 6px; }
+        .streak-week-row { display: flex; justify-content: center; gap: 8px; margin: 4px 0 14px; }
+        .streak-day-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--bg-alt); color: var(--text-secondary); }
+        .streak-day-dot.checked { background: var(--gradient-brand); color: #fff; }
+        .streak-day-dot.today { box-shadow: 0 0 0 2px var(--primary-blue); }
+        .streak-modal-longest { font-size: 12.5px; color: var(--text-secondary); margin-top: -14px; margin-bottom: 20px; }
+
         /* ── BOTTOM SHEET (Profile & Context Menus) ── */
         .bottom-sheet-overlay { position: fixed; inset: 0; bottom: var(--keyboard-inset, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s, bottom 0.15s ease; display: flex; align-items: flex-end; justify-content: center; }
         #story-views-sheet-overlay { z-index: 100010; }
@@ -3798,6 +3809,19 @@
         </div>
     </div>
 
+    <div id="streak-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <div class="streak-modal-flame" id="streak-modal-flame">🔥</div>
+            <h3 id="streak-modal-count">0-day streak</h3>
+            <div class="streak-week-row" id="streak-week-row"></div>
+            <p id="streak-modal-sub">Check in daily to keep your streak alive.</p>
+            <p class="streak-modal-longest" id="streak-modal-longest"></p>
+            <div class="modal-actions">
+                <button type="button" id="btn-close-streak-modal" class="btn-pill btn-primary">Nice!</button>
+            </div>
+        </div>
+    </div>
+
     <div id="invite-to-group-modal-overlay" class="modal-overlay">
         <div class="custom-modal">
             <h3>Invite by ID</h3>
@@ -5306,6 +5330,9 @@
                                 <h1>Home</h1>
                             </div>
                             <div class="chat-header-icons">
+                                <button type="button" class="streak-badge-btn" id="streak-badge-btn" title="Daily streak" style="display:none;">
+                                    <span class="streak-flame">🔥</span><span id="streak-badge-count">0</span>
+                                </button>
                                 <div class="search-icon-btn js-search-open" id="home-search-icon-btn" data-search-list="discover-grid-scroll" title="Search" style="display:none;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
@@ -6475,6 +6502,113 @@
                 btnConfirm.onclick = () => { overlay.classList.remove('active'); resolve(true); };
                 btnCancel.onclick = () => { overlay.classList.remove('active'); resolve(false); };
             });
+        }
+
+        // ── DAILY STREAK ──
+        // Retention mechanic: every calendar day the person opens the app (by their device's
+        // local clock, not UTC — streaks should follow the person's own day, not a server day
+        // that might roll over while they're asleep) counts as one check-in. Consecutive-day
+        // check-ins build a streak; missing a day resets it to 1 on the next visit. Stored at
+        // users/{uid}/streak so it's visible across devices, with a 30-day rolling `history` map
+        // (date string -> true) kept just for the week-view calendar in the modal — the running
+        // `count`/`longest` numbers are the source of truth, history is display-only and pruned
+        // on every write so it can't grow unbounded.
+        let currentStreakData = { count: 0, longest: 0, lastCheckIn: null, history: {} };
+        const STREAK_MILESTONES = {
+            3: "Nice, 3 days in a row! 🔥",
+            7: "One week strong! 🎉",
+            14: "Two weeks running — great habit!",
+            30: "A whole month streak! 🏆",
+            60: "60 days of showing up. Incredible.",
+            100: "100-day streak. Legendary. 🎖️",
+            365: "365 days. One full year!"
+        };
+        function streakLocalDateStr(d) {
+            d = d || new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+        function streakAddDaysStr(dateStr, delta) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            dt.setDate(dt.getDate() + delta);
+            return streakLocalDateStr(dt);
+        }
+        function updateStreakBadgeUI() {
+            const btn = document.getElementById('streak-badge-btn');
+            if (!btn) return;
+            btn.style.display = 'flex';
+            document.getElementById('streak-badge-count').textContent = currentStreakData.count || 0;
+            btn.classList.toggle('streak-active', currentStreakData.lastCheckIn === streakLocalDateStr());
+        }
+        function renderStreakWeekRow() {
+            const row = document.getElementById('streak-week-row');
+            if (!row) return;
+            const today = streakLocalDateStr();
+            const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+            let html = '';
+            for (let i = 6; i >= 0; i--) {
+                const dStr = streakAddDaysStr(today, -i);
+                const dow = new Date(dStr + 'T00:00:00').getDay();
+                const checked = !!currentStreakData.history[dStr];
+                const isToday = dStr === today;
+                html += `<div class="streak-day-dot${checked ? ' checked' : ''}${isToday ? ' today' : ''}">${dayLabels[dow]}</div>`;
+            }
+            row.innerHTML = html;
+        }
+        // `justCheckedIn` distinguishes the auto-popup right after a fresh check-in (shows a
+        // milestone message where one applies) from tapping the header badge any other time to
+        // just review status (generic "keep it going" copy, no re-congratulating).
+        function showStreakModal(justCheckedIn) {
+            const overlay = document.getElementById('streak-modal-overlay');
+            if (!overlay) return;
+            document.getElementById('streak-modal-count').textContent = `${currentStreakData.count}-day streak`;
+            const milestoneMsg = STREAK_MILESTONES[currentStreakData.count];
+            document.getElementById('streak-modal-sub').textContent = justCheckedIn
+                ? (milestoneMsg || "You're checked in for today. Come back tomorrow to keep it going!")
+                : "Check in daily to keep your streak alive.";
+            document.getElementById('streak-modal-longest').textContent = currentStreakData.longest > currentStreakData.count
+                ? `Longest streak: ${currentStreakData.longest} days`
+                : (currentStreakData.longest > 1 ? "That's your longest streak yet!" : '');
+            renderStreakWeekRow();
+            overlay.classList.add('active');
+        }
+        document.getElementById('streak-badge-btn').addEventListener('click', () => showStreakModal(false));
+        document.getElementById('btn-close-streak-modal').addEventListener('click', () => {
+            document.getElementById('streak-modal-overlay').classList.remove('active');
+        });
+        // Called once per onAuthStateChanged sign-in with whatever streak data was already on
+        // the profile (avoids a second DB read — the caller already fetched the profile). Only
+        // writes to the DB and pops the celebration modal the first time this local day sees the
+        // person open the app; every other app-open/tab-switch today just re-renders from
+        // currentStreakData with no network call.
+        async function processDailyStreak(uid, existingStreak) {
+            const today = streakLocalDateStr();
+            const streak = existingStreak || {};
+            let count = streak.count || 0;
+            let longest = streak.longest || 0;
+            let history = Object.assign({}, streak.history || {});
+            const lastCheckIn = streak.lastCheckIn || null;
+
+            if (lastCheckIn === today) {
+                currentStreakData = { count, longest, lastCheckIn, history };
+                updateStreakBadgeUI();
+                return;
+            }
+
+            const yesterday = streakAddDaysStr(today, -1);
+            count = (lastCheckIn === yesterday) ? count + 1 : 1;
+            longest = Math.max(longest, count);
+            history[today] = true;
+            const cutoff = streakAddDaysStr(today, -30);
+            Object.keys(history).forEach((k) => { if (k < cutoff) delete history[k]; });
+
+            await update(ref(database, `users/${uid}/streak`), { count, longest, lastCheckIn: today, history });
+            currentStreakData = { count, longest, lastCheckIn: today, history };
+            updateStreakBadgeUI();
+            showStreakModal(true);
         }
 
         let currentViewerImageUrl = '';
@@ -20289,6 +20423,10 @@
                     createdAt: existingProfileData.createdAt || (user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : Date.now())
                 });
 
+                // Fire-and-forget: today's check-in shouldn't hold up the rest of login. Reuses
+                // existingProfileData fetched just above instead of a second DB read.
+                processDailyStreak(user.uid, existingProfileData.streak).catch((err) => console.error('Daily streak check-in failed', err));
+
                 try {
                     const username = await ensureUsername(user);
                     document.getElementById('display-username').textContent = '@' + username;
@@ -20331,6 +20469,9 @@
                 myAppliedJobIds = new Set();
                 if (callLogUnsub) { callLogUnsub(); callLogUnsub = null; }
                 cachedCallLogEntries = [];
+                currentStreakData = { count: 0, longest: 0, lastCheckIn: null, history: {} };
+                const streakBtn = document.getElementById('streak-badge-btn');
+                if (streakBtn) streakBtn.style.display = 'none';
             }
             if (isInitialLoad) {
                 // Branded splash hides on its existing 800ms timing. The logo lifts and fades

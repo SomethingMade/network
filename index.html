@@ -2184,6 +2184,12 @@
         .community-category-chip:hover { background: var(--bg-hover); }
         .community-category-chip.active { background: var(--text-primary); color: var(--bg-surface); border-color: var(--text-primary); }
 
+        /* Scrollable vertical feed container — same scroll behavior as the Home feed's
+           .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
+           single vertical column and scroll independently of the fixed header/tabs above them. */
+        #communities-feed-container { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 24px; overflow-anchor: none; }
+        #communities-feed-list { display: flex; flex-direction: column; }
+
         /* One community post card = one group/page chat message rendered feed-style. Reuses
            .feed-post-card's body/text/avatar layout (see buildFeedPostCard) and adds a byline
            row on top naming which community it came from, matching X's Community-feed look. */
@@ -3145,6 +3151,7 @@
             body.glass-theme .nav-indicator { background: var(--gradient-brand); opacity: 1; box-shadow: 0 1px 4px rgba(var(--primary-rgb), 0.4); }
             .chat-list-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
             .discover-grid-scroll { padding-bottom: calc(78px + 24px + env(safe-area-inset-bottom)); }
+            #communities-feed-container { padding-bottom: calc(78px + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
             .chat-view-back { display: block; }
@@ -5388,7 +5395,7 @@
                         <div class="community-category-chips" id="community-category-chips"></div>
                     </div>
                     <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
-                    <div id="communities-feed-container"></div>
+                    <div id="communities-feed-container"><div id="communities-feed-list"></div></div>
                 </div>
 
 
@@ -7773,7 +7780,13 @@
                 }
                 if (hash === 'tab-groups') {
                     if (isInitialSync !== true) updateHeaderGroupsBadge(0);
-                    loadCommunityFeed();
+                    // Only fetch if this Home/Explore + category combo hasn't been loaded yet
+                    // this session — re-entering the tab should show what's already there, not
+                    // refetch and reshuffle. A true refresh happens on app reload (or via
+                    // Check Updates, which reloads the app) or by switching subtab/category.
+                    if (!communityFeedContexts[communityFeedContextKey(activeCommunitySubtab, activeCommunityCategory)]) {
+                        loadCommunityFeed();
+                    }
                 }
                 if(activeTab) {
                     activeTab.classList.add('active-tab');
@@ -16384,10 +16397,14 @@
         }
 
         // Refreshes anything in the Communities tab that depends on cachedGroups/cachedGroupChatsMeta:
-        // the group-invites banner, the active group chat header (if one's open), and — only when
-        // the Communities tab is actually the one on screen — the post feed itself (see
-        // loadCommunityFeed). Gated on visibility because a feed refresh means several Firebase
-        // reads (one per community), which isn't worth doing for a tab the user isn't looking at.
+        // the group-invites banner and the active group chat header (if one's open). The post
+        // feed itself (see loadCommunityFeed) is deliberately NOT refetched here on every data
+        // tick — cachedGroups/cachedGroupChatsMeta change constantly (any group's metadata, any
+        // new message anywhere), and reloading the feed on each of those would reshuffle posts
+        // and blow away the person's scroll position while they're mid-read. The feed is only
+        // fetched the first time a given Home/Explore + category view is visited this session
+        // (i.e. effectively "on app reload"); after that it just sits there, growing only via
+        // infinite scroll or an explicit subtab/category switch.
         function renderGroupsLists() {
             const user = auth.currentUser;
             if (!user) return;
@@ -16399,7 +16416,9 @@
             }
 
             if (document.getElementById('tab-groups').classList.contains('active-tab')) {
-                loadCommunityFeed();
+                if (!communityFeedContexts[communityFeedContextKey(activeCommunitySubtab, activeCommunityCategory)]) {
+                    loadCommunityFeed();
+                }
             }
         }
 
@@ -16472,10 +16491,29 @@
         // feature — this is a separate, lighter-weight feed built from existing group chat
         // messages, per the product decision to reuse chat content rather than add a whole new
         // "community post" data model.)
+        //
+        // Loading model mirrors the Home feed's infinite scroll (see loadOlderPosts /
+        // initFeedScrollListener): an IntersectionObserver sentinel at the bottom of the list
+        // triggers loadMoreCommunityPosts() as the person nears the end, which fetches another
+        // page instead of everything at once. Unlike the Home feed there's no live listener —
+        // group chat messages aren't a purpose-built "posts" node — so paging happens in two
+        // tiers per view: first sample not-yet-seen communities, then once every community has
+        // been sampled, page deeper into each one's older messages via a per-community cursor.
+        //
+        // One context object (communityFeedContexts, keyed by subtab+category) is kept per
+        // Home/Explore + category combination for the lifetime of the page. Revisiting a view
+        // that's already been loaded just re-renders its cached posts — no refetch, no reshuffle,
+        // no lost scroll position — so a genuine network refresh only happens the first time a
+        // given view is opened this session (i.e. effectively "on app reload").
         const COMMUNITY_CATEGORIES = ['All', 'Sports', 'Technology', 'Art', 'Entertainment', 'Gaming', 'News', 'General'];
         let activeCommunitySubtab = 'home'; // 'home' (joined communities) | 'explore' (public, not yet joined)
         let activeCommunityCategory = 'All';
-        let communityFeedLoadToken = 0; // bumped on every load so a slow, superseded fetch never overwrites a newer one
+        const COMMUNITY_FEED_GROUPS_PER_BATCH = 15; // how many not-yet-sampled communities to pull in per page
+        const COMMUNITY_FEED_MSGS_PER_GROUP = 6;     // messages fetched per community per page
+        const COMMUNITY_FEED_POSTS_PER_BATCH = 25;   // posts actually rendered per page, after shuffle/dedupe
+        const communityFeedContexts = {};            // "subtab::category" -> feed context, persists until page reload
+        let activeCommunityFeedCtx = null;            // context object currently mounted in the DOM
+        let communityFeedIO = null;                   // shared IntersectionObserver for the load-more sentinel
 
         function shuffleArray(arr) {
             for (let i = arr.length - 1; i > 0; i--) {
@@ -16483,6 +16521,14 @@
                 [arr[i], arr[j]] = [arr[j], arr[i]];
             }
             return arr;
+        }
+
+        function communityFeedContextKey(subtab, category) {
+            return `${subtab}::${category}`;
+        }
+
+        function communityFeedEmptyStateHtml(subtab) {
+            return `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'Join some communities to see their posts here.' : 'No posts yet in these communities.'}</p></div>`;
         }
 
         function renderCommunityCategoryChips() {
@@ -16528,44 +16574,221 @@
             return ids;
         }
 
-        // Pulls a handful of recent messages from a random sample of eligible communities and
-        // interleaves them into one shuffled feed — the "random algorithm" the Explore/Home feed
-        // is built on. Capped on both ends (communities sampled, posts shown) to keep this to a
-        // reasonable number of reads.
+        // Entry point for showing the Communities feed for whatever subtab/category is active.
+        // If that exact view has already been loaded this session, just re-renders it from cache
+        // (no network call); otherwise starts a fresh context and fetches its first page.
         async function loadCommunityFeed() {
-            const token = ++communityFeedLoadToken;
+            const subtab = activeCommunitySubtab;
+            const category = activeCommunityCategory;
+            const key = communityFeedContextKey(subtab, category);
             const container = document.getElementById('communities-feed-container');
-            const communityIds = getCommunityIdsForSubtab(activeCommunitySubtab);
+            const communityIds = getCommunityIdsForSubtab(subtab);
 
             if (communityIds.length === 0) {
-                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${activeCommunitySubtab === 'home' ? "Join some communities to see their posts here." : "No public communities to explore right now."}</p></div>`;
+                activeCommunityFeedCtx = null;
+                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'Join some communities to see their posts here.' : 'No public communities to explore right now.'}</p></div>`;
                 return;
             }
 
-            container.innerHTML = `<p class="empty-msg" style="padding:40px 0;">Loading posts…</p>`;
-
-            const sampleIds = shuffleArray(communityIds.slice()).slice(0, 25);
-            const perGroupMessages = await Promise.all(sampleIds.map(async (gid) => {
-                try {
-                    const snap = await get(query(ref(database, `group_threads/${gid}/messages`), limitToLast(6)));
-                    if (!snap.exists()) return [];
-                    return Object.entries(snap.val())
-                        .map(([key, msg]) => ({ key, ...msg, groupId: gid }))
-                        .filter(msg => !msg.deleted && (msg.text || (msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video'))));
-                } catch (err) { return []; }
-            }));
-
-            if (token !== communityFeedLoadToken) return; // a newer load has since started — drop this one
-
-            let posts = shuffleArray(perGroupMessages.flat()).slice(0, 40);
-
-            if (posts.length === 0) {
-                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">No posts yet in ${activeCommunitySubtab === 'home' ? 'your communities' : 'these communities'}.</p></div>`;
+            const existing = communityFeedContexts[key];
+            if (existing) {
+                activeCommunityFeedCtx = existing;
+                renderCommunityFeedFromContext(existing);
                 return;
             }
 
-            container.innerHTML = '';
-            posts.forEach(msg => container.appendChild(buildCommunityPostCard(msg)));
+            const ctx = {
+                subtab,
+                remainingGroupIds: shuffleArray(communityIds.slice()),
+                sampledGroupIds: [],
+                groupCursors: {}, // groupId -> oldest loaded createdAt (null once that community's history is exhausted)
+                loadedKeys: new Set(),
+                posts: [],
+                exhausted: false,
+                loading: false,
+                emptyBatches: 0
+            };
+            communityFeedContexts[key] = ctx;
+            activeCommunityFeedCtx = ctx;
+
+            container.innerHTML = '<div id="communities-feed-list"></div>';
+            await loadMoreCommunityPosts(ctx);
+        }
+
+        // Re-mounts an already-loaded context's posts into the DOM without touching the network —
+        // used when switching back to a subtab/category that's been visited before this session.
+        function renderCommunityFeedFromContext(ctx) {
+            const container = document.getElementById('communities-feed-container');
+            container.innerHTML = '<div id="communities-feed-list"></div>';
+            const list = document.getElementById('communities-feed-list');
+            if (ctx.posts.length === 0) {
+                list.innerHTML = communityFeedEmptyStateHtml(ctx.subtab);
+                return;
+            }
+            ctx.posts.forEach(msg => list.appendChild(buildCommunityPostCard(msg)));
+            if (!ctx.exhausted) ensureCommunityFeedSentinelAtEnd(list);
+        }
+
+        function buildCommunityFeedSkeletonCard() {
+            const card = document.createElement('div');
+            card.className = 'feed-post-card feed-post-skeleton';
+            card.innerHTML = `
+                <div class="x-post-row">
+                    <div class="x-post-avatar-col"><div class="feed-skeleton-avatar"></div></div>
+                    <div class="x-post-content-col">
+                        <div class="feed-skeleton-bar feed-skeleton-name"></div>
+                        <div class="feed-skeleton-bar feed-skeleton-time"></div>
+                    </div>
+                </div>
+                <div class="feed-post-body">
+                    <div class="feed-skeleton-bar feed-skeleton-text-line"></div>
+                    <div class="feed-skeleton-bar feed-skeleton-text-line short"></div>
+                </div>`;
+            return card;
+        }
+        function showCommunityFeedLoadingSkeletons(list) {
+            if (!list) return [];
+            const nodes = [];
+            for (let i = 0; i < FEED_SKELETON_COUNT; i++) {
+                const card = buildCommunityFeedSkeletonCard();
+                list.appendChild(card);
+                nodes.push(card);
+            }
+            return nodes;
+        }
+        function removeCommunityFeedLoadingSkeletons(nodes) {
+            (nodes || []).forEach(node => node.remove());
+        }
+
+        // Keeps a single load-more sentinel as the last child of the feed list and bound to a
+        // shared IntersectionObserver — same pattern as initFeedScrollListener/loadOlderPosts on
+        // the Home feed. Re-created automatically whenever the list is rebuilt from scratch
+        // (full container.innerHTML resets destroy the old sentinel along with everything else).
+        function ensureCommunityFeedSentinelAtEnd(list) {
+            if (!list) return;
+            let sentinel = document.getElementById('community-feed-load-more-sentinel');
+            const isNew = !sentinel;
+            if (isNew) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'community-feed-load-more-sentinel';
+                sentinel.style.height = '1px';
+            }
+            list.appendChild(sentinel); // (re)append so it's always the last child
+            if (!communityFeedIO) {
+                communityFeedIO = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) loadMoreCommunityPosts(activeCommunityFeedCtx);
+                    });
+                }, {
+                    root: document.getElementById('communities-feed-container'),
+                    rootMargin: '0px 0px 400px 0px',
+                    threshold: 0
+                });
+            }
+            if (isNew) communityFeedIO.observe(sentinel);
+        }
+
+        // Fetches the next page for a feed context: first spends down its pool of not-yet-sampled
+        // communities (a "sample" load), then once that pool is empty, pages deeper into each
+        // already-sampled community's older messages using a per-community createdAt cursor (a
+        // "history" load) — same endAt(cursor - 1) + limitToLast pagination shape as the Home
+        // feed's loadOlderPosts. Stops (ctx.exhausted = true) once a full pass of the latter
+        // yields nothing new twice in a row, matching noMoreOlderPosts's emptyOlderFetchCount.
+        async function loadMoreCommunityPosts(ctx) {
+            if (!ctx || ctx.loading || ctx.exhausted) return;
+            ctx.loading = true;
+            const list = document.getElementById('communities-feed-list');
+            const skeletonNodes = showCommunityFeedLoadingSkeletons(list);
+
+            try {
+                let fetchedRaw = [];
+
+                if (ctx.remainingGroupIds.length > 0) {
+                    const batchIds = ctx.remainingGroupIds.splice(0, COMMUNITY_FEED_GROUPS_PER_BATCH);
+                    const results = await Promise.all(batchIds.map(async (gid) => {
+                        try {
+                            const snap = await get(query(ref(database, `group_threads/${gid}/messages`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
+                            const entries = [];
+                            let oldest = Infinity;
+                            snap.forEach((child) => {
+                                const m = child.val();
+                                if (m.createdAt && m.createdAt < oldest) oldest = m.createdAt;
+                                entries.push({ key: child.key, ...m, groupId: gid });
+                                return false;
+                            });
+                            ctx.groupCursors[gid] = isFinite(oldest) ? oldest : null;
+                            return entries;
+                        } catch (err) { return []; }
+                    }));
+                    ctx.sampledGroupIds.push(...batchIds);
+                    fetchedRaw = results.flat();
+                } else {
+                    const eligibleIds = ctx.sampledGroupIds.filter(gid => isFinite(ctx.groupCursors[gid]));
+                    const results = await Promise.all(eligibleIds.map(async (gid) => {
+                        const cursor = ctx.groupCursors[gid];
+                        try {
+                            const snap = await get(query(ref(database, `group_threads/${gid}/messages`), orderByChild('createdAt'), endAt(cursor - 1), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
+                            const entries = [];
+                            let oldest = Infinity;
+                            snap.forEach((child) => {
+                                const m = child.val();
+                                if (m.createdAt && m.createdAt < oldest) oldest = m.createdAt;
+                                entries.push({ key: child.key, ...m, groupId: gid });
+                                return false;
+                            });
+                            ctx.groupCursors[gid] = isFinite(oldest) ? oldest : null;
+                            return entries;
+                        } catch (err) { return []; }
+                    }));
+                    fetchedRaw = results.flat();
+                }
+
+                const isActive = ctx === activeCommunityFeedCtx;
+                if (isActive) removeCommunityFeedLoadingSkeletons(skeletonNodes);
+
+                const fresh = shuffleArray(fetchedRaw.filter((msg) => {
+                    const dedupeKey = `${msg.groupId}:${msg.key}`;
+                    if (ctx.loadedKeys.has(dedupeKey)) return false;
+                    if (msg.deleted) return false;
+                    if (!(msg.text || (msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video')))) return false;
+                    ctx.loadedKeys.add(dedupeKey);
+                    return true;
+                })).slice(0, COMMUNITY_FEED_POSTS_PER_BATCH);
+
+                if (fresh.length === 0) {
+                    if (ctx.remainingGroupIds.length === 0) {
+                        ctx.emptyBatches++;
+                        if (ctx.emptyBatches >= 2) ctx.exhausted = true;
+                    }
+                } else {
+                    ctx.emptyBatches = 0;
+                    ctx.posts.push(...fresh);
+                    if (isActive && list) {
+                        const emptyState = list.querySelector('.empty-state');
+                        if (emptyState) emptyState.remove();
+                        fresh.forEach(msg => list.appendChild(buildCommunityPostCard(msg)));
+                    }
+                }
+
+                if (ctx.remainingGroupIds.length === 0 && ctx.sampledGroupIds.every(gid => !isFinite(ctx.groupCursors[gid]))) {
+                    ctx.exhausted = true;
+                }
+
+                if (isActive && list) {
+                    if (ctx.posts.length === 0 && ctx.exhausted) {
+                        list.innerHTML = communityFeedEmptyStateHtml(ctx.subtab);
+                    } else if (!ctx.exhausted) {
+                        ensureCommunityFeedSentinelAtEnd(list);
+                    }
+                }
+            } catch (err) {
+                console.warn('loadMoreCommunityPosts failed:', err);
+                removeCommunityFeedLoadingSkeletons(skeletonNodes);
+            } finally {
+                ctx.loading = false;
+            }
         }
 
         // Renders one group/page chat message as a feed-style post card: a small byline row

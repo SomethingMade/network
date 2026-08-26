@@ -24,6 +24,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Michroma&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* Extra breathing room above the OS's own gesture bar/nav on phones that don't
+               report a reliable env(safe-area-inset-bottom) — nudges our bottom nav bar (and
+               everything that pads around its height) up a bit so it isn't obscured. */
+            --nav-bar-extra-bottom: 12px;
             --primary-blue: #111111;
             --primary-rgb: 17, 17, 17;
             --nav-active-green: #111111;
@@ -1394,7 +1398,7 @@
         .floating-video-center-play svg { width: 16px; height: 16px; margin-left: 1px; }
         .floating-video-mute-bar { position: absolute; bottom: 6px; left: 6px; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
         .floating-video-player:hover .floating-video-mute-bar, .floating-video-player.show-controls .floating-video-mute-bar { opacity: 1; pointer-events: auto; }
-        @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(78px + env(safe-area-inset-bottom) + 14px); right: 12px; } }
+        @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom) + 14px); right: 12px; } }
         .feed-video-controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: linear-gradient(transparent, rgba(0,0,0,0.68)); }
         .feed-video-playpause-btn, .feed-video-mute-btn { background: none; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px; flex-shrink: 0; }
         .feed-video-playpause-btn svg, .feed-video-mute-btn svg { width: 18px; height: 18px; }
@@ -3113,7 +3117,7 @@
                 justify-items: center;
                 height: 60px;
                 padding: 0 2px;
-                padding-bottom: env(safe-area-inset-bottom);
+                padding-bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
                 position: fixed;
                 left: 0; right: 0; bottom: 0;
                 width: 100%;
@@ -3151,13 +3155,13 @@
                 border-top: 1px solid var(--border-color);
             }
             body.glass-theme .nav-indicator { background: var(--gradient-brand); opacity: 1; box-shadow: 0 1px 4px rgba(var(--primary-rgb), 0.4); }
-            .chat-list-container { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
-            .discover-grid-scroll { padding-bottom: calc(78px + 24px + env(safe-area-inset-bottom)); }
-            #communities-feed-container { padding-bottom: calc(78px + 24px + env(safe-area-inset-bottom)); }
+            .chat-list-container { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); }
+            .discover-grid-scroll { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + 24px + env(safe-area-inset-bottom)); }
+            #communities-feed-container { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
             .chat-view-back { display: block; }
-            .fab-add { position: fixed; bottom: calc(78px + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
+            .fab-add { position: fixed; bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
 
             /* Primary nav-bar action button: centered INSIDE the bottom navigation.
                Its icon and behavior change per active tab (New Post on Home, New Chat
@@ -3205,7 +3209,7 @@
             .wa-chip svg { width: 12px; height: 12px; }
             .wa-archived-row { gap: 12px; padding: 10px 4px; }
             .wa-archived-row span { font-size: 14px; }
-            .chat-list-container { padding: 8px 10px calc(78px + env(safe-area-inset-bottom)); }
+            .chat-list-container { padding: 8px 10px calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); }
             .chat-item { gap: 12px; padding: 10px 8px; }
             .chat-avatar-ring { width: 48px; height: 48px; }
             .chat-avatar-ring .avatar { width: 42px; height: 42px; }
@@ -16538,8 +16542,13 @@
             return `${subtab}::${category}`;
         }
 
+        // Only reached once we already know communityIds.length > 0 for this subtab (the
+        // "you haven't joined/there's nothing public" case is handled earlier in
+        // loadCommunityFeed, before a context is even created) — so by the time this renders,
+        // the person already has communities to draw from and the only reason the list is
+        // empty is that nobody's posted in them yet.
         function communityFeedEmptyStateHtml(subtab) {
-            return `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'Join some communities to see their posts here.' : 'No posts yet in these communities.'}</p></div>`;
+            return `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'home' ? 'No posts yet in your communities. Send a message in one to get things started!' : 'No posts yet in these communities.'}</p></div>`;
         }
 
         function renderCommunityCategoryChips() {
@@ -16585,10 +16594,12 @@
             // TEMP DIAGNOSTIC — remove once the Home-tab-shows-no-communities issue is confirmed
             // fixed. Logs exactly why a group did or didn't qualify, so a mismatch between what
             // the Chats list shows and what Communities Home shows can be pinpointed from the
-            // browser console instead of guessed at blind.
-            if (subtab === 'home') {
+            // browser console instead of guessed at blind. Also covers Explore: if cachedGroups
+            // is non-empty but Explore still comes back empty, this shows whether that's because
+            // every group is private, or because you're already a member of all the public ones.
+            if (subtab === 'home' || subtab === 'explore') {
                 const totalGroups = Object.keys(cachedGroups).length;
-                console.log(`[communities-debug] uid=${user.uid} totalGroupsInCache=${totalGroups} homeMatches=${ids.length}`);
+                console.log(`[communities-debug] subtab=${subtab} uid=${user.uid} totalGroupsInCache=${totalGroups} matches=${ids.length}`);
                 if (totalGroups > 0) {
                     Object.keys(cachedGroups).forEach(gid => {
                         const g = cachedGroups[gid] || {};

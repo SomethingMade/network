@@ -16778,19 +16778,21 @@
             loadCommunityFeed();
         });
 
-        // Home = communities I've joined; Explore = public communities available to browse
-        // (includes ones already joined — those just render with a "Joined" badge instead of
-        // a Join button, see renderDiscoverGroupItem) — filtered by the active category chip,
-        // 'All' meaning no filter. Both the post feed (loadCommunityFeed) and the "communities
-        // to join" suggestion strip on Explore read from this.
+        // Home = every public community's posts, visible to everyone regardless of membership
+        // (this is the actual Communities feed people read). Explore is just a discovery strip
+        // of public communities the person hasn't joined yet, each with a Join button (see
+        // renderDiscoverGroupItem) — it doesn't load a post feed of its own.
         function getCommunityIdsForSubtab(subtab) {
             const user = auth.currentUser;
             if (!user) return [];
             let ids = Object.keys(cachedCommunities).filter(gid => {
                 const g = cachedCommunities[gid];
-                if (!g) return false;
-                const isMember = !!(g.members && g.members[user.uid]);
-                return subtab === 'home' ? isMember : g.isPublic;
+                if (!g || !g.isPublic) return false;
+                if (subtab === 'explore') {
+                    const isMember = !!(g.members && g.members[user.uid]);
+                    return !isMember;
+                }
+                return true;
             });
             if (activeCommunityCategory !== 'All') {
                 ids = ids.filter(gid => (cachedCommunities[gid].category || 'General') === activeCommunityCategory);
@@ -16861,15 +16863,28 @@
             const category = activeCommunityCategory;
             const key = communityFeedContextKey(subtab, category);
             const container = document.getElementById('communities-feed-container');
-            // Home shows posts only from communities the person has joined; Explore is scoped to
-            // public communities they haven't joined yet — the ones actually meant for discovery.
-            const communityIds = getCommunityIdsForSubtab(subtab);
 
             renderExploreGroupsSection();
 
+            // Explore is discovery-only: just the "communities to join" strip, no post feed.
+            if (subtab === 'explore') {
+                activeCommunityFeedCtx = null;
+                const ids = getCommunityIdsForSubtab('explore');
+                container.innerHTML = ids.length === 0
+                    ? '<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">No public communities to explore right now.</p></div>'
+                    : '';
+                ensureExploreGroupsSectionEl();
+                renderExploreGroupsSection();
+                return;
+            }
+
+            // Home shows posts from every public community, visible to everyone regardless of
+            // whether the person has joined it.
+            const communityIds = getCommunityIdsForSubtab(subtab);
+
             if (communityIds.length === 0) {
                 activeCommunityFeedCtx = null;
-                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">${subtab === 'explore' ? 'No public communities to explore right now.' : 'No communities yet.'}</p></div>`;
+                container.innerHTML = `<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">No communities yet.</p></div>`;
                 ensureExploreGroupsSectionEl();
                 renderExploreGroupsSection();
                 return;

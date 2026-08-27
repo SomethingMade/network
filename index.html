@@ -3016,9 +3016,10 @@
            (#user-info-sheet-overlay / #profile-bottom-sheet-overlay, both z-index 100010). See the
            tier comment above #image-viewer-overlay.active.above-sheet for the full picture. */
         #reel-viewer-overlay.active.above-sheet { z-index: 100012; }
-        /* .reel-viewer-topbar / .reel-viewer-close are no longer used now that the reel viewer
-           has a real chat-header-area (see #reel-viewer-overlay HTML) — leaving the rules here
-           rather than deleting them, same as this file's other retired-but-kept UI pieces. */
+        /* .reel-viewer-topbar / .reel-viewer-close / .reel-viewer-header are no longer used —
+           the header chrome was removed in favor of the bottom progress line (see
+           .reel-item-progress-track) — leaving the rules here rather than deleting them,
+           same as this file's other retired-but-kept UI pieces. */
         .reel-viewer-topbar { position: absolute; top: 16px; right: 16px; z-index: 4; display: flex; align-items: center; gap: 10px; }
         .reel-viewer-close { width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: #fff; cursor: pointer; transition: 0.2s; }
         .reel-viewer-close:hover { opacity: 0.75; }
@@ -3047,6 +3048,10 @@
         .reel-item-action-btn.reposted { color: var(--success-green, #34C759); }
         .reel-item-action-btn.reposted svg { color: var(--success-green, #34C759); }
         .reel-item-view-stat { cursor: default; }
+        /* Thin TikTok/Reels-style playback progress line pinned to the very bottom edge of
+           each video, replacing the removed top header as the viewer's only chrome. */
+        .reel-item-progress-track { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.25); z-index: 3; }
+        .reel-item-progress-fill { height: 100%; width: 0%; background: #fff; }
 
         @keyframes statusShimmer { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
 
@@ -6088,16 +6093,6 @@
     </div>
 
     <div id="reel-viewer-overlay">
-        <div class="chat-header-area reel-viewer-header">
-            <div class="chat-header-top">
-                <div class="chat-header-title-row">
-                    <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-                    <h1>Reels</h1>
-                </div>
-                <div class="chat-header-icons">
-                </div>
-            </div>
-        </div>
         <div class="reel-viewer-track" id="reel-viewer-track"></div>
     </div>
 
@@ -6999,6 +6994,9 @@
                             <span>${formatFeedCount((post && post.impressionCount) || 0)}</span>
                         </div>
                     </div>
+                    <div class="reel-item-progress-track">
+                        <div class="reel-item-progress-fill"></div>
+                    </div>
                 </div>`;
         }
 
@@ -7077,6 +7075,14 @@
                         err.textContent = "This video can't be played.";
                         media.appendChild(err);
                     }
+                });
+                // Drives the bottom progress line — updates on every timeupdate tick and also
+                // resets to 0 on each loop restart (loop=true means timeupdate fires with a
+                // near-zero currentTime right after the video wraps).
+                const progressFill = itemEl.querySelector('.reel-item-progress-fill');
+                video.addEventListener('timeupdate', () => {
+                    if (!progressFill || !video.duration) return;
+                    progressFill.style.width = ((video.currentTime / video.duration) * 100) + '%';
                 });
                 video.src = videoUrl;
                 media.appendChild(video);

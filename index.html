@@ -1767,6 +1767,16 @@
         /* Form panel: flat, no pattern/blobs — just centered content, X-style. */
         #auth-form-side { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; background: var(--bg-base); padding: 40px 24px; }
 
+        /* Landing step only: black-white gradient now covers the whole form-side section
+           (instead of living on the small .auth-landing card), so it fills the entire
+           right-hand panel behind the glass card. Toggled via .auth-landing-active,
+           set by showAuthStep() in JS. */
+        #auth-form-side.auth-landing-active {
+            background: linear-gradient(160deg, #000000 0%, #2b2b2b 35%, #6e6e6e 70%, #ffffff 100%);
+            background-size: 180% 180%;
+            animation: authLandingGradientShift 14s ease infinite;
+        }
+
         .auth-card-stack { position: relative; width: 100%; max-width: 380px; }
         .auth-card { position: relative; width: 100%; padding: 0; animation: authCardIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
         @keyframes authCardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -1802,7 +1812,7 @@
         /* Flat, solid X-style treatment for inputs/buttons — scoped to the auth screen only,
            so the shared .pill-input/.btn-pill classes keep their normal gradient/shadow look
            everywhere else in the app (search bars, modals, settings sheets). */
-        #auth-form-side .pill-input { border-width: 1px; border-radius: 4px; background: var(--bg-alt); }
+        #auth-form-side .pill-input { border-width: 1px; border-radius: 50px; background: var(--bg-alt); }
         #auth-form-side .pill-input:focus { border-color: var(--text-primary); background: var(--bg-surface); box-shadow: 0 0 0 1px var(--text-primary); }
         #auth-form-side .btn-primary { background: var(--text-primary); color: var(--bg-base); box-shadow: none; }
         #auth-form-side .btn-primary:hover { opacity: 0.88; box-shadow: none; transform: none; }
@@ -1868,9 +1878,10 @@
            independent of the app's theme, same as this screen always looked in the reference. */
         .auth-landing {
             display: flex; flex-direction: column; border-radius: 28px; overflow: hidden;
-            background: linear-gradient(160deg, #33B4FF 0%, #1DA1F2 45%, #0B5FA8 100%);
-            background-size: 180% 180%; animation: authLandingGradientShift 14s ease infinite;
-            padding: 30px 26px 26px; min-height: 480px; box-shadow: 0 20px 50px rgba(11,95,168,0.35);
+            background: rgba(0,0,0,0.32);
+            backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,255,255,0.14);
+            padding: 30px 26px 26px; min-height: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
         }
         @keyframes authLandingGradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .auth-landing-topbar { display: flex; align-items: center; gap: 9px; }
@@ -1886,7 +1897,7 @@
         .auth-landing-btn-row:hover { background: rgba(255,255,255,0.24); }
         .auth-landing-btn-row:active { transform: scale(0.98); }
         .auth-landing-arrow-circle { width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .auth-landing-arrow-circle svg { width: 16px; height: 16px; color: #0B5FA8; }
+        .auth-landing-arrow-circle svg { width: 16px; height: 16px; color: #111111; }
 
         /* Small back caret shown on the phone/email steps to return to the landing screen. */
         .auth-step-back-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; margin-bottom: 18px; padding: 0; }
@@ -5159,7 +5170,7 @@
                 <span>HABA</span>
             </div>
         </div>
-        <div id="auth-form-side">
+        <div id="auth-form-side" class="auth-landing-active">
             <div class="auth-card-stack">
             <div class="auth-card">
                 <div class="auth-card-brand">
@@ -14419,6 +14430,8 @@
             stepPhone.style.display = step === 'phone' ? 'block' : 'none';
             stepOtp.style.display = step === 'otp' ? 'block' : 'none';
             stepEmail.style.display = step === 'email' ? 'block' : 'none';
+            const formSide = document.getElementById('auth-form-side');
+            if (formSide) formSide.classList.toggle('auth-landing-active', step === 'landing');
             // The landing step carries its own logo/wordmark, so hide the generic mobile
             // .auth-card-brand (shown above every other step via its own media query) while
             // landing is active to avoid showing the Haba mark twice.

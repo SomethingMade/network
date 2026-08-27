@@ -7658,11 +7658,16 @@
 
             doScroll();
             // Media (images/videos/voice cards) can finish laying out after this first pass,
-            // which leaves the last bubble short of the bottom. Re-run the scroll a few times
-            // as layout settles, and again whenever an unloaded image/video finishes loading.
+            // which leaves the last bubble short of the bottom — most visibly, a caption below
+            // an image reads as "cut off" because its final line sits just past the fold.
+            // Re-run the scroll as layout settles, and again whenever an unloaded image/video
+            // finishes loading. External media hosts can take well over 350ms, so also watch
+            // via ResizeObserver until the container's height stops changing, rather than giving
+            // up after a fixed set of timeouts.
             requestAnimationFrame(doScroll);
             setTimeout(doScroll, 100);
             setTimeout(doScroll, 350);
+            setTimeout(doScroll, 800);
 
             chatMessages.querySelectorAll('img, video').forEach(el => {
                 if (el.tagName === 'IMG') {
@@ -7671,6 +7676,18 @@
                     if (el.readyState < 1) el.addEventListener('loadedmetadata', doScroll, { once: true });
                 }
             });
+
+            // Belt-and-suspenders: watch for any further height changes (slow images, fonts
+            // swapping in, etc.) for a short window after send/receive, and keep pinning to the
+            // bottom as long as the user was already at (or near) the bottom when this ran.
+            if (typeof ResizeObserver !== 'undefined') {
+                const wasNearBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 150;
+                if (wasNearBottom) {
+                    const ro = new ResizeObserver(() => doScroll());
+                    ro.observe(chatMessages);
+                    setTimeout(() => ro.disconnect(), 2000);
+                }
+            }
         }
 
         (function setupScrollToBottomButton() {

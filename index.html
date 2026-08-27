@@ -9398,102 +9398,6 @@
         // --- FEED: POSTS + COMMENTS ---
         let feedListenersAttached = false;
         let cachedPosts = {};
-
-        // --- FEED: LOCAL PERSISTENT CACHE ---
-        // Every app boot previously re-fetched the whole first page of the feed from Firebase
-        // before anything could render, leaving the feed blank/skeletons for a beat every time,
-        // even for someone who was just here a minute ago. This caches the last page of posts
-        // to localStorage (per-account, since different accounts see different feeds) so a
-        // returning session can paint instantly from what's already on disk, then reconcile
-        // with the live Firebase listeners as they stream in — same "stale-while-revalidate"
-        // pattern as any offline-first feed.
-        const FEED_CACHE_VERSION = 1;
-        const FEED_CACHE_MAX_POSTS = 50; // kept equal to FEED_PAGE_SIZE (defined further below) —
-                                          // can't reference it directly here, it's declared later
-                                          // in this same script and both are const (temporal dead zone)
-        const FEED_CACHE_SAVE_DEBOUNCE_MS = 1500;
-        let feedCacheSaveTimer = null;
-
-        function feedCacheKey(uid) {
-            return `haba_feed_cache_v${FEED_CACHE_VERSION}_${uid}`;
-        }
-
-        // Reads the last-saved page of posts for this account, if any. Returns null (rather
-        // than throwing) on any storage error — corrupted/missing/blocked storage should just
-        // behave like a cold start, never break the feed.
-        function loadFeedCacheFromStorage(uid) {
-            try {
-                const raw = localStorage.getItem(feedCacheKey(uid));
-                if (!raw) return null;
-                const parsed = JSON.parse(raw);
-                if (!parsed || typeof parsed.posts !== 'object') return null;
-                return parsed;
-            } catch (e) {
-                console.warn('Feed cache read failed, ignoring cache', e);
-                return null;
-            }
-        }
-
-        // Persists the newest FEED_CACHE_MAX_POSTS entries currently in cachedPosts. Debounced
-        // so a burst of child_added/child_changed events (initial load, someone liking things)
-        // triggers one write instead of dozens.
-        function scheduleFeedCacheSave() {
-            clearTimeout(feedCacheSaveTimer);
-            feedCacheSaveTimer = setTimeout(saveFeedCacheToStorage, FEED_CACHE_SAVE_DEBOUNCE_MS);
-        }
-
-        function saveFeedCacheToStorage() {
-            const user = auth.currentUser;
-            if (!user) return;
-            try {
-                const entries = Object.entries(cachedPosts)
-                    .filter(([, post]) => post && typeof post.timestamp === 'number')
-                    .sort((a, b) => b[1].timestamp - a[1].timestamp)
-                    .slice(0, FEED_CACHE_MAX_POSTS);
-                const posts = {};
-                entries.forEach(([postId, post]) => { posts[postId] = post; });
-                localStorage.setItem(feedCacheKey(user.uid), JSON.stringify({ posts, savedAt: Date.now() }));
-            } catch (e) {
-                // Quota exceeded or storage disabled — caching is a nice-to-have, never fatal.
-                console.warn('Feed cache write failed, continuing without it', e);
-            }
-        }
-
-        // Paints the feed instantly from whatever was cached last session, before the live
-        // Firebase listener has said a word. cachedPosts/oldestLoadedPostTimestamp are primed
-        // from it too, so the live listener's onChildAdded naturally treats these as "already
-        // have it" (skips re-inserting a duplicate card) and just patches counts in place —
-        // real data still wins the moment it arrives, this only removes the empty-feed wait.
-        function renderFeedFromCache(uid) {
-            const cache = loadFeedCacheFromStorage(uid);
-            if (!cache || !cache.posts) return false;
-
-            const entries = Object.entries(cache.posts)
-                .filter(([, post]) => post && canViewPost(post))
-                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
-            if (entries.length === 0) return false;
-
-            const list = document.getElementById('feed-posts-list');
-            if (!list) return false;
-
-            entries.forEach(([postId, post]) => {
-                cachedPosts[postId] = post;
-                if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
-                    oldestLoadedPostTimestamp = post.timestamp;
-                }
-                if (!list.querySelector(`[data-post-id="${postId}"]`)) {
-                    list.appendChild(buildFeedPostCard(postId, post));
-                }
-            });
-            reorderFeedCards();
-            applyFeedSubtabFilter();
-            updateFeedEmptyState();
-            // These cards are last session's snapshot, not confirmed-live yet — mark the list
-            // so anyone who wants to distinguish "showing cached data" from "confirmed live"
-            // (e.g. a subtle refresh affordance) can key off it. Cleared once the live burst ends.
-            list.dataset.feedFromCache = 'true';
-            return true;
-        }
         let cachedSavedPosts = {}; // postId -> true, from saved_posts/{me} — private, mine only
         let feedComposerImages = []; // array of {previewUrl, url, uploading, promise, error}, max FEED_MAX_IMAGES, mutually exclusive with video. url is null until the background upload resolves; previewUrl (a local blob URL, or the same remote url for GIFs) is shown immediately either way.
         let feedComposerVideo = null; // {previewUrl, url, uploading, promise, thumbnailUrl, error} or null; mutually exclusive with images
@@ -10682,7 +10586,6 @@
             applyFeedSubtabFilter();
             const container = document.getElementById('discover-grid-scroll');
             if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
-            scheduleFeedCacheSave();
         }
 
         document.getElementById('feed-new-posts-pill')?.addEventListener('click', applyPendingNewPosts);
@@ -10819,7 +10722,6 @@
             if (feedListenersAttached) return;
             feedListenersAttached = true;
             initFeedScrollListener();
-            renderFeedFromCache(user.uid);
 
             fetchNewsHeadlines().then(() => sprinkleNewsCards());
 
@@ -10863,14 +10765,7 @@
             const FEED_BURST_MAX_MS = 10000;   // hard cap so a stuck connection can't wedge this open
             let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
-            const endFeedInitialBurst = () => {
-                feedInitialBurstActive = false;
-                const list = document.getElementById('feed-posts-list');
-                if (list) delete list.dataset.feedFromCache;
-                // The live window has now finished streaming in — write it out so the *next*
-                // cold start has fresh data to paint from instead of this session's cache.
-                saveFeedCacheToStorage();
-            };
+            const endFeedInitialBurst = () => { feedInitialBurstActive = false; };
             const bumpFeedBurstQuiet = () => {
                 clearTimeout(feedBurstQuietTimer);
                 feedBurstQuietTimer = setTimeout(endFeedInitialBurst, FEED_BURST_QUIET_MS);
@@ -10935,7 +10830,6 @@
                     patchFeedPostCounts(existingCard, post);
                     patchDuplicateContentCards(postId, post, existingCard);
                     if (currentViewerPostId === postId) syncImageViewerPostBar();
-                    scheduleFeedCacheSave();
                     return;
                 }
                 // Even if this exact card doesn't exist yet (or its content changed), other
@@ -10955,7 +10849,6 @@
                 if (activePostOptions && activePostOptions.postId === postId) {
                     activePostOptions = { postId, post, card: newCard };
                 }
-                scheduleFeedCacheSave();
             });
 
             onChildRemoved(postsQuery, async (snap) => {
@@ -11000,7 +10893,6 @@
                     existingCard.remove();
                 });
                 updateFeedEmptyState();
-                scheduleFeedCacheSave();
             });
 
             // Note: ranking no longer auto-resettles on a timer or on contacts changes — that

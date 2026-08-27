@@ -28,6 +28,10 @@
                report a reliable env(safe-area-inset-bottom) — nudges our bottom nav bar (and
                everything that pads around its height) up a bit so it isn't obscured. */
             --nav-bar-extra-bottom: 12px;
+            /* Total vertical space reserved at the bottom of scrollable screens on mobile:
+               the floating "Ask anything" bar + gap + pill nav row + bottom margin.
+               Feeds into every padding-bottom/bottom calc() that clears the floating nav. */
+            --nav-bar-total: 150px;
             --primary-blue: #111111;
             --primary-rgb: 17, 17, 17;
             --nav-active-green: #111111;
@@ -1410,7 +1414,7 @@
         .floating-video-center-play svg { width: 16px; height: 16px; margin-left: 1px; }
         .floating-video-mute-bar { position: absolute; bottom: 6px; left: 6px; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
         .floating-video-player:hover .floating-video-mute-bar, .floating-video-player.show-controls .floating-video-mute-bar { opacity: 1; pointer-events: auto; }
-        @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom) + 14px); right: 12px; } }
+        @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom) + 14px); right: 12px; } }
         .feed-video-controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: linear-gradient(transparent, rgba(0,0,0,0.68)); }
         .feed-video-playpause-btn, .feed-video-mute-btn { background: none; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px; flex-shrink: 0; }
         .feed-video-playpause-btn svg, .feed-video-mute-btn svg { width: 18px; height: 18px; }
@@ -3145,26 +3149,54 @@
         }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
+            /* ── Floating pill bottom nav (search bar + segmented pill + circular action button) ── */
+            #ask-anything-bar {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                position: fixed;
+                left: 16px; right: 16px;
+                bottom: calc(76px + env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
+                height: 48px;
+                padding: 0 8px 0 18px;
+                background: var(--bg-surface);
+                border-radius: var(--radius-pill);
+                box-shadow: var(--shadow-elevated);
+                z-index: 100;
+                cursor: pointer;
+                transition: transform 0.25s ease;
+            }
+            #ask-anything-bar.nav-scroll-hidden { transform: translateY(140%); }
+            #ask-anything-bar span { flex: 1; font-size: 14.5px; color: var(--text-secondary); font-weight: 500; }
+            #ask-anything-bar .ask-anything-mic { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); flex-shrink: 0; }
+            #ask-anything-bar svg { width: 19px; height: 19px; }
+            body.glass-theme #ask-anything-bar {
+                background: var(--bg-surface) !important;
+                backdrop-filter: blur(24px) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+            }
+
             .side-nav {
                 display: grid;
-                grid-template-columns: 1fr 1fr 54px 1fr 1fr;
+                grid-template-columns: repeat(4, 1fr);
                 justify-items: center;
                 height: 60px;
-                padding: 0 2px;
-                padding-bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
+                padding: 0 6px;
                 position: fixed;
-                left: 0; right: 0; bottom: 0;
-                width: 100%;
+                left: 16px;
+                right: 86px;
+                bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
+                width: auto;
                 border-right: none;
-                border-top: 1px solid var(--border-color);
-                border-radius: 0;
+                border-top: none;
+                border-radius: var(--radius-pill);
                 align-items: center;
                 z-index: 100;
-                box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+                box-shadow: var(--shadow-elevated);
                 background: var(--bg-surface) !important;
                 transition: transform 0.25s ease;
             }
-            .side-nav.nav-scroll-hidden { transform: translateY(100%); }
+            .side-nav.nav-scroll-hidden { transform: translateY(140%); }
             /* Reels no longer has its own bottom-nav tab — every entry point now passes
                fullscreen:true (see openReelViewer), so this bottom:60px case is just a
                defensive fallback and shouldn't normally be hit. */
@@ -3173,7 +3205,7 @@
                full screen instead of leaving the reserved nav-bar strip at the bottom,
                which otherwise can show whatever's behind it instead of the nav bar. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-fab-spacer { display: block; width: 54px; height: 1px; }
+            .nav-fab-spacer { display: none; }
             .nav-item { padding: 6px 8px; color: var(--nav-active-black); }
             .nav-item svg { stroke: var(--nav-active-black); opacity: 0.55; }
             .nav-item span { opacity: 0.55; }
@@ -3181,46 +3213,45 @@
             .nav-item.active { color: var(--nav-active-green); }
             .nav-item.active svg { stroke: var(--nav-active-green); }
             .nav-badge { opacity: 1; }
-            .nav-indicator { background: var(--nav-active-green); opacity: 1; box-shadow: none; height: 3px; border-radius: 3px 3px 0 0; }
+            .nav-indicator { display: none; }
             body.glass-theme .side-nav {
                 background: var(--bg-surface) !important;
                 backdrop-filter: blur(24px) saturate(160%) !important;
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
-                border-top: 1px solid var(--border-color);
+                border-top: none;
             }
-            body.glass-theme .nav-indicator { background: var(--gradient-brand); opacity: 1; box-shadow: 0 1px 4px rgba(var(--primary-rgb), 0.4); }
-            .chat-list-container { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); }
-            .discover-grid-scroll { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + 24px + env(safe-area-inset-bottom)); }
-            #communities-feed-container { padding-bottom: calc(78px + var(--nav-bar-extra-bottom) + 24px + env(safe-area-inset-bottom)); }
+            .chat-list-container { padding-bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); }
+            .discover-grid-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
+            #communities-feed-container { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
             .chat-view-back { display: block; }
-            .fab-add { position: fixed; bottom: calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
+            .fab-add { position: fixed; bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
 
-            /* Primary nav-bar action button: centered INSIDE the bottom navigation.
-               Its icon and behavior change per active tab (New Post on Home, New Chat
-               on Messages) instead of separate floating buttons scattered per tab. It
-               is intentionally larger than the other nav icons while staying
-               completely within the 60px navigation bar. */
+            /* Primary action button: a separate circular button floating beside the pill
+               nav (not inside it), matching the pill-nav + circle-button layout. Its icon
+               and behavior change per active tab (New Post on Home, New Chat on Messages)
+               instead of separate floating buttons scattered per tab. */
             #fab-nav-action {
-                left: 50%;
-                right: auto;
-                bottom: calc(env(safe-area-inset-bottom) + 3px);
-                width: 54px;
-                height: 54px;
-                min-width: 54px;
-                min-height: 54px;
+                left: auto;
+                right: 16px;
+                bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
+                width: 60px;
+                height: 60px;
+                min-width: 60px;
+                min-height: 60px;
                 font-size: 34px;
                 line-height: 1;
                 z-index: 101;
-                transform: translateX(-50%);
+                transform: none;
+                background: var(--primary-blue);
                 box-shadow: 0 5px 16px rgba(var(--primary-rgb), 0.32);
             }
             #fab-nav-action:hover {
-                transform: translateX(-50%) scale(1.04);
+                transform: scale(1.04);
             }
             #fab-nav-action.fab-scroll-hidden {
-                transform: translateX(-50%) translateY(140%);
+                transform: translateY(140%);
             }
             /* The chat-bubble SVG reads visually smaller than the bold "+" glyph at the
                same box size, so nudge it down to match the plus sign's optical weight. */
@@ -3243,7 +3274,7 @@
             .wa-chip svg { width: 12px; height: 12px; }
             .wa-archived-row { gap: 12px; padding: 10px 4px; }
             .wa-archived-row span { font-size: 14px; }
-            .chat-list-container { padding: 8px 10px calc(78px + var(--nav-bar-extra-bottom) + env(safe-area-inset-bottom)); }
+            .chat-list-container { padding: 8px 10px calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); }
             .chat-item { gap: 12px; padding: 10px 8px; }
             .chat-avatar-ring { width: 48px; height: 48px; }
             .chat-avatar-ring .avatar { width: 42px; height: 42px; }
@@ -5290,6 +5321,13 @@
     <div id="messenger-screen">
         <div class="app-grid">
             
+            <div id="ask-anything-bar" title="Search">
+                <span>Ask anything</span>
+                <div class="ask-anything-mic">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </div>
+            </div>
+
             <nav class="side-nav">
                 <div class="nav-indicator" id="nav-indicator"></div>
                 <div class="nav-item active" data-tab="tab-status">
@@ -16498,6 +16536,7 @@
         // one up independently but toggle the same shared nav element. ---
         (function initNavScrollHide() {
             const nav = document.querySelector('.side-nav');
+            const askBar = document.getElementById('ask-anything-bar');
             if (!nav) return;
             const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'calls-list-container', 'contacts-list-container'];
             const THRESHOLD = 6; // ignore tiny scroll jitter
@@ -16511,11 +16550,25 @@
                     if (Math.abs(delta) < THRESHOLD) return;
                     if (delta > 0 && current > 40) {
                         nav.classList.add('nav-scroll-hidden'); // scrolling down
+                        if (askBar) askBar.classList.add('nav-scroll-hidden');
                     } else {
                         nav.classList.remove('nav-scroll-hidden'); // scrolling up
+                        if (askBar) askBar.classList.remove('nav-scroll-hidden');
                     }
                     lastScrollTop = current;
                 }, { passive: true });
+            });
+        })();
+
+        // "Ask anything" floating bar — opens the same fullscreen search overlay as the
+        // Search nav-item (see initTabs' searchNavBtn handler above).
+        (function initAskAnythingBar() {
+            const askBar = document.getElementById('ask-anything-bar');
+            if (!askBar) return;
+            askBar.addEventListener('click', () => {
+                triggerHaptic(12);
+                const searchNavBtn = document.getElementById('nav-search-btn');
+                if (searchNavBtn) searchNavBtn.click();
             });
         })();
 

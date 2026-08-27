@@ -2364,7 +2364,15 @@
         .scroll-to-bottom-btn.has-unread .unread-dot { display: block; }
         
         @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .msg-bubble { max-width: 68%; padding: 8px 14px 9px 14px; border-radius: 20px; font-size: 14px; line-height: 1.45; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; }
+        /* flex-shrink: 0 is required here, not cosmetic: .chat-view-messages is a flex column,
+           and media bubbles set overflow:hidden (to clip the image's rounded corners). Per the
+           flexbox spec, an item's automatic min-height protection only applies when its own
+           overflow is visible — with overflow:hidden it drops to 0, so once messages overflow
+           the visible chat height, the flex column silently SHRINKS bubbles to fit instead of
+           actually overflowing/scrolling, squashing captioned image bubbles and clipping the
+           caption's last line(s). flex-shrink:0 forces every bubble to stay at its full content
+           height so the container's overflow-y:auto scrolls instead of compressing bubbles. */
+        .msg-bubble { max-width: 68%; padding: 8px 14px 9px 14px; border-radius: 20px; font-size: 14px; line-height: 1.45; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; flex-shrink: 0; }
         .date-separator { display: flex; justify-content: center; align-self: center; margin: 4px 0 8px; }
         .chat-favourite-star { vertical-align: middle; margin: 0 3px; position: relative; top: -1px; }
         .date-separator span { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 14px; box-shadow: var(--shadow-bubble); letter-spacing: 0.1px; }

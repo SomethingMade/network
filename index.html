@@ -2471,7 +2471,7 @@
         .msg-media-save-btn:hover { background: rgba(0,0,0,0.75); }
         .msg-media-save-btn:active { transform: scale(0.92); }
         .msg-media-save-btn svg { width: 16px; height: 16px; }
-        .msg-media-caption { padding: 8px 12px 2px; font-size: 14px; color: var(--text-primary); word-break: break-word; }
+        .msg-media-caption { padding: 8px 12px 2px; font-size: 14px; word-break: break-word; }
         /* Captioned media bubble: instead of a rounded photo with a separate flat-cornered
            caption strip floating underneath it, treat image+caption as ONE pill-shaped bubble —
            same silhouette as a text bubble (20px corners, tail corner clipped to 4px). The
@@ -6152,7 +6152,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -16969,7 +16969,8 @@
                 posts: [],
                 exhausted: false,
                 loading: false,
-                emptyBatches: 0
+                emptyBatches: 0,
+                realtimeGroupIds: new Set() // groupIds already wired up with a live onChildAdded listener
             };
             communityFeedContexts[key] = ctx;
             activeCommunityFeedCtx = ctx;
@@ -16994,6 +16995,7 @@
             }
             ctx.posts.forEach(msg => list.appendChild(buildCommunityPostCard(msg)));
             if (!ctx.exhausted) ensureCommunityFeedSentinelAtEnd(list);
+            reorderCommunityFeedCards(ctx);
         }
 
         function buildCommunityFeedSkeletonCard() {
@@ -17061,6 +17063,83 @@
         // "history" load) — same endAt(cursor - 1) + limitToLast pagination shape as the Home
         // feed's loadOlderPosts. Stops (ctx.exhausted = true) once a full pass of the latter
         // yields nothing new twice in a row, matching noMoreOlderPosts's emptyOlderFetchCount.
+        // --- COMMUNITY FEED RANKING ---
+        // Same recipe as the Home feed's computeFeedScore (see "FEED RANKING" above): recency
+        // decay + engagement weight + a flat contacts bonus + a seeded per-viewer jitter so
+        // ordering is deterministic-but-varied instead of a fresh Math.random() shuffle on every
+        // load. Falls back to 0 engagement for posts whose communityPostEngagement hasn't been
+        // fetched into communityEngagementCache yet — same as the like/comment counts on the
+        // card itself, which patch in asynchronously via fetchCommunityEngagement.
+        function computeCommunityFeedScore(msg) {
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : 'anon';
+            const now = Date.now();
+            const ts = msg.createdAt || now;
+            const ageHours = Math.max(0, (now - ts) / 3600000);
+            const recencyScore = Math.max(0, 100 - ageHours * (100 / 48));
+            const msgId = communityMsgEngagementId(msg);
+            const eng = communityEngagementCache[msgId] || {};
+            const engagementScore = (eng.likeCount || 0) * 2 + (eng.commentCount || 0) * 4;
+            const contactBonus = (cachedContacts && cachedContacts[msg.senderUid]) ? 40 : 0;
+            const jitter = seededRandom01(msgId + ':' + myUid) * 20;
+            return recencyScore + engagementScore + contactBonus + jitter;
+        }
+
+        // Reorders the already-rendered community post cards in place by computeCommunityFeedScore
+        // — mirrors reorderFeedCards's "move DOM nodes, don't rebuild them" approach so an open
+        // comment sheet or menu isn't disturbed. Called whenever ctx's post set changes (a fresh
+        // page lands, or a realtime post arrives) and only touches the DOM when ctx is the one
+        // currently on screen.
+        function reorderCommunityFeedCards(ctx) {
+            if (!ctx || ctx !== activeCommunityFeedCtx) return;
+            const list = document.getElementById('communities-feed-list');
+            if (!list) return;
+            const postsById = {};
+            ctx.posts.forEach(msg => { postsById[communityMsgEngagementId(msg)] = msg; });
+            const cards = Array.from(list.children).filter(el => el.dataset.msgId);
+            cards.sort((a, b) => {
+                const msgA = postsById[a.dataset.msgId], msgB = postsById[b.dataset.msgId];
+                if (!msgA || !msgB) return 0;
+                return computeCommunityFeedScore(msgB) - computeCommunityFeedScore(msgA);
+            });
+            cards.forEach(card => list.appendChild(card));
+            const sentinel = document.getElementById('community-feed-load-more-sentinel');
+            if (sentinel) list.appendChild(sentinel);
+        }
+
+        // Once a community has been sampled into a feed context, wires up a live onChildAdded
+        // listener scoped to createdAt > sinceCreatedAt (whatever was newest at fetch time) so a
+        // post made by anyone in that community shows up in the Home/Explore feed immediately,
+        // instead of only appearing after the next pagination fetch or a full reload. Runs for
+        // the lifetime of the context (contexts are cached and never torn down, same as their
+        // ctx.posts array), and is idempotent per (ctx, groupId) via ctx.realtimeGroupIds.
+        function attachCommunityFeedRealtimeListener(ctx, gid, sinceCreatedAt) {
+            if (ctx.realtimeGroupIds.has(gid)) return;
+            ctx.realtimeGroupIds.add(gid);
+            const cutoff = isFinite(sinceCreatedAt) ? sinceCreatedAt : Date.now();
+            const q = query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), startAt(cutoff + 1));
+            onChildAdded(q, (snap) => {
+                const m = snap.val();
+                if (!m) return;
+                const msg = { key: snap.key, ...m, groupId: gid };
+                const dedupeKey = `${gid}:${msg.key}`;
+                if (ctx.loadedKeys.has(dedupeKey)) return;
+                if (msg.deleted) return;
+                if (!(msg.text || (msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video')))) return;
+                ctx.loadedKeys.add(dedupeKey);
+                ctx.posts.unshift(msg);
+                if (ctx === activeCommunityFeedCtx) {
+                    const list = document.getElementById('communities-feed-list');
+                    if (list) {
+                        const emptyEl = list.querySelector('.empty-state');
+                        if (emptyEl) emptyEl.remove();
+                        list.appendChild(buildCommunityPostCard(msg));
+                        reorderCommunityFeedCards(ctx);
+                    }
+                }
+            });
+        }
+
         async function loadMoreCommunityPosts(ctx) {
             if (!ctx || ctx.loading || ctx.exhausted) return;
             ctx.loading = true;
@@ -17075,16 +17154,19 @@
                     const results = await Promise.all(batchIds.map(async (gid) => {
                         try {
                             const snap = await get(query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
-                            if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
+                            if (!snap.exists()) { ctx.groupCursors[gid] = null; attachCommunityFeedRealtimeListener(ctx, gid, Date.now()); return []; }
                             const entries = [];
                             let oldest = Infinity;
+                            let newest = -Infinity;
                             snap.forEach((child) => {
                                 const m = child.val();
                                 if (m.createdAt && m.createdAt < oldest) oldest = m.createdAt;
+                                if (m.createdAt && m.createdAt > newest) newest = m.createdAt;
                                 entries.push({ key: child.key, ...m, groupId: gid });
                                 return false;
                             });
                             ctx.groupCursors[gid] = isFinite(oldest) ? oldest : null;
+                            attachCommunityFeedRealtimeListener(ctx, gid, newest);
                             return entries;
                         } catch (err) { return []; }
                     }));
@@ -17115,14 +17197,14 @@
                 const isActive = ctx === activeCommunityFeedCtx;
                 if (isActive) removeCommunityFeedLoadingSkeletons(skeletonNodes);
 
-                const fresh = shuffleArray(fetchedRaw.filter((msg) => {
+                const fresh = fetchedRaw.filter((msg) => {
                     const dedupeKey = `${msg.groupId}:${msg.key}`;
                     if (ctx.loadedKeys.has(dedupeKey)) return false;
                     if (msg.deleted) return false;
                     if (!(msg.text || (msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video')))) return false;
                     ctx.loadedKeys.add(dedupeKey);
                     return true;
-                })).slice(0, COMMUNITY_FEED_POSTS_PER_BATCH);
+                }).sort((a, b) => computeCommunityFeedScore(b) - computeCommunityFeedScore(a)).slice(0, COMMUNITY_FEED_POSTS_PER_BATCH);
 
                 if (fresh.length === 0) {
                     if (ctx.remainingGroupIds.length === 0) {
@@ -17136,6 +17218,7 @@
                         const emptyState = list.querySelector('.empty-state');
                         if (emptyState) emptyState.remove();
                         fresh.forEach(msg => list.appendChild(buildCommunityPostCard(msg)));
+                        reorderCommunityFeedCards(ctx);
                     }
                 }
 

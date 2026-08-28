@@ -8091,6 +8091,12 @@
 
         function handleHashChange(isInitialSync) {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
+            // Guards against calling showFeedCommunitiesView() twice in the same pass (see the
+            // chat-close block below and the generic tab-hash restore further down) — a second,
+            // redundant call while the first is still mid-fetch replaces #communities-feed-list
+            // with a fresh node, stranding the in-flight fetch's DOM reference so its posts render
+            // into a detached element the user never sees (fixed by only ever calling it once here).
+            let communitiesFeedRestoredThisPass = false;
             
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
@@ -8160,7 +8166,10 @@
                 // the generic tab-hash restore logic further down.
                 if (restoreCommunitiesFeedOnChatClose) {
                     restoreCommunitiesFeedOnChatClose = false;
-                    if (hash === 'tab-status') showFeedCommunitiesView();
+                    if (hash === 'tab-status') {
+                        showFeedCommunitiesView();
+                        communitiesFeedRestoredThisPass = true;
+                    }
                 }
             }
             if (hash !== 'story' && storyActive && !isNestedViewerHash) {
@@ -8201,7 +8210,7 @@
                 // belongs), and returning to Home while that subtab is selected re-mounts it.
                 if (hash !== 'tab-status') {
                     restoreCommunitiesFeedContainerHome();
-                } else if (feedActiveSubtab === 'communities') {
+                } else if (feedActiveSubtab === 'communities' && !communitiesFeedRestoredThisPass) {
                     showFeedCommunitiesView();
                 }
                 if (hash === 'tab-groups') {
@@ -17639,6 +17648,11 @@
         async function loadMoreCommunityPosts(ctx) {
             if (!ctx || ctx.loading || ctx.exhausted) return;
             ctx.loading = true;
+            // Re-queried at each use below rather than captured once up front — if the container
+            // gets rebuilt (e.g. renderCommunityFeedFromContext runs again) while this fetch is
+            // still in flight, a stale reference here would silently append into a detached node
+            // instead of the live one, leaving the visible feed empty until something else forced
+            // a fresh re-render.
             const list = document.getElementById('communities-feed-list');
             const skeletonNodes = showCommunityFeedLoadingSkeletons(list);
 
@@ -17691,6 +17705,7 @@
                 }
 
                 const isActive = ctx === activeCommunityFeedCtx;
+                const liveList = document.getElementById('communities-feed-list');
                 if (isActive) removeCommunityFeedLoadingSkeletons(skeletonNodes);
 
                 const fresh = fetchedRaw.filter((msg) => {
@@ -17710,10 +17725,10 @@
                 } else {
                     ctx.emptyBatches = 0;
                     ctx.posts.push(...fresh);
-                    if (isActive && list) {
-                        const emptyState = list.querySelector('.empty-state');
+                    if (isActive && liveList) {
+                        const emptyState = liveList.querySelector('.empty-state');
                         if (emptyState) emptyState.remove();
-                        fresh.forEach(msg => list.appendChild(buildCommunityPostCard(msg)));
+                        fresh.forEach(msg => liveList.appendChild(buildCommunityPostCard(msg)));
                         reorderCommunityFeedCards(ctx);
                     }
                 }
@@ -17722,11 +17737,11 @@
                     ctx.exhausted = true;
                 }
 
-                if (isActive && list) {
+                if (isActive && liveList) {
                     if (ctx.posts.length === 0 && ctx.exhausted) {
-                        list.innerHTML = communityFeedEmptyStateHtml(ctx.subtab);
+                        liveList.innerHTML = communityFeedEmptyStateHtml(ctx.subtab);
                     } else if (!ctx.exhausted) {
-                        ensureCommunityFeedSentinelAtEnd(list);
+                        ensureCommunityFeedSentinelAtEnd(liveList);
                     }
                 }
             } catch (err) {

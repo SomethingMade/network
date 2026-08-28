@@ -8149,6 +8149,19 @@
                 activeChatUid = null;
                 cancelReplyMode(); cancelEditMode();
                 highlightActiveChat();
+
+                // A community post's chat can be opened while parked on the Home feed's
+                // "Communities" subtab (hash stays 'tab-status' the whole time — switching feed
+                // subtabs never touches the hash). Opening that chat still pushes its own '#chat'
+                // history entry on top though, so closing it can land back on 'tab-status' before
+                // this same handleHashChange pass has re-evaluated feedActiveSubtab below — without
+                // this, the Home feed was quietly falling back to its default "For you" view instead
+                // of staying on Communities. Force it back explicitly rather than relying solely on
+                // the generic tab-hash restore logic further down.
+                if (restoreCommunitiesFeedOnChatClose) {
+                    restoreCommunitiesFeedOnChatClose = false;
+                    if (hash === 'tab-status') showFeedCommunitiesView();
+                }
             }
             if (hash !== 'story' && storyActive && !isNestedViewerHash) {
                 clearTimeout(storyState.timer);
@@ -8188,15 +8201,8 @@
                 // belongs), and returning to Home while that subtab is selected re-mounts it.
                 if (hash !== 'tab-status') {
                     restoreCommunitiesFeedContainerHome();
-                } else {
-                    // Restore the exact Home feed subtab before mounting its content.
-                    restoreFeedSubtabAfterChat();
-                    if (feedActiveSubtab === 'communities') {
-                        showFeedCommunitiesView();
-                    } else {
-                        hideFeedCommunitiesView();
-                        applyFeedSubtabFilter();
-                    }
+                } else if (feedActiveSubtab === 'communities') {
+                    showFeedCommunitiesView();
                 }
                 if (hash === 'tab-groups') {
                     if (isInitialSync !== true) updateHeaderGroupsBadge(0);
@@ -12350,27 +12356,9 @@
         // client-side show/hide over cards already in cachedPosts/the DOM — it doesn't change
         // what gets fetched, so switching tabs is instant with no extra network round-trip.
         let feedActiveSubtab = 'forYou';
-
-        // Preserve the Home > Communities subtab when a community post opens a group chat.
-        // The chat is a hash navigation (#chat), so Back must return to the same feed view.
-        let feedSubtabReturnFromChat = null;
-        function rememberFeedSubtabBeforeChat(subtab) {
-            // The group-chat view uses #chat. Remember the Home feed subtab whenever
-            // a community post opens a chat so Back restores the exact feed context
-            // instead of falling back to the default For you view.
-            if (window.location.hash === '#tab-status' && ['forYou', 'following', 'communities'].includes(subtab)) {
-                feedSubtabReturnFromChat = subtab;
-            }
-        }
-        function restoreFeedSubtabAfterChat() {
-            if (window.location.hash !== '#tab-status' || !feedSubtabReturnFromChat) return;
-            const subtab = feedSubtabReturnFromChat;
-            feedSubtabReturnFromChat = null;
-            feedActiveSubtab = subtab;
-            document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.feedSubtab === subtab);
-            });
-        }
+        // Set right before opening a community post's chat while viewing the Home feed's
+        // "Communities" subtab — see the matching check in handleHashChange's chat-close cleanup.
+        let restoreCommunitiesFeedOnChatClose = false;
 
         function feedCardMatchesSubtab(post) {
             if (feedActiveSubtab !== 'following') return true;
@@ -18086,12 +18074,7 @@
             // Name, avatar, verified badge, business pill, and @username are filled in (and kept
             // live) via applyLiveProfileToPostCard, same as a real feed post.
             applyLiveProfileToPostCard(card);
-            card.addEventListener('click', () => {
-                if (window.location.hash === '#tab-status' && feedActiveSubtab === 'communities') {
-                    rememberFeedSubtabBeforeChat('communities');
-                }
-                openGroupChatView(msg.groupId);
-            });
+            card.addEventListener('click', () => openGroupChatView(msg.groupId));
 
             const avatarCol = card.querySelector('.x-post-avatar-col');
             if (avatarCol) avatarCol.addEventListener('click', (e) => {
@@ -19175,13 +19158,6 @@
             const group = cachedCommunities[groupId];
             if (!user || !group) return;
 
-            // Capture the Home feed subtab at the actual chat entry point. This makes
-            // the fix apply to every community-post -> chat path, not only the main
-            // card click handler (e.g. menus/edit actions that also open a group chat).
-            if (window.location.hash === '#tab-status' && feedActiveSubtab === 'communities') {
-                rememberFeedSubtabBeforeChat('communities');
-            }
-
             activeGroupId = groupId;
             activeChatUid = null;
             isActiveThreadInitialLoad = true;
@@ -19412,6 +19388,8 @@
                 isActiveThreadInitialLoad = false;
             });
 
+            const hashBeforeGroupChat = window.location.hash.replace('#', '') || 'tab-status';
+            restoreCommunitiesFeedOnChatClose = (feedActiveSubtab === 'communities' && hashBeforeGroupChat === 'tab-status');
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
             highlightActiveChat();

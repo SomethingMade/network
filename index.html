@@ -7137,6 +7137,7 @@
             const media = itemEl.querySelector('.reel-item-media');
             let video = media.querySelector('video');
             const post = cachedPosts[postId];
+            const hasMusic = !!(post && post.music && post.music.previewUrl);
             if (!video) {
                 // Keep the spinner in place — don't wipe media's contents — so there's always a
                 // custom loading state instead of a bare <video> flashing the browser/OS's own
@@ -7175,8 +7176,30 @@
                 media.appendChild(video);
                 video.addEventListener('click', () => toggleReelItemPlayback(itemEl, video));
                 if (!videoUrl) video.dispatchEvent(new Event('error'));
+
+                // When a song is attached, the clip's own audio stays muted permanently and the
+                // attached track plays instead, kept in sync with play/pause/seek — same rule as
+                // the inline feed player and the plain video viewer.
+                if (hasMusic) {
+                    const musicAudio = document.createElement('audio');
+                    musicAudio.className = 'reel-item-music-audio';
+                    musicAudio.src = post.music.previewUrl;
+                    musicAudio.loop = true;
+                    musicAudio.preload = 'none';
+                    musicAudio.style.display = 'none';
+                    media.appendChild(musicAudio);
+                    video.addEventListener('play', () => {
+                        musicAudio.currentTime = video.currentTime;
+                        musicAudio.play().catch(() => {});
+                    });
+                    video.addEventListener('pause', () => { musicAudio.pause(); });
+                    video.addEventListener('seeked', () => { musicAudio.currentTime = video.currentTime; });
+                    video.addEventListener('timeupdate', () => {
+                        if (Math.abs(musicAudio.currentTime - video.currentTime) > 0.3) musicAudio.currentTime = video.currentTime;
+                    });
+                }
             }
-            video.muted = false;
+            video.muted = hasMusic;
             video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
 
             const user = auth.currentUser;
@@ -7200,6 +7223,8 @@
         function deactivateReelItem(itemEl) {
             const video = itemEl.querySelector('.reel-item-media video');
             if (video && !video.paused) video.pause();
+            const musicAudio = itemEl.querySelector('.reel-item-music-audio');
+            if (musicAudio && !musicAudio.paused) musicAudio.pause();
             const hint = itemEl.querySelector('.reel-item-play-hint');
             if (hint) hint.classList.remove('visible');
         }
@@ -7269,6 +7294,7 @@
         function closeReelViewer() {
             const track = document.getElementById('reel-viewer-track');
             track.querySelectorAll('.reel-item-media video').forEach(v => { v.pause(); v.src = ''; });
+            track.querySelectorAll('.reel-item-music-audio').forEach(a => { a.pause(); a.src = ''; });
             if (reelObserver) { reelObserver.disconnect(); reelObserver = null; }
             track.innerHTML = '';
             reelPostIds = [];
@@ -20011,6 +20037,7 @@
             if (floatingVideoEl && !floatingVideoEl.paused) floatingVideoEl.pause();
             const reelTrack = document.getElementById('reel-viewer-track');
             if (reelTrack) reelTrack.querySelectorAll('.reel-item-media video').forEach(v => { if (!v.paused) v.pause(); });
+            if (reelTrack) reelTrack.querySelectorAll('.reel-item-music-audio').forEach(a => { if (!a.paused) a.pause(); });
             if (currentlyPlayingVoice) {
                 currentlyPlayingVoice.pause();
                 const prevWaveform = currentlyPlayingVoice._bubbleEl && currentlyPlayingVoice._bubbleEl.querySelector('.msg-voice-waveform');

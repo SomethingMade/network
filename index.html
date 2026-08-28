@@ -11186,6 +11186,7 @@
                     previewImage.style.display = 'none';
                     previewImage.src = '';
                     previewVideo.src = feedComposerVideo.previewUrl;
+                    previewVideo.poster = feedComposerVideo.posterUrl || feedComposerVideo.thumbnailUrl || '';
                     previewVideo.style.display = 'block';
                     previewRemove.style.display = 'flex';
                     musicBtn.style.display = 'flex';
@@ -11278,6 +11279,9 @@
                 if (feedComposerVideo && feedComposerVideo.previewUrl && feedComposerVideo.previewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(feedComposerVideo.previewUrl);
                 }
+                if (feedComposerVideo && feedComposerVideo.posterUrl) {
+                    URL.revokeObjectURL(feedComposerVideo.posterUrl);
+                }
                 feedComposerImages = [];
                 feedComposerVideo = null;
                 feedComposerMusic = null;
@@ -11329,6 +11333,9 @@
             function clearComposerVideoOnly() {
                 if (feedComposerVideo && feedComposerVideo.previewUrl && feedComposerVideo.previewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(feedComposerVideo.previewUrl);
+                }
+                if (feedComposerVideo && feedComposerVideo.posterUrl) {
+                    URL.revokeObjectURL(feedComposerVideo.posterUrl);
                 }
                 feedComposerVideo = null;
             }
@@ -11411,10 +11418,17 @@
                     clearComposerVideoOnly();
                     feedComposerMusic = null;
                     updateComposerMusicChip();
-                    const entry = { previewUrl: URL.createObjectURL(videoFile), url: null, uploading: true, thumbnailUrl: null, promise: null };
+                    const entry = { previewUrl: URL.createObjectURL(videoFile), url: null, uploading: true, thumbnailUrl: null, posterUrl: null, promise: null };
                     feedComposerVideo = entry;
                     renderComposerPreview(); // instant preview + spinner, no waiting on the network
                     refreshSubmitState();
+                    // Local poster frame so the preview shows the video's own first frame instead
+                    // of the browser's blank grey placeholder while metadata/upload are pending.
+                    generateVideoThumbnailBlob(videoFile).then((blob) => {
+                        if (feedComposerVideo !== entry) return;
+                        entry.posterUrl = URL.createObjectURL(blob);
+                        renderComposerPreview();
+                    }).catch(() => {});
                     const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
                     uploadComposerVideoEntry(entry, videoFile, uid).catch(() => {});
                     return;

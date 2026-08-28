@@ -3043,6 +3043,9 @@
         .reel-item-author { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; margin-bottom: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-author .avatar { width: 30px; height: 30px; font-size: 13px; }
         .reel-item-caption { font-size: 13.5px; line-height: 1.35; opacity: 0.95; text-shadow: 0 1px 6px rgba(0,0,0,0.55); max-height: 4.1em; overflow: hidden; }
+        .reel-item-music { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; font-weight: 600; max-width: 100%; }
+        .reel-item-music svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .reel-item-music span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-actions { position: absolute; right: 10px; bottom: 40px; display: flex; flex-direction: column; align-items: center; gap: 20px; z-index: 2; }
         .reel-item-action-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: #fff; cursor: pointer; font-size: 11px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-action-btn svg { width: 27px; height: 27px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
@@ -7062,6 +7065,7 @@
                     <div class="reel-item-info">
                         <div class="reel-item-author">${feedAvatarHtml(author)}<span></span></div>
                         ${caption ? `<div class="reel-item-caption"></div>` : ''}
+                        ${post && post.music ? `<div class="reel-item-music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg><span></span></div>` : ''}
                     </div>
                     <div class="reel-item-actions">
                         <button type="button" class="reel-item-action-btn reel-like-btn${likedByMe ? ' liked' : ''}" data-post-id="${postId}">
@@ -7099,6 +7103,8 @@
             if (nameEl) nameEl.innerHTML = escapeHtmlForPost(author.name || (post && post.name) || 'User') + verifiedBadgeFor(uid, uid === AI_UID);
             const captionEl = itemEl.querySelector('.reel-item-caption');
             if (captionEl) captionEl.innerHTML = (post && post.text) ? linkifyHashtags(post.text) : '';
+            const musicEl = itemEl.querySelector('.reel-item-music span');
+            if (musicEl && post && post.music) musicEl.textContent = `${post.music.trackName || ''}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
         }
 
         function reelExtendQueueIfNeeded() {
@@ -7196,6 +7202,13 @@
                     video.addEventListener('seeked', () => { musicAudio.currentTime = video.currentTime; });
                     video.addEventListener('timeupdate', () => {
                         if (Math.abs(musicAudio.currentTime - video.currentTime) > 0.3) musicAudio.currentTime = video.currentTime;
+                    });
+                    // Video stalls to rebuffer (network hiccup, seek past unbuffered data) —
+                    // pause the song so it doesn't drift ahead, then resume in sync once the
+                    // video actually resumes playing.
+                    video.addEventListener('waiting', () => { musicAudio.pause(); });
+                    video.addEventListener('playing', () => {
+                        if (!video.paused) { musicAudio.currentTime = video.currentTime; musicAudio.play().catch(() => {}); }
                     });
                 }
             }

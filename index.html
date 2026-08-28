@@ -5584,7 +5584,6 @@
                         <div class="feed-subtabs" id="feed-subtabs">
                             <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                             <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                            <button type="button" class="feed-subtab-btn" data-feed-subtab="communities">Communities</button>
                         </div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
@@ -5594,12 +5593,6 @@
                                 <p>No posts yet. Be the first to share something!</p>
                             </div>
                         </div>
-                        <!-- Communities subtab reuses the real #communities-feed-container node (see
-                             showFeedCommunitiesView/restoreCommunitiesFeedContainerHome) rather than
-                             duplicating the community-feed pagination/realtime pipeline — it's just
-                             physically moved in here, forced to the Home/"All" view (posts only, no
-                             Explore strip), and moved back to #tab-groups the moment this tab is left. -->
-                        <div id="feed-communities-mount" style="display:none;"></div>
                     </div>
                 </div>
 
@@ -8091,13 +8084,7 @@
 
         function handleHashChange(isInitialSync) {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
-            // Guards against calling showFeedCommunitiesView() twice in the same pass (see the
-            // chat-close block below and the generic tab-hash restore further down) — a second,
-            // redundant call while the first is still mid-fetch replaces #communities-feed-list
-            // with a fresh node, stranding the in-flight fetch's DOM reference so its posts render
-            // into a detached element the user never sees (fixed by only ever calling it once here).
-            let communitiesFeedRestoredThisPass = false;
-            
+
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
             const imageViewerActive = document.getElementById('image-viewer-overlay').classList.contains('active');
@@ -8155,22 +8142,6 @@
                 activeChatUid = null;
                 cancelReplyMode(); cancelEditMode();
                 highlightActiveChat();
-
-                // A community post's chat can be opened while parked on the Home feed's
-                // "Communities" subtab (hash stays 'tab-status' the whole time — switching feed
-                // subtabs never touches the hash). Opening that chat still pushes its own '#chat'
-                // history entry on top though, so closing it can land back on 'tab-status' before
-                // this same handleHashChange pass has re-evaluated feedActiveSubtab below — without
-                // this, the Home feed was quietly falling back to its default "For you" view instead
-                // of staying on Communities. Force it back explicitly rather than relying solely on
-                // the generic tab-hash restore logic further down.
-                if (restoreCommunitiesFeedOnChatClose) {
-                    restoreCommunitiesFeedOnChatClose = false;
-                    if (hash === 'tab-status') {
-                        showFeedCommunitiesView();
-                        communitiesFeedRestoredThisPass = true;
-                    }
-                }
             }
             if (hash !== 'story' && storyActive && !isNestedViewerHash) {
                 clearTimeout(storyState.timer);
@@ -8203,15 +8174,6 @@
                 // was last open gets wiped before the person ever sees it.
                 if (hash === 'tab-chats' && isInitialSync !== true) {
                     updateChatsUnreadBadge(0);
-                }
-                // Keep #communities-feed-container in the right place regardless of how the user
-                // got here: leaving Home tears down the in-place Communities posts view (so direct
-                // navigation to the real Communities tab always finds its container where it
-                // belongs), and returning to Home while that subtab is selected re-mounts it.
-                if (hash !== 'tab-status') {
-                    restoreCommunitiesFeedContainerHome();
-                } else if (feedActiveSubtab === 'communities' && !communitiesFeedRestoredThisPass) {
-                    showFeedCommunitiesView();
                 }
                 if (hash === 'tab-groups') {
                     if (isInitialSync !== true) updateHeaderGroupsBadge(0);
@@ -12365,10 +12327,6 @@
         // client-side show/hide over cards already in cachedPosts/the DOM — it doesn't change
         // what gets fetched, so switching tabs is instant with no extra network round-trip.
         let feedActiveSubtab = 'forYou';
-        // Set right before opening a community post's chat while viewing the Home feed's
-        // "Communities" subtab — see the matching check in handleHashChange's chat-close cleanup.
-        let restoreCommunitiesFeedOnChatClose = false;
-
         function feedCardMatchesSubtab(post) {
             if (feedActiveSubtab !== 'following') return true;
             if (!post || !post.uid) return false;
@@ -12387,42 +12345,6 @@
             updateFeedEmptyState();
         }
 
-        // The Communities feed subtab doesn't have its own post store to filter — community posts
-        // are group-thread messages, entirely separate from cachedPosts — so instead of duplicating
-        // that whole pagination/realtime pipeline, we physically relocate the real
-        // #communities-feed-container (normally inside #tab-groups) into #feed-communities-mount
-        // here, force it onto the Home/"All" view, and move it back out the moment this tab is
-        // left. Moving a DOM node (rather than rebuilding it) also means an already-loaded feed
-        // just reappears instantly with its scroll position and live listeners intact.
-        function parkCommunitiesFeedContainerIn(targetEl) {
-            const container = document.getElementById('communities-feed-container');
-            if (container && targetEl && container.parentElement !== targetEl) targetEl.appendChild(container);
-        }
-        function restoreCommunitiesFeedContainerHome() {
-            const home = document.getElementById('tab-groups');
-            parkCommunitiesFeedContainerIn(home);
-        }
-        function showFeedCommunitiesView() {
-            const feedContainer = document.getElementById('feed-posts-container');
-            const mount = document.getElementById('feed-communities-mount');
-            if (feedContainer) feedContainer.style.display = 'none';
-            if (mount) mount.style.display = '';
-            parkCommunitiesFeedContainerIn(mount);
-            // Posts only, no Explore/category picking here — always the same "every public
-            // community's posts" view regardless of whatever subtab/category the real Communities
-            // tab was last left on.
-            activeCommunitySubtab = 'home';
-            activeCommunityCategory = 'All';
-            loadCommunityFeed();
-        }
-        function hideFeedCommunitiesView() {
-            const mount = document.getElementById('feed-communities-mount');
-            if (mount) mount.style.display = 'none';
-            const feedContainer = document.getElementById('feed-posts-container');
-            if (feedContainer) feedContainer.style.display = '';
-            restoreCommunitiesFeedContainerHome();
-        }
-
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
             if (!btn || btn.classList.contains('active')) return;
@@ -12430,12 +12352,7 @@
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
-            if (feedActiveSubtab === 'communities') {
-                showFeedCommunitiesView();
-            } else {
-                hideFeedCommunitiesView();
-                applyFeedSubtabFilter();
-            }
+            applyFeedSubtabFilter();
         });
 
         function updateFeedEmptyState() {
@@ -19403,8 +19320,6 @@
                 isActiveThreadInitialLoad = false;
             });
 
-            const hashBeforeGroupChat = window.location.hash.replace('#', '') || 'tab-status';
-            restoreCommunitiesFeedOnChatClose = (feedActiveSubtab === 'communities' && hashBeforeGroupChat === 'tab-status');
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
             highlightActiveChat();

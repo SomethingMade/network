@@ -766,6 +766,8 @@
            Settings itself — placed after settings-bottom-sheet-overlay in the DOM, so equal
            z-index still paints it above when both are open. */
         #verified-badge-page-overlay { z-index: 100010; }
+        /* Haba Verification (business-account KYC) is opened from inside Settings too. */
+        #haba-verification-overlay { z-index: 100010; }
         /* Same reasoning: the PIN setup/change/disable flow for App Lock is opened from
            inside the Settings sheet too, and needs to clear it the same way. Placed after
            settings-bottom-sheet-overlay (and copyright-policy-sheet-overlay) in the DOM. */
@@ -4592,7 +4594,7 @@
                     <div class="wa-row-icon chip-gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
                     <div class="wa-row-body">
                         <span class="wa-row-title">Business Account <span class="group-badge-pill gold-business" id="business-account-pill" style="display:none; margin-left:6px;">Business</span></span>
-                        <span class="wa-row-sub">Get a gold verified badge and show up as a business across the app</span>
+                        <span class="wa-row-sub">Get a gold verified badge and show up as a business across the app — requires Haba Verification</span>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="business-account-toggle">
@@ -4999,6 +5001,62 @@
                     <button type="button" id="btn-buy-verified-badge" class="wa-row-btn">Buy · R19.99</button>
                 </div>
                 <p style="margin: 10px 0 0; font-size:11.5px; color:var(--text-secondary); text-align:center; line-height:1.5;">Payments are processed securely by Paystack. The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- "Haba Verification" — business-account identity verification (Didit, via the Latch
+         backend). Opened from the Business Account row in Settings instead of flipping the
+         toggle straight away; see startBusinessVerification / the business-account-toggle
+         handler below. Mirrors the Get Verified page's structure/markup conventions. -->
+    <div id="haba-verification-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 92vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="sheet-handle"></div>
+            <div style="padding: 0 20px 12px; display:flex; align-items:center; justify-content:space-between; border-bottom: 1px solid var(--border-color);">
+                <h3 style="margin:0; font-size:16px;">Haba Verification</h3>
+                <svg id="btn-close-haba-verification" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+
+            <div style="padding: 28px 24px 8px; overflow-y:auto; flex:1;">
+                <div style="text-align:center; margin-bottom: 26px;">
+                    <div style="width:72px; height:72px; margin:0 auto 16px; border-radius:50%; background:rgba(212,160,23,0.14); display:flex; align-items:center; justify-content:center;">
+                        <svg viewBox="0 0 22 22" width="40" height="40" aria-label="Business Verification"><path fill="#D4A017" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>
+                    </div>
+                    <h2 style="margin:0 0 6px; font-size:19px; font-weight:700;">Verify your identity</h2>
+                    <p style="margin:0; font-size:13.5px; color:var(--text-secondary); line-height:1.5;">Business Accounts get a gold badge and business-only features. To unlock one, Haba Verification confirms you're a real person first — a quick, secure ID check.</p>
+                </div>
+
+                <!-- Step 1: applicant details, then "Start Verification" kicks off a Didit
+                     session via startBusinessVerification. -->
+                <div id="haba-verification-form-step">
+                    <div class="field" style="margin-bottom:14px;">
+                        <input type="text" id="haba-verification-name" class="pill-input" placeholder="Full legal name" autocomplete="name">
+                    </div>
+                    <div class="field" style="margin-bottom:14px;">
+                        <input type="email" id="haba-verification-email" class="pill-input" placeholder="Email (optional)" autocomplete="email">
+                    </div>
+                    <div class="field" style="margin-bottom:6px;">
+                        <input type="text" id="haba-verification-id-number" class="pill-input" placeholder="ID or passport number" autocomplete="off">
+                    </div>
+                    <p style="margin:0 0 18px; font-size:11.5px; color:var(--text-secondary); line-height:1.5;">Used only to confirm your identity with our verification partner, Didit. Your ID number is masked everywhere else in Haba.</p>
+                    <div id="haba-verification-form-error" style="display:none; color:#FF3B30; font-size:12.5px; margin-bottom:12px;"></div>
+                    <button type="button" id="btn-start-haba-verification" class="wa-row-btn" style="width:100%; text-align:center; padding:13px;">Start Verification</button>
+                </div>
+
+                <!-- Step 2: session created — link out to Didit's hosted flow, live status
+                     below updates via a Firestore listener on businessVerifications/{uid}. -->
+                <div id="haba-verification-status-step" style="display:none;">
+                    <div class="wa-list-row" style="padding-left:0; padding-right:0;">
+                        <div class="wa-row-body">
+                            <span class="wa-row-title">Status</span>
+                            <span class="wa-row-sub" id="haba-verification-status-text">Not started</span>
+                        </div>
+                        <span class="chip-status" id="haba-verification-status-chip" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; background:rgba(255,255,255,0.08);">—</span>
+                    </div>
+                    <button type="button" id="btn-continue-haba-verification" class="wa-row-btn" style="width:100%; text-align:center; padding:13px; margin-top:14px;">Continue Verification</button>
+                    <button type="button" id="btn-recheck-haba-verification" class="wa-row-btn" style="width:100%; text-align:center; padding:13px; margin-top:10px; background:transparent; border:1px solid var(--border-color); color:var(--text-primary);">Check Status</button>
+                    <p style="margin:14px 0 0; font-size:11.5px; color:var(--text-secondary); text-align:center; line-height:1.5;">This opens Didit's secure verification flow in a new tab. Come back here once you're done — this page updates automatically.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -6183,7 +6241,7 @@
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
         import { getRemoteConfig, fetchAndActivate, getValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-remote-config.js";
@@ -8894,6 +8952,8 @@
             });
         }
         const functionsClient = getFunctions(app);
+        const startBusinessVerificationCallable = httpsCallable(functionsClient, 'startBusinessVerification');
+        const refreshBusinessVerificationCallable = httpsCallable(functionsClient, 'refreshBusinessVerification');
         
         // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
         // NOTE: AI_FIRESTORE_COLLECTION must match the "Firestore Collection Path" you configure
@@ -11873,6 +11933,146 @@
         });
         verifiedBadgePageOverlay.addEventListener('click', (e) => {
             if (e.target === verifiedBadgePageOverlay) verifiedBadgePageOverlay.classList.remove('active');
+        });
+
+        // --- Haba Verification — business-account identity check (Didit, via Latch's
+        // self-serve endpoints). Opened from the Business Account row in Settings; see
+        // the business-account-toggle handler further below, which redirects here instead
+        // of flipping the toggle straight away when the user isn't verified yet. ---
+        const habaVerificationOverlay = document.getElementById('haba-verification-overlay');
+        const habaVerificationFormStep = document.getElementById('haba-verification-form-step');
+        const habaVerificationStatusStep = document.getElementById('haba-verification-status-step');
+        const habaVerificationStatusText = document.getElementById('haba-verification-status-text');
+        const habaVerificationStatusChip = document.getElementById('haba-verification-status-chip');
+        const habaVerificationFormError = document.getElementById('haba-verification-form-error');
+        let habaVerificationUnsub = null;
+        let habaVerificationCurrentUrl = null;
+
+        function habaVerificationStatusStyle(status) {
+            switch (status) {
+                case 'Approved': return { bg: 'rgba(52,199,89,0.15)', color: '#34C759', label: 'Approved' };
+                case 'Declined': return { bg: 'rgba(255,59,48,0.15)', color: '#FF3B30', label: 'Declined' };
+                case 'In Review': return { bg: 'rgba(255,159,10,0.15)', color: '#FF9F0A', label: 'In Review' };
+                case 'In Progress': return { bg: 'rgba(10,132,255,0.15)', color: '#0A84FF', label: 'In Progress' };
+                default: return { bg: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', label: status || 'Not Started' };
+            }
+        }
+
+        function applyHabaVerificationStatus(status) {
+            const s = habaVerificationStatusStyle(status);
+            habaVerificationStatusChip.textContent = s.label;
+            habaVerificationStatusChip.style.background = s.bg;
+            habaVerificationStatusChip.style.color = s.color;
+            if (status === 'Approved') {
+                habaVerificationStatusText.textContent = "You're verified — your Business Account is ready.";
+            } else if (status === 'Declined') {
+                habaVerificationStatusText.textContent = "This verification was declined. You can start a new one.";
+            } else if (status === 'In Review' || status === 'In Progress') {
+                habaVerificationStatusText.textContent = "We're checking your details — this page updates automatically.";
+            } else {
+                habaVerificationStatusText.textContent = 'Not started';
+            }
+        }
+
+        // Applies an Approved decision locally the moment the Firestore listener sees it,
+        // instead of waiting on a full profile reload — the diditWebhook also flips this
+        // server-side, so this is belt-and-suspenders for a snappy UI.
+        async function handleHabaVerificationApproved() {
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await update(ref(database, `users/${user.uid}`), { isBusinessAccount: true });
+            } catch (e) { /* server-side webhook will still flip it */ }
+            const businessToggle = document.getElementById('business-account-toggle');
+            if (businessToggle) businessToggle.checked = true;
+            document.getElementById('business-account-pill').style.display = 'inline-block';
+            notify('Verified! Your Business Account is now active.');
+            setTimeout(() => habaVerificationOverlay.classList.remove('active'), 1400);
+        }
+
+        function listenToBusinessVerification(uid) {
+            if (habaVerificationUnsub) habaVerificationUnsub();
+            habaVerificationUnsub = onSnapshot(doc(firestoreDb, 'businessVerifications', uid), (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                habaVerificationCurrentUrl = data.url || habaVerificationCurrentUrl;
+                applyHabaVerificationStatus(data.status);
+                if (data.status === 'Approved') handleHabaVerificationApproved();
+            });
+        }
+
+        async function openHabaVerificationSheet() {
+            const user = auth.currentUser;
+            if (!user) return;
+            habaVerificationFormError.style.display = 'none';
+            habaVerificationOverlay.classList.add('active');
+            listenToBusinessVerification(user.uid);
+            try {
+                const existing = await getDoc(doc(firestoreDb, 'businessVerifications', user.uid));
+                if (existing.exists() && existing.data().status && existing.data().status !== 'Declined') {
+                    habaVerificationCurrentUrl = existing.data().url || null;
+                    applyHabaVerificationStatus(existing.data().status);
+                    habaVerificationFormStep.style.display = 'none';
+                    habaVerificationStatusStep.style.display = 'block';
+                    return;
+                }
+            } catch (e) { /* fall through to the form */ }
+            habaVerificationFormStep.style.display = 'block';
+            habaVerificationStatusStep.style.display = 'none';
+        }
+
+        function closeHabaVerificationSheet() {
+            habaVerificationOverlay.classList.remove('active');
+            if (habaVerificationUnsub) { habaVerificationUnsub(); habaVerificationUnsub = null; }
+        }
+        document.getElementById('btn-close-haba-verification').addEventListener('click', closeHabaVerificationSheet);
+        habaVerificationOverlay.addEventListener('click', (e) => {
+            if (e.target === habaVerificationOverlay) closeHabaVerificationSheet();
+        });
+
+        document.getElementById('btn-start-haba-verification').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-start-haba-verification');
+            const fullName = document.getElementById('haba-verification-name').value.trim();
+            const email = document.getElementById('haba-verification-email').value.trim();
+            const idNumber = document.getElementById('haba-verification-id-number').value.trim();
+
+            habaVerificationFormError.style.display = 'none';
+            if (!fullName) { habaVerificationFormError.textContent = 'Your full legal name is required.'; habaVerificationFormError.style.display = 'block'; return; }
+            if (!idNumber) { habaVerificationFormError.textContent = 'An ID or passport number is required.'; habaVerificationFormError.style.display = 'block'; return; }
+
+            btn.textContent = 'Starting…';
+            btn.disabled = true;
+            try {
+                const result = await startBusinessVerificationCallable({ fullName, email: email || undefined, idNumber });
+                habaVerificationCurrentUrl = result.data?.url || null;
+                applyHabaVerificationStatus(result.data?.status || 'Not Started');
+                habaVerificationFormStep.style.display = 'none';
+                habaVerificationStatusStep.style.display = 'block';
+                if (habaVerificationCurrentUrl) window.open(habaVerificationCurrentUrl, '_blank', 'noopener');
+            } catch (e) {
+                habaVerificationFormError.textContent = e.message || "Couldn't start verification. Try again.";
+                habaVerificationFormError.style.display = 'block';
+            }
+            btn.textContent = 'Start Verification';
+            btn.disabled = false;
+        });
+
+        document.getElementById('btn-continue-haba-verification').addEventListener('click', () => {
+            if (habaVerificationCurrentUrl) window.open(habaVerificationCurrentUrl, '_blank', 'noopener');
+        });
+
+        document.getElementById('btn-recheck-haba-verification').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-recheck-haba-verification');
+            btn.textContent = 'Checking…';
+            btn.disabled = true;
+            try {
+                const result = await refreshBusinessVerificationCallable();
+                applyHabaVerificationStatus(result.data?.status);
+            } catch (e) {
+                notify(e.message || "Couldn't check status right now.", 'error');
+            }
+            btn.textContent = 'Check Status';
+            btn.disabled = false;
         });
 
         function enterPostEditMode(postId, post, card) {
@@ -15196,6 +15396,26 @@
             const user = auth.currentUser;
             if (!user) return;
             const isBusiness = e.target.checked;
+
+            // Turning it ON requires Haba Verification first (unless a prior verification
+            // already came back Approved) — send the user through that flow instead of
+            // granting the badge on trust alone.
+            if (isBusiness) {
+                e.target.checked = false; // stays off until verification actually approves
+                try {
+                    const existing = await getDoc(doc(firestoreDb, 'businessVerifications', user.uid));
+                    if (existing.exists() && existing.data().status === 'Approved') {
+                        e.target.checked = true;
+                        // fall through to the normal write-through below
+                    } else {
+                        openHabaVerificationSheet();
+                        return;
+                    }
+                } catch (err) {
+                    openHabaVerificationSheet();
+                    return;
+                }
+            }
 
             // Switching from Business back to Personal has real consequences (loses the gold
             // badge, drops out of business features like publishing ads, and re-locks the

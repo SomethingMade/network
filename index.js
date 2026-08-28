@@ -1,11 +1,13 @@
 const { onValueCreated } = require("firebase-functions/v2/database");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const { initializeApp } = require("firebase-admin/app");
 const { getDatabase } = require("firebase-admin/database");
+const { getFirestore } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const admin = require("firebase-admin");
+const crypto = require("crypto");
 
 initializeApp();
 
@@ -293,3 +295,279 @@ exports.verifyYocoCheckout = onCall({ secrets: [YOCO_SECRET_KEY] }, async (reque
         throw new HttpsError("internal", "Could not verify payment.");
     }
 });
+
+// --- HABA VERIFICATION (BUSINESS ACCOUNT — DIDIT IDENTITY CHECK) ---
+//
+// Self-serve KYC a user goes through when switching to / creating a Business
+// Account in Settings (see the "Haba Verification" sheet in index.html). Three
+// pieces:
+//  - startBusinessVerification (callable) — starts a Didit session for the caller's
+//    own uid only, stores it in Firestore under businessVerifications/{uid}.
+//  - refreshBusinessVerification (callable) — manual "check now" fallback that polls
+//    Didit directly, for the rare case a webhook was missed.
+//  - diditWebhook (HTTPS) — Didit calls this on every status change. We verify the
+//    HMAC signature, update businessVerifications/{uid}, and on Approved flip
+//    users/{uid}/isBusinessAccount in the Realtime Database so the gold badge shows
+//    up everywhere the rest of the app already reads it from.
+//
+// Secrets (set with `firebase functions:secrets:set NAME`):
+//  - DIDIT_API_KEY         — x-api-key for verification.didit.me
+//  - DIDIT_WEBHOOK_SECRET  — secret_shared_key from the webhook destination you
+//                            create in the Didit Business Console
+//  - DIDIT_WORKFLOW_ID     — the workflow to run sessions against
+
+const DIDIT_API_KEY = defineSecret("DIDIT_API_KEY");
+const DIDIT_WEBHOOK_SECRET = defineSecret("DIDIT_WEBHOOK_SECRET");
+const DIDIT_WORKFLOW_ID = defineSecret("DIDIT_WORKFLOW_ID");
+
+const DIDIT_BASE_URL = "https://verification.didit.me";
+const WEBHOOK_TOLERANCE_SECONDS = 300; // reject anything older than 5 minutes
+
+/** Masks an ID/passport number for anything that isn't the raw compliance record. */
+function maskIdNumber(idNumber) {
+    if (!idNumber) return null;
+    const digits = String(idNumber);
+    if (digits.length <= 4) return "••••";
+    return `${"•".repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
+exports.startBusinessVerification = onCall(
+    { secrets: [DIDIT_API_KEY, DIDIT_WORKFLOW_ID] },
+    async (request) => {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Sign in required.");
+        }
+        const uid = request.auth.uid;
+        const { fullName, firstName, lastName, email, idNumber, phone } = request.data || {};
+
+        if (!idNumber || !String(idNumber).trim()) {
+            throw new HttpsError("invalid-argument", "An ID number is required.");
+        }
+        if (!fullName && !(firstName && lastName)) {
+            throw new HttpsError("invalid-argument", "Your full legal name is required.");
+        }
+
+        const firestore = getFirestore();
+
+        // Reuse an in-flight or already-approved session instead of spawning a
+        // duplicate every time the user re-opens the Business Account flow.
+        const existingSnap = await firestore.collection("businessVerifications").doc(uid).get();
+        if (existingSnap.exists) {
+            const existing = existingSnap.data();
+            if (existing.url && existing.status && existing.status !== "Declined") {
+                return {
+                    sessionId: existing.sessionId,
+                    url: existing.url,
+                    status: existing.status,
+                    reused: true,
+                };
+            }
+        }
+
+        const [derivedFirst, ...rest] = (fullName || "").trim().split(/\s+/);
+        const derivedLast = rest.join(" ");
+
+        const payload = {
+            workflow_id: DIDIT_WORKFLOW_ID.value(),
+            vendor_data: `biz:${uid}`,
+            metadata: { source: "haba-business-verification", uid },
+            contact_details: email
+                ? { email, send_notification_emails: true, email_lang: "en" }
+                : undefined,
+            expected_details: {
+                first_name: firstName || derivedFirst || undefined,
+                last_name: lastName || derivedLast || undefined,
+                identification_number: String(idNumber).trim(),
+            },
+        };
+
+        const diditRes = await fetch(`${DIDIT_BASE_URL}/v3/session/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": DIDIT_API_KEY.value(),
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!diditRes.ok) {
+            const errBody = await diditRes.text();
+            logger.error("Didit business session creation failed", { status: diditRes.status, errBody });
+            throw new HttpsError("internal", "Couldn't start verification. Please try again shortly.");
+        }
+
+        const session = await diditRes.json();
+
+        await firestore
+            .collection("businessVerifications")
+            .doc(uid)
+            .set({
+                uid,
+                sessionId: session.session_id,
+                sessionToken: session.session_token,
+                workflowId: session.workflow_id,
+                url: session.url,
+                status: session.status || "Not Started",
+                applicantName: fullName || [firstName, lastName].filter(Boolean).join(" ") || null,
+                email: email || null,
+                phone: phone || null,
+                idNumberMasked: maskIdNumber(idNumber),
+                idNumberLast4: String(idNumber).trim().slice(-4),
+                decision: null,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        return {
+            sessionId: session.session_id,
+            url: session.url,
+            status: session.status || "Not Started",
+        };
+    }
+);
+
+exports.refreshBusinessVerification = onCall(
+    { secrets: [DIDIT_API_KEY] },
+    async (request) => {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Sign in required.");
+        }
+        const uid = request.auth.uid;
+        const firestore = getFirestore();
+
+        const docSnap = await firestore.collection("businessVerifications").doc(uid).get();
+        if (!docSnap.exists) {
+            throw new HttpsError("not-found", "No verification session found for this account.");
+        }
+        const { sessionId } = docSnap.data();
+
+        const diditRes = await fetch(`${DIDIT_BASE_URL}/v3/session/${sessionId}/decision/`, {
+            headers: { "x-api-key": DIDIT_API_KEY.value() },
+        });
+
+        if (!diditRes.ok) {
+            throw new HttpsError("internal", "Could not fetch the verification status from Didit.");
+        }
+
+        const decision = await diditRes.json();
+
+        await firestore
+            .collection("businessVerifications")
+            .doc(uid)
+            .set(
+                {
+                    status: decision.status || null,
+                    decision,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
+
+        if (decision.status === "Approved") {
+            try {
+                await getDatabase().ref(`users/${uid}`).update({
+                    isBusinessAccount: true,
+                    businessVerifiedAt: admin.database.ServerValue.TIMESTAMP,
+                });
+            } catch (e) {
+                logger.error("Could not flip isBusinessAccount after approval", { uid, error: e.message });
+            }
+        }
+
+        return { status: decision.status || null };
+    }
+);
+
+exports.diditWebhook = onRequest(
+    { secrets: [DIDIT_WEBHOOK_SECRET] },
+    async (req, res) => {
+        if (req.method !== "POST") {
+            res.status(405).send("Method not allowed");
+            return;
+        }
+
+        const signatureHeader = req.headers["x-signature"];
+        const timestampHeader = req.headers["x-timestamp"];
+        const rawBody = req.rawBody; // Buffer — Functions v2 preserves this before JSON parsing
+
+        if (!signatureHeader || !timestampHeader || !rawBody) {
+            res.status(400).send("Missing webhook headers or body.");
+            return;
+        }
+
+        const timestamp = parseInt(timestampHeader, 10);
+        const now = Math.floor(Date.now() / 1000);
+        if (!timestamp || Math.abs(now - timestamp) > WEBHOOK_TOLERANCE_SECONDS) {
+            logger.warn("Rejected webhook: stale or invalid timestamp", { timestamp, now });
+            res.status(400).send("Stale timestamp.");
+            return;
+        }
+
+        const expectedSignature = crypto
+            .createHmac("sha256", DIDIT_WEBHOOK_SECRET.value())
+            .update(rawBody)
+            .digest("hex");
+
+        const signatureValid =
+            expectedSignature.length === String(signatureHeader).length &&
+            crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(String(signatureHeader)));
+
+        if (!signatureValid) {
+            logger.warn("Rejected webhook: signature mismatch");
+            res.status(401).send("Invalid signature.");
+            return;
+        }
+
+        const event = req.body; // safe to trust now that the signature checked out
+        const { session_id: sessionId, status, webhook_type: webhookType, decision, vendor_data: vendorData } = event;
+
+        if (!sessionId) {
+            res.status(400).send("Missing session_id.");
+            return;
+        }
+
+        // Only Haba's self-serve Business Account sessions reach this webhook — they're
+        // always tagged vendor_data: "biz:<uid>" by startBusinessVerification above.
+        if (!vendorData || !String(vendorData).startsWith("biz:")) {
+            logger.warn("Ignoring webhook with unrecognized vendor_data", { sessionId, vendorData });
+            res.status(200).send("ignored");
+            return;
+        }
+
+        const uid = String(vendorData).slice(4);
+        const firestore = getFirestore();
+        const bizRef = firestore.collection("businessVerifications").doc(uid);
+
+        await bizRef.set(
+            {
+                sessionId,
+                status: status || null,
+                decision: decision || null,
+                lastWebhookType: webhookType || null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+        );
+
+        // Audit trail — every webhook delivery, kept as its own record.
+        await bizRef.collection("events").add({
+            webhookType: webhookType || null,
+            status: status || null,
+            decision: decision || null,
+            receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        if (status === "Approved") {
+            try {
+                await getDatabase().ref(`users/${uid}`).update({
+                    isBusinessAccount: true,
+                    businessVerifiedAt: admin.database.ServerValue.TIMESTAMP,
+                });
+            } catch (e) {
+                logger.error("Could not flip isBusinessAccount after approval", { uid, error: e.message });
+            }
+        }
+
+        res.status(200).send("ok");
+    }
+);

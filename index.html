@@ -1234,6 +1234,10 @@
         .feed-new-posts-pill-text { white-space: nowrap; }
         .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
         .feed-post-card.post-highlight { animation: postHighlightFlash 2s ease-out; }
+        /* Barely-there tint so a sponsored post reads as slightly distinct from organic ones
+           without looking like a separate promo unit stapled into the feed. */
+        .feed-post-card[data-is-ad="1"] { background: rgba(var(--primary-rgb), 0.02); }
+        .feed-post-card[data-is-ad="1"]:hover { background: rgba(var(--primary-rgb), 0.045); }
         @keyframes postHighlightFlash {
             0% { background: rgba(var(--primary-rgb), 0.16); }
             100% { background: var(--bg-surface); }
@@ -1364,10 +1368,10 @@
         .feed-link-preview-img { width: 100%; max-height: 260px; object-fit: cover; display: block; background: var(--bg-input); }
         .feed-link-preview-url { display: block; padding: 8px 12px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-search-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px 20px; display: none; }
-        .feed-post-ad-cta { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0 60px; width: calc(100% - 60px); padding: 11px 14px; border-radius: 50px; background: #111111; border: none; color: #FFFFFF; font-size: 13.5px; font-weight: 700; text-decoration: none; box-sizing: border-box; transition: opacity 0.15s ease, transform 0.15s ease; }
-        .feed-post-ad-cta:hover { background: #000000; opacity: 0.94; }
+        .feed-post-ad-cta { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: flex-start; margin: 10px 0 0 60px; padding: 8px 15px; border-radius: 50px; background: var(--bg-alt); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 13px; font-weight: 600; text-decoration: none; box-sizing: border-box; transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+        .feed-post-ad-cta:hover { background: var(--bg-hover); border-color: rgba(var(--primary-rgb), 0.18); }
         .feed-post-ad-cta:active { transform: scale(0.98); }
-        .feed-post-ad-cta svg { flex-shrink: 0; }
+        .feed-post-ad-cta svg { flex-shrink: 0; width: 12px; height: 12px; }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
         .feed-composer-music-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; }
@@ -2171,6 +2175,11 @@
         .group-badge-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 50px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); text-transform: uppercase; letter-spacing: 0.3px; }
         .group-badge-pill.business { background: rgba(124, 77, 255, 0.12); color: #7C4DFF; }
         .group-badge-pill.gold-business { background: rgba(212, 160, 23, 0.14); color: #B8860B; }
+        /* Muted, low-key label for ads — deliberately quieter than the gold "Business" pill so
+           disclosure doesn't read like a promo callout (see feed-post-business-pill toggle). */
+        .group-badge-pill.sponsored-pill { background: rgba(var(--primary-rgb), 0.08); color: var(--text-secondary); }
+        .feed-post-why-ad-inline { background: none; border: none; padding: 0; margin-left: 3px; font-size: 10px; font-weight: 600; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+        .feed-post-why-ad-inline:hover { color: var(--text-primary); }
         .bio-mention-business { color: #0A84FF; font-weight: 600; cursor: pointer; }
         .bio-mention-business:hover { text-decoration: underline; }
         .business-page-promo { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; text-align: left; }
@@ -9601,7 +9610,12 @@
                 const isAdPost = card.dataset.isAd === '1';
                 businessPillEl.style.display = (isAdPost || profile.isBusinessAccount) ? '' : 'none';
                 businessPillEl.textContent = isAdPost ? 'Sponsored' : 'Business';
+                // Ads get the quieter grey pill, verified business accounts keep the gold one.
+                businessPillEl.classList.toggle('sponsored-pill', isAdPost);
+                businessPillEl.classList.toggle('gold-business', !isAdPost);
             }
+            const whyAdInlineEl = card.querySelector('.feed-post-why-ad-inline');
+            if (whyAdInlineEl) whyAdInlineEl.style.display = (card.dataset.isAd === '1') ? '' : 'none';
             const usernameEl = card.querySelector('.x-post-username');
             if (usernameEl) usernameEl.textContent = profile.username ? '@' + profile.username : '';
             const avatarCol = card.querySelector('.x-post-avatar-col');
@@ -11814,19 +11828,8 @@
             document.getElementById('btn-post-why-ad').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
-                const { post } = activePostOptions;
-                const businessName = (post.uid && cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'This business';
-                document.getElementById('why-ad-business-name').textContent = businessName;
-                // Haba's ads have no personal targeting today — a business just pays to promote a
-                // post into everyone's feed — so the reasons stay honest about that rather than
-                // implying data-driven targeting that isn't actually happening.
-                document.getElementById('why-ad-reasons').innerHTML = `
-                    <li>${escapeHtmlForPost(businessName)} paid to promote this post to people on Haba</li>
-                    <li>It isn't targeted using your personal data — ads currently reach everyone active on the feed</li>
-                `;
-                const overlay = document.getElementById('why-ad-sheet-overlay');
-                syncSheetAboveViewer(overlay);
-                overlay.classList.add('active');
+                const { postId, post, card } = activePostOptions;
+                openWhyAdSheetForPost(postId, post, card);
             });
             document.getElementById('btn-why-ad-close').addEventListener('click', () => {
                 document.getElementById('why-ad-sheet-overlay').classList.remove('active', 'above-viewer');
@@ -11915,6 +11918,24 @@
         }
 
         let activePostOptions = null;
+
+        // Shared by the "Why?" link on the post card itself and the "Why am I seeing this ad"
+        // item in the post options sheet — both just need to know which post to explain.
+        function openWhyAdSheetForPost(postId, post, card) {
+            activePostOptions = { postId, post, card };
+            const businessName = (post.uid && cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'This business';
+            document.getElementById('why-ad-business-name').textContent = businessName;
+            // Haba's ads have no personal targeting today — a business just pays to promote a
+            // post into everyone's feed — so the reasons stay honest about that rather than
+            // implying data-driven targeting that isn't actually happening.
+            document.getElementById('why-ad-reasons').innerHTML = `
+                <li>${escapeHtmlForPost(businessName)} paid to promote this post to people on Haba</li>
+                <li>It isn't targeted using your personal data — ads currently reach everyone active on the feed</li>
+            `;
+            const overlay = document.getElementById('why-ad-sheet-overlay');
+            syncSheetAboveViewer(overlay);
+            overlay.classList.add('active');
+        }
 
         function openPostOptions(postId, post, card) {
             activePostOptions = { postId, post, card };
@@ -13086,6 +13107,7 @@
                                 <span class="name"></span>
                                 <span class="name-badge"></span>
                                 <span class="feed-post-business-pill group-badge-pill gold-business" style="display:none;">Business</span>
+                                <button type="button" class="feed-post-why-ad-inline" style="display:none;">Why?</button>
                                 <span class="time"><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span>${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
                             </div>
                             ${menuBtnHtml}
@@ -13262,6 +13284,12 @@
 
             const menuBtn = card.querySelector('.feed-post-menu-btn');
             if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, wrapperPost, card));
+
+            const whyAdInline = card.querySelector('.feed-post-why-ad-inline');
+            if (whyAdInline) whyAdInline.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openWhyAdSheetForPost(postId, wrapperPost, card);
+            });
 
             return card;
         }

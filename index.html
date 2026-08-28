@@ -5584,7 +5584,7 @@
                         <div class="feed-subtabs" id="feed-subtabs">
                             <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                             <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                            <button type="button" class="feed-subtab-btn js-goto-communities" data-feed-subtab="communities">Communities</button>
+                            <button type="button" class="feed-subtab-btn" data-feed-subtab="communities">Communities</button>
                         </div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
@@ -5594,6 +5594,12 @@
                                 <p>No posts yet. Be the first to share something!</p>
                             </div>
                         </div>
+                        <!-- Communities subtab reuses the real #communities-feed-container node (see
+                             showFeedCommunitiesView/restoreCommunitiesFeedContainerHome) rather than
+                             duplicating the community-feed pagination/realtime pipeline — it's just
+                             physically moved in here, forced to the Home/"All" view (posts only, no
+                             Explore strip), and moved back to #tab-groups the moment this tab is left. -->
+                        <div id="feed-communities-mount" style="display:none;"></div>
                     </div>
                 </div>
 
@@ -8175,6 +8181,15 @@
                 // was last open gets wiped before the person ever sees it.
                 if (hash === 'tab-chats' && isInitialSync !== true) {
                     updateChatsUnreadBadge(0);
+                }
+                // Keep #communities-feed-container in the right place regardless of how the user
+                // got here: leaving Home tears down the in-place Communities posts view (so direct
+                // navigation to the real Communities tab always finds its container where it
+                // belongs), and returning to Home while that subtab is selected re-mounts it.
+                if (hash !== 'tab-status') {
+                    restoreCommunitiesFeedContainerHome();
+                } else if (feedActiveSubtab === 'communities') {
+                    showFeedCommunitiesView();
                 }
                 if (hash === 'tab-groups') {
                     if (isInitialSync !== true) updateHeaderGroupsBadge(0);
@@ -12347,17 +12362,55 @@
             updateFeedEmptyState();
         }
 
+        // The Communities feed subtab doesn't have its own post store to filter — community posts
+        // are group-thread messages, entirely separate from cachedPosts — so instead of duplicating
+        // that whole pagination/realtime pipeline, we physically relocate the real
+        // #communities-feed-container (normally inside #tab-groups) into #feed-communities-mount
+        // here, force it onto the Home/"All" view, and move it back out the moment this tab is
+        // left. Moving a DOM node (rather than rebuilding it) also means an already-loaded feed
+        // just reappears instantly with its scroll position and live listeners intact.
+        function parkCommunitiesFeedContainerIn(targetEl) {
+            const container = document.getElementById('communities-feed-container');
+            if (container && targetEl && container.parentElement !== targetEl) targetEl.appendChild(container);
+        }
+        function restoreCommunitiesFeedContainerHome() {
+            const home = document.getElementById('tab-groups');
+            parkCommunitiesFeedContainerIn(home);
+        }
+        function showFeedCommunitiesView() {
+            const feedContainer = document.getElementById('feed-posts-container');
+            const mount = document.getElementById('feed-communities-mount');
+            if (feedContainer) feedContainer.style.display = 'none';
+            if (mount) mount.style.display = '';
+            parkCommunitiesFeedContainerIn(mount);
+            // Posts only, no Explore/category picking here — always the same "every public
+            // community's posts" view regardless of whatever subtab/category the real Communities
+            // tab was last left on.
+            activeCommunitySubtab = 'home';
+            activeCommunityCategory = 'All';
+            loadCommunityFeed();
+        }
+        function hideFeedCommunitiesView() {
+            const mount = document.getElementById('feed-communities-mount');
+            if (mount) mount.style.display = 'none';
+            const feedContainer = document.getElementById('feed-posts-container');
+            if (feedContainer) feedContainer.style.display = '';
+            restoreCommunitiesFeedContainerHome();
+        }
+
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
-            // Communities isn't a feed filter like For you/Following — it's a shortcut into the
-            // separate Communities tab (see .js-goto-communities), so it shouldn't take over the
-            // active/underline state here or trigger applyFeedSubtabFilter.
-            if (!btn || btn.dataset.feedSubtab === 'communities' || btn.classList.contains('active')) return;
+            if (!btn || btn.classList.contains('active')) return;
             triggerHaptic(10);
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
-            applyFeedSubtabFilter();
+            if (feedActiveSubtab === 'communities') {
+                showFeedCommunitiesView();
+            } else {
+                hideFeedCommunitiesView();
+                applyFeedSubtabFilter();
+            }
         });
 
         function updateFeedEmptyState() {

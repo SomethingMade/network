@@ -3948,6 +3948,19 @@
             </div>
         </div>
     </div>
+    <!-- Lists everyone in not_interested/{me} — the same list "Not interested in this post" and
+         "Hide This Ad" (above) both write to — so people can undo either kind of hide from one
+         place instead of it being a one-way action. -->
+    <div id="hidden-ads-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px; max-height: 70vh; display: flex; flex-direction: column;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 4px;">Hidden Ads &amp; Posts</div>
+            <div style="padding: 0 20px 10px; color: var(--text-secondary); font-size: 13.5px; line-height: 1.5;">
+                You won't see ads or posts from these accounts. Tap Unhide to see them again.
+            </div>
+            <div id="hidden-ads-list-container" class="chat-list-container" style="flex: 1; overflow-y: auto; padding: 0 4px;"></div>
+        </div>
+    </div>
     <!-- Community          posts don't have a profile-media-grid equivalent to pin into) — kept as its own sheet
          rather than shared, same reasoning as #community-comments-sheet-overlay below. -->
     <div id="community-post-options-sheet-overlay" class="bottom-sheet-overlay">
@@ -4789,6 +4802,14 @@
                 <div class="wa-list-row wa-row-clickable" id="setting-blocked-contacts">
                     <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></div>
                     <div class="wa-row-body"><span class="wa-row-title">Blocked Contacts</span></div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="setting-hidden-ads">
+                    <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Hidden Ads &amp; Posts</span>
+                        <span class="wa-row-sub">People whose ads and posts you've hidden</span>
+                    </div>
                     <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
                 <div class="wa-list-row wa-row-clickable" id="setting-invite-friend">
@@ -8585,6 +8606,63 @@
             goToTab('tab-contacts');
             const blockedSubtabBtn = document.querySelector('#contacts-sub-tabs button[data-subtab="blocked"]');
             if (blockedSubtabBtn) blockedSubtabBtn.click();
+        });
+
+        // --- Hidden Ads & Posts Settings Shortcut ---
+        function renderHiddenAdsList() {
+            const list = document.getElementById('hidden-ads-list-container');
+            if (!list) return;
+            list.innerHTML = '';
+            const hiddenUids = Object.keys(cachedNotInterested).filter(uid => cachedNotInterested[uid]);
+            if (hiddenUids.length === 0) {
+                list.innerHTML = '<p class="empty-msg">You haven\'t hidden any ads or posts.</p>';
+                return;
+            }
+            hiddenUids.forEach(uid => {
+                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+                const displayName = profile.name || 'Unknown User';
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                item.dataset.uid = uid;
+                item.dataset.name = displayName;
+                item.innerHTML = `
+                    <div class="avatar" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>
+                    <div class="chat-preview">
+                        <h3>${displayName}${verifiedBadgeFor(uid, false)}</h3>
+                        <p>Ads &amp; posts hidden</p>
+                    </div>
+                    <button type="button" class="contact-action-btn primary" data-action="unhide-ad">Unhide</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+        document.getElementById('setting-hidden-ads').addEventListener('click', () => {
+            settingsSheetOverlay.classList.remove('active');
+            renderHiddenAdsList();
+            document.getElementById('hidden-ads-sheet-overlay').classList.add('active');
+        });
+        document.getElementById('hidden-ads-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'hidden-ads-sheet-overlay') document.getElementById('hidden-ads-sheet-overlay').classList.remove('active');
+        });
+        document.getElementById('hidden-ads-list-container').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.contact-action-btn[data-action="unhide-ad"]');
+            if (!btn) return;
+            const card = btn.closest('.chat-item');
+            const uid = card.dataset.uid;
+            const name = card.dataset.name;
+            const user = auth.currentUser;
+            if (!user || !uid) return;
+            try {
+                delete cachedNotInterested[uid]; // optimistic, mirrors markNotInterested's own optimism
+                card.remove();
+                if (!document.querySelector('#hidden-ads-list-container .chat-item')) renderHiddenAdsList();
+                await remove(ref(database, `not_interested/${user.uid}/${uid}`));
+                notify(`You'll see ads and posts from ${name} again`);
+            } catch (err) {
+                cachedNotInterested[uid] = true;
+                renderHiddenAdsList();
+                notify('Failed to unhide', 'error');
+            }
         });
 
         // --- Storage & Data: Clear Cache ---

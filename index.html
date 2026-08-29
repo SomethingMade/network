@@ -1372,6 +1372,18 @@
         .feed-post-ad-cta:hover { background: var(--bg-hover); border-color: rgba(var(--primary-rgb), 0.18); }
         .feed-post-ad-cta:active { transform: scale(0.98); }
         .feed-post-ad-cta svg { flex-shrink: 0; width: 12px; height: 12px; }
+        /* App-install-style footer bar that attaches directly to the bottom of an ad's image/video
+           (no gap, matching width/radius) so the CTA reads as part of the media card itself —
+           mirrors how X/Instagram app-install ads look — rather than floating below it. Used only
+           when the ad actually has media to attach to; text-only ads keep the plain pill above. */
+        .x-media-grid.has-ad-cta[data-count="1"] { border-radius: 16px 16px 0 0; }
+        .feed-post-video-wrap.has-ad-cta { border-radius: 16px 16px 0 0; }
+        .feed-post-ad-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px 60px; width: calc(100% - 60px); padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 16px 16px; box-sizing: border-box; text-decoration: none; }
+        .feed-post-ad-card-footer-info { min-width: 0; }
+        .feed-post-ad-card-footer-name { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .feed-post-ad-card-footer-url { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; margin-top: 1px; }
+        .feed-post-ad-card-footer-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 9px 20px; border-radius: 50px; background: var(--text-primary); color: var(--bg-surface); font-size: 14px; font-weight: 700; white-space: nowrap; transition: opacity 0.15s ease, transform 0.15s ease; }
+        .feed-post-ad-card-footer:active .feed-post-ad-card-footer-btn { transform: scale(0.96); }
 
         .feed-composer-attach-row { display: flex; align-items: center; gap: 16px; }
         .feed-composer-music-btn { background: none; border: none; padding: 0; margin: 0; font-family: inherit; }
@@ -9694,6 +9706,8 @@
             }
             const whyAdInlineEl = card.querySelector('.feed-post-why-ad-inline');
             if (whyAdInlineEl) whyAdInlineEl.style.display = (card.dataset.isAd === '1') ? '' : 'none';
+            const adFooterNameEl = card.querySelector('.feed-post-ad-card-footer-name');
+            if (adFooterNameEl) adFooterNameEl.textContent = displayName;
             const usernameEl = card.querySelector('.x-post-username');
             if (usernameEl) usernameEl.textContent = profile.username ? '@' + profile.username : '';
             const avatarCol = card.querySelector('.x-post-avatar-col');
@@ -13107,8 +13121,9 @@
                     <svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                 </div>
                 <audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : '';
+            const isCardAd = !!(post.isAd && post.adUrl);
             const imageHtml = postImages.length ? `
-                <div class="x-media-grid" data-count="${postImages.length}">
+                <div class="x-media-grid${isCardAd ? ' has-ad-cta' : ''}" data-count="${postImages.length}">
                     <div class="x-media-carousel-track">
                         ${postImages.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
                     </div>
@@ -13121,7 +13136,7 @@
                     <span></span>
                 </div>` : '';
             const videoHtml = post.videoUrl ? `
-                <div class="feed-post-video-wrap" data-has-music="${post.music ? '1' : '0'}">
+                <div class="feed-post-video-wrap${isCardAd ? ' has-ad-cta' : ''}" data-has-music="${post.music ? '1' : '0'}">
                     <video class="feed-post-video" src="${post.videoUrl}" ${(() => { const t = post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
                     ${post.music ? `<audio class="feed-post-video-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
@@ -13156,11 +13171,24 @@
                     <span class="feed-link-preview-url">${escapeHtmlForPost(post.linkPreview.url.replace(/^https?:\/\//i, ''))}</span>
                 </a>` : '';
             const pollHtml = post.poll ? buildFeedPollHtml(post.poll, myUid) : '';
-            const adCtaHtml = (post.isAd && post.adUrl) ? `
+            // Ads with media get the CTA attached as a footer bar directly under the image/video
+            // (see .has-ad-cta / .feed-post-ad-card-footer), reading as one continuous card the way
+            // app-install ads look on X/Instagram. Text-only ads (nothing to attach to) fall back
+            // to the plain floating pill below.
+            const adHasMedia = isCardAd && (postImages.length || post.videoUrl);
+            const adDestinationHost = isCardAd ? (() => { try { return new URL(post.adUrl).hostname.replace(/^www\./, ''); } catch (e) { return post.adUrl; } })() : '';
+            const adCtaHtml = isCardAd ? (adHasMedia ? `
+                <a class="feed-post-ad-card-footer" href="${escapeHtmlForPost(post.adUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
+                    <span class="feed-post-ad-card-footer-info">
+                        <span class="feed-post-ad-card-footer-name"></span>
+                        <span class="feed-post-ad-card-footer-url">${escapeHtmlForPost(adDestinationHost)}</span>
+                    </span>
+                    <span class="feed-post-ad-card-footer-btn">${escapeHtmlForPost(post.adCta || 'Learn More')}</span>
+                </a>` : `
                 <a class="feed-post-ad-cta" href="${escapeHtmlForPost(post.adUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
                     <span>${escapeHtmlForPost(post.adCta || 'Learn More')}</span>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>` : '';
+                </a>`) : '';
             const taggedUids = post.mentions ? Object.keys(post.mentions).filter(uid => uid !== post.uid) : [];
             const taggedHtml = taggedUids.length ? `
                 <div class="feed-post-tagged-row">

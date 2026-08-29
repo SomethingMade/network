@@ -1930,6 +1930,18 @@
         .auth-landing-btn-row:active { transform: scale(0.98); }
         .auth-landing-arrow-circle { width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .auth-landing-arrow-circle svg { width: 16px; height: 16px; color: #111111; }
+        /* First-time-signup-only account type picker (see promptAccountType()) — same peer-choice
+           layout style as the landing step's two action rows, but as selectable info cards rather
+           than solid black buttons since neither option is the "primary" action here. */
+        .account-type-choices { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
+        .account-type-card { display: flex; align-items: center; gap: 14px; width: 100%; background: #F7F7F7; border: 1.5px solid #E1E1E1; padding: 16px 18px; border-radius: 18px; cursor: pointer; text-align: left; transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease; font-family: inherit; }
+        .account-type-card:hover { border-color: #111111; background: #F0F0F0; }
+        .account-type-card:active { transform: scale(0.98); }
+        .account-type-card-icon { width: 44px; height: 44px; border-radius: 50%; background: #111111; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .account-type-card-icon svg { width: 21px; height: 21px; }
+        .account-type-card-body { flex: 1; min-width: 0; }
+        .account-type-card-title { font-size: 15.5px; font-weight: 700; color: #111111; margin-bottom: 2px; }
+        .account-type-card-sub { font-size: 12.5px; color: rgba(17,17,17,0.6); line-height: 1.35; }
 
         /* Small back caret shown on the phone/email steps to return to the landing screen. */
         .auth-step-back-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; margin-bottom: 18px; padding: 0; }
@@ -5424,6 +5436,28 @@
                     <p class="toggle-auth" style="margin-top:8px;"><span id="btn-forgot-password">Forgot password?</span> &nbsp;·&nbsp; <span id="btn-back-to-phone">Use phone instead</span></p>
                 </div>
 
+                <!-- ── ACCOUNT TYPE STEP (first-time signup only — see promptAccountType()) ── -->
+                <div id="auth-step-account-type" style="display:none;">
+                    <h2>How will you use Haba?</h2>
+                    <p>You can switch to a Business Account anytime later in Settings</p>
+                    <div class="account-type-choices">
+                        <button type="button" id="btn-account-type-personal" class="account-type-card">
+                            <span class="account-type-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+                            <span class="account-type-card-body">
+                                <span class="account-type-card-title">Personal Account</span>
+                                <span class="account-type-card-sub">Chat, post, and connect with friends and communities</span>
+                            </span>
+                        </button>
+                        <button type="button" id="btn-account-type-business" class="account-type-card">
+                            <span class="account-type-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></span>
+                            <span class="account-type-card-body">
+                                <span class="account-type-card-title">Business Account</span>
+                                <span class="account-type-card-sub">Get a Business badge and access ads &amp; job posting</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
             </div>
             </div>
         </div>
@@ -6303,7 +6337,7 @@
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -9467,6 +9501,12 @@
 
         let recaptchaVerifier = null;
         let confirmationResult = null;
+        // Lets onAuthStateChanged (which fires the moment Firebase sign-in completes, before our
+        // own OTP/email handlers below get a chance to run their next line) pause and wait until
+        // those handlers have finished deciding whether this is a first-time signup that needs
+        // the account-type picker — see promptAccountType() and the two call sites that set this.
+        let authGatePromise = null;
+        let authGateResolve = null;
         let pendingPhoneNumber = null;
 
         let profileRecaptchaVerifier = null;
@@ -14879,6 +14919,7 @@
         const stepPhone = document.getElementById('auth-step-phone');
         const stepOtp = document.getElementById('auth-step-otp');
         const stepEmail = document.getElementById('auth-step-email');
+        const stepAccountType = document.getElementById('auth-step-account-type');
         const authCardBrand = document.querySelector('.auth-card-brand');
 
         function showAuthStep(step) {
@@ -14886,6 +14927,7 @@
             stepPhone.style.display = step === 'phone' ? 'block' : 'none';
             stepOtp.style.display = step === 'otp' ? 'block' : 'none';
             stepEmail.style.display = step === 'email' ? 'block' : 'none';
+            if (stepAccountType) stepAccountType.style.display = step === 'account-type' ? 'block' : 'none';
             const formSide = document.getElementById('auth-form-side');
             if (formSide) formSide.classList.toggle('auth-landing-active', step === 'landing');
             // The landing step carries its own logo/wordmark, so hide the generic mobile
@@ -14893,6 +14935,29 @@
             // landing is active to avoid showing the Haba mark twice.
             if (authCardBrand) authCardBrand.style.display = step === 'landing' ? 'none' : '';
         }
+
+        // First-time-signup-only account type choice — shown from onAuthStateChanged (see
+        // authGatePromise) right after a genuinely new account is created (phone OTP with
+        // isNewUser, or email/password signup), before the app shell ever appears, so the choice
+        // always happens exactly once per account and never on a returning login. Resolves once
+        // the person taps a card; onAuthStateChanged then writes isBusinessAccount accordingly.
+        let accountTypeChoiceResolve = null;
+        function promptAccountType() {
+            showAuthStep('account-type');
+            return new Promise(resolve => { accountTypeChoiceResolve = resolve; });
+        }
+        document.getElementById('btn-account-type-personal').addEventListener('click', () => {
+            if (!accountTypeChoiceResolve) return;
+            const resolveFn = accountTypeChoiceResolve;
+            accountTypeChoiceResolve = null;
+            resolveFn('personal');
+        });
+        document.getElementById('btn-account-type-business').addEventListener('click', () => {
+            if (!accountTypeChoiceResolve) return;
+            const resolveFn = accountTypeChoiceResolve;
+            accountTypeChoiceResolve = null;
+            resolveFn('business');
+        });
 
         // Landing screen ("See what's happening" — X/Twitter-style splash before any input
         // fields) — both buttons lead into the same phone-first flow, which already handles
@@ -15151,11 +15216,19 @@
             if (!otpCode || otpCode.length < 6) return showCustomModal("Required", "Please enter the 6-digit code.");
             if (!confirmationResult) return showCustomModal("Session Expired", "Please request a new code.");
             showLoading();
+            authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
             try {
-                await confirmationResult.confirm(otpCode);
+                const cred = await confirmationResult.confirm(otpCode);
                 stopWebOtpAutofill();
                 hideLoading();
                 await playOtpSuccessAnimation();
+                const addInfo = getAdditionalUserInfo(cred);
+                if (addInfo && addInfo.isNewUser) {
+                    const chosenType = await promptAccountType();
+                    if (chosenType === 'business') {
+                        try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
+                    }
+                }
             } catch (err) {
                 hideLoading();
                 // Wrong or expired digits get the matching red-X animation instead of a modal —
@@ -15167,6 +15240,8 @@
                     showCustomModal("Verification Failed", err.message.replace("Firebase: ", ""));
                 }
                 clearOtpBoxes(true);
+            } finally {
+                if (authGateResolve) { authGateResolve(); authGateResolve = null; }
             }
         });
 
@@ -15210,15 +15285,26 @@
             if (password.length < 6) return showCustomModal("Password Too Short", "Your password must be at least 6 characters.");
             emailAuthInFlight = true;
             showLoading();
+            const isSignupAttempt = emailAuthMode === 'signup';
+            if (isSignupAttempt) authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
             try {
-                if (emailAuthMode === 'signup') {
-                    await createUserWithEmailAndPassword(auth, email, password);
+                if (isSignupAttempt) {
+                    const cred = await createUserWithEmailAndPassword(auth, email, password);
+                    hideLoading();
+                    const chosenType = await promptAccountType();
+                    if (chosenType === 'business') {
+                        try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
+                    }
                 } else {
                     await signInWithEmailAndPassword(auth, email, password);
                 }
             } catch (err) {
                 showCustomModal(emailAuthMode === 'signup' ? "Couldn't Create Account" : "Couldn't Sign In", err.message.replace("Firebase: ", ""));
-            } finally { hideLoading(); emailAuthInFlight = false; }
+            } finally {
+                hideLoading();
+                emailAuthInFlight = false;
+                if (authGateResolve) { authGateResolve(); authGateResolve = null; }
+            }
         });
 
         document.getElementById('btn-forgot-password').addEventListener('click', async () => {
@@ -21620,6 +21706,15 @@
             if (await checkForForcedUpdate()) return;
 
             if (user) {
+                // If a signup handler above is still deciding whether this is a first-time
+                // account that needs the account-type picker (and, if so, waiting on the
+                // person's tap), hold the auth screen up right here rather than revealing the
+                // app underneath it — see authGatePromise.
+                if (authGatePromise) {
+                    await authGatePromise;
+                    authGatePromise = null;
+                }
+
                 if (!window.location.hash) {
                     const restoreHash = window.__initialHash || '#tab-status';
                     history.replaceState(null, '', restoreHash.startsWith('#') ? restoreHash : '#' + restoreHash);

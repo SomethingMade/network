@@ -5662,6 +5662,7 @@
                         <div class="feed-subtabs" id="feed-subtabs">
                             <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                             <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
+                            <button type="button" class="feed-subtab-btn" data-feed-subtab="ai">Haba AI</button>
                         </div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
@@ -9157,13 +9158,15 @@
         const functionsClient = getFunctions(app);
         const startBusinessVerificationCallable = httpsCallable(functionsClient, 'startBusinessVerification');
         const refreshBusinessVerificationCallable = httpsCallable(functionsClient, 'refreshBusinessVerification');
-        
-        // --- GOZA AI ASSISTANT (Firestore "Build Chatbot with the Gemini API" extension) ---
-        // NOTE: AI_FIRESTORE_COLLECTION must match the "Firestore Collection Path" you configure
-        // when installing the extension. Use a per-user wildcard path so each user's chat stays
-        // private, e.g. set the extension's Collection Path to:  ai_discussions/{uid}/messages
+        // Same Firebase project as Nuru (newstart-64c43), so this reuses the "chatWithNuru"
+        // Cloud Function already deployed there — model, system instruction, and the xAI API
+        // key all stay server-side in functions/index.js. Sent with model: 'grok-latest', same
+        // as Nuru's live provider.
+        const chatWithNuruCallable = httpsCallable(functionsClient, 'chatWithNuru');
+
+        // --- HABA AI ASSISTANT (xAI/Grok, via the shared chatWithNuru Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
-        const AI_NAME = "Goza AI";
+        const AI_NAME = "Haba AI";
 
         // Fallback profile picture used whenever a user hasn't uploaded their own — a plain
         // person silhouette on a neutral circle, inlined as a data URI so it never depends on
@@ -9437,7 +9440,7 @@
             if (stickerApiModeActive) exitStickerApiMode();
         }
 
-        const AI_FIRESTORE_COLLECTION = (uid) => `ai_discussions/${uid}/messages`;
+        // AI_NAME is used as the assistant's display name and typing-indicator label.
 
         // --- EMOJI PICKER ---
         const EMOJI_CATALOG = [
@@ -12487,8 +12490,15 @@
 
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
-            if (!btn || btn.classList.contains('active')) return;
+            if (!btn) return;
             triggerHaptic(10);
+            // "Haba AI" is a shortcut into the AI chat, not a feed filter — it doesn't take
+            // over the active/selected state from For you / Following.
+            if (btn.dataset.feedSubtab === 'ai') {
+                openChatView(AI_UID, AI_NAME, '');
+                return;
+            }
+            if (btn.classList.contains('active')) return;
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
@@ -21823,11 +21833,19 @@
                     document.getElementById('display-username').textContent = '@' + username;
                 } catch (err) { console.error('Username assignment failed', err); }
 
-                // Goza AI assistant feature removed — clean up any chat entry left over from
-                // when it used to auto-seed a welcome message for every new user.
+                // Seed a Haba AI entry in the chat list the first time this user logs in, so
+                // there's something to tap — a real message only gets added once they actually
+                // send one (see sendMessageToAI). Checked-then-set so repeat logins don't
+                // clobber it, and so a user who deletes/archives the AI chat isn't forced back
+                // into it on their next login.
                 try {
-                    await update(ref(database), { [`user_chats/${user.uid}/${AI_UID}`]: null });
-                } catch (err) { console.error('Failed to remove leftover Goza AI chat', err); }
+                    const aiChatSnap = await get(ref(database, `user_chats/${user.uid}/${AI_UID}`));
+                    if (!aiChatSnap.exists()) {
+                        await update(ref(database), {
+                            [`user_chats/${user.uid}/${AI_UID}`]: { text: 'Ask me anything', timestamp: Date.now(), unreadCount: 0 }
+                        });
+                    }
+                } catch (err) { console.error('Failed to seed Haba AI chat entry', err); }
 
                 const connectedRef = ref(database, '.info/connected');
                 onValue(connectedRef, (snap) => {
@@ -24900,11 +24918,12 @@
             catch (err) { showCustomModal('Message Failed', 'Your message could not be sent.'); }
         }
 
-        // --- GOZA AI ASSISTANT MESSAGING ---
+        // --- HABA AI MESSAGING ---
         // Writes the user's message straight into the normal dm_threads thread (so it renders
         // with the existing bubble/typing/scroll code), bumps the AI card's position in the chat
-        // list like a real contact, then hands the prompt to Firestore for the Gemini extension
-        // to pick up. The AI's reply is written back into the same dm_thread once it's ready.
+        // list like a real contact, then hands the conversation to the shared "chatWithNuru"
+        // Cloud Function (xAI/Grok) the same way Nuru does. The reply is written back into the
+        // same dm_thread once it comes back.
         async function sendMessageToAI(text, user) {
             const threadId = threadIdFor(user.uid, AI_UID);
             const now = Date.now();
@@ -24921,38 +24940,30 @@
             set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), true);
 
             try {
-                const docRef = await addDoc(collection(firestoreDb, AI_FIRESTORE_COLLECTION(user.uid)), {
-                    prompt: text,
-                    createTime: fsServerTimestamp()
-                });
+                // Pull this thread's existing history so the model has context, same shape
+                // Nuru keeps client-side: an array of { role, content } turns.
+                const historySnap = await get(ref(database, `dm_threads/${threadId}/messages`));
+                const conversation = historySnap.exists()
+                    ? Object.values(historySnap.val())
+                        .sort((a, b) => a.createdAt - b.createdAt)
+                        .map(m => ({ role: m.senderUid === AI_UID ? 'assistant' : 'user', content: m.text || '' }))
+                    : [{ role: 'user', content: text }];
 
-                const unsub = onSnapshot(docRef, async (snap) => {
-                    const data = snap.data();
-                    if (!data) return;
+                const result = await chatWithNuruCallable({ messages: conversation, model: 'grok-latest' });
+                const reply = result.data && result.data.text;
+                if (!reply) throw new Error('Empty response from chatWithNuru');
 
-                    if (data.status && data.status.state === 'COMPLETED' && data.response) {
-                        unsub();
-                        set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                        const replyTime = Date.now();
-                        const replyKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
-                        const replyUpdates = {};
-                        replyUpdates[`dm_threads/${threadId}/messages/${replyKey}`] = { text: data.response, senderUid: AI_UID, createdAt: replyTime };
-                        replyUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: data.response, timestamp: replyTime, unreadCount: 0 };
-                        update(ref(database), replyUpdates);
-                    } else if (data.status && data.status.state === 'ERRORED') {
-                        unsub();
-                        set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                        showCustomModal('Goza AI', data.status.error ? `Error: ${data.status.error}` : "I couldn't process that right now. Please try again.");
-                    }
-                }, (err) => {
-                    console.error('Goza AI snapshot listener error', err);
-                    set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                    showCustomModal('Goza AI', `Couldn't read the response (${err.code || err.message}).`);
-                });
-            } catch (err) {
-                console.error('Goza AI addDoc failed', err);
                 set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
-                showCustomModal('Goza AI', `Couldn't send that (${err.code || err.message}). Check Firestore rules.`);
+                const replyTime = Date.now();
+                const replyKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                const replyUpdates = {};
+                replyUpdates[`dm_threads/${threadId}/messages/${replyKey}`] = { text: reply, senderUid: AI_UID, createdAt: replyTime };
+                replyUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: reply, timestamp: replyTime, unreadCount: 0 };
+                await update(ref(database), replyUpdates);
+            } catch (err) {
+                console.error('chatWithNuru call failed', err);
+                set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
+                showCustomModal(AI_NAME, `Couldn't reach ${AI_NAME} right now (${err.code || err.message || 'unknown error'}). Please try again.`);
             }
         }
 

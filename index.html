@@ -546,6 +546,7 @@
         .avatar { width: 48px; height: 48px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
         /* Goza AI avatar — animated infinite-loop gradient, same nebula shift used on the AI trigger elsewhere */
         .ai-avatar-nebula { background: linear-gradient(120deg, #7C4DFF 0%, #5E5CE6 45%, #18C7FF 100%) !important; background-size: 220% 220% !important; animation: aiAvatarNebulaShift 6s ease infinite; }
+        .ai-avatar-black { background: #000000 !important; cursor: pointer; }
         @keyframes aiAvatarNebulaShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .avatar[data-full] { pointer-events: auto; cursor: zoom-in; }
         .empty-msg { text-align: center; color: var(--text-secondary); margin-top: 40px; font-size: 14px; }
@@ -9165,6 +9166,12 @@
         // --- HABA AI ASSISTANT (xAI/Grok, via Haba's own habaAIChat Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
         const AI_NAME = "Haba AI";
+        // Full-size version of the AI avatar (black background, white ring) shown when the
+        // avatar is tapped to "view avatar" — there's no uploaded photo to fetch, so this is
+        // generated inline as a data URI instead of a Storage URL.
+        const AI_AVATAR_VIEWER_SRC = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#000"/><circle cx="200" cy="200" r="150" fill="none" stroke="#fff" stroke-width="6"/></svg>'
+        );
 
         // Fallback profile picture used whenever a user hasn't uploaded their own — a plain
         // person silhouette on a neutral circle, inlined as a data URI so it never depends on
@@ -19242,6 +19249,7 @@
         });
         document.getElementById('chat-view-avatar').addEventListener('click', () => {
             if (activeGroupId) { document.getElementById('btn-group-info').click(); }
+            else if (activeChatUid === AI_UID) { openImageViewer(AI_AVATAR_VIEWER_SRC, true); }
             else if (activeChatUid) { openUserProfileSheet(activeChatUid); }
         });
         document.getElementById('chat-view-avatar').style.cursor = 'pointer';
@@ -21401,7 +21409,7 @@
             item.dataset.favourite = (metaData && metaData.favourite) ? 'true' : 'false';
             
             let avatarHtml = isAI
-                ? `<div class="avatar ai-avatar-nebula" style="border: none; display:flex; align-items:center; justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.4" stroke="white" stroke-width="1.4"/></svg></div>`
+                ? `<div class="avatar ai-avatar-black" style="border: none; display:flex; align-items:center; justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.4" stroke="white" stroke-width="1.4"/></svg></div>`
                 : `<div class="avatar" data-full="${profile.photoURL || DEFAULT_AVATAR_URL}" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>`;
 
             if (isChatPane && !isAI) {
@@ -24324,7 +24332,7 @@
             
             const avatarEl = document.getElementById('chat-view-avatar');
             if (otherUid === AI_UID) {
-                avatarEl.classList.add('ai-avatar-nebula');
+                avatarEl.classList.add('ai-avatar-black');
                 avatarEl.style.backgroundImage = "none";
                 avatarEl.style.background = "";
                 avatarEl.style.display = "flex";
@@ -24332,7 +24340,7 @@
                 avatarEl.style.justifyContent = "center";
                 avatarEl.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.4" stroke="white" stroke-width="1.4"/></svg>';
             } else {
-                avatarEl.classList.remove('ai-avatar-nebula');
+                avatarEl.classList.remove('ai-avatar-black');
                 avatarEl.style.background = "";
                 avatarEl.innerHTML = "";
                 avatarEl.style.backgroundImage = `url('${otherAvatar || DEFAULT_AVATAR_URL}')`;

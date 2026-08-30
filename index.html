@@ -9158,13 +9158,11 @@
         const functionsClient = getFunctions(app);
         const startBusinessVerificationCallable = httpsCallable(functionsClient, 'startBusinessVerification');
         const refreshBusinessVerificationCallable = httpsCallable(functionsClient, 'refreshBusinessVerification');
-        // Same Firebase project as Nuru (newstart-64c43), so this reuses the "chatWithNuru"
-        // Cloud Function already deployed there — model, system instruction, and the xAI API
-        // key all stay server-side in functions/index.js. Sent with model: 'grok-latest', same
-        // as Nuru's live provider.
-        const chatWithNuruCallable = httpsCallable(functionsClient, 'chatWithNuru');
+        // Haba's own Cloud Function (see functions/index.js) — calls xAI directly, with the
+        // system prompt and API key kept server-side. Not shared with any other app.
+        const habaAIChatCallable = httpsCallable(functionsClient, 'habaAIChat');
 
-        // --- HABA AI ASSISTANT (xAI/Grok, via the shared chatWithNuru Cloud Function) ---
+        // --- HABA AI ASSISTANT (xAI/Grok, via Haba's own habaAIChat Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
         const AI_NAME = "Haba AI";
 
@@ -24940,8 +24938,8 @@
             set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), true);
 
             try {
-                // Pull this thread's existing history so the model has context, same shape
-                // Nuru keeps client-side: an array of { role, content } turns.
+                // Pull this thread's existing history so the model has context: an array of
+                // { role, content } turns, oldest first.
                 const historySnap = await get(ref(database, `dm_threads/${threadId}/messages`));
                 const conversation = historySnap.exists()
                     ? Object.values(historySnap.val())
@@ -24949,9 +24947,9 @@
                         .map(m => ({ role: m.senderUid === AI_UID ? 'assistant' : 'user', content: m.text || '' }))
                     : [{ role: 'user', content: text }];
 
-                const result = await chatWithNuruCallable({ messages: conversation, model: 'grok-latest' });
+                const result = await habaAIChatCallable({ messages: conversation });
                 const reply = result.data && result.data.text;
-                if (!reply) throw new Error('Empty response from chatWithNuru');
+                if (!reply) throw new Error('Empty response from habaAIChat');
 
                 set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
                 const replyTime = Date.now();
@@ -24961,7 +24959,7 @@
                 replyUpdates[`user_chats/${user.uid}/${AI_UID}`] = { text: reply, timestamp: replyTime, unreadCount: 0 };
                 await update(ref(database), replyUpdates);
             } catch (err) {
-                console.error('chatWithNuru call failed', err);
+                console.error('habaAIChat call failed', err);
                 set(ref(database, `dm_threads/${threadId}/typing/${AI_UID}`), false);
                 showCustomModal(AI_NAME, `Couldn't reach ${AI_NAME} right now (${err.code || err.message || 'unknown error'}). Please try again.`);
             }

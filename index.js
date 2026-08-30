@@ -571,3 +571,109 @@ exports.diditWebhook = onRequest(
         res.status(200).send("ok");
     }
 );
+
+// --- HABA AI (XAI/GROK CHAT) ---
+//
+// Callable the client hits as httpsCallable(functionsClient, "habaAIChat") with
+// { messages: [{ role, content }, ...] } and gets back { text }. The xAI key and
+// system prompt live only here — never sent to or stored on the client.
+//
+// Secret (set with `firebase functions:secrets:set NAME`):
+//  - XAI_API_KEY — from https://console.x.ai
+//
+// Independent of anything else calling xAI elsewhere (e.g. Nuru) — separate secret
+// binding, separate system prompt, no shared code.
+
+const XAI_API_KEY = defineSecret("XAI_API_KEY");
+
+const XAI_MODEL = "grok-4";
+const XAI_ENDPOINT = "https://api.x.ai/v1/chat/completions";
+
+const HABA_AI_SYSTEM_PROMPT = `You are Haba AI, the assistant built into the Haba messaging app.
+You chat with users right inside their DMs, the same as any other contact would.
+Be helpful, direct, and conversational — short, natural replies rather than long essays,
+unless the user's question genuinely needs more depth. You can help with everyday questions,
+drafting or improving messages, explaining things, and general conversation. You do not have
+access to the user's other chats, contacts, or any private data in the app beyond what they
+type directly to you in this conversation.`;
+
+// Keeps the request small and well-formed: drops anything without real text, caps each
+// message's length, and only keeps the most recent turns.
+const HABA_AI_MAX_MESSAGE_CHARS = 4000;
+const HABA_AI_MAX_HISTORY_TURNS = 30;
+
+function sanitizeHabaAIMessages(rawMessages) {
+    if (!Array.isArray(rawMessages)) return [];
+    return rawMessages
+        .filter((m) => m && typeof m.content === "string" && m.content.trim().length > 0)
+        .map((m) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: m.content.slice(0, HABA_AI_MAX_MESSAGE_CHARS),
+        }))
+        .slice(-HABA_AI_MAX_HISTORY_TURNS);
+}
+
+exports.habaAIChat = onCall(
+    {
+        secrets: [XAI_API_KEY],
+        maxInstances: 20,
+        timeoutSeconds: 60,
+    },
+    async (request) => {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Sign in to use Haba AI.");
+        }
+
+        const messages = sanitizeHabaAIMessages(request.data && request.data.messages);
+        if (messages.length === 0) {
+            throw new HttpsError("invalid-argument", "No message content to send.");
+        }
+
+        const apiKey = XAI_API_KEY.value();
+        if (!apiKey) {
+            logger.error("habaAIChat: XAI_API_KEY secret is not set");
+            throw new HttpsError("failed-precondition", "AI is not configured yet.");
+        }
+
+        let response;
+        try {
+            response = await fetch(XAI_ENDPOINT, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: XAI_MODEL,
+                    messages: [{ role: "system", content: HABA_AI_SYSTEM_PROMPT }, ...messages],
+                }),
+            });
+        } catch (err) {
+            logger.error("habaAIChat: network error reaching xAI", err);
+            throw new HttpsError("unavailable", "Could not reach xAI.");
+        }
+
+        if (!response.ok) {
+            const errBody = await response.text().catch(() => "");
+            logger.error("habaAIChat: xAI returned an error", { status: response.status, errBody });
+            throw new HttpsError("internal", `xAI request failed (${response.status}).`);
+        }
+
+        let data;
+        try {
+            data = await response.json();
+        } catch (err) {
+            logger.error("habaAIChat: failed to parse xAI response as JSON", err);
+            throw new HttpsError("internal", "xAI returned an unreadable response.");
+        }
+
+        const text =
+            data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        if (!text) {
+            logger.error("habaAIChat: unexpected xAI response shape", JSON.stringify(data));
+            throw new HttpsError("internal", "xAI returned an empty response.");
+        }
+
+        return { text };
+    }
+);

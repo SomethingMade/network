@@ -1691,6 +1691,56 @@
         .wa-insights-post-date { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .wa-insights-post-views { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
         .wa-insights-post-views svg { width: 14px; height: 14px; }
+
+        /* Insights top-level Overview/Audience tabs — same flat underline-tab look as
+           .feed-subtabs, just scoped separately since this row sits inside a sheet with
+           its own padding instead of feed's edge-to-edge container. */
+        .insights-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin: 2px 0 4px; }
+        .insights-tab-btn { flex: 1; text-align: center; padding: 12px 0 11px; border: none; background: none; color: var(--text-secondary); font-size: 14.5px; font-weight: 700; font-family: inherit; cursor: pointer; position: relative; transition: color 0.15s ease; }
+        .insights-tab-btn.active { color: var(--text-primary); }
+        .insights-tab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--primary-blue); }
+        .insights-tab-panel { display: none; }
+        .insights-tab-panel.active { display: block; }
+
+        /* Section sub-header: title + info icon on the left, a tappable date-range control
+           on the right (e.g. "Profile" ... "30 days ⌄"), mirroring the reference design. */
+        .insights-subhead { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 2px; }
+        .insights-subhead-title { display: flex; align-items: center; gap: 5px; font-size: 15.5px; font-weight: 700; color: var(--text-primary); }
+        .insights-subhead-title svg { width: 14px; height: 14px; color: var(--text-secondary); }
+        .insights-range-wrap { position: relative; }
+        .insights-range-btn { display: flex; align-items: center; gap: 3px; border: none; background: none; padding: 4px 2px; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
+        .insights-range-btn svg { width: 13px; height: 13px; transition: transform 0.15s ease; }
+        .insights-range-btn.open svg { transform: rotate(180deg); }
+        .insights-range-menu { position: absolute; top: calc(100% + 4px); right: 0; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-elevated); padding: 4px; min-width: 132px; z-index: 20; display: none; }
+        .insights-range-menu.open { display: block; }
+        .insights-range-menu-item { display: block; width: 100%; text-align: left; border: none; background: none; font-family: inherit; font-size: 13.5px; font-weight: 500; color: var(--text-primary); padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+        .insights-range-menu-item:hover { background: var(--bg-hover); }
+        .insights-range-menu-item.active { font-weight: 700; color: var(--comment-blue); }
+
+        /* Stat cards row (Views / Viewers / Net Followers) — horizontally scrollable so it
+           degrades gracefully on narrow phones instead of squeezing three cards to fit. */
+        .insights-stat-row { display: flex; gap: 10px; padding: 6px 16px 4px; overflow-x: auto; scrollbar-width: none; }
+        .insights-stat-row::-webkit-scrollbar { display: none; }
+        .insights-stat-card { flex: 1 0 108px; scroll-snap-align: start; border-radius: 14px; padding: 12px 14px; }
+        .insights-stat-card:nth-child(odd) { background: var(--bg-surface); border: 1px solid var(--border-color); }
+        .insights-stat-card:nth-child(even) { background: var(--bg-alt); }
+        .insights-stat-label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px; }
+        .insights-stat-value { font-size: 24px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+        .insights-stat-delta { font-size: 12px; font-weight: 600; margin-top: 3px; color: var(--text-secondary); }
+        .insights-stat-delta.up { color: var(--success-green); }
+        .insights-stat-delta.down { color: var(--danger-red); }
+
+        /* Lightweight inline SVG line chart — no charting library, just a polyline + area
+           fill computed from real per-day post-view buckets. */
+        .insights-chart-wrap { padding: 10px 16px 4px; }
+        .insights-chart-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+        .insights-chart-empty { text-align: center; font-size: 12.5px; color: var(--text-secondary); padding: 28px 0 8px; }
+
+        .insights-threads-filter-note { font-size: 12px; color: var(--text-secondary); padding: 0 16px 4px; }
+        .insights-threads-empty { text-align: center; font-size: 13px; color: var(--text-secondary); padding: 34px 16px; }
+        .insights-post-metric { display: flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+        .insights-post-metric svg { width: 14px; height: 14px; }
+
         .wa-earnings-card { border-radius: 16px; padding: 16px; margin: 0 16px; }
         .wa-earnings-card.locked { display: flex; gap: 12px; background: var(--bg-alt); }
         .wa-earnings-lock-icon { width: 38px; height: 38px; border-radius: 50%; background: var(--bg-input); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -4943,93 +4993,162 @@
                 <button type="button" id="btn-close-insights" class="wa-header-icon-btn" aria-label="Back">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
-                <div class="wa-header-title">Account Insights</div>
+                <div class="wa-header-title">Insights</div>
                 <div style="width:38px; flex-shrink:0;"></div>
             </div>
 
-            <div class="wa-section">
-                <div class="wa-section-title">Overview</div>
-                <div class="wa-insights-grid">
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-posts-count">0</span>
-                        <span class="wa-insights-card-label">Posts</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-impressions-count">0</span>
-                        <span class="wa-insights-card-label">Post Views</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-media-count">0</span>
-                        <span class="wa-insights-card-label">Media Shared</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-followers-count">0</span>
-                        <span class="wa-insights-card-label">Followers</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-following-count">0</span>
-                        <span class="wa-insights-card-label">Following</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-groups-count">0</span>
-                        <span class="wa-insights-card-label">Groups Joined</span>
-                    </div>
-                    <div class="wa-insights-card">
-                        <span class="wa-insights-card-value" id="insights-contacts-count">0</span>
-                        <span class="wa-insights-card-label">Contacts</span>
-                    </div>
-                </div>
+            <div class="insights-tabs" id="insights-tabs">
+                <button type="button" class="insights-tab-btn active" data-insights-tab="overview">Overview</button>
+                <button type="button" class="insights-tab-btn" data-insights-tab="audience">Audience</button>
             </div>
 
-            <div class="wa-section" id="insights-earnings-section">
-                <div class="wa-section-title">Earnings</div>
-                <div id="insights-earnings-locked" class="wa-earnings-card locked" style="display:none;">
-                    <div class="wa-earnings-lock-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <!-- ── OVERVIEW TAB ─────────────────────────────────────────────────── -->
+            <div class="insights-tab-panel active" id="insights-panel-overview">
+
+                <div class="insights-subhead">
+                    <div class="insights-subhead-title">
+                        <span>Profile</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Views and viewers count activity from your posts within the selected period. Net followers reflects follows and unfollows since this update shipped."><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                     </div>
-                    <div class="wa-earnings-lock-body">
-                        <div class="wa-earnings-lock-title">Earnings locked</div>
-                        <div class="wa-earnings-lock-sub">Reach 100 followers to start earning from your post views</div>
-                        <div class="wa-earnings-progress-track">
-                            <div class="wa-earnings-progress-fill" id="insights-earnings-progress-fill"></div>
+                    <div class="insights-range-wrap" id="insights-profile-range-wrap">
+                        <button type="button" class="insights-range-btn" id="insights-profile-range-btn">
+                            <span id="insights-profile-range-label">30 days</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="insights-range-menu" id="insights-profile-range-menu">
+                            <button type="button" class="insights-range-menu-item" data-range="7">7 days</button>
+                            <button type="button" class="insights-range-menu-item active" data-range="30">30 days</button>
+                            <button type="button" class="insights-range-menu-item" data-range="90">90 days</button>
+                            <button type="button" class="insights-range-menu-item" data-range="0">Lifetime</button>
                         </div>
-                        <div class="wa-earnings-progress-label" id="insights-earnings-progress-label">0/100 followers</div>
                     </div>
                 </div>
-                <div id="insights-earnings-unlocked" class="wa-earnings-card unlocked" style="display:none;">
-                    <div class="wa-earnings-unlocked-top">
-                        <span class="wa-earnings-value" id="insights-earnings-amount">R0.00</span>
-                        <span class="wa-earnings-tier-badge" id="insights-earnings-tier-badge">Tier 1</span>
+
+                <div class="insights-stat-row">
+                    <div class="insights-stat-card">
+                        <div class="insights-stat-label">Views</div>
+                        <div class="insights-stat-value" id="insights-views-value">0</div>
                     </div>
-                    <div class="wa-earnings-sub" id="insights-earnings-rate-label">R0.00 per 1,000 views</div>
-                    <div class="wa-earnings-next-tier" id="insights-earnings-next-tier"></div>
+                    <div class="insights-stat-card">
+                        <div class="insights-stat-label">Viewers</div>
+                        <div class="insights-stat-value" id="insights-viewers-value">0</div>
+                    </div>
+                    <div class="insights-stat-card">
+                        <div class="insights-stat-label">Net followers</div>
+                        <div class="insights-stat-value" id="insights-net-followers-value">0</div>
+                        <div class="insights-stat-delta" id="insights-net-followers-delta"></div>
+                    </div>
                 </div>
+
+                <div class="insights-chart-wrap" id="insights-chart-wrap">
+                    <svg id="insights-chart-svg" viewBox="0 0 680 180" preserveAspectRatio="none"></svg>
+                    <div class="insights-chart-empty" id="insights-chart-empty" style="display:none;">No views in this date range</div>
+                </div>
+
+                <div class="insights-subhead" style="margin-top:8px;">
+                    <div class="insights-subhead-title"><span>Your Posts</span></div>
+                    <div class="insights-range-wrap" id="insights-threads-range-wrap">
+                        <button type="button" class="insights-range-btn" id="insights-threads-range-btn">
+                            <span id="insights-threads-range-label">30 days</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="insights-range-menu" id="insights-threads-range-menu">
+                            <button type="button" class="insights-range-menu-item" data-range="7">7 days</button>
+                            <button type="button" class="insights-range-menu-item active" data-range="30">30 days</button>
+                            <button type="button" class="insights-range-menu-item" data-range="90">90 days</button>
+                            <button type="button" class="insights-range-menu-item" data-range="0">Lifetime</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wa-filter-row" id="insights-threads-filter-row" style="padding: 4px 16px 6px; margin-bottom: 0;">
+                    <button type="button" class="wa-chip active" data-thread-filter="latest">Latest</button>
+                    <button type="button" class="wa-chip" data-thread-filter="views">Most views</button>
+                    <button type="button" class="wa-chip" data-thread-filter="replies">Most replies</button>
+                    <button type="button" class="wa-chip" data-thread-filter="likes">Most likes</button>
+                </div>
+
+                <div id="insights-threads-list"></div>
+                <div class="insights-threads-empty" id="insights-threads-empty" style="display:none;">No posts in this date range</div>
             </div>
 
-            <div class="wa-section" id="insights-top-posts-section" style="display:none;">
-                <div class="wa-section-title">Most Viewed Posts</div>
-                <div id="insights-top-posts-list"></div>
-            </div>
+            <!-- ── AUDIENCE TAB ─────────────────────────────────────────────────── -->
+            <div class="insights-tab-panel" id="insights-panel-audience">
 
-            <div class="wa-section">
-                <div class="wa-section-title">Account</div>
-                <div class="wa-list-row">
-                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
-                    <div class="wa-row-body">
-                        <span class="wa-row-title">Member Since</span>
-                        <span class="wa-row-sub" id="insights-member-since">—</span>
+                <div class="wa-section" style="margin-top:4px;">
+                    <div class="wa-insights-grid">
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-followers-count">0</span>
+                            <span class="wa-insights-card-label">Followers</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-following-count">0</span>
+                            <span class="wa-insights-card-label">Following</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-posts-count">0</span>
+                            <span class="wa-insights-card-label">Posts</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-media-count">0</span>
+                            <span class="wa-insights-card-label">Media Shared</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-groups-count">0</span>
+                            <span class="wa-insights-card-label">Groups Joined</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-contacts-count">0</span>
+                            <span class="wa-insights-card-label">Contacts</span>
+                        </div>
                     </div>
                 </div>
-                <div class="wa-list-row">
-                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"></path></svg></div>
-                    <div class="wa-row-body">
-                        <span class="wa-row-title">Username</span>
-                        <span class="wa-row-sub" id="insights-username">@—</span>
+
+                <div class="wa-section" id="insights-earnings-section">
+                    <div class="wa-section-title">Earnings</div>
+                    <div id="insights-earnings-locked" class="wa-earnings-card locked" style="display:none;">
+                        <div class="wa-earnings-lock-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        </div>
+                        <div class="wa-earnings-lock-body">
+                            <div class="wa-earnings-lock-title">Earnings locked</div>
+                            <div class="wa-earnings-lock-sub">Reach 100 followers to start earning from your post views</div>
+                            <div class="wa-earnings-progress-track">
+                                <div class="wa-earnings-progress-fill" id="insights-earnings-progress-fill"></div>
+                            </div>
+                            <div class="wa-earnings-progress-label" id="insights-earnings-progress-label">0/100 followers</div>
+                        </div>
+                    </div>
+                    <div id="insights-earnings-unlocked" class="wa-earnings-card unlocked" style="display:none;">
+                        <div class="wa-earnings-unlocked-top">
+                            <span class="wa-earnings-value" id="insights-earnings-amount">R0.00</span>
+                            <span class="wa-earnings-tier-badge" id="insights-earnings-tier-badge">Tier 1</span>
+                        </div>
+                        <div class="wa-earnings-sub" id="insights-earnings-rate-label">R0.00 per 1,000 views</div>
+                        <div class="wa-earnings-next-tier" id="insights-earnings-next-tier"></div>
                     </div>
                 </div>
-            </div>
 
-            <p class="wa-insights-note">These numbers are based on activity on this account and update automatically.</p>
+                <div class="wa-section">
+                    <div class="wa-section-title">Account</div>
+                    <div class="wa-list-row">
+                        <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+                        <div class="wa-row-body">
+                            <span class="wa-row-title">Member Since</span>
+                            <span class="wa-row-sub" id="insights-member-since">—</span>
+                        </div>
+                    </div>
+                    <div class="wa-list-row">
+                        <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"></path></svg></div>
+                        <div class="wa-row-body">
+                            <span class="wa-row-title">Username</span>
+                            <span class="wa-row-sub" id="insights-username">@—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="wa-insights-note">These numbers are based on activity on this account and update automatically.</p>
+            </div>
         </div>
     </div>
 
@@ -16491,6 +16610,75 @@
             if (e.target === insightsSheetOverlay) insightsSheetOverlay.classList.remove('active');
         });
 
+        // Overview / Audience top-level tabs.
+        document.getElementById('insights-tabs').addEventListener('click', (e) => {
+            const tabBtn = e.target.closest('.insights-tab-btn[data-insights-tab]');
+            if (!tabBtn) return;
+            const tab = tabBtn.dataset.insightsTab;
+            document.querySelectorAll('#insights-tabs .insights-tab-btn').forEach(b => b.classList.toggle('active', b === tabBtn));
+            document.getElementById('insights-panel-overview').classList.toggle('active', tab === 'overview');
+            document.getElementById('insights-panel-audience').classList.toggle('active', tab === 'audience');
+        });
+
+        // Generic date-range dropdown wiring, shared by the Profile stats range and the
+        // Your Posts range — each keeps its own selected value and re-renders only its own
+        // section rather than the whole sheet.
+        function initInsightsRangeDropdown(btnId, menuId, labelId, onSelect) {
+            const btn = document.getElementById(btnId);
+            const menu = document.getElementById(menuId);
+            const label = document.getElementById(labelId);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const willOpen = !menu.classList.contains('open');
+                document.querySelectorAll('.insights-range-menu.open').forEach(m => m.classList.remove('open'));
+                document.querySelectorAll('.insights-range-btn.open').forEach(b => b.classList.remove('open'));
+                if (willOpen) { menu.classList.add('open'); btn.classList.add('open'); }
+            });
+            menu.querySelectorAll('.insights-range-menu-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    menu.querySelectorAll('.insights-range-menu-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    menu.classList.remove('open');
+                    btn.classList.remove('open');
+                    label.textContent = item.textContent;
+                    onSelect(parseInt(item.dataset.range, 10));
+                });
+            });
+        }
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.insights-range-menu.open').forEach(m => m.classList.remove('open'));
+            document.querySelectorAll('.insights-range-btn.open').forEach(b => b.classList.remove('open'));
+        });
+
+        let insightsProfileRangeDays = 30;
+        let insightsThreadsRangeDays = 30;
+        let insightsThreadsFilter = 'latest';
+        let insightsMyPostsCache = [];
+        let insightsFollowEventsCache = [];
+
+        initInsightsRangeDropdown('insights-profile-range-btn', 'insights-profile-range-menu', 'insights-profile-range-label', (days) => {
+            insightsProfileRangeDays = days;
+            renderInsightsOverviewStats(insightsMyPostsCache);
+            renderInsightsChart(insightsMyPostsCache);
+            applyInsightsNetFollowers();
+        });
+        initInsightsRangeDropdown('insights-threads-range-btn', 'insights-threads-range-menu', 'insights-threads-range-label', (days) => {
+            insightsThreadsRangeDays = days;
+            renderInsightsThreadsList(insightsMyPostsCache);
+        });
+        document.getElementById('insights-threads-filter-row').addEventListener('click', (e) => {
+            const chip = e.target.closest('.wa-chip[data-thread-filter]');
+            if (!chip) return;
+            insightsThreadsFilter = chip.dataset.threadFilter;
+            document.querySelectorAll('#insights-threads-filter-row .wa-chip').forEach(c => c.classList.toggle('active', c === chip));
+            renderInsightsThreadsList(insightsMyPostsCache);
+        });
+
+        // days === 0 means "Lifetime" (no lower bound).
+        function insightsRangeCutoff(days) {
+            return days ? Date.now() - days * 24 * 60 * 60 * 1000 : 0;
+        }
+
         // Follower-gated earnings: locked below 100 followers, then a tiered rate per
         // 1,000 post impressions once unlocked (higher follower counts unlock better
         // rates). Purely a display of estimated earnings for now — no payout flow yet.
@@ -16543,6 +16731,7 @@
             const myPosts = Object.entries(cachedPosts)
                 .filter(([id, post]) => post && post.uid === user.uid && !post.repostOf)
                 .map(([id, post]) => ({ ...post, postId: id }));
+            insightsMyPostsCache = myPosts;
             const myMedia = myPosts.filter(post => post.imageUrl || post.videoUrl);
             const totalImpressions = myPosts.reduce((sum, post) => sum + (post.impressionCount || 0), 0);
             const myGroupsCount = Object.keys(cachedCommunities).filter(gid => {
@@ -16551,8 +16740,8 @@
             }).length;
             const myContactsCount = Object.keys(cachedContacts).length;
 
+            // Audience tab
             document.getElementById('insights-posts-count').textContent = myPosts.length;
-            document.getElementById('insights-impressions-count').textContent = formatFeedCount(totalImpressions);
             document.getElementById('insights-media-count').textContent = myMedia.length;
             document.getElementById('insights-followers-count').textContent = myProfile.followersCount || 0;
             document.getElementById('insights-following-count').textContent = myProfile.followingCount || 0;
@@ -16564,22 +16753,142 @@
             document.getElementById('insights-member-since').textContent = creationTime ? formatJoinedDate(creationTime) : 'Unknown';
             document.getElementById('insights-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
 
-            renderInsightsTopPosts(myPosts);
+            // Overview tab
+            renderInsightsOverviewStats(myPosts);
+            renderInsightsChart(myPosts);
+            renderInsightsThreadsList(myPosts);
+            renderInsightsNetFollowers(user.uid);
         }
 
-        // Top 5 of the user's own posts by impression (view) count, each row opening
-        // straight into that post's comments sheet so tapping a stat leads somewhere.
-        function renderInsightsTopPosts(myPosts) {
-            const section = document.getElementById('insights-top-posts-section');
-            const list = document.getElementById('insights-top-posts-list');
-            const viewedPosts = myPosts.filter(post => (post.impressionCount || 0) > 0);
-            if (!viewedPosts.length) {
-                section.style.display = 'none';
-                list.innerHTML = '';
+        // "Views" and "Viewers" for the selected window. Each post impression is already
+        // deduped to one count per viewing account (see registerPostImpression's
+        // post_views/{postId}/{uid} transaction), so the two numbers share the same
+        // underlying tally here rather than one being a fabricated subset of the other.
+        function renderInsightsOverviewStats(myPosts) {
+            const cutoff = insightsRangeCutoff(insightsProfileRangeDays);
+            const inRange = myPosts.filter(post => (post.timestamp || 0) >= cutoff);
+            const views = inRange.reduce((sum, post) => sum + (post.impressionCount || 0), 0);
+            document.getElementById('insights-views-value').textContent = formatFeedCount(views);
+            document.getElementById('insights-viewers-value').textContent = formatFeedCount(views);
+        }
+
+        // Net followers over the selected window, from the followEvents/{uid} log (written
+        // by followUser/unfollowUser). Accounts that followed this feature only show data
+        // going forward — older follows/unfollows weren't logged, so the count can read 0
+        // even on an established account until new activity comes in.
+        async function renderInsightsNetFollowers(uid) {
+            try {
+                const snap = await get(ref(database, `followEvents/${uid}`));
+                insightsFollowEventsCache = snap.exists() ? Object.values(snap.val()) : [];
+            } catch (err) {
+                insightsFollowEventsCache = [];
+            }
+            applyInsightsNetFollowers();
+        }
+        function applyInsightsNetFollowers() {
+            const valueEl = document.getElementById('insights-net-followers-value');
+            const deltaEl = document.getElementById('insights-net-followers-delta');
+            const cutoff = insightsRangeCutoff(insightsProfileRangeDays);
+            const inRange = insightsFollowEventsCache.filter(ev => (ev && ev.ts || 0) >= cutoff);
+            const gained = inRange.filter(ev => ev.type === 'follow').length;
+            const lost = inRange.filter(ev => ev.type === 'unfollow').length;
+            const net = gained - lost;
+            valueEl.textContent = (net > 0 ? '+' : '') + net;
+            deltaEl.classList.remove('up', 'down');
+            if (net > 0) {
+                deltaEl.classList.add('up');
+                deltaEl.textContent = `${gained} new`;
+            } else if (net < 0) {
+                deltaEl.classList.add('down');
+                deltaEl.textContent = `${lost} unfollowed`;
+            } else {
+                deltaEl.textContent = inRange.length ? 'No change' : '';
+            }
+        }
+
+        // Lightweight inline SVG line chart of daily post views — bucketed by the day each
+        // post was published, since view events aren't logged individually. "Lifetime" falls
+        // back to a 90-day window so the chart stays readable instead of trying to render an
+        // unbounded timeline.
+        function renderInsightsChart(myPosts) {
+            const svg = document.getElementById('insights-chart-svg');
+            const emptyEl = document.getElementById('insights-chart-empty');
+            const days = insightsProfileRangeDays || 90;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const buckets = [];
+            for (let i = days - 1; i >= 0; i--) {
+                buckets.push({ ts: today.getTime() - i * 86400000, views: 0 });
+            }
+            const startTs = buckets[0].ts;
+            myPosts.forEach(post => {
+                if (!post.timestamp || post.timestamp < startTs) return;
+                const d = new Date(post.timestamp);
+                d.setHours(0, 0, 0, 0);
+                const bucket = buckets.find(b => b.ts === d.getTime());
+                if (bucket) bucket.views += (post.impressionCount || 0);
+            });
+            const maxViews = Math.max(...buckets.map(b => b.views), 0);
+            if (maxViews === 0) {
+                svg.innerHTML = '';
+                emptyEl.style.display = 'block';
                 return;
             }
-            const top = [...viewedPosts].sort((a, b) => (b.impressionCount || 0) - (a.impressionCount || 0)).slice(0, 5);
-            list.innerHTML = top.map(post => {
+            emptyEl.style.display = 'none';
+            const W = 680, H = 180, padTop = 14, padBottom = 14;
+            const usableH = H - padTop - padBottom;
+            const stepX = buckets.length > 1 ? W / (buckets.length - 1) : W;
+            const points = buckets.map((b, i) => ({
+                x: i * stepX,
+                y: padTop + usableH - (b.views / maxViews) * usableH
+            }));
+            const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+            const areaPath = linePath + ` L${points[points.length - 1].x.toFixed(1)},${H} L0,${H} Z`;
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="insightsChartFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--primary-blue)" stop-opacity="0.18"></stop>
+                        <stop offset="100%" stop-color="var(--primary-blue)" stop-opacity="0"></stop>
+                    </linearGradient>
+                </defs>
+                <path d="${areaPath}" fill="url(#insightsChartFill)" stroke="none"></path>
+                <path d="${linePath}" fill="none" stroke="var(--primary-blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            `;
+        }
+
+        // The user's own posts, filtered to the selected date range and sorted/labeled by
+        // the active chip (Latest / Most views / Most replies / Most likes). Each row opens
+        // straight into that post's comments sheet so tapping one leads somewhere.
+        function renderInsightsThreadsList(myPosts) {
+            const cutoff = insightsRangeCutoff(insightsThreadsRangeDays);
+            let list = myPosts.filter(post => (post.timestamp || 0) >= cutoff);
+
+            const metricField = insightsThreadsFilter === 'views' ? 'impressionCount'
+                : insightsThreadsFilter === 'replies' ? 'commentCount'
+                : insightsThreadsFilter === 'likes' ? 'likeCount'
+                : 'impressionCount'; // 'latest' still displays view counts, just sorted by date
+            if (insightsThreadsFilter === 'latest') {
+                list = [...list].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            } else {
+                list = [...list].sort((a, b) => (b[metricField] || 0) - (a[metricField] || 0));
+            }
+            list = list.slice(0, 20);
+
+            const listEl = document.getElementById('insights-threads-list');
+            const emptyEl = document.getElementById('insights-threads-empty');
+            if (!list.length) {
+                listEl.innerHTML = '';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+
+            const metricIcons = {
+                impressionCount: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>',
+                commentCount: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>',
+                likeCount: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>'
+            };
+            listEl.innerHTML = list.map(post => {
                 const thumbUrl = post.imageUrl || (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
                 const thumbHtml = thumbUrl
                     ? `<img class="wa-insights-post-thumb" src="${escapeHtmlForPost(thumbUrl)}" alt="">`
@@ -16592,13 +16901,13 @@
                             <div class="wa-insights-post-text">${escapeHtmlForPost(snippet)}</div>
                             <div class="wa-insights-post-date" data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</div>
                         </div>
-                        <div class="wa-insights-post-views">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
-                            ${formatFeedCount(post.impressionCount || 0)}
+                        <div class="insights-post-metric">
+                            ${metricIcons[metricField]}
+                            ${formatFeedCount(post[metricField] || 0)}
                         </div>
                     </div>`;
             }).join('');
-            list.querySelectorAll('.wa-insights-post-row').forEach(row => {
+            listEl.querySelectorAll('.wa-insights-post-row').forEach(row => {
                 row.addEventListener('click', () => {
                     const postId = row.dataset.postId;
                     if (!postId) return;
@@ -16606,7 +16915,6 @@
                     openPostComments(postId);
                 });
             });
-            section.style.display = '';
         }
 
         document.getElementById('btn-save-profile').addEventListener('click', async (e) => {
@@ -16879,6 +17187,12 @@
             updates[`followers/${targetUid}/${user.uid}`] = true;
             updates[`users/${user.uid}/followingCount`] = increment(1);
             updates[`users/${targetUid}/followersCount`] = increment(1);
+            // Timestamped log of follow/unfollow events on the target's own node, purely so
+            // the Insights "Net followers" chart/stat can show real gains/losses over a
+            // date range instead of just a point-in-time total. Kept as its own path (not
+            // on users/{uid} itself) so it doesn't bloat profile reads.
+            const followEventKey = push(ref(database, `followEvents/${targetUid}`)).key;
+            updates[`followEvents/${targetUid}/${followEventKey}`] = { type: 'follow', ts: Date.now(), by: user.uid };
             await update(ref(database), updates);
             createNotification(targetUid, { type: 'follow' });
         }
@@ -16891,6 +17205,8 @@
             updates[`followers/${targetUid}/${user.uid}`] = null;
             updates[`users/${user.uid}/followingCount`] = increment(-1);
             updates[`users/${targetUid}/followersCount`] = increment(-1);
+            const followEventKey = push(ref(database, `followEvents/${targetUid}`)).key;
+            updates[`followEvents/${targetUid}/${followEventKey}`] = { type: 'unfollow', ts: Date.now(), by: user.uid };
             await update(ref(database), updates);
         }
 

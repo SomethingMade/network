@@ -762,6 +762,10 @@
         /* Same reasoning: the reel viewer's header has its own avatar trigger, so this
            needs to clear the reel viewer's z-index too, not just the default bottom-sheet layer. */
         #profile-bottom-sheet-overlay { z-index: 100010; }
+        /* Share Profile (QR code + share link) is opened from inside the profile sheet,
+           so it needs the same top tier — placed after profile-bottom-sheet-overlay in
+           the DOM, so equal z-index still paints it above when both are open. */
+        #share-profile-sheet-overlay { z-index: 100010; }
         /* Settings is opened from inside the profile sheet, so it needs to sit at the same
            top tier — it's placed after profile-bottom-sheet-overlay in the DOM, so equal
            z-index still paints it above when both are open. */
@@ -4429,6 +4433,9 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                         </button>
                         <div class="tm-profile-header-actions">
+                            <button type="button" id="btn-share-profile" class="tm-profile-icon-btn" aria-label="Share profile">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                            </button>
                             <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                             </button>
@@ -4491,6 +4498,23 @@
                     <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="share-profile-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="text-align:center; padding:22px 24px 26px;">
+            <div class="sheet-handle"></div>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+                <h3 style="margin:0; font-size:17px;">Share Profile</h3>
+                <button type="button" id="btn-close-share-profile" class="tm-profile-icon-btn" aria-label="Close" style="position:static;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <p style="color:var(--text-secondary); font-size:13.5px; margin:0 0 16px;">Let someone scan this to find you, or share your profile link.</p>
+            <div id="share-profile-qr-canvas" class="my-qr-code-box"></div>
+            <p id="share-profile-username-label" style="font-weight:700; font-family:monospace; color:var(--text-primary); margin:0 0 20px;">@username</p>
+            <button type="button" id="btn-download-profile-qr" class="btn-pill btn-outline" style="width:100%; margin-bottom:10px;">Download QR Code</button>
+            <button type="button" id="btn-share-profile-link" class="btn-pill btn-primary" style="width:100%;">Share Profile Link</button>
         </div>
     </div>
 
@@ -16924,6 +16948,11 @@
             showLoading();
             try {
                 let friendUid = null;
+                // If this came from scanning the Share Profile QR, it'll be a full profile
+                // URL rather than a bare username — pull the trailing slug out first.
+                if (rawInput.startsWith(PROFILE_WEB_BASE_URL)) {
+                    rawInput = rawInput.slice(PROFILE_WEB_BASE_URL.length).replace(/\/+$/, '');
+                }
                 const digitsOnly = rawInput.replace(/[^0-9]/g, '');
                 const looksLikePhone = digitsOnly.length >= 7 && !rawInput.replace(/[\s+()-]/g, '').match(/[a-zA-Z@_]/);
 
@@ -17014,6 +17043,89 @@
                 });
             }
         }
+
+        const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
+        // Public read-only profile page, served by the profileView Cloud Function via a
+        // Firebase Hosting rewrite (see firebase.json). Update this if you attach a custom domain.
+        const PROFILE_WEB_BASE_URL = 'https://newstart-64c43.web.app/u/';
+
+        // Renders the QR code inside the Share Profile sheet — same qrValue convention as
+        // renderMyQrCode (username if set, uid as fallback) so both codes scan to the same result.
+        function renderShareProfileQr() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const usernameLabel = document.getElementById('display-username').textContent;
+            const hasUsername = usernameLabel && usernameLabel !== '@—' && usernameLabel !== '@loading';
+            const slug = hasUsername ? usernameLabel.replace('@', '') : user.uid;
+            const qrValue = PROFILE_WEB_BASE_URL + slug;
+
+            document.getElementById('share-profile-username-label').textContent = hasUsername ? usernameLabel : 'Scan to find me';
+
+            const container = document.getElementById('share-profile-qr-canvas');
+            container.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(container, {
+                    text: qrValue,
+                    width: 150,
+                    height: 150,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        }
+
+        const shareProfileSheetOverlay = document.getElementById('share-profile-sheet-overlay');
+        document.getElementById('btn-share-profile').addEventListener('click', () => {
+            renderShareProfileQr();
+            shareProfileSheetOverlay.classList.add('active');
+        });
+        document.getElementById('btn-close-share-profile').addEventListener('click', () => {
+            shareProfileSheetOverlay.classList.remove('active');
+        });
+        shareProfileSheetOverlay.addEventListener('click', (e) => {
+            if (e.target === shareProfileSheetOverlay) shareProfileSheetOverlay.classList.remove('active');
+        });
+
+        // Downloads the rendered QR code as a PNG. QRCode.js draws to a <canvas> (or an
+        // <img> as a fallback on older browsers) inside the container, so we grab whichever
+        // is present rather than assuming canvas support.
+        document.getElementById('btn-download-profile-qr').addEventListener('click', () => {
+            const container = document.getElementById('share-profile-qr-canvas');
+            const canvas = container.querySelector('canvas');
+            const img = container.querySelector('img');
+            const dataUrl = canvas ? canvas.toDataURL('image/png') : (img ? img.src : null);
+            if (!dataUrl) { notify('QR code is not ready yet, try again.', 'error'); return; }
+            const usernameLabel = document.getElementById('share-profile-username-label').textContent || 'profile';
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `haba-${usernameLabel.replace('@', '')}-qr.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+
+        document.getElementById('btn-share-profile-link').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            const usernameLabel = document.getElementById('display-username').textContent;
+            const hasUsername = usernameLabel && usernameLabel !== '@—' && usernameLabel !== '@loading';
+            const slug = hasUsername ? usernameLabel.replace('@', '') : (user ? user.uid : '');
+            const profileUrl = PROFILE_WEB_BASE_URL + slug;
+            const shareText = hasUsername
+                ? `Follow me on Haba! Find me at ${usernameLabel}:`
+                : `Follow me on Haba!`;
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Haba', text: shareText, url: profileUrl }); }
+                catch (err) { /* user cancelled share, ignore */ }
+            } else {
+                try {
+                    await navigator.clipboard.writeText(`${shareText} ${profileUrl}`);
+                    notify('Profile link copied to clipboard!');
+                } catch (err) {
+                    showCustomModal('Share Profile', `${shareText} ${profileUrl}`);
+                }
+            }
+        });
 
         // Opens the device camera and scans video frames for a QR code using jsQR. Stops
         // itself automatically once a code is found, or when the panel/modal is closed.

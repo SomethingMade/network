@@ -1489,14 +1489,16 @@
         .floating-video-mute-bar { position: absolute; bottom: 6px; left: 6px; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
         .floating-video-player:hover .floating-video-mute-bar, .floating-video-player.show-controls .floating-video-mute-bar { opacity: 1; pointer-events: auto; }
         @media (max-width: 420px) { .floating-video-player { width: 152px; bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom) + 14px); right: 12px; } }
-        .feed-video-controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: linear-gradient(transparent, rgba(0,0,0,0.68)); }
-        .feed-video-playpause-btn, .feed-video-mute-btn { background: none; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px; flex-shrink: 0; }
-        .feed-video-playpause-btn svg, .feed-video-mute-btn svg { width: 18px; height: 18px; }
-        .feed-video-progress-track { position: relative; flex: 1; height: 14px; display: flex; align-items: center; cursor: pointer; }
-        .feed-video-progress-track::before { content: ''; position: absolute; left: 0; right: 0; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; }
-        .feed-video-progress-fill { position: absolute; left: 0; height: 4px; width: 0%; background: #fff; border-radius: 2px; pointer-events: none; }
-        .feed-video-progress-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); left: 0%; box-shadow: 0 0 4px rgba(0,0,0,0.5); pointer-events: none; }
-        .feed-video-time { color: #fff; font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+        .feed-video-controls { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(17,17,17,0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-pill); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+        .feed-video-playpause-btn, .feed-video-mute-btn { background: rgba(255,255,255,0.12); border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; transition: background 0.15s ease, transform 0.15s var(--ease-smooth); }
+        .feed-video-playpause-btn:active, .feed-video-mute-btn:active { transform: scale(0.88); background: rgba(255,255,255,0.24); }
+        .feed-video-playpause-btn svg, .feed-video-mute-btn svg { width: 15px; height: 15px; }
+        .feed-video-progress-track { position: relative; flex: 1; height: 16px; display: flex; align-items: center; cursor: pointer; }
+        .feed-video-progress-track::before { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+        .feed-video-progress-fill { position: absolute; left: 0; height: 3px; width: 0%; background: #fff; border-radius: 2px; pointer-events: none; }
+        .feed-video-progress-thumb { position: absolute; top: 50%; width: 11px; height: 11px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%) scale(1); left: 0%; box-shadow: 0 1px 3px rgba(0,0,0,0.4); pointer-events: none; transition: transform 0.15s var(--ease-smooth), box-shadow 0.15s ease; }
+        .feed-video-progress-track.dragging .feed-video-progress-thumb { transform: translate(-50%, -50%) scale(1.5); box-shadow: 0 0 0 6px rgba(255,255,255,0.18), 0 2px 6px rgba(0,0,0,0.4); }
+        .feed-video-time { color: rgba(255,255,255,0.85); font-size: 11px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
         .feed-post-reactors { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
         .feed-post-reactors-avatars { display: flex; }
@@ -12919,12 +12921,12 @@
 
             let isDragging = false;
             track.addEventListener('click', (e) => { e.stopPropagation(); seekFromClientX(e.clientX); });
-            track.addEventListener('mousedown', (e) => { e.stopPropagation(); isDragging = true; seekFromClientX(e.clientX); });
+            track.addEventListener('mousedown', (e) => { e.stopPropagation(); isDragging = true; track.classList.add('dragging'); seekFromClientX(e.clientX); });
             window.addEventListener('mousemove', (e) => { if (isDragging) seekFromClientX(e.clientX); });
-            window.addEventListener('mouseup', () => { isDragging = false; });
-            track.addEventListener('touchstart', (e) => { isDragging = true; seekFromClientX(e.touches[0].clientX); }, { passive: true });
+            window.addEventListener('mouseup', () => { isDragging = false; track.classList.remove('dragging'); });
+            track.addEventListener('touchstart', (e) => { isDragging = true; track.classList.add('dragging'); seekFromClientX(e.touches[0].clientX); }, { passive: true });
             track.addEventListener('touchmove', (e) => { if (isDragging) seekFromClientX(e.touches[0].clientX); }, { passive: true });
-            track.addEventListener('touchend', () => { isDragging = false; });
+            track.addEventListener('touchend', () => { isDragging = false; track.classList.remove('dragging'); });
 
             updatePlayUI();
             updateMuteUI();

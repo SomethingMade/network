@@ -546,7 +546,25 @@
         .avatar { width: 48px; height: 48px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
         /* Goza AI avatar — animated infinite-loop gradient, same nebula shift used on the AI trigger elsewhere */
         .ai-avatar-nebula { background: linear-gradient(120deg, #7C4DFF 0%, #5E5CE6 45%, #18C7FF 100%) !important; background-size: 220% 220% !important; animation: aiAvatarNebulaShift 6s ease infinite; }
-        .ai-avatar-black { background: #000000 !important; cursor: pointer; }
+        .ai-avatar-black {
+            background-color: #000000 !important;
+            background-image:
+                radial-gradient(circle at 30% 30%, rgba(124,77,255,0.9) 0%, rgba(124,77,255,0) 60%),
+                radial-gradient(circle at 70% 35%, rgba(24,199,255,0.85) 0%, rgba(24,199,255,0) 55%),
+                radial-gradient(circle at 45% 75%, rgba(94,92,230,0.8) 0%, rgba(94,92,230,0) 60%),
+                radial-gradient(circle at 75% 70%, rgba(255,110,199,0.5) 0%, rgba(255,110,199,0) 55%) !important;
+            background-size: 200% 200% !important;
+            background-blend-mode: screen !important;
+            animation: aiAvatarNebulaLoop 10s ease-in-out infinite !important;
+            cursor: pointer;
+        }
+        @keyframes aiAvatarNebulaLoop {
+            0%   { background-position: 20% 20%, 80% 30%, 40% 90%, 70% 70%; }
+            25%  { background-position: 40% 10%, 60% 55%, 65% 70%, 45% 90%; }
+            50%  { background-position: 65% 40%, 30% 20%, 80% 55%, 25% 55%; }
+            75%  { background-position: 30% 65%, 70% 75%, 20% 40%, 60% 25%; }
+            100% { background-position: 20% 20%, 80% 30%, 40% 90%, 70% 70%; }
+        }
         @keyframes aiAvatarNebulaShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .avatar[data-full] { pointer-events: auto; cursor: zoom-in; }
         .empty-msg { text-align: center; color: var(--text-secondary); margin-top: 40px; font-size: 14px; }
@@ -9170,7 +9188,23 @@
         // avatar is tapped to "view avatar" — there's no uploaded photo to fetch, so this is
         // generated inline as a data URI instead of a Storage URL.
         const AI_AVATAR_VIEWER_SRC = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#000"/><circle cx="200" cy="200" r="150" fill="none" stroke="#fff" stroke-width="6"/></svg>'
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">' +
+            '<defs>' +
+            '<clipPath id="aiRingClip"><circle cx="200" cy="200" r="150"/></clipPath>' +
+            '<filter id="aiNebulaBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="28"/></filter>' +
+            '</defs>' +
+            '<rect width="400" height="400" fill="#000"/>' +
+            '<g clip-path="url(#aiRingClip)">' +
+            '<rect x="50" y="50" width="300" height="300" fill="#000"/>' +
+            '<g filter="url(#aiNebulaBlur)" style="mix-blend-mode:screen">' +
+            '<circle cx="150" cy="150" r="70" fill="#7C4DFF" opacity="0.85"><animateTransform attributeName="transform" type="rotate" from="0 200 200" to="360 200 200" dur="9s" repeatCount="indefinite"/></circle>' +
+            '<circle cx="260" cy="180" r="60" fill="#18C7FF" opacity="0.8"><animateTransform attributeName="transform" type="rotate" from="0 200 200" to="-360 200 200" dur="13s" repeatCount="indefinite"/></circle>' +
+            '<circle cx="200" cy="270" r="65" fill="#5E5CE6" opacity="0.8"><animateTransform attributeName="transform" type="rotate" from="0 200 200" to="360 200 200" dur="16s" repeatCount="indefinite"/></circle>' +
+            '<circle cx="220" cy="150" r="45" fill="#FF6EC7" opacity="0.55"><animateTransform attributeName="transform" type="rotate" from="0 200 200" to="-360 200 200" dur="11s" repeatCount="indefinite"/></circle>' +
+            '</g>' +
+            '</g>' +
+            '<circle cx="200" cy="200" r="150" fill="none" stroke="#fff" stroke-width="6"/>' +
+            '</svg>'
         );
 
         // Fallback profile picture used whenever a user hasn't uploaded their own — a plain

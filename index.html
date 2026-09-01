@@ -2104,7 +2104,12 @@
         .tab-content.tab-slide-in-right { animation: tabSlideInRight 0.2s ease-out; }
         .tab-content.tab-slide-in-left { animation: tabSlideInLeft 0.2s ease-out; }
 
-        .chat-header-area { background: var(--bg-surface); border-bottom: 1px solid var(--border-color); padding: calc(16px + min(env(safe-area-inset-top), 20px)) 16px 10px; color: var(--text-primary); flex-shrink: 0; }
+        .chat-header-area { background: var(--bg-surface); border-bottom: 1px solid var(--border-color); padding: calc(16px + min(env(safe-area-inset-top), 20px)) 16px 10px; color: var(--text-primary); flex-shrink: 0; transition: margin-top 0.28s ease; }
+        /* Hides the per-tab header on scroll-down / reveals on scroll-up, same direction-based
+           pattern as .nav-scroll-hidden and .subtabs-scroll-hidden below. Height varies per tab
+           (search box, filter chips, etc.) so JS measures it and sets --header-hide-h just before
+           adding this class — see initHeaderScrollHide. */
+        .chat-header-area.header-scroll-hidden { margin-top: calc(-1 * var(--header-hide-h, 200px)); }
         .chat-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; position: relative; }
 
         /* Small brand mark on the right of the Home tab header only — decorative (aria-hidden,
@@ -17737,7 +17742,45 @@
             }, { passive: true });
         })();
 
+        // --- Hide each tab's header (logo/title/search) while scrolling down its list,
+        // reveal it again on scroll up. Same direction-based pattern as the nav bar and
+        // feed subtabs above, just paired per-tab since each tab has its own header +
+        // scroll container. Margin-top (not transform) is used so the scroll container
+        // actually slides up to fill the space, instead of leaving a gap. ---
+        (function initHeaderScrollHide() {
+            const pairs = [
+                ['tab-chats', 'chat-list-container'],
+                ['tab-status', 'discover-grid-scroll'],
+                ['tab-groups', 'communities-feed-container'],
+                ['tab-calls', 'calls-list-container'],
+                ['tab-contacts', 'contacts-list-container'],
+            ];
+            const THRESHOLD = 6; // ignore tiny scroll jitter
+            pairs.forEach(([tabId, scrollId]) => {
+                const tab = document.getElementById(tabId);
+                const scrollEl = document.getElementById(scrollId);
+                const header = tab?.querySelector('.chat-header-area');
+                if (!scrollEl || !header) return;
+                let lastScrollTop = scrollEl.scrollTop; // match actual position, not an assumed 0
+                scrollEl.addEventListener('scroll', () => {
+                    const current = scrollEl.scrollTop;
+                    const delta = current - lastScrollTop;
+                    if (Math.abs(delta) < THRESHOLD) return;
+                    if (delta > 0 && current > 40) {
+                        // scrolling down: measure the header's current height (it varies with
+                        // search box / filter chips) right before collapsing it away
+                        header.style.setProperty('--header-hide-h', `${header.offsetHeight}px`);
+                        header.classList.add('header-scroll-hidden');
+                    } else {
+                        header.classList.remove('header-scroll-hidden'); // scrolling up
+                    }
+                    lastScrollTop = current;
+                }, { passive: true });
+            });
+        })();
+
         // --- GROUPS ---
+
         let cachedCommunities = {};
         let cachedGroupChatsMeta = {};
         let cachedGroupInvites = {};

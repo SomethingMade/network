@@ -20641,9 +20641,30 @@
 
             const { ring, inner } = buildStoryRing(items);
 
+            // Show a preview of the most recently uploaded story itself (its photo, a video
+            // frame, or its text background) inside the ring, rather than the user's profile
+            // photo — so the circle previews what's actually new, like the story-card view.
+            const latest = items[items.length - 1];
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'story-avatar-img';
-            avatarDiv.style.backgroundImage = `url('${photoURL || DEFAULT_AVATAR_URL}')`;
+
+            if (latest.type === 'text') {
+                avatarDiv.style.background = latest.bgColor || 'linear-gradient(135deg, #2E2E2E, #111111)';
+            } else if (latest.type === 'video') {
+                const vid = document.createElement('video');
+                vid.src = latest.mediaURL;
+                vid.muted = true;
+                vid.playsInline = true;
+                vid.preload = 'metadata';
+                // Stays invisible until the seeked frame actually lands, so it shows the plain
+                // dark circle while loading instead of the browser's native video placeholder.
+                vid.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;opacity:0;transition:opacity 0.15s ease;';
+                vid.addEventListener('loadedmetadata', () => { vid.currentTime = 0.1; });
+                vid.addEventListener('seeked', () => { vid.style.opacity = '1'; });
+                avatarDiv.appendChild(vid);
+            } else {
+                avatarDiv.style.backgroundImage = `url('${latest.mediaURL || DEFAULT_AVATAR_URL}')`;
+            }
 
             inner.appendChild(avatarDiv);
             ring.appendChild(inner);

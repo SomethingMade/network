@@ -12691,9 +12691,13 @@
             // the paginated window), so waiting on that round-trip made a real
             // delete feel delayed. Remove it here immediately instead.
             delete cachedPosts[postId];
-            const list = document.getElementById('feed-posts-list');
-            const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
-            if (existingCard) {
+            // A post can be showing in more than one place at once — the main feed, a
+            // profile's Posts tab (mine or the author's), the profile Media grid, and/or
+            // the Reels track — so sweep every card for it, not just whichever one lives
+            // in #feed-posts-list. Missing the others left stale cards behind until that
+            // section happened to re-render (e.g. a refresh), and re-deleting from one of
+            // those stale cards was a no-op since cachedPosts[postId] was already gone.
+            document.querySelectorAll(`.feed-post-card[data-post-id="${postId}"]`).forEach(existingCard => {
                 const vid = existingCard.querySelector('.feed-post-video');
                 if (vid && feedMediaObserver) feedMediaObserver.unobserve(vid);
                 const postImg = existingCard.querySelector('.x-media-grid-item img');
@@ -12701,7 +12705,9 @@
                 if (feedImpressionObserver) feedImpressionObserver.unobserve(existingCard);
                 if (existingCard.__impressionTimer) clearTimeout(existingCard.__impressionTimer);
                 existingCard.remove();
-            }
+            });
+            document.querySelectorAll(`.profile-media-grid-item[data-post-id="${postId}"]`).forEach(item => item.remove());
+            document.querySelectorAll(`.reel-item[data-post-id="${postId}"]`).forEach(item => item.remove());
             updateFeedEmptyState();
 
             try {

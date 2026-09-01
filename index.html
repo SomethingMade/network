@@ -6828,9 +6828,7 @@
             const spinner = document.getElementById('wallpaper-upload-spinner');
             spinner.style.display = 'flex';
             try {
-                const safeName = (file.name || 'wallpaper').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const compressed = await compressImageFile(file);
-                const url = await uploadToFirebaseStorage(compressed, `wallpapers/${user.uid}/${Date.now()}_${safeName}`);
+                const { url } = await uploadToCloudinary(file);
                 await update(ref(database, `users/${user.uid}`), { chatWallpaper: url });
                 applyChatWallpaperToDOM(url);
 
@@ -9335,53 +9333,6 @@
             return url;
         }
 
-        // Client-side stand-in for Cloudinary's automatic image optimization: downsamples large
-        // photos to a sane max dimension and re-encodes as JPEG before they go to Firebase
-        // Storage, which — unlike Cloudinary — stores and serves files exactly as uploaded, with
-        // no server-side transform step. Keeps upload bandwidth and Storage usage down without a
-        // visible quality hit. Animated GIFs are left untouched (canvas would flatten them to a
-        // single frame) and small files are skipped since there's nothing worth saving.
-        function compressImageFile(file, maxDimension = 1600, quality = 0.82) {
-            return new Promise((resolve) => {
-                if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/gif') {
-                    resolve(file);
-                    return;
-                }
-                if (file.size < 400 * 1024) {
-                    resolve(file);
-                    return;
-                }
-                const img = new Image();
-                const objectUrl = URL.createObjectURL(file);
-                const cleanup = () => URL.revokeObjectURL(objectUrl);
-                img.onload = () => {
-                    const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
-                    const w = Math.max(1, Math.round(img.width * scale));
-                    const h = Math.max(1, Math.round(img.height * scale));
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = w;
-                        canvas.height = h;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, w, h);
-                        canvas.toBlob((blob) => {
-                            cleanup();
-                            // Only use the re-encoded version if it's actually smaller.
-                            resolve(blob && blob.size < file.size ? blob : file);
-                        }, 'image/jpeg', quality);
-                    } catch (err) {
-                        cleanup();
-                        resolve(file);
-                    }
-                };
-                img.onerror = () => {
-                    cleanup();
-                    resolve(file);
-                };
-                img.src = objectUrl;
-            });
-        }
-
         // Client-side stand-in for Cloudinary's server-generated video poster frame: draws a
         // frame from the video file onto a canvas and returns it as a JPEG Blob, so feed post
         // videos hosted on Firebase Storage can still get a thumbnail uploaded alongside them.
@@ -9963,12 +9914,30 @@
             }
         }
 
-        // All uploads now go through uploadToFirebaseStorage (see above) — Cloudinary has been
-        // fully retired from the upload path. cloudinaryVideoThumbnail is kept below purely as
-        // a read-time fallback so any video posts/messages uploaded before this migration (whose
-        // stored URLs still point at Cloudinary) keep showing a poster frame; it does nothing
-        // for Firebase Storage URLs (they don't match '/video/upload/') and simply returns null,
-        // in which case callers fall back to an in-browser onloadedmetadata seek instead.
+        const CLOUDINARY_CLOUD_NAME = "dqkujefxj";
+        const CLOUDINARY_UPLOAD_PRESET = "banter_box";
+        const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+
+        async function uploadToCloudinary(file) {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+            const res = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: formData });
+            if (!res.ok) throw new Error("Cloudinary upload failed");
+            const data = await res.json();
+            return {
+                url: data.secure_url,
+                type: data.resource_type === "video" ? "video" : (data.resource_type === "raw" ? "raw" : "image"),
+                duration: data.duration || null,
+                bytes: data.bytes || (file ? file.size : null),
+                format: data.format || null
+            };
+        }
+
+        // Turns a Cloudinary video URL into a real, server-rendered JPG thumbnail URL by
+        // inserting a start-offset + format transformation right after '/video/upload/'.
+        // No client-side canvas/CORS involved — Cloudinary extracts the frame on its end.
+        // offsetSeconds is clamped server-side to the clip's length, so short videos are safe.
         function cloudinaryVideoThumbnail(videoUrl, offsetSeconds = 1) {
             if (!videoUrl) return null;
             const marker = '/video/upload/';
@@ -26006,8 +25975,8 @@
                     if (!applyViewOnce) {
                         // Regular (non-view-once) photos and videos in a 1:1 DM are end-to-end
                         // encrypted before upload — see encryptFileForPeer above. View-once
-                        // media uploads unencrypted below since it already has its own
-                        // one-time-view protection.
+                        // media keeps using the Cloudinary path below since it already has its
+                        // own one-time-view protection.
                         const { blob, encrypted } = await encryptFileForPeer(chatUid, file);
                         const safeName = (file.name || (isVideo ? 'video' : 'photo')).replace(/[^a-zA-Z0-9.\-_]/g, '_');
                         const storagePath = `dm_media/${threadId}/${Date.now()}_${safeName}`;
@@ -26021,15 +25990,10 @@
                         previewText = isVideo ? '🎥 Video' : '📷 Photo';
                         if (caption) previewText = caption;
                     } else {
-                        // View-once media isn't end-to-end encrypted (it has its own one-time-view
-                        // protection instead), so it can go straight to Firebase Storage. Photos are
-                        // downsized client-side first to keep upload bandwidth and Storage usage down.
-                        const safeName = (file.name || (isVideo ? 'video' : 'photo')).replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                        const storagePath = `dm_media/${threadId}/${Date.now()}_${safeName}`;
-                        const uploadFile = isVideo ? file : await compressImageFile(file);
-                        url = await uploadToFirebaseStorage(uploadFile, storagePath);
+                        const { url: cUrl, type } = await uploadToCloudinary(file);
+                        url = cUrl;
                         msgPayload.mediaURL = url;
-                        msgPayload.mediaType = isVideo ? 'video' : 'image';
+                        msgPayload.mediaType = type === 'video' ? 'video' : 'image';
                         msgPayload.viewOnce = true;
                         msgPayload.viewOnceViewed = false;
                         previewText = msgPayload.mediaType === 'video' ? '🔒 Video (view once)' : '🔒 Photo (view once)';
@@ -26405,10 +26369,10 @@
             try {
                 // Voice notes in a 1:1 DM are end-to-end encrypted before upload, same as
                 // photos/videos/documents (see encryptFileForPeer above) — except view-once
-                // notes, which upload unencrypted since they already have their own
-                // one-time-view protection. Firebase Storage doesn't inspect/report media
-                // metadata the way Cloudinary did, so fallbackDuration (timed client-side
-                // while recording) is used as the duration either way.
+                // notes, which keep using the Cloudinary path below since they already have
+                // their own one-time-view protection. Ciphertext isn't decodable audio, so
+                // Cloudinary's transcoding/duration detection can't run on encrypted notes
+                // anyway — fallbackDuration (timed client-side while recording) is used instead.
                 const threadId = threadIdFor(user.uid, chatUid);
                 const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
                 const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaType: 'audio' };
@@ -26423,9 +26387,9 @@
                         msgPayload.mediaMimeType = blob.type || 'audio/webm';
                     }
                 } else {
-                    const storagePath = `dm_media/${threadId}/${Date.now()}_voice.webm`;
-                    msgPayload.mediaURL = await uploadToFirebaseStorage(blob, storagePath);
-                    msgPayload.duration = fallbackDuration || 0;
+                    const { url, duration } = await uploadToCloudinary(blob);
+                    msgPayload.mediaURL = url;
+                    msgPayload.duration = duration || fallbackDuration || 0;
                     msgPayload.viewOnce = true;
                     msgPayload.viewOnceViewed = false;
                 }

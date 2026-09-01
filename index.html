@@ -8151,25 +8151,6 @@
             btn.addEventListener('click', () => scrollToBottom(true));
         })();
 
-        // Scrolling near the top of an open chat fetches one older page of
-        // messages on demand, instead of the app ever downloading/holding a
-        // whole thread's history in memory at once.
-        (function setupLoadOlderMessagesOnScroll() {
-            const chatMessages = document.getElementById('chat-view-messages');
-            if (!chatMessages) return;
-            chatMessages.addEventListener('scroll', () => {
-                if (chatMessages.scrollTop > 80) return;
-                if (activeChatUid && activeChatUid !== undefined) {
-                    const threadId = threadIdFor(auth.currentUser?.uid, activeChatUid);
-                    const isAIThread = activeChatUid === AI_UID;
-                    if (dmSnapshotHandlers[threadId]) loadOlderDmMessages(threadId, activeChatUid, isAIThread);
-                }
-                if (typeof activeGroupId !== 'undefined' && activeGroupId && groupSnapshotHandlers[activeGroupId]) {
-                    loadOlderGroupMessages(activeGroupId);
-                }
-            });
-        })();
-
         function filterListItems(inputElement, containerId) {
             const query = inputElement.value.toLowerCase();
             const container = document.getElementById(containerId);
@@ -20044,26 +20025,12 @@
                 }
             });
 
-            // Reset pagination state for this group thread — only the most
-            // recent page live-syncs; older history is fetched on demand.
-            olderMessagesCache[groupId] = {};
-            oldestLoadedCreatedAt[groupId] = null;
-            hasMoreOlderMessages[groupId] = true;
-
-            const handleGroupMessagesSnapshot = (snap, opts = {}) => {
-                const isLoadOlder = !!opts.isLoadOlder;
-                const shouldStickToBottom = !isLoadOlder && (isActiveThreadInitialLoad || isNearBottom(messagesEl));
+            unsubscribeGroupMessages = onValue(ref(database, `group_threads/${groupId}/messages`), (snap) => {
+                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
-                const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
                 if (snap.exists()) {
-                    const liveVal = snap.val();
-                    lastLiveGroupMessagesVal[groupId] = liveVal;
-                    const merged = Object.assign({}, olderMessagesCache[groupId], liveVal);
-                    const items = Object.entries(merged).map(([key, val]) => ({ key, ...val })).sort((a, b) => a.createdAt - b.createdAt);
-                    if (items.length) oldestLoadedCreatedAt[groupId] = items[0].createdAt;
-                    if (!isLoadOlder && Object.keys(liveVal).length < MSGS_PAGE_SIZE) hasMoreOlderMessages[groupId] = false;
-                    if (hasMoreOlderMessages[groupId] !== false) messagesEl.appendChild(buildLoadOlderMessagesButton(groupId, null, false, true));
+                    const items = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })).sort((a, b) => a.createdAt - b.createdAt);
                     let lastDateKey = null;
                     items.forEach(msg => {
                         const msgDateKey = dayKey(msg.createdAt);
@@ -20202,55 +20169,16 @@
                 appendGroupTypingBubbleIfNeeded();
                 if (shouldStickToBottom) {
                     scrollToBottom(isActiveThreadInitialLoad);
-                } else if (isLoadOlder) {
-                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
                 } else {
                     messagesEl.scrollTop = prevScrollTop;
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;
-            };
-            groupSnapshotHandlers[groupId] = handleGroupMessagesSnapshot;
-            unsubscribeGroupMessages = onValue(
-                query(ref(database, `group_threads/${groupId}/messages`), orderByChild('createdAt'), limitToLast(MSGS_PAGE_SIZE)),
-                handleGroupMessagesSnapshot
-            );
+            });
 
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
             highlightActiveChat();
-        }
-
-        // Group-chat counterpart to loadOlderDmMessages — one-time fetch of an
-        // older page, merged into cache, re-rendered via the same handler.
-        let lastLiveGroupMessagesVal = {};
-        async function loadOlderGroupMessages(groupId) {
-            if (isLoadingOlderMessages || hasMoreOlderMessages[groupId] === false) return;
-            const cursor = oldestLoadedCreatedAt[groupId];
-            if (!cursor) return;
-            isLoadingOlderMessages = true;
-            const btn = document.getElementById('load-older-messages-btn');
-            if (btn) btn.textContent = 'Loading…';
-            try {
-                const olderSnap = await get(query(
-                    ref(database, `group_threads/${groupId}/messages`),
-                    orderByChild('createdAt'), endAt(cursor - 1), limitToLast(MSGS_PAGE_SIZE)
-                ));
-                const olderCount = olderSnap.exists() ? Object.keys(olderSnap.val()).length : 0;
-                if (olderCount === 0) {
-                    hasMoreOlderMessages[groupId] = false;
-                } else {
-                    olderMessagesCache[groupId] = Object.assign({}, olderMessagesCache[groupId], olderSnap.val());
-                    if (olderCount < MSGS_PAGE_SIZE) hasMoreOlderMessages[groupId] = false;
-                }
-                if (activeGroupId === groupId && typeof groupSnapshotHandlers[groupId] === 'function') {
-                    const liveVal = lastLiveGroupMessagesVal[groupId] || {};
-                    const fauxSnap = { exists: () => true, val: () => liveVal };
-                    groupSnapshotHandlers[groupId](fauxSnap, { isLoadOlder: true });
-                }
-            } finally {
-                isLoadingOlderMessages = false;
-            }
         }
 
         async function sendGroupMessage() {
@@ -22634,16 +22562,6 @@
         let unsubscribeReadReceipt = null;
         let activeChatOtherLastRead = 0;
         let isActiveThreadInitialLoad = true;
-        // Message pagination — keeps only the most recent MSGS_PAGE_SIZE messages
-        // live-synced (data + memory usage), older pages are fetched on demand
-        // (one-time reads, not live listeners) when the user scrolls to the top.
-        const MSGS_PAGE_SIZE = 40;
-        let olderMessagesCache = {};    // { threadKey: { msgKey: msgVal, ... } } fetched-so-far older pages
-        let oldestLoadedCreatedAt = {}; // { threadKey: number } oldest createdAt currently loaded/rendered
-        let hasMoreOlderMessages = {};  // { threadKey: boolean }
-        let isLoadingOlderMessages = false;
-        let dmSnapshotHandlers = {};    // { threadId: handler fn } so loadOlderDmMessages can re-render the active thread
-        let groupSnapshotHandlers = {}; // { groupId: handler fn } so loadOlderGroupMessages can re-render the active group
         let chatListTypingUnsubscribers = {};
         let chatListReadReceiptUnsubscribers = {};
         let groupListTypingUnsubscribers = {};
@@ -25096,13 +25014,6 @@
             const threadId = threadIdFor(user.uid, otherUid);
             const isAIThread = otherUid === AI_UID;
 
-            // Reset pagination state for this thread — start fresh with just the
-            // most recent page; older history is fetched on demand (see
-            // loadOlderDmMessages below), not downloaded/synced up front.
-            olderMessagesCache[threadId] = {};
-            oldestLoadedCreatedAt[threadId] = null;
-            hasMoreOlderMessages[threadId] = true;
-
             // Mark this thread as read by me, right now
             if (!isAIThread && isReadReceiptsEnabled()) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
 
@@ -25134,25 +25045,14 @@
                 }
             });
 
-            // Messages listener logic for Chat View — live-syncs only the most
-            // recent MSGS_PAGE_SIZE messages (bounded data usage + memory), not
-            // the entire thread history. Older messages are merged in from
-            // olderMessagesCache, populated by loadOlderDmMessages() on demand.
-            const handleDmMessagesSnapshot = async (snap, opts = {}) => {
-                const isLoadOlder = !!opts.isLoadOlder;
-                const shouldStickToBottom = !isLoadOlder && (isActiveThreadInitialLoad || isNearBottom(messagesEl));
+            // Messages listener logic for Chat View
+            unsubscribeChatMessages = onValue(ref(database, `dm_threads/${threadId}/messages`), async (snap) => {
+                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
-                const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
                 if (snap.exists()) {
-                    const liveVal = snap.val();
-                    lastLiveDmMessagesVal[threadId] = liveVal;
-                    const merged = Object.assign({}, olderMessagesCache[threadId], liveVal);
-                    const items = Object.entries(merged).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
-                    if (items.length) oldestLoadedCreatedAt[threadId] = items[0].createdAt;
-                    if (!isLoadOlder && Object.keys(liveVal).length < MSGS_PAGE_SIZE) hasMoreOlderMessages[threadId] = false;
-                    if (hasMoreOlderMessages[threadId] !== false) messagesEl.appendChild(buildLoadOlderMessagesButton(threadId, otherUid, isAIThread));
+                    const items = Object.entries(snap.val()).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
                     let lastDateKey = null;
 
                     if (!isAIThread) {
@@ -25441,74 +25341,15 @@
                 
                 if (shouldStickToBottom) {
                     scrollToBottom(isActiveThreadInitialLoad);
-                } else if (isLoadOlder) {
-                    // Older messages were prepended above the fold — keep the same
-                    // content anchored under the user's eye instead of jumping.
-                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
                 } else {
                     messagesEl.scrollTop = prevScrollTop;
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;
-            };
-            dmSnapshotHandlers[threadId] = handleDmMessagesSnapshot;
-            unsubscribeChatMessages = onValue(
-                query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSGS_PAGE_SIZE)),
-                handleDmMessagesSnapshot
-            );
+            });
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
             highlightActiveChat();
-        }
-
-        // Fetches one older page of DM messages (one-time read, not a live
-        // listener) and merges it into the cache, then re-renders using the
-        // exact same handler the live listener uses — same decrypt/render path,
-        // just fed a bigger merged item set. Triggered by scrolling to the top.
-        let lastLiveDmMessagesVal = {};
-        async function loadOlderDmMessages(threadId, otherUid, isAIThread) {
-            if (isLoadingOlderMessages || hasMoreOlderMessages[threadId] === false) return;
-            const cursor = oldestLoadedCreatedAt[threadId];
-            if (!cursor) return;
-            isLoadingOlderMessages = true;
-            const btn = document.getElementById('load-older-messages-btn');
-            if (btn) btn.textContent = 'Loading…';
-            try {
-                const olderSnap = await get(query(
-                    ref(database, `dm_threads/${threadId}/messages`),
-                    orderByChild('createdAt'), endAt(cursor - 1), limitToLast(MSGS_PAGE_SIZE)
-                ));
-                const olderCount = olderSnap.exists() ? Object.keys(olderSnap.val()).length : 0;
-                if (olderCount === 0) {
-                    hasMoreOlderMessages[threadId] = false;
-                } else {
-                    olderMessagesCache[threadId] = Object.assign({}, olderMessagesCache[threadId], olderSnap.val());
-                    if (olderCount < MSGS_PAGE_SIZE) hasMoreOlderMessages[threadId] = false;
-                }
-                if (activeChatUid === otherUid && typeof dmSnapshotHandlers[threadId] === 'function') {
-                    const liveVal = lastLiveDmMessagesVal[threadId] || {};
-                    const fauxSnap = { exists: () => true, val: () => liveVal };
-                    await dmSnapshotHandlers[threadId](fauxSnap, { isLoadOlder: true });
-                }
-            } finally {
-                isLoadingOlderMessages = false;
-            }
-        }
-
-        function buildLoadOlderMessagesButton(threadOrGroupId, otherUid, isAIThread, isGroup) {
-            const wrap = document.createElement('div');
-            wrap.style.textAlign = 'center';
-            wrap.style.padding = '8px 0 4px';
-            const btn = document.createElement('button');
-            btn.id = 'load-older-messages-btn';
-            btn.textContent = 'Load earlier messages';
-            btn.style.cssText = 'border:none;background:var(--bg-hover);color:var(--text-secondary);font-size:13px;padding:6px 14px;border-radius:var(--radius-pill);cursor:pointer;';
-            btn.addEventListener('click', () => {
-                if (isGroup) loadOlderGroupMessages(threadOrGroupId);
-                else loadOlderDmMessages(threadOrGroupId, otherUid, isAIThread);
-            });
-            wrap.appendChild(btn);
-            return wrap;
         }
 
         document.getElementById('chat-list-container').addEventListener('click', (e) => {

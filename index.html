@@ -1361,7 +1361,14 @@
            Followers/Following list's copy of this row, which lives in a zero-padding sheet and
            is already full width, is unaffected. */
         #feed-subtabs { margin-left: -14px; margin-right: -14px; }
-        .feed-subtabs.subtabs-scroll-hidden { transform: translateY(-100%); }
+        /* Feed tab only: the subtabs and the circle stories row below them float together as
+           one permanently-pinned sticky unit, so the stories row stays visible at the top
+           while the feed scrolls instead of scrolling away with the posts underneath. The
+           wrapper (not #feed-subtabs itself) owns the sticky behavior; #feed-subtabs is
+           demoted to a plain in-flow block inside it so the two don't double-stick. */
+        .feed-sticky-header { position: sticky; top: 0; z-index: 5; background: var(--bg-base); margin-left: -14px; margin-right: -14px; }
+        .feed-sticky-header #feed-subtabs { position: static; margin-left: 0; margin-right: 0; }
+        .feed-sticky-header .stories-scroll { padding-left: 14px; padding-right: 14px; box-sizing: border-box; }
         .feed-subtab-btn { flex: 1; text-align: center; padding: 14px 0 12px; border: none; background: none; color: var(--text-secondary); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; position: relative; transition: color 0.15s ease; }
         .feed-subtab-btn:hover { background: var(--bg-hover); }
         .feed-subtab-btn.active { color: var(--text-primary); }
@@ -5868,12 +5875,14 @@
                             </div>
                         </div>
 
-                        <div class="feed-subtabs" id="feed-subtabs">
-                            <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
-                            <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                            <button type="button" class="feed-subtab-btn feed-subtab-ai" data-feed-subtab="ai"><span class="ai-avatar-black feed-subtab-ai-icon" aria-hidden="true"></span>Haba AI</button>
+                        <div class="feed-sticky-header" id="feed-sticky-header">
+                            <div class="feed-subtabs" id="feed-subtabs">
+                                <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
+                                <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
+                                <button type="button" class="feed-subtab-btn feed-subtab-ai" data-feed-subtab="ai"><span class="ai-avatar-black feed-subtab-ai-icon" aria-hidden="true"></span>Haba AI</button>
+                            </div>
+                            <div class="stories-scroll" id="stories-scroll-feed"></div>
                         </div>
-                        <div class="stories-scroll" id="stories-scroll-feed"></div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
@@ -17740,28 +17749,10 @@
             });
         })();
 
-        // --- Reveal the For you/Following subtabs as soon as the person starts scrolling
-        // up, rather than making them scroll all the way back to the top of the feed. Same
-        // direction-based show/hide as the bottom nav above (down hides, up reveals), just
-        // applied to the sticky subtabs bar instead of the nav. ---
-        (function initFeedSubtabsScrollHide() {
-            const scrollEl = document.getElementById('discover-grid-scroll');
-            const subtabs = document.getElementById('feed-subtabs');
-            if (!scrollEl || !subtabs) return;
-            let lastScrollTop = scrollEl.scrollTop;
-            const THRESHOLD = 6; // ignore tiny scroll jitter
-            scrollEl.addEventListener('scroll', () => {
-                const current = scrollEl.scrollTop;
-                const delta = current - lastScrollTop;
-                if (Math.abs(delta) < THRESHOLD) return;
-                if (delta > 0 && current > 40) {
-                    subtabs.classList.add('subtabs-scroll-hidden'); // scrolling down
-                } else {
-                    subtabs.classList.remove('subtabs-scroll-hidden'); // scrolling up
-                }
-                lastScrollTop = current;
-            }, { passive: true });
-        })();
+        // --- The subtabs + stories row now stay permanently pinned at the top via
+        // .feed-sticky-header (position: sticky) — see the CSS block above. They no longer
+        // hide on scroll down, since the stories circles should stay floating/visible the
+        // whole time the feed scrolls, not just while scrolling up. ---
 
         // --- Hide each tab's header (logo/title/search) while scrolling down its list,
         // reveal it again on scroll up. Same direction-based pattern as the nav bar and

@@ -1833,19 +1833,25 @@
         .wa-suggested-section { margin-bottom: 22px; }
         .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
         .profile-suggested-scroll::-webkit-scrollbar { display: none; }
-        .profile-suggested-card { position: relative; flex: 0 0 132px; scroll-snap-align: start; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 18px; padding: 16px 12px 12px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease; }
+        /* Card layout: a fixed-height cover photo + fixed-height name/handle lines + a
+           2-line-clamped bio give every card the same total height regardless of how
+           long any one person's name/bio is — no explicit height needed. Width is a
+           percentage (capped) so exactly one card reads as "current" with a sliver of
+           the next peeking in, X-style, on any screen size. */
+        .profile-suggested-card { position: relative; flex: 0 0 82%; max-width: 300px; scroll-snap-align: start; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; text-align: left; cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease; }
         .profile-suggested-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
         .profile-suggested-card.is-dismissing { opacity: 0; transform: scale(0.85); pointer-events: none; }
-        .profile-suggested-card-dismiss { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--bg-hover); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; z-index: 2; transition: background 0.15s ease, color 0.15s ease; }
-        .profile-suggested-card-dismiss:hover { background: var(--border-color); color: var(--text-primary); }
+        .profile-suggested-card-dismiss { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(0,0,0,0.45); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; z-index: 3; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: background 0.15s ease; }
+        .profile-suggested-card-dismiss:hover { background: rgba(0,0,0,0.65); }
         .profile-suggested-card-dismiss svg { width: 12px; height: 12px; }
-        .profile-suggested-avatar-ring { width: 62px; height: 62px; border-radius: 50%; padding: 2.5px; background: var(--gradient-brand); margin-bottom: 10px; flex-shrink: 0; }
-        .profile-suggested-card .avatar { width: 100%; height: 100%; font-size: 19px; margin-bottom: 0; border: 2.5px solid var(--bg-alt); box-sizing: border-box; }
-        .profile-suggested-card h4 { font-size: 13.5px; font-weight: 700; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 2px; display: flex; align-items: center; justify-content: center; gap: 2px; }
-        .profile-suggested-username { font-size: 11.5px; color: var(--text-secondary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
-        .profile-suggested-meta { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; }
-        .profile-suggested-meta svg { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.75; }
-        .profile-suggested-card .discover-card-add-btn { width: 100%; padding: 7px 0; font-size: 12px; }
+        .profile-suggested-cover { height: 92px; flex-shrink: 0; background: var(--gradient-brand); background-size: cover; background-position: center; }
+        .profile-suggested-avatar-ring { position: absolute; top: 64px; left: 12px; width: 58px; height: 58px; border-radius: 50%; padding: 3px; background: var(--bg-alt); z-index: 2; margin-bottom: 0; }
+        .profile-suggested-card .avatar { width: 100%; height: 100%; font-size: 18px; margin-bottom: 0; border: none; box-sizing: border-box; }
+        .profile-suggested-follow-btn { position: absolute; top: 100px; right: 12px; width: auto; padding: 7px 16px; font-size: 12.5px; z-index: 2; }
+        .profile-suggested-info { padding: 34px 12px 14px; display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .profile-suggested-card h4 { font-size: 14px; font-weight: 700; color: var(--text-primary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 1px; display: flex; align-items: center; gap: 2px; justify-content: flex-start; }
+        .profile-suggested-username { font-size: 12.5px; color: var(--text-secondary); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 6px; display: block; }
+        .profile-suggested-bio { font-size: 12.5px; color: var(--text-secondary); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
         .wa-field-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; font-weight: 500; padding: 0; }
         .wa-field-input::placeholder { color: var(--text-secondary); font-weight: 400; }
 
@@ -10853,16 +10859,23 @@
             const profile = cachedUsers[uid] || {};
             const name = profile.name || 'Haba User';
             const followers = profile.followersCount || 0;
+            const coverStyle = profile.coverPhotoURL ? ` style="background-image:url('${profile.coverPhotoURL}')"` : '';
+            const bioText = profile.about
+                ? escapeHtmlForPost(profile.about)
+                : (followers > 0 ? `${formatProfileCount(followers)} followers` : 'New to Haba');
             return `
                 <div class="profile-suggested-card" data-uid="${uid}">
                     <button type="button" class="profile-suggested-card-dismiss" data-uid="${uid}" title="Not interested" aria-label="Dismiss suggestion">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
+                    <div class="profile-suggested-cover"${coverStyle}></div>
                     <div class="profile-suggested-avatar-ring">${feedAvatarHtml(profile)}</div>
-                    <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
-                    ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Haba</span>'}
-                    ${followers > 0 ? `<span class="profile-suggested-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>${formatProfileCount(followers)} followers</span>` : '<span class="profile-suggested-meta" style="margin-bottom:14px;"></span>'}
-                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+                    <button type="button" class="discover-card-add-btn profile-suggested-follow-btn" data-uid="${uid}">Follow</button>
+                    <div class="profile-suggested-info">
+                        <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                        ${profile.username ? `<span class="profile-suggested-username">@${escapeHtmlForPost(profile.username)}</span>` : '<span class="profile-suggested-username">On Haba</span>'}
+                        <p class="profile-suggested-bio">${bioText}</p>
+                    </div>
                 </div>
             `;
         }

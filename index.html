@@ -1601,6 +1601,21 @@
         .feed-post-skeleton .feed-skeleton-text-line.short { width: 65%; }
         .feed-post-skeleton .feed-skeleton-media { margin-top: 10px; height: 160px; border-radius: 12px; }
 
+        /* Skeleton bubbles shown above the earliest loaded message while an older page of
+           chat/group history is being fetched — same shimmer technique as the feed skeletons
+           above, just shaped like message bubbles instead of post cards. */
+        .msg-bubble.msg-skeleton { pointer-events: none; padding: 10px 14px; max-width: 62%; background: var(--bg-alt); }
+        .msg-bubble.msg-skeleton.out { align-self: flex-end; }
+        .msg-bubble.msg-skeleton.in { align-self: flex-start; }
+        .msg-skeleton-line { position: relative; overflow: hidden; height: 9px; border-radius: 5px; background: var(--border-color); }
+        .msg-skeleton-line + .msg-skeleton-line { margin-top: 7px; width: 60%; }
+        .msg-skeleton-line::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+            background-size: 200% 100%; animation: statusShimmer 1.4s ease-in-out infinite;
+        }
+        body.dark-theme .msg-skeleton-line::after { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%); background-size: 200% 100%; }
+
         .feed-comment-item { display: flex; gap: 12px; padding: 14px 0; align-items: flex-start; }
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; position: relative; }
@@ -19985,6 +20000,7 @@
 
             const messagesEl = document.getElementById('chat-view-messages');
             messagesEl.innerHTML = '';
+            resetChatMessagePagination();
             if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
             if (typeof unsubscribeGroupMessages === 'function') unsubscribeGroupMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
@@ -20025,12 +20041,63 @@
                 }
             });
 
-            unsubscribeGroupMessages = onValue(ref(database, `group_threads/${groupId}/messages`), (snap) => {
+            // Fetches an older page of group messages (one-time read, not a live listener) and
+            // merges them into cachedThreadMessages, then re-renders — same pattern as
+            // loadOlderDmMessages()/loadOlderPosts(), anchored to the top of the thread.
+            async function loadOlderGroupMessages() {
+                if (isLoadingMoreMessages || noMoreOlderMessages) return;
+                if (!isFinite(oldestLoadedMessageTimestamp)) return;
+                if (activeGroupId !== groupId) return; // user navigated away from this thread
+                isLoadingMoreMessages = true;
+                const skeletonNodes = showChatLoadingSkeletons(messagesEl);
+
+                try {
+                    const olderQuery = query(
+                        ref(database, `group_threads/${groupId}/messages`),
+                        orderByChild('createdAt'),
+                        endAt(oldestLoadedMessageTimestamp - 1),
+                        limitToLast(MSG_PAGE_SIZE)
+                    );
+                    const snap = await get(olderQuery);
+                    let fetchedCount = 0;
+
+                    if (snap.exists()) {
+                        const entries = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val }));
+                        fetchedCount = entries.length;
+                        entries.forEach(msg => {
+                            if (msg.createdAt && msg.createdAt < oldestLoadedMessageTimestamp) {
+                                oldestLoadedMessageTimestamp = msg.createdAt;
+                            }
+                            cachedThreadMessages[msg.key] = msg;
+                        });
+                    }
+
+                    if (activeGroupId !== groupId) return; // navigated away while the fetch was in flight
+                    if (fetchedCount === 0) {
+                        emptyOlderMessageFetchCount++;
+                        if (emptyOlderMessageFetchCount >= 2) noMoreOlderMessages = true;
+                    } else {
+                        emptyOlderMessageFetchCount = 0;
+                    }
+                    renderGroupThread();
+                } catch (e) {
+                    console.warn('loadOlderGroupMessages failed:', e);
+                    removeChatLoadingSkeletons(messagesEl, skeletonNodes);
+                } finally {
+                    isLoadingMoreMessages = false;
+                }
+            }
+
+            // Renders the thread from cachedThreadMessages (the live limitToLast window merged
+            // with any older pages fetched via loadOlderGroupMessages). Called both by the live
+            // messages listener below and by loadOlderGroupMessages after a paginated fetch.
+            function renderGroupThread() {
                 const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
+                const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
-                if (snap.exists()) {
-                    const items = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })).sort((a, b) => a.createdAt - b.createdAt);
+                const items = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                if (items.length) {
                     let lastDateKey = null;
                     items.forEach(msg => {
                         const msgDateKey = dayKey(msg.createdAt);
@@ -20170,10 +20237,28 @@
                 if (shouldStickToBottom) {
                     scrollToBottom(isActiveThreadInitialLoad);
                 } else {
-                    messagesEl.scrollTop = prevScrollTop;
+                    // Keeps the view visually stable whether new content landed at the bottom
+                    // (delta ~0) or an older page just got prepended at the top (delta = the
+                    // height that page added).
+                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;
+                initChatMessagesScrollListener(messagesEl, loadOlderGroupMessages);
+            }
+
+            // Messages listener logic for Group Chat View — watches only the newest
+            // MSG_PAGE_SIZE messages live; older history is fetched on demand via
+            // loadOlderGroupMessages above instead of ever loading the whole thread at once.
+            const groupMessagesQuery = query(ref(database, `group_threads/${groupId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
+            unsubscribeGroupMessages = onValue(groupMessagesQuery, (snap) => {
+                const liveItems = snap.exists() ? Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })) : [];
+                liveItems.forEach(msg => { cachedThreadMessages[msg.key] = msg; });
+                if (liveItems.length) {
+                    const liveOldest = Math.min(...liveItems.map(m => m.createdAt));
+                    oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, liveOldest);
+                }
+                renderGroupThread();
             });
 
             window.location.hash = 'chat';
@@ -22567,6 +22652,94 @@
         let groupListTypingUnsubscribers = {};
         let replyingToMessage = null;
         let editingMessage = null;
+
+        // --- Chat message pagination -------------------------------------------------------
+        // Same idea as the Home feed's FEED_PAGE_SIZE/loadOlderPosts/cachedPosts pattern: the
+        // live listener only ever watches a limitToLast(MSG_PAGE_SIZE) window (newest messages,
+        // so edits/reactions/deletes on recent messages still patch in place), and older history
+        // is fetched lazily in one-time pages as the user scrolls up toward the top of the
+        // thread, instead of ever pulling a whole thread's history into memory/DOM at once.
+        // cachedThreadMessages accumulates every message currently loaded into the open thread
+        // (both from the live window and from paginated older fetches) and is reset whenever a
+        // different chat/group is opened.
+        const MSG_PAGE_SIZE = 30;
+        const MSG_SKELETON_COUNT = 3;
+        let cachedThreadMessages = {};
+        let oldestLoadedMessageTimestamp = Infinity;
+        let isLoadingMoreMessages = false;
+        let noMoreOlderMessages = false;
+        let emptyOlderMessageFetchCount = 0;
+        let chatMessagesScrollIO = null; // IntersectionObserver bound to the open thread's top sentinel
+
+        // Resets all of the pagination bookkeeping above — call this every time a chat or group
+        // thread is (re)opened, before wiring up its listeners.
+        function resetChatMessagePagination() {
+            cachedThreadMessages = {};
+            oldestLoadedMessageTimestamp = Infinity;
+            isLoadingMoreMessages = false;
+            noMoreOlderMessages = false;
+            emptyOlderMessageFetchCount = 0;
+            if (chatMessagesScrollIO) { chatMessagesScrollIO.disconnect(); chatMessagesScrollIO = null; }
+        }
+
+        function buildChatMsgSkeletonBubble(isOwn) {
+            const bubble = document.createElement('div');
+            bubble.className = 'msg-bubble msg-skeleton ' + (isOwn ? 'out' : 'in');
+            bubble.innerHTML = `<div class="msg-skeleton-line"></div><div class="msg-skeleton-line"></div>`;
+            return bubble;
+        }
+
+        // Prepends a few shimmering placeholder bubbles above the current top of the thread
+        // while an older page loads, so pagination reads as "more history above" rather than a
+        // blank stall, and holds the user's current scroll position steady as they're inserted.
+        function showChatLoadingSkeletons(messagesEl) {
+            if (!messagesEl) return [];
+            const nodes = [];
+            const anchor = messagesEl.firstChild;
+            const prevScrollHeight = messagesEl.scrollHeight;
+            const prevScrollTop = messagesEl.scrollTop;
+            for (let i = 0; i < MSG_SKELETON_COUNT; i++) {
+                const bubble = buildChatMsgSkeletonBubble(i % 2 === 0);
+                messagesEl.insertBefore(bubble, anchor);
+                nodes.push(bubble);
+            }
+            messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
+            return nodes;
+        }
+
+        function removeChatLoadingSkeletons(messagesEl, nodes) {
+            if (!messagesEl || !nodes || !nodes.length) return;
+            const prevScrollHeight = messagesEl.scrollHeight;
+            const prevScrollTop = messagesEl.scrollTop;
+            nodes.forEach(node => node.remove());
+            messagesEl.scrollTop = prevScrollTop - (prevScrollHeight - messagesEl.scrollHeight);
+        }
+
+        // Binds an IntersectionObserver to a sentinel placed at the very top of the thread, so
+        // scrolling up near the earliest loaded message triggers loadOlderFn() to fetch the next
+        // page — the same lazy-pagination pattern as initFeedScrollListener()/loadOlderPosts() on
+        // the Home feed, just anchored to the top of the pane instead of the bottom of the list.
+        function initChatMessagesScrollListener(messagesEl, loadOlderFn) {
+            if (chatMessagesScrollIO) { chatMessagesScrollIO.disconnect(); chatMessagesScrollIO = null; }
+            if (!messagesEl || noMoreOlderMessages) return;
+            let sentinel = document.getElementById('chat-load-more-sentinel');
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'chat-load-more-sentinel';
+                sentinel.style.height = '1px';
+            }
+            messagesEl.insertBefore(sentinel, messagesEl.firstChild);
+            chatMessagesScrollIO = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) loadOlderFn();
+                });
+            }, {
+                root: messagesEl,
+                rootMargin: '400px 0px 0px 0px',
+                threshold: 0
+            });
+            chatMessagesScrollIO.observe(sentinel);
+        }
         const EDIT_WINDOW_MS = 15 * 60 * 1000;
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
@@ -25005,6 +25178,7 @@
 
             const messagesEl = document.getElementById('chat-view-messages');
             messagesEl.innerHTML = '';
+            resetChatMessagePagination();
             
             if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
@@ -25045,25 +25219,82 @@
                 }
             });
 
-            // Messages listener logic for Chat View
-            unsubscribeChatMessages = onValue(ref(database, `dm_threads/${threadId}/messages`), async (snap) => {
+            // Fetches an older page of DM messages (one-time read, not a live listener) and
+            // merges them into cachedThreadMessages, then re-renders — mirrors loadOlderPosts()
+            // on the Home feed, just anchored to the top of the thread instead of the bottom
+            // of the feed.
+            async function loadOlderDmMessages() {
+                if (isLoadingMoreMessages || noMoreOlderMessages) return;
+                if (!isFinite(oldestLoadedMessageTimestamp)) return;
+                if (activeChatUid !== otherUid) return; // user navigated away from this thread
+                isLoadingMoreMessages = true;
+                const skeletonNodes = showChatLoadingSkeletons(messagesEl);
+
+                try {
+                    const olderQuery = query(
+                        ref(database, `dm_threads/${threadId}/messages`),
+                        orderByChild('createdAt'),
+                        endAt(oldestLoadedMessageTimestamp - 1),
+                        limitToLast(MSG_PAGE_SIZE)
+                    );
+                    const snap = await get(olderQuery);
+                    let fetchedCount = 0;
+
+                    if (snap.exists()) {
+                        const entries = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val }));
+                        fetchedCount = entries.length;
+
+                        if (!isAIThread) {
+                            await Promise.all(entries.map(async (msg) => {
+                                if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
+                                if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
+                                    msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                                }
+                            }));
+                        }
+
+                        entries.forEach(msg => {
+                            if (msg.createdAt && msg.createdAt < oldestLoadedMessageTimestamp) {
+                                oldestLoadedMessageTimestamp = msg.createdAt;
+                            }
+                            cachedThreadMessages[msg.key] = msg;
+                        });
+                    }
+
+                    if (activeChatUid !== otherUid) return; // navigated away while the fetch was in flight
+                    if (fetchedCount === 0) {
+                        emptyOlderMessageFetchCount++;
+                        if (emptyOlderMessageFetchCount >= 2) noMoreOlderMessages = true;
+                    } else {
+                        emptyOlderMessageFetchCount = 0;
+                    }
+                    renderDmThread();
+                } catch (e) {
+                    // Pagination hitting the start of the thread (or a transient read issue)
+                    // isn't something the user needs to see — just stop trying, and log for
+                    // our own debugging.
+                    console.warn('loadOlderDmMessages failed:', e);
+                    removeChatLoadingSkeletons(messagesEl, skeletonNodes);
+                } finally {
+                    isLoadingMoreMessages = false;
+                }
+            }
+
+            // Renders the thread from cachedThreadMessages (the live limitToLast window merged
+            // with any older pages fetched via loadOlderDmMessages). Called both by the live
+            // messages listener below and by loadOlderDmMessages after a paginated fetch — this
+            // way scrolled-in history survives the live listener's re-renders instead of getting
+            // wiped by the next new message/edit/reaction.
+            function renderDmThread() {
                 const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
+                const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
-                if (snap.exists()) {
-                    const items = Object.entries(snap.val()).map(([key, val]) => ({key, ...val})).sort((a, b) => a.createdAt - b.createdAt);
+                const items = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                if (items.length) {
                     let lastDateKey = null;
 
-                    if (!isAIThread) {
-                        await Promise.all(items.map(async (msg) => {
-                            if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
-                            if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
-                                msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
-                            }
-                        }));
-                    }
-                    
                     items.forEach(msg => {
                         const msgDateKey = dayKey(msg.createdAt);
                         if (msgDateKey !== lastDateKey) {
@@ -25342,10 +25573,43 @@
                 if (shouldStickToBottom) {
                     scrollToBottom(isActiveThreadInitialLoad);
                 } else {
-                    messagesEl.scrollTop = prevScrollTop;
+                    // Keeps the view visually stable whether new content landed at the bottom
+                    // (delta ~0, we were already scrolled up reading older messages) or an older
+                    // page just got prepended at the top (delta = the height that page added).
+                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;
+                initChatMessagesScrollListener(messagesEl, loadOlderDmMessages);
+            }
+
+            // Messages listener logic for Chat View — watches only the newest MSG_PAGE_SIZE
+            // messages live (so edits/reactions/deletes on recent messages still patch in
+            // place); older history is fetched on demand via loadOlderDmMessages above instead
+            // of ever loading the whole thread at once.
+            const dmMessagesQuery = query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
+            unsubscribeChatMessages = onValue(dmMessagesQuery, async (snap) => {
+                const liveItems = snap.exists() ? Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })) : [];
+
+                if (!isAIThread) {
+                    await Promise.all(liveItems.map(async (msg) => {
+                        if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
+                        if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
+                            msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                        }
+                    }));
+                }
+
+                // Merge the live window into the accumulated cache (this also refreshes any
+                // older-page entries that have re-entered the live window, e.g. after an edit
+                // or a new reaction) and track how far back we've loaded for pagination.
+                liveItems.forEach(msg => { cachedThreadMessages[msg.key] = msg; });
+                if (liveItems.length) {
+                    const liveOldest = Math.min(...liveItems.map(m => m.createdAt));
+                    oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, liveOldest);
+                }
+
+                renderDmThread();
             });
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');

@@ -2187,6 +2187,7 @@
         /* The posts feed (For you / Following) is never shown in the search view — only
            stories and the search history/results belong there. */
         #search-fullscreen-body #feed-subtabs,
+        #search-fullscreen-body #stories-scroll-feed,
         #search-fullscreen-body #feed-posts-container { display: none !important; }
 
         /* ── WHATSAPP-STYLE FILTER CHIPS & ARCHIVED ROW ── */
@@ -5872,6 +5873,7 @@
                             <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
                             <button type="button" class="feed-subtab-btn feed-subtab-ai" data-feed-subtab="ai"><span class="ai-avatar-black feed-subtab-ai-icon" aria-hidden="true"></span>Haba AI</button>
                         </div>
+                        <div class="stories-scroll" id="stories-scroll-feed"></div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
@@ -20835,7 +20837,9 @@
             const user = auth.currentUser;
             if (!user) return;
             const storiesBar = document.getElementById('stories-scroll');
+            const storiesBarFeed = document.getElementById('stories-scroll-feed');
             storiesBar.classList.add('uploading');
+            if (storiesBarFeed) storiesBarFeed.classList.add('uploading');
             try {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
@@ -20858,6 +20862,7 @@
                 showCustomModal("Upload Failed", "We couldn't upload all stories.");
             } finally {
                 storiesBar.classList.remove('uploading');
+                if (storiesBarFeed) storiesBarFeed.classList.remove('uploading');
                 document.getElementById('story-file-input').value = "";
                 pendingStoryFiles = null;
                 pendingStoryCaption = '';
@@ -26479,6 +26484,7 @@
                     }
                 });
                 renderStoriesBar(cachedUsers, cachedStories);
+                renderStoriesBar(cachedUsers, cachedStories, 'stories-scroll-feed');
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderChatRequests();
                 if (activeChatUid) updateActiveChatStatus();
@@ -26503,6 +26509,7 @@
                     });
                 });
                 renderStoriesBar(cachedUsers, cachedStories);
+                renderStoriesBar(cachedUsers, cachedStories, 'stories-scroll-feed');
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 if (userChatsInitialized) renderChatListFromCache();
             });

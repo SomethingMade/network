@@ -19911,7 +19911,8 @@
 
             groupAvatarUpload.classList.add('uploading');
             try {
-                const { url } = await uploadToCloudinary(file);
+                const safeName = (file.name || 'group').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const url = await uploadToFirebaseStorage(file, `communities/${activeGroupId}/profile_${Date.now()}_${safeName}`);
                 await update(ref(database, `communities/${activeGroupId}`), { photoURL: url });
                 groupAvatarPreview.style.backgroundImage = `url('${url}')`;
                 groupAvatarPreview.textContent = "";

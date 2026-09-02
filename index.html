@@ -828,6 +828,29 @@
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: min(85vh, 100%); overflow-y: auto; overflow-x: hidden; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
 
+        /* ── SIDEBAR DRAWER (opened by tapping the header avatar) ──
+           A left-edge sliding panel, same z-index tier and backdrop treatment as the bottom
+           sheets above, just anchored to the left edge and sliding on X instead of Y. */
+        .sidebar-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: stretch; justify-content: flex-start; }
+        .sidebar-drawer-overlay.active { opacity: 1; visibility: visible; }
+        .sidebar-drawer { background: var(--bg-surface); width: min(300px, 84vw); height: 100%; box-shadow: 10px 0 40px rgba(0,0,0,0.2); transform: translateX(-100%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); overflow-y: auto; color: var(--text-primary); padding: 20px 16px 24px; display: flex; flex-direction: column; }
+        .sidebar-drawer-overlay.active .sidebar-drawer { transform: translateX(0); }
+        .sidebar-drawer-close { align-self: flex-end; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--bg-alt); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; margin-bottom: 8px; flex-shrink: 0; }
+        .sidebar-drawer-close svg { width: 16px; height: 16px; }
+        .sidebar-drawer-profile { display: flex; align-items: center; gap: 12px; padding: 4px 6px 20px; cursor: pointer; border-radius: 14px; transition: background 0.15s ease; }
+        .sidebar-drawer-profile:hover { background: var(--bg-alt); }
+        .sidebar-drawer-avatar { width: 52px; height: 52px; background-color: var(--primary-blue); }
+        .sidebar-drawer-identity { min-width: 0; }
+        .sidebar-drawer-identity h4 { font-size: 15.5px; font-weight: 700; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-drawer-identity p { font-size: 13px; color: var(--text-secondary); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-drawer-menu { display: flex; flex-direction: column; gap: 2px; }
+        .sidebar-drawer-item { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: none; background: none; color: var(--text-primary); font-size: 14.5px; font-weight: 600; font-family: inherit; padding: 12px 10px; border-radius: 12px; cursor: pointer; transition: background 0.15s ease; }
+        .sidebar-drawer-item:hover { background: var(--bg-alt); }
+        .sidebar-drawer-item svg { width: 21px; height: 21px; flex-shrink: 0; stroke-width: 1.8; }
+        .sidebar-drawer-divider { height: 1px; background: var(--border-color); margin: 10px 4px; }
+        .sidebar-drawer-item-danger { color: var(--danger-red); }
+        .sidebar-drawer-item-danger:hover { background: rgba(255,69,58,0.08); }
+
         /* ── CONTACT INFO, PROFILE & INSIGHTS AS A FULL-SCREEN PAGE (phone) ──
            The "Contact Info" panel (viewing someone else), the "Profile" panel
            (editing your own), and "Account Insights" read like a social profile/stats
@@ -3745,10 +3768,10 @@
     <div id="loading-overlay" class="active">
         <div class="haba-mark" role="img" aria-label="Haba">
             <div class="haba-logo-img">
-                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#111111" stroke-width="11" stroke-linejoin="round" stroke-linecap="round">
-                    <polygon points="20,80 170,30 80,110" stroke-opacity="0.75" />
-                    <polygon points="120,180 170,30 80,110" />
-                    <polygon points="20,80 80,110 80,140" stroke-opacity="0.55" />
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="20,80 170,30 80,110" fill="var(--primary-blue)" fill-opacity="0.75" />
+                    <polygon points="120,180 170,30 80,110" fill="var(--primary-blue)" />
+                    <polygon points="20,80 80,110 80,140" fill="var(--primary-blue)" fill-opacity="0.55" />
                 </svg>
             </div>
             <span class="haba-wordmark">HABA</span>
@@ -5241,6 +5264,56 @@
 
                 <p class="wa-insights-note">These numbers are based on activity on this account and update automatically.</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Sidebar drawer: opened by tapping the header avatar ([data-profile-trigger]). Quick
+         nav to Profile/Saved/Groups/Insights/Jobs/Settings/Log Out without leaving the current
+         tab — the sheets/tabs it links out to already exist elsewhere in the app, this is just
+         a faster on-ramp to them. -->
+    <div id="sidebar-drawer-overlay" class="sidebar-drawer-overlay">
+        <div class="sidebar-drawer">
+            <button type="button" id="btn-close-sidebar-drawer" class="sidebar-drawer-close" aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div class="sidebar-drawer-profile" id="sidebar-drawer-profile-trigger">
+                <div class="avatar sidebar-drawer-avatar" id="sidebar-drawer-avatar"></div>
+                <div class="sidebar-drawer-identity">
+                    <h4 id="sidebar-drawer-name">—</h4>
+                    <p id="sidebar-drawer-username">@—</p>
+                </div>
+            </div>
+            <nav class="sidebar-drawer-menu">
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-profile">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    <span>Profile</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-saved">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Saved</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-groups">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <span>Groups</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-insights">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Insights</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-jobs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><line x1="2" y1="13" x2="22" y2="13"/></svg>
+                    <span>Jobs</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Settings</span>
+                </button>
+                <div class="sidebar-drawer-divider"></div>
+                <button type="button" class="sidebar-drawer-item sidebar-drawer-item-danger" id="sidebar-drawer-logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <span>Log Out</span>
+                </button>
+            </nav>
         </div>
     </div>
 
@@ -16124,7 +16197,73 @@
             handler.openIframe();
         });
 
-        btnProfileNavEls.forEach(btn => btn.addEventListener('click', openProfileSheet));
+        // Header avatars ([data-profile-trigger], all tab headers) now open the sidebar
+        // drawer — a quick nav menu — instead of jumping straight into the Profile sheet.
+        // Profile itself is still one tap away as the first item in the drawer.
+        const sidebarDrawerOverlay = document.getElementById('sidebar-drawer-overlay');
+
+        function openSidebarDrawer(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            const user = auth.currentUser;
+            if (user) {
+                const myProfile = cachedUsers[user.uid] || {};
+                document.getElementById('sidebar-drawer-avatar').style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
+                document.getElementById('sidebar-drawer-name').textContent = user.displayName || 'Me';
+                document.getElementById('sidebar-drawer-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
+            }
+            sidebarDrawerOverlay.classList.add('active');
+        }
+        function closeSidebarDrawer() {
+            sidebarDrawerOverlay.classList.remove('active');
+        }
+
+        // Opens the Profile sheet already switched to a given subtab (e.g. "saved") — reuses
+        // the same posts/replies/media/saved subtab wiring the Profile sheet already has.
+        function openProfileSheetOnSubtab(subtab) {
+            openProfileSheet({ preventDefault: () => {} });
+            requestAnimationFrame(() => {
+                const btn = document.querySelector(`#my-profile-subtabs .profile-subtab-btn[data-subtab="${subtab}"]`);
+                if (btn) btn.click();
+            });
+        }
+
+        btnProfileNavEls.forEach(btn => btn.addEventListener('click', openSidebarDrawer));
+        document.getElementById('btn-close-sidebar-drawer').addEventListener('click', closeSidebarDrawer);
+        sidebarDrawerOverlay.addEventListener('click', (e) => {
+            if (e.target === sidebarDrawerOverlay) closeSidebarDrawer();
+        });
+        document.getElementById('sidebar-drawer-profile-trigger').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openProfileSheetOnSubtab('posts');
+        });
+        document.getElementById('sidebar-drawer-profile').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openProfileSheetOnSubtab('posts');
+        });
+        document.getElementById('sidebar-drawer-saved').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openProfileSheetOnSubtab('saved');
+        });
+        document.getElementById('sidebar-drawer-groups').addEventListener('click', () => {
+            closeSidebarDrawer();
+            goToTab('tab-groups');
+        });
+        document.getElementById('sidebar-drawer-insights').addEventListener('click', () => {
+            closeSidebarDrawer();
+            document.getElementById('btn-open-insights').click();
+        });
+        document.getElementById('sidebar-drawer-jobs').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openJobsSheet();
+        });
+        document.getElementById('sidebar-drawer-settings').addEventListener('click', () => {
+            closeSidebarDrawer();
+            document.getElementById('btn-open-settings').click();
+        });
+        document.getElementById('sidebar-drawer-logout').addEventListener('click', () => {
+            closeSidebarDrawer();
+            document.getElementById('btn-logout').click();
+        });
 
         // --- Business Account toggle: writes isBusinessAccount to the user's public profile so the
         // gold verified badge (see verifiedBadgeFor/BUSINESS_BADGE_SVG) shows up everywhere their

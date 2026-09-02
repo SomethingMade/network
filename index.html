@@ -7243,11 +7243,27 @@
         document.getElementById('btn-close-streak-modal').addEventListener('click', () => {
             document.getElementById('streak-modal-overlay').classList.remove('active');
         });
+        // TRIAL_BADGE_DURATION_MS itself lives further down with the rest of the badge code (see
+        // verifiedBadgeFor), but as a top-level const it's already defined by the time any of
+        // these streak functions actually run (they're only called after sign-in, long after the
+        // whole script has parsed), so referencing it here is safe.
+        //
+        // A trial is "available" to grant via streak if the account has never had one, OR had one
+        // that has since fully expired (14 days elapsed) — NOT while a trial/purchase is still
+        // active. This lets a lapsed-trial user earn it again by rebuilding an 8-day streak,
+        // without letting the streak grant stack on top of (or prematurely renew) a still-active
+        // trial.
+        function streakTrialBadgeAvailable(trialBadgeActivatedAt) {
+            if (!trialBadgeActivatedAt) return true;
+            return (Date.now() - trialBadgeActivatedAt) >= TRIAL_BADGE_DURATION_MS;
+        }
         // Rewards an account that's kept an STREAK_TRIAL_THRESHOLD-day-or-longer daily streak
         // with the free 14-day Verified Badge trial, the exact same grant the manual "Start
-        // Trial" button in Settings makes (see refreshTrialBadgeUI) — same one-time rule too:
-        // callers only invoke this when trialBadgeActivatedAt isn't already set, so an account
-        // can never re-trigger it once used (whether via streak or the manual button).
+        // Trial" button in Settings makes (see refreshTrialBadgeUI). Unlike the manual button
+        // (a strict one-time-ever grant), this can fire more than once per account: each call
+        // sets a fresh trialBadgeActivatedAt, so a new 8-day streak built after a previous trial
+        // has expired re-activates another 14-day trial. Callers gate this with
+        // streakTrialBadgeAvailable() so it never fires while a trial/purchase is still active.
         async function grantStreakTrialBadge(uid) {
             await update(ref(database, `users/${uid}`), { trialBadgeActivatedAt: serverTimestamp() });
             // Optimistic local estimate, same reasoning as the manual "Start Trial" button —
@@ -7282,7 +7298,9 @@
                 // Covers an account that already had a long-enough streak before this feature
                 // existed (or a previous grant attempt failed) — catches it up next time they
                 // open the app, not just on the exact day the count first crosses the threshold.
-                if (count >= STREAK_TRIAL_THRESHOLD && !trialBadgeActivatedAt) {
+                // Also covers a lapsed trial: streakTrialBadgeAvailable() lets this re-fire once
+                // a previously-granted trial has fully expired.
+                if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
                     grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
                 }
                 return;
@@ -7298,7 +7316,7 @@
             await update(ref(database, `users/${uid}/streak`), { count, longest, lastCheckIn: today, history });
             currentStreakData = { count, longest, lastCheckIn: today, history };
             updateStreakBadgeUI();
-            if (count >= STREAK_TRIAL_THRESHOLD && !trialBadgeActivatedAt) {
+            if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
                 grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
             }
             showStreakModal(true);

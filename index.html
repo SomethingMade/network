@@ -2406,8 +2406,9 @@
         .group-badge-pill.sponsored-pill { background: rgba(var(--primary-rgb), 0.08); color: var(--text-secondary); }
         .feed-post-why-ad-inline { background: none; border: none; padding: 0; margin-left: 3px; font-size: 10px; font-weight: 600; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
         .feed-post-why-ad-inline:hover { color: var(--text-primary); }
-        .bio-mention-business { color: #0A84FF; font-weight: 600; cursor: pointer; }
-        .bio-mention-business:hover { text-decoration: underline; }
+        .bio-mention-business { color: #0A84FF; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; vertical-align: middle; }
+        .bio-mention-business:hover { opacity: 0.85; }
+        .bio-mention-business-avatar { display: inline-block; width: 20px; height: 20px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-hover); flex-shrink: 0; vertical-align: middle; }
         .business-page-promo { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; text-align: left; }
         .business-page-promo h5 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
         .business-page-promo p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px; }
@@ -14706,8 +14707,9 @@
             return uids;
         }
 
-        // Renders an about/bio string as safe HTML, highlighting any @username mention that
-        // resolves to a Business Account in blue. Clicking it opens that business's profile.
+        // Renders an about/bio string as safe HTML, replacing any @username mention that
+        // resolves to a Business Account with that business's avatar shown inline as a small
+        // clickable logo (no text). Clicking the logo opens that business's profile.
         function linkifyBioMentions(text) {
             const escaped = escapeHtmlForPost(text || '');
             const withUrls = escaped.replace(MSG_URL_REGEX, (raw) => {
@@ -14720,8 +14722,9 @@
             return withUrls.replace(/@([a-zA-Z0-9_]{2,20})/g, (match, handle) => {
                 const entry = Object.entries(cachedUsers).find(([, u]) => u && u.username && u.username.toLowerCase() === handle.toLowerCase());
                 if (entry && entry[1].isBusinessAccount) {
-                    const [uid] = entry;
-                    return `<span class="bio-mention-business" data-uid="${uid}" role="link" tabindex="0">${match}</span>`;
+                    const [uid, u] = entry;
+                    const photoURL = u.photoURL || DEFAULT_AVATAR_URL;
+                    return `<span class="bio-mention-business" data-uid="${uid}" role="link" tabindex="0" title="${match}"><span class="bio-mention-business-avatar" style="background-image: url('${photoURL}')"></span></span>`;
                 }
                 return match;
             });

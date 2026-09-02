@@ -2150,28 +2150,33 @@
         .nav-badge { position: absolute; top: 4px; right: 10px; width: 10px; height: 10px; background: var(--danger-red); border-radius: 50%; border: 2px solid var(--bg-surface); z-index: 2; }
         .nav-badge.nav-badge-count { width: auto; height: 16px; min-width: 16px; top: 0px; right: 4px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; line-height: 1; border-radius: 9px; }
 
-        /* ── Nav-bar compose button (X-style): a single circular action button that
-           sits inline as a nav item. Icon/behavior swap with the active tab — see
-           updateFabNavAction(). Base rules here cover the desktop vertical sidebar;
-           the mobile media query below resizes it to sit flush in the bottom row. */
+        /* ── Nav-bar compose button: a circular floating action button (X-style).
+           Icon/behavior swap with the active tab — see updateFabNavAction(). Base
+           rules here cover desktop (floats bottom-right of the chat pane, like
+           .fab-add); the mobile media query below repositions it above the bottom
+           nav bar. */
         .nav-compose-btn {
-            position: relative;
-            width: 44px; height: 44px;
+            position: absolute;
+            bottom: 32px;
+            right: 32px;
+            width: 60px; height: 60px;
             border-radius: 50%;
             background: var(--primary-blue);
             color: var(--text-inverse);
             border: none;
-            font-size: 26px;
+            font-size: 32px;
             line-height: 1;
             cursor: pointer;
             display: none; /* JS (updateFabNavAction) switches this to flex when relevant */
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 10px 25px rgba(var(--primary-rgb), 0.4);
+            z-index: 50;
+            transition: transform 0.25s ease, opacity 0.25s ease, background 0.2s ease;
         }
         .nav-compose-btn:hover { transform: scale(1.05); background: var(--accent-purple); }
-        .nav-compose-btn svg { width: 22px; height: 22px; }
+        .nav-compose-btn svg { width: 24px; height: 24px; }
 
         .profile-btn { width: 36px; height: 36px; border-radius: 50%; background-color: rgba(var(--primary-rgb), 0.1); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid transparent; color: var(--primary-blue); font-weight: bold; font-size: 14px; transition: 0.2s; }
         .header-profile-btn { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; }
@@ -3433,7 +3438,7 @@
             :root { --nav-bar-total: 64px; }
             .side-nav {
                 display: grid;
-                grid-template-columns: repeat(5, 1fr);
+                grid-template-columns: repeat(4, 1fr);
                 justify-items: center;
                 height: 52px;
                 padding: 0;
@@ -3485,21 +3490,30 @@
             .chat-view-back { display: block; }
             .fab-add { position: fixed; bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
 
-            /* Compose button, inline as the centre nav item (X-style). Icon and
-               behavior change per active tab (New Post on Home, New Chat on Messages) —
-               see updateFabNavAction(). */
+            /* Compose button: floats above the bottom nav bar, right-aligned, like X's
+               mobile "New Post" button. Icon and behavior change per active tab
+               (New Post on Home, New Chat on Messages) — see updateFabNavAction(). */
             .nav-compose-btn {
-                width: 34px;
-                height: 34px;
-                font-size: 22px;
+                position: fixed;
+                left: auto;
+                right: 16px;
+                bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom));
+                width: 56px;
+                height: 56px;
+                min-width: 56px;
+                min-height: 56px;
+                font-size: 30px;
                 line-height: 1;
+                z-index: 101;
+                box-shadow: 0 5px 16px rgba(var(--primary-rgb), 0.32);
             }
+            .nav-compose-btn:hover { transform: scale(1.04); }
             .nav-compose-btn.fab-scroll-hidden {
                 transform: translateY(140%);
             }
             /* The chat-bubble SVG reads visually smaller than the bold "+" glyph at the
                same box size, so nudge it down to match the plus sign's optical weight. */
-            .nav-compose-btn.fab-nav-action-chat svg { width: 18px; height: 18px; }
+            .nav-compose-btn.fab-nav-action-chat svg { width: 22px; height: 22px; }
         }
 
         /* ── SMALL-SCREEN TUNING (narrow phones: iPhone SE, small Android, standard iPhones, etc.) ── */
@@ -3574,7 +3588,7 @@
 
             /* Floating add button & scroll-to-bottom */
             .fab-add { width: 50px; height: 50px; font-size: 26px; }
-            .nav-compose-btn { width: 32px; height: 32px; font-size: 20px; }
+            .nav-compose-btn { width: 50px; height: 50px; min-width: 50px; min-height: 50px; font-size: 26px; }
             .scroll-to-bottom-btn { width: 34px; height: 34px; right: 16px; }
 
             /* Chat conversation view */
@@ -5860,9 +5874,7 @@
                 </div>
                 <!-- Single primary nav-bar action button: icon and click behavior swap
                      per active tab (New Post on Home, New Chat on Messages) via
-                     updateFabNavAction() instead of separate floating buttons. Sits
-                     inline as the centre nav item, X-style. -->
-                <button type="button" class="nav-compose-btn" id="fab-nav-action" title="New Post">+</button>
+                     updateFabNavAction() instead of separate floating buttons. -->
                 <div class="nav-item" id="nav-notifications-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -6179,6 +6191,7 @@
                 </div>
 
                 <button type="button" class="fab-add" id="fab-add-friend" title="Follow Someone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6"></path><path d="M22 11h-6"></path></svg></button>
+                <button type="button" class="nav-compose-btn" id="fab-nav-action" title="New Post">+</button>
             </aside>
 
             <main class="workspace-pane">

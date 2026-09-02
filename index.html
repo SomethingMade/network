@@ -10182,7 +10182,7 @@
             document.querySelectorAll('#feed-posts-container .feed-post-card[data-uid]').forEach(applyLiveProfileToPostCard);
         }
 
-        // --- NEWS CARDS IN FEED (Currents API latest-news, called directly from the client) ---
+        // --- NEWS CARDS IN FEED (Currents API latest-news, shared across every user via Firebase) ---
         // Currents allows any-origin CORS on its free tier (unlike NewsAPI.org, which blocks
         // everything but localhost), so this can hit the API straight from the browser with no
         // proxy function. Key is hardcoded below — get one at https://currentsapi.services.
@@ -10192,11 +10192,20 @@
         // NOTE: a hardcoded key is visible to anyone who views page source and could be used to
         // burn the daily quota; move it into Remote Config later if that becomes a problem, no
         // other code here needs to change to do that.
+        //
+        // The fetched batch is published to sharedNewsCache/latest in Firebase so every user's
+        // feed shows the identical set of headlines. Previously each browser fetched and cached
+        // Currents' "latest news" independently, so two people opening the feed hours apart (or
+        // just on different days relative to their own device's 24h cache) would see different
+        // articles. fetchNewsHeadlines() now checks the shared copy first and only falls through
+        // to calling Currents when it's missing or stale, publishing the refreshed batch back for
+        // everyone else once it does. Needs an RTDB rule allowing authenticated read/write on
+        // sharedNewsCache — add one if the project's existing rules don't already cover it.
         const CURRENTS_API_KEY = 'AZZOie9hyFShgrAVkPXG9MNNgLtACTCgu_BwDtYIdKlaZulH';
         const NEWS_CACHE_STORAGE_KEY = 'haba_news_cache_v1';
-        const NEWS_CACHE_MS = 24 * 60 * 60 * 1000; // 24h — persisted to localStorage so a page
-        // refresh reuses the same headlines instead of re-hitting the API; only expires and
-        // re-fetches once a full day has passed since the last successful fetch.
+        const NEWS_CACHE_MS = 24 * 60 * 60 * 1000; // 24h — governs how often the *shared* Firebase
+        // copy is refreshed; localStorage below is just a per-device echo of that shared batch so
+        // a page refresh can paint instantly, not a source of truth in its own right.
         let newsFetchInFlight = null;
 
         // Seed the in-memory cache from localStorage on load, so the very first call to
@@ -10232,10 +10241,23 @@
         }
 
         async function fetchNewsHeadlines() {
-            if (Date.now() - newsArticlesFetchedAt < NEWS_CACHE_MS && cachedNewsArticles.length) return cachedNewsArticles;
             if (newsFetchInFlight) return newsFetchInFlight;
             newsFetchInFlight = (async () => {
                 try {
+                    // Always check the shared batch first — this, not each device's own clock, is
+                    // what keeps every user looking at the same headlines. Only fall through to
+                    // calling Currents when the shared copy is missing or past NEWS_CACHE_MS.
+                    const sharedSnap = await get(ref(database, 'sharedNewsCache/latest')).catch(() => null);
+                    const shared = sharedSnap && sharedSnap.exists() ? sharedSnap.val() : null;
+                    if (shared && Array.isArray(shared.articles) && shared.articles.length && Date.now() - shared.fetchedAt < NEWS_CACHE_MS) {
+                        if (shared.fetchedAt !== newsArticlesFetchedAt) {
+                            cachedNewsArticles = shared.articles;
+                            newsArticlesFetchedAt = shared.fetchedAt;
+                            saveNewsCacheToStorage();
+                        }
+                        return cachedNewsArticles;
+                    }
+
                     const url = `https://api.currentsapi.services/v1/latest-news?language=en&page_size=20&apiKey=${CURRENTS_API_KEY}`;
                     const response = await fetch(url);
                     const data = await response.json().catch(() => null);
@@ -10260,10 +10282,16 @@
                         cachedNewsArticles = articles;
                         newsArticlesFetchedAt = Date.now();
                         saveNewsCacheToStorage();
+                        // Publish for everyone else to read. Best-effort: if another client's
+                        // refresh lands right after this one, Realtime Database just keeps
+                        // whichever write was last — the batch still ends up identical for every
+                        // user from that point on, just decided by whoever wrote second.
+                        set(ref(database, 'sharedNewsCache/latest'), { articles: cachedNewsArticles, fetchedAt: newsArticlesFetchedAt })
+                            .catch(e => console.warn('publishing sharedNewsCache failed:', e));
                     } else {
                         // Currents returns thin/empty results occasionally on the free plan —
-                        // don't cache an empty result as if it were a real 20-minute answer, so
-                        // the next feed load tries again instead of staying blank for the full TTL.
+                        // don't cache an empty result as if it were a real fetch, so the next
+                        // feed load tries again instead of staying blank for the full TTL.
                         console.warn('fetchNewsHeadlines: 0 articles returned — check Currents dashboard for quota/plan coverage');
                     }
                 } catch (err) {
@@ -20287,12 +20315,10 @@
                     }
 
                     if (activeGroupId !== groupId) return; // navigated away while the fetch was in flight
-                    if (fetchedCount === 0) {
-                        emptyOlderMessageFetchCount++;
-                        if (emptyOlderMessageFetchCount >= 2) noMoreOlderMessages = true;
-                    } else {
-                        emptyOlderMessageFetchCount = 0;
-                    }
+                    // A single empty page is a deterministic, consistent read — it already
+                    // proves nothing older exists, so there's no need to wait for a second
+                    // miss before retiring the pill.
+                    if (fetchedCount === 0) noMoreOlderMessages = true;
                     renderGroupThread();
                 } catch (e) {
                     console.warn('loadOlderGroupMessages failed:', e);
@@ -20472,6 +20498,10 @@
                     const liveOldest = Math.min(...liveItems.map(m => m.createdAt));
                     oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, liveOldest);
                 }
+                // A live window smaller than a full page means it just swept up the entire
+                // thread from the top — nothing older can exist, so there's no pagination left
+                // to offer instead of waiting on a round-trip fetch to discover that.
+                if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
                 renderGroupThread();
             });
 
@@ -22882,7 +22912,6 @@
         let oldestLoadedMessageTimestamp = Infinity;
         let isLoadingMoreMessages = false;
         let noMoreOlderMessages = false;
-        let emptyOlderMessageFetchCount = 0;
         let chatMessagesScrollHandler = null; // scroll listener bound to the open thread's messages pane, toggles the pill below
         let chatMessagesPillClickHandler = null;
 
@@ -22893,7 +22922,6 @@
             oldestLoadedMessageTimestamp = Infinity;
             isLoadingMoreMessages = false;
             noMoreOlderMessages = false;
-            emptyOlderMessageFetchCount = 0;
             const messagesEl = document.getElementById('chat-view-messages');
             const pill = document.getElementById('load-older-msgs-pill');
             if (messagesEl && chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
@@ -25508,12 +25536,10 @@
                     }
 
                     if (activeChatUid !== otherUid) return; // navigated away while the fetch was in flight
-                    if (fetchedCount === 0) {
-                        emptyOlderMessageFetchCount++;
-                        if (emptyOlderMessageFetchCount >= 2) noMoreOlderMessages = true;
-                    } else {
-                        emptyOlderMessageFetchCount = 0;
-                    }
+                    // A single empty page is a deterministic, consistent read — it already
+                    // proves nothing older exists, so there's no need to wait for a second
+                    // miss before retiring the pill.
+                    if (fetchedCount === 0) noMoreOlderMessages = true;
                     renderDmThread();
                 } catch (e) {
                     // Pagination hitting the start of the thread (or a transient read issue)
@@ -25854,6 +25880,10 @@
                     const liveOldest = Math.min(...liveItems.map(m => m.createdAt));
                     oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, liveOldest);
                 }
+                // A live window smaller than a full page means it just swept up the entire
+                // thread from the top — nothing older can exist, so there's no pagination left
+                // to offer instead of waiting on a round-trip fetch to discover that.
+                if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
 
                 renderDmThread();
             });

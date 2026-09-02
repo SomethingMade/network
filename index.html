@@ -2527,6 +2527,36 @@
         .scroll-to-bottom-btn.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
         .scroll-to-bottom-btn .unread-dot { position: absolute; top: 2px; right: 2px; width: 9px; height: 9px; border-radius: 50%; background: var(--primary-blue); border: 2px solid var(--bg-base, #fff); display: none; }
         .scroll-to-bottom-btn.has-unread .unread-dot { display: block; }
+
+        /* Floating pill shown at the top of the thread while scrolled up, letting the user
+           pull in the next batch of older messages on demand — same idea as WhatsApp's
+           floating "load more" chip, instead of silently auto-loading behind their back. */
+        .load-older-msgs-pill {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translate(-50%, -14px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            border-radius: 999px;
+            background: var(--bg-base, #fff);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.16);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .load-older-msgs-pill.visible { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .load-older-msgs-pill svg { flex-shrink: 0; }
+        .load-older-msgs-pill.is-loading svg { animation: spin 0.8s linear infinite; }
+        .load-older-msgs-pill:active { transform: translate(-50%, 0) scale(0.96); }
         
         @keyframes bubbleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         /* flex-shrink: 0 is required here, not cosmetic: .chat-view-messages is a flex column,
@@ -6114,6 +6144,10 @@
         </div>
         
         <div class="chat-view-messages" id="chat-view-messages"></div>
+        <button type="button" class="load-older-msgs-pill" id="load-older-msgs-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            <span id="load-older-msgs-pill-label">Load earlier messages</span>
+        </button>
         <button type="button" class="scroll-to-bottom-btn" id="scroll-to-bottom-btn" title="Scroll to latest">
             <span class="unread-dot"></span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -22669,7 +22703,8 @@
         let isLoadingMoreMessages = false;
         let noMoreOlderMessages = false;
         let emptyOlderMessageFetchCount = 0;
-        let chatMessagesScrollIO = null; // IntersectionObserver bound to the open thread's top sentinel
+        let chatMessagesScrollHandler = null; // scroll listener bound to the open thread's messages pane, toggles the pill below
+        let chatMessagesPillClickHandler = null;
 
         // Resets all of the pagination bookkeeping above — call this every time a chat or group
         // thread is (re)opened, before wiring up its listeners.
@@ -22679,7 +22714,18 @@
             isLoadingMoreMessages = false;
             noMoreOlderMessages = false;
             emptyOlderMessageFetchCount = 0;
-            if (chatMessagesScrollIO) { chatMessagesScrollIO.disconnect(); chatMessagesScrollIO = null; }
+            const messagesEl = document.getElementById('chat-view-messages');
+            const pill = document.getElementById('load-older-msgs-pill');
+            if (messagesEl && chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
+            if (pill && chatMessagesPillClickHandler) pill.removeEventListener('click', chatMessagesPillClickHandler);
+            chatMessagesScrollHandler = null;
+            chatMessagesPillClickHandler = null;
+            if (pill) { pill.classList.remove('visible', 'is-loading'); setLoadOlderPillLabel(false); }
+        }
+
+        function setLoadOlderPillLabel(isLoading) {
+            const label = document.getElementById('load-older-msgs-pill-label');
+            if (label) label.textContent = isLoading ? 'Loading…' : 'Load earlier messages';
         }
 
         function buildChatMsgSkeletonBubble(isOwn) {
@@ -22715,30 +22761,37 @@
             messagesEl.scrollTop = prevScrollTop - (prevScrollHeight - messagesEl.scrollHeight);
         }
 
-        // Binds an IntersectionObserver to a sentinel placed at the very top of the thread, so
-        // scrolling up near the earliest loaded message triggers loadOlderFn() to fetch the next
-        // page — the same lazy-pagination pattern as initFeedScrollListener()/loadOlderPosts() on
-        // the Home feed, just anchored to the top of the pane instead of the bottom of the list.
+        // Wires up the floating "Load earlier messages" pill (see .load-older-msgs-pill): it
+        // fades in whenever the user has scrolled up near the top of the thread and there's
+        // more history to fetch, and fetches the next page on tap — same idea as WhatsApp's
+        // floating "load more" chip, an explicit user action rather than a silent auto-load.
         function initChatMessagesScrollListener(messagesEl, loadOlderFn) {
-            if (chatMessagesScrollIO) { chatMessagesScrollIO.disconnect(); chatMessagesScrollIO = null; }
-            if (!messagesEl || noMoreOlderMessages) return;
-            let sentinel = document.getElementById('chat-load-more-sentinel');
-            if (!sentinel) {
-                sentinel = document.createElement('div');
-                sentinel.id = 'chat-load-more-sentinel';
-                sentinel.style.height = '1px';
+            const pill = document.getElementById('load-older-msgs-pill');
+            if (!messagesEl || !pill) return;
+            if (chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
+            if (chatMessagesPillClickHandler) pill.removeEventListener('click', chatMessagesPillClickHandler);
+
+            if (noMoreOlderMessages) {
+                pill.classList.remove('visible');
+                return;
             }
-            messagesEl.insertBefore(sentinel, messagesEl.firstChild);
-            chatMessagesScrollIO = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) loadOlderFn();
+
+            chatMessagesScrollHandler = () => {
+                if (noMoreOlderMessages) { pill.classList.remove('visible'); return; }
+                pill.classList.toggle('visible', messagesEl.scrollTop < 250);
+            };
+            chatMessagesPillClickHandler = () => {
+                if (isLoadingMoreMessages || noMoreOlderMessages) return;
+                pill.classList.add('is-loading');
+                setLoadOlderPillLabel(true);
+                Promise.resolve(loadOlderFn()).finally(() => {
+                    pill.classList.remove('is-loading');
+                    setLoadOlderPillLabel(false);
                 });
-            }, {
-                root: messagesEl,
-                rootMargin: '400px 0px 0px 0px',
-                threshold: 0
-            });
-            chatMessagesScrollIO.observe(sentinel);
+            };
+            messagesEl.addEventListener('scroll', chatMessagesScrollHandler);
+            pill.addEventListener('click', chatMessagesPillClickHandler);
+            chatMessagesScrollHandler();
         }
         const EDIT_WINDOW_MS = 15 * 60 * 1000;
         let activeContextMenuMsg = null;

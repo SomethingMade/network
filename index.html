@@ -9311,11 +9311,16 @@
 
         // --- Invite a Friend ---
         document.getElementById('setting-invite-friend').addEventListener('click', async () => {
+            const user = auth.currentUser;
             const uname = document.getElementById('display-username').textContent;
-            const inviteUrl = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
-            const shareText = uname && uname !== '@—' && uname !== '@loading'
-                ? `Chat with me on Haba! Find me at ${uname} — download the app: ${inviteUrl}`
-                : `Chat with me on Haba! Download the app: ${inviteUrl}`;
+            const hasUsername = uname && uname !== '@—' && uname !== '@loading';
+            // Same link the Share Profile sheet uses (PROFILE_WEB_BASE_URL) — opens straight in
+            // the browser as a read-only profile page instead of bouncing to the Play Store.
+            const slug = hasUsername ? uname.replace('@', '') : (user ? user.uid : '');
+            const inviteUrl = PROFILE_WEB_BASE_URL + slug;
+            const shareText = hasUsername
+                ? `Chat with me on Haba! Find me at ${uname}: ${inviteUrl}`
+                : `Chat with me on Haba! ${inviteUrl}`;
             if (navigator.share) {
                 try { await navigator.share({ title: 'Haba', text: shareText, url: inviteUrl }); }
                 catch (err) { /* user cancelled share, ignore */ }
@@ -12552,21 +12557,24 @@
             });
             // Sharing a post outside the app has nowhere to deep-link back into an individual
             // post (this is a single-page app with no per-post web route), so — same pattern as
-            // "Invite a Friend" above — the share always points recipients at the Play Store;
-            // anyone who doesn't have Haba yet lands on the install page instead of a dead link.
+            // "Invite a Friend" above — the share points recipients at the author's public
+            // profile web page (PROFILE_WEB_BASE_URL), which opens straight in the browser;
+            // anyone who doesn't have Haba yet can still see who shared it and follow from there.
             document.getElementById('btn-post-share').addEventListener('click', async () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
                 const { post } = activePostOptions;
-                const playStoreUrl = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
-                const authorName = (post.uid && cachedUsers[post.uid] && cachedUsers[post.uid].name) || post.name || 'Someone';
+                const authorProfile = (post.uid && cachedUsers[post.uid]) || {};
+                const authorSlug = authorProfile.username || post.uid || '';
+                const profileUrl = PROFILE_WEB_BASE_URL + authorSlug;
+                const authorName = authorProfile.name || post.name || 'Someone';
                 const caption = (post.text || '').trim();
                 const captionPreview = caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
                 const shareText = captionPreview
-                    ? `${authorName} on Haba: "${captionPreview}" — get the app to see more: ${playStoreUrl}`
-                    : `Check out ${authorName}'s post on Haba — get the app: ${playStoreUrl}`;
+                    ? `${authorName} on Haba: "${captionPreview}" — see more: ${profileUrl}`
+                    : `Check out ${authorName}'s post on Haba: ${profileUrl}`;
                 if (navigator.share) {
-                    try { await navigator.share({ title: 'Haba', text: shareText, url: playStoreUrl }); }
+                    try { await navigator.share({ title: 'Haba', text: shareText, url: profileUrl }); }
                     catch (err) { /* user cancelled share, ignore */ }
                 } else {
                     try {
@@ -17856,7 +17864,6 @@
             }
         }
 
-        const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
         // Public read-only profile page, served by the profileView Cloud Function via a
         // Firebase Hosting rewrite (see firebase.json). Update this if you attach a custom domain.
         const PROFILE_WEB_BASE_URL = 'https://newstart-64c43.web.app/u/';
@@ -19355,16 +19362,21 @@
             if (!activeCommunityPostOptions) return;
             const { msg } = activeCommunityPostOptions;
             const group = cachedCommunities[msg.groupId] || {};
-            const playStoreUrl = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
-            const authorName = (msg.senderUid && cachedUsers[msg.senderUid] && cachedUsers[msg.senderUid].name) || msg.senderName || 'Someone';
+            // Same browser-opening profile link as the regular post share above — no per-post
+            // web route, so this points at the author's public profile page instead of the
+            // Play Store.
+            const authorProfile = (msg.senderUid && cachedUsers[msg.senderUid]) || {};
+            const authorSlug = authorProfile.username || msg.senderUid || '';
+            const profileUrl = PROFILE_WEB_BASE_URL + authorSlug;
+            const authorName = authorProfile.name || msg.senderName || 'Someone';
             const communityName = group.name || 'a community';
             const caption = (msg.text || '').trim();
             const captionPreview = caption.length > 120 ? caption.slice(0, 117) + '...' : caption;
             const shareText = captionPreview
-                ? `${authorName} in ${communityName} on Haba: "${captionPreview}" — get the app to see more: ${playStoreUrl}`
-                : `Check out ${authorName}'s post in ${communityName} on Haba — get the app: ${playStoreUrl}`;
+                ? `${authorName} in ${communityName} on Haba: "${captionPreview}" — see more: ${profileUrl}`
+                : `Check out ${authorName}'s post in ${communityName} on Haba: ${profileUrl}`;
             if (navigator.share) {
-                try { await navigator.share({ title: 'Haba', text: shareText, url: playStoreUrl }); }
+                try { await navigator.share({ title: 'Haba', text: shareText, url: profileUrl }); }
                 catch (err) { /* user cancelled share, ignore */ }
             } else {
                 try {
@@ -22337,8 +22349,13 @@
                 }
             } else if (inviteBtn) {
                 const name = inviteBtn.dataset.name;
-                const inviteUrl = 'https://play.google.com/store/apps/details?id=co.median.android.dyzzdkm';
-                const inviteText = `Hey ${name}! I'm using Haba to chat — download the app: ${inviteUrl}`;
+                const uname = document.getElementById('display-username').textContent;
+                const hasUsername = uname && uname !== '@—' && uname !== '@loading';
+                // Same browser-opening profile link as Invite a Friend / Share Profile — not the
+                // Play Store.
+                const slug = hasUsername ? uname.replace('@', '') : (user ? user.uid : '');
+                const inviteUrl = PROFILE_WEB_BASE_URL + slug;
+                const inviteText = `Hey ${name}! I'm using Haba to chat — find me here: ${inviteUrl}`;
                 if (navigator.share) {
                     try { await navigator.share({ text: inviteText, url: inviteUrl }); } catch (err) { /* user cancelled */ }
                 } else {

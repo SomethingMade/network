@@ -2132,11 +2132,6 @@
         @media (min-width: 769px) and (max-width: 1024px) {
             body.communities-open .app-grid { grid-template-columns: 0 1fr; }
         }
-        /* Reserves the centre grid column for #fab-nav-action on mobile so the four
-           tab icons sit with equal gaps around it. Not part of the desktop sidebar
-           layout (fab there is a free-floating corner button), so hidden by default
-           and only switched on inside the mobile nav grid below. */
-        .nav-fab-spacer { display: none; }
         .nav-indicator { position: absolute; bottom: 0; left: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--nav-active-green); opacity: 1; pointer-events: none; z-index: 0; transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s ease, opacity 0.25s ease; }
         .nav-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--nav-active-black); cursor: pointer; transition: color 0.2s ease; font-size: 11px; font-weight: 500; padding: 8px 14px; }
         .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
@@ -2154,6 +2149,29 @@
         
         .nav-badge { position: absolute; top: 4px; right: 10px; width: 10px; height: 10px; background: var(--danger-red); border-radius: 50%; border: 2px solid var(--bg-surface); z-index: 2; }
         .nav-badge.nav-badge-count { width: auto; height: 16px; min-width: 16px; top: 0px; right: 4px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; line-height: 1; border-radius: 9px; }
+
+        /* ── Nav-bar compose button (X-style): a single circular action button that
+           sits inline as a nav item. Icon/behavior swap with the active tab — see
+           updateFabNavAction(). Base rules here cover the desktop vertical sidebar;
+           the mobile media query below resizes it to sit flush in the bottom row. */
+        .nav-compose-btn {
+            position: relative;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: var(--primary-blue);
+            color: var(--text-inverse);
+            border: none;
+            font-size: 26px;
+            line-height: 1;
+            cursor: pointer;
+            display: none; /* JS (updateFabNavAction) switches this to flex when relevant */
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+        }
+        .nav-compose-btn:hover { transform: scale(1.05); background: var(--accent-purple); }
+        .nav-compose-btn svg { width: 22px; height: 22px; }
 
         .profile-btn { width: 36px; height: 36px; border-radius: 50%; background-color: rgba(var(--primary-rgb), 0.1); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid transparent; color: var(--primary-blue); font-weight: bold; font-size: 14px; transition: 0.2s; }
         .header-profile-btn { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; }
@@ -3411,23 +3429,26 @@
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
             }
 
+            /* ── Flat, full-width, icon-only bottom nav bar (X-style) ── */
+            :root { --nav-bar-total: 64px; }
             .side-nav {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(5, 1fr);
                 justify-items: center;
-                height: 60px;
-                padding: 0 6px;
+                height: 52px;
+                padding: 0;
+                padding-bottom: env(safe-area-inset-bottom);
                 position: fixed;
-                left: 16px;
-                right: 86px;
-                bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
-                width: auto;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
                 border-right: none;
-                border-top: none;
-                border-radius: var(--radius-pill);
+                border-top: 1px solid var(--border-color);
+                border-radius: 0;
                 align-items: center;
                 z-index: 100;
-                box-shadow: var(--shadow-elevated);
+                box-shadow: none;
                 background: var(--bg-surface) !important;
                 transition: transform 0.25s ease;
             }
@@ -3435,16 +3456,17 @@
             /* Reels no longer has its own bottom-nav tab — every entry point now passes
                fullscreen:true (see openReelViewer), so this bottom:60px case is just a
                defensive fallback and shouldn't normally be hit. */
-            #reel-viewer-overlay { bottom: 60px; }
+            #reel-viewer-overlay { bottom: 52px; }
             /* Opened from a feed post's expand button (not the Reels tab) — cover the
                full screen instead of leaving the reserved nav-bar strip at the bottom,
                which otherwise can show whatever's behind it instead of the nav bar. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-fab-spacer { display: none; }
             .nav-item { padding: 6px 8px; color: var(--nav-active-black); }
-            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.55; }
-            .nav-item span { opacity: 0.55; }
-            .nav-item.active svg, .nav-item.active span { opacity: 1; }
+            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.75; }
+            /* X's bottom nav is icon-only — labels stay screen-reader-only even for the
+               active tab (unlike the desktop sidebar, which reveals the active label). */
+            .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+            .nav-item.active svg { opacity: 1; }
             .nav-item.active { color: var(--nav-active-green); }
             .nav-item.active svg { stroke: var(--nav-active-green); }
             .nav-badge { opacity: 1; }
@@ -3463,34 +3485,21 @@
             .chat-view-back { display: block; }
             .fab-add { position: fixed; bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); right: 24px; z-index: 99; }
 
-            /* Primary action button: a separate circular button floating beside the pill
-               nav (not inside it), matching the pill-nav + circle-button layout. Its icon
-               and behavior change per active tab (New Post on Home, New Chat on Messages)
-               instead of separate floating buttons scattered per tab. */
-            #fab-nav-action {
-                left: auto;
-                right: 16px;
-                bottom: calc(env(safe-area-inset-bottom) + var(--nav-bar-extra-bottom));
-                width: 60px;
-                height: 60px;
-                min-width: 60px;
-                min-height: 60px;
-                font-size: 34px;
+            /* Compose button, inline as the centre nav item (X-style). Icon and
+               behavior change per active tab (New Post on Home, New Chat on Messages) —
+               see updateFabNavAction(). */
+            .nav-compose-btn {
+                width: 34px;
+                height: 34px;
+                font-size: 22px;
                 line-height: 1;
-                z-index: 101;
-                transform: none;
-                background: var(--primary-blue);
-                box-shadow: 0 5px 16px rgba(var(--primary-rgb), 0.32);
             }
-            #fab-nav-action:hover {
-                transform: scale(1.04);
-            }
-            #fab-nav-action.fab-scroll-hidden {
+            .nav-compose-btn.fab-scroll-hidden {
                 transform: translateY(140%);
             }
             /* The chat-bubble SVG reads visually smaller than the bold "+" glyph at the
                same box size, so nudge it down to match the plus sign's optical weight. */
-            #fab-nav-action.fab-nav-action-chat svg { width: 24px; height: 24px; }
+            .nav-compose-btn.fab-nav-action-chat svg { width: 18px; height: 18px; }
         }
 
         /* ── SMALL-SCREEN TUNING (narrow phones: iPhone SE, small Android, standard iPhones, etc.) ── */
@@ -3565,7 +3574,7 @@
 
             /* Floating add button & scroll-to-bottom */
             .fab-add { width: 50px; height: 50px; font-size: 26px; }
-            #fab-nav-action { width: 54px; height: 54px; min-width: 54px; min-height: 54px; font-size: 34px; }
+            .nav-compose-btn { width: 32px; height: 32px; font-size: 20px; }
             .scroll-to-bottom-btn { width: 34px; height: 34px; right: 16px; }
 
             /* Chat conversation view */
@@ -5842,15 +5851,6 @@
                     </svg>
                     <span>Home</span>
                 </div>
-                <div class="nav-item" data-tab="tab-chats">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <rect class="icon-line" x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/>
-                        <polyline class="icon-line" points="2 6 12 13 22 6" stroke="currentColor" stroke-width="1.8"/>
-                        <path class="icon-fill" fill-rule="evenodd" d="M2 6.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6.5l-10 6.5z"/>
-                    </svg>
-                    <span>Messages</span>
-                </div>
-                <div class="nav-fab-spacer" aria-hidden="true"></div>
                 <div class="nav-item" id="nav-search-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <circle class="icon-line" cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.8"/>
@@ -5858,6 +5858,11 @@
                     </svg>
                     <span>Search</span>
                 </div>
+                <!-- Single primary nav-bar action button: icon and click behavior swap
+                     per active tab (New Post on Home, New Chat on Messages) via
+                     updateFabNavAction() instead of separate floating buttons. Sits
+                     inline as the centre nav item, X-style. -->
+                <button type="button" class="nav-compose-btn" id="fab-nav-action" title="New Post">+</button>
                 <div class="nav-item" id="nav-notifications-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -5865,6 +5870,14 @@
                         <path class="icon-fill" d="M12 2a6 6 0 0 0-6 6c0 7-3 9-3 9h18s-3-2-3-9a6 6 0 0 0-6-6zm-1.73 19a2 2 0 0 0 3.46 0z"/>
                     </svg>
                     <span>Notifications</span>
+                </div>
+                <div class="nav-item" data-tab="tab-chats">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <rect class="icon-line" x="2" y="4" width="20" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                        <polyline class="icon-line" points="2 6 12 13 22 6" stroke="currentColor" stroke-width="1.8"/>
+                        <path class="icon-fill" fill-rule="evenodd" d="M2 6.5V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6.5l-10 6.5z"/>
+                    </svg>
+                    <span>Messages</span>
                 </div>
             </nav>
 
@@ -6166,10 +6179,6 @@
                 </div>
 
                 <button type="button" class="fab-add" id="fab-add-friend" title="Follow Someone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6"></path><path d="M22 11h-6"></path></svg></button>
-                <!-- Single primary nav-bar action button: icon and click behavior swap
-                     per active tab (New Post on Home, New Chat on Messages) via
-                     updateFabNavAction() instead of separate floating buttons. -->
-                <button type="button" class="fab-add" id="fab-nav-action" title="New Post">+</button>
             </aside>
 
             <main class="workspace-pane">

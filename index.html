@@ -1306,6 +1306,20 @@
         .x-post-row { display: flex; gap: 12px; }
         .x-post-avatar-col { flex-shrink: 0; cursor: pointer; }
         .x-post-avatar-col .avatar { width: 48px; height: 48px; background-color: var(--primary-blue); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 17px; }
+
+        /* Thread-style connector line: drawn between two consecutive posts by the same
+           author (see updateThreadConnectors), like Threads/X. Two segments meet at the
+           card's border-bottom so they read as one continuous line: "down" runs from the
+           bottom of THIS card's avatar to this card's own bottom edge; "up" runs from the
+           NEXT card's top edge up to the top of its avatar. Positioned off --x-avatar-size
+           so it still lines up at the narrow-screen avatar size below. */
+        :root { --x-avatar-size: 48px; }
+        .feed-post-card { position: relative; }
+        .feed-thread-connector { display: none; position: absolute; left: calc(16px + (var(--x-avatar-size) / 2) - 1px); width: 2px; background: var(--border-color); pointer-events: none; z-index: 0; }
+        .feed-thread-connector-down { top: calc(12px + var(--x-avatar-size)); bottom: 0; }
+        .feed-thread-connector-up { top: 0; height: 12px; }
+        .feed-post-card.has-connector-down .feed-thread-connector-down,
+        .feed-post-card.has-connector-up .feed-thread-connector-up { display: block; }
         .x-post-content-col { flex: 1; min-width: 0; }
         .x-post-headline { display: flex; align-items: flex-start; gap: 4px; min-width: 0; }
         .x-post-headline-main { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
@@ -3513,6 +3527,7 @@
             .story-card-avatar-ring .story-ring-inner { width: 25px; height: 25px; }
             .story-card-avatar { font-size: 11px; }
             .x-post-avatar-col .avatar { width: 42px; height: 42px; font-size: 15px; }
+            :root { --x-avatar-size: 42px; }
             .discover-card-avatar-wrap { width: 46px; height: 46px; }
             .discover-card .avatar.discover-card-avatar { font-size: 16px; }
             .group-member-row .avatar { width: 34px; height: 34px; }
@@ -11203,6 +11218,41 @@
         // it look like the feed "jumped to the top" even though the scroll position itself never
         // changed. To avoid that, we pin an anchor card (whatever has playing/just-finished media,
         // or otherwise whatever's currently in view) to its on-screen position after reordering.
+        // Thread-style connector line between consecutive posts by the same author (like
+        // Threads/X) — see the .feed-thread-connector CSS above buildFeedPostCard's markup.
+        // Recomputed on any childList change (new posts prepended/appended, reordering,
+        // deletions) rather than hooked into every call site that mutates a list, since
+        // there are several (realtime listeners, pagination, reposts, profile tabs...).
+        function updateThreadConnectors(container) {
+            if (!container) return;
+            const cards = Array.from(container.children).filter(el => el.classList && el.classList.contains('feed-post-card'));
+            cards.forEach(card => card.classList.remove('has-connector-down', 'has-connector-up'));
+            for (let i = 0; i < cards.length - 1; i++) {
+                const a = cards[i], b = cards[i + 1];
+                // Reposts and ads break the visual thread — never connect through them, even
+                // if the wrapped/original author matches a neighboring post's author.
+                const aEligible = a.dataset.uid && a.dataset.isAd !== '1' && !a.querySelector('.feed-repost-banner');
+                const bEligible = b.dataset.uid && b.dataset.isAd !== '1' && !b.querySelector('.feed-repost-banner');
+                if (aEligible && bEligible && a.dataset.uid === b.dataset.uid) {
+                    a.classList.add('has-connector-down');
+                    b.classList.add('has-connector-up');
+                }
+            }
+        }
+        function watchThreadConnectors(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container || container.dataset.threadConnectorWatched === '1') return;
+            container.dataset.threadConnectorWatched = '1';
+            let scheduled = false;
+            const run = () => { scheduled = false; updateThreadConnectors(container); };
+            new MutationObserver(() => {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(run);
+            }).observe(container, { childList: true });
+            updateThreadConnectors(container);
+        }
+
         function findFeedAnchorCard(list, container) {
             const media = list.querySelectorAll('.feed-post-video, .feed-post-music-audio');
             for (const el of media) {
@@ -13767,6 +13817,8 @@
                 </button>`;
 
             card.innerHTML = `
+                <div class="feed-thread-connector feed-thread-connector-down"></div>
+                <div class="feed-thread-connector feed-thread-connector-up"></div>
                 ${(isRepost && !isQuote) ? buildRepostBannerHtml(wrapperPost) : ''}
                 <div class="x-post-row">
                     <div class="x-post-avatar-col">
@@ -22858,6 +22910,7 @@
                 initNotificationsListener();
                 initJobsListener();
                 initIncomingCallListener();
+                ['feed-posts-list', 'my-profile-posts-list', 'my-profile-replies-list', 'my-profile-saved-list', 'user-info-posts-list', 'user-info-replies-list'].forEach(watchThreadConnectors);
             } else {
                 document.getElementById('auth-screen').style.display = 'flex';
                 showAuthStep('landing');

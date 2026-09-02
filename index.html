@@ -2169,7 +2169,8 @@
            pointer-events: none) so it never intercepts taps meant for the profile button or the
            icon row it now sits just left of; reuses the splash screen's mark geometry, without
            its drop-shadow filter, tinted to the app's accent color instead of splash white. */
-        .home-header-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 1; }
+        .home-header-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); cursor: pointer; z-index: 1; transition: transform 0.1s ease; }
+        .home-header-logo:active { transform: translate(-50%, -50%) scale(0.88); }
         .home-header-logo svg { width: 24px; height: 24px; display: block; }
         .home-header-settings-btn { position: absolute; right: 44px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); background: none; border: none; padding: 0; z-index: 1; }
         .home-header-settings-btn svg { width: 20px; height: 20px; }
@@ -5928,7 +5929,7 @@
                 <div id="tab-status" class="tab-content active-tab">
                     <div class="chat-header-area">
                         <div class="chat-header-top">
-                            <div class="home-header-logo" aria-hidden="true">
+                            <div class="home-header-logo" id="home-header-logo" role="button" tabindex="0" aria-label="Scroll to top" title="Scroll to top">
                                 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                                     <polygon points="20,80 170,30 80,110" fill="var(--primary-blue)" fill-opacity="0.75" />
                                     <polygon points="120,180 170,30 80,110" fill="var(--primary-blue)" />
@@ -16679,6 +16680,23 @@
         settingsSheetOverlay.addEventListener('click', (e) => {
             if (e.target === settingsSheetOverlay) settingsSheetOverlay.classList.remove('active');
         });
+
+        // Tapping the Home header logo scrolls the feed back to the top, same shortcut as
+        // X/Instagram's wordmark tap. The logo used to be purely decorative (pointer-events:
+        // none, aria-hidden) since it just sits absolute-centered over the header row — see its
+        // CSS/HTML for the matching changes that made it interactive.
+        const homeHeaderLogo = document.getElementById('home-header-logo');
+        if (homeHeaderLogo) {
+            const scrollHomeFeedToTop = () => {
+                document.getElementById('discover-grid-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            homeHeaderLogo.addEventListener('click', scrollHomeFeedToTop);
+            homeHeaderLogo.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                scrollHomeFeedToTop();
+            });
+        }
 
         // --- App Lock (Settings → Security) ---
         // A local, device-only PIN/biometric gate — not tied to the Firebase account, just

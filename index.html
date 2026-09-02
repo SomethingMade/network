@@ -2124,7 +2124,9 @@
            and only switched on inside the mobile nav grid below. */
         .nav-fab-spacer { display: none; }
         .nav-indicator { position: absolute; bottom: 0; left: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--nav-active-green); opacity: 1; pointer-events: none; z-index: 0; transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s ease, opacity 0.25s ease; }
-        .nav-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--nav-active-black); cursor: pointer; transition: color 0.2s ease; font-size: 11px; font-weight: 500; padding: 8px 14px; }
+        .nav-item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--nav-active-black); cursor: pointer; transition: color 0.2s ease; font-size: 11px; font-weight: 500; padding: 8px 14px; }
+        .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+        .nav-item.active span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; }
         .nav-item:hover { color: var(--nav-active-black); }
         .nav-item:hover svg { stroke: var(--nav-active-black); }
         .nav-item.active { color: var(--nav-active-green); }
@@ -7130,9 +7132,16 @@
         // `count`/`longest` numbers are the source of truth, history is display-only and pruned
         // on every write so it can't grow unbounded.
         let currentStreakData = { count: 0, longest: 0, lastCheckIn: null, history: {} };
+        // Streaks of STREAK_TRIAL_THRESHOLD days or more (checked in every day, no gaps — a
+        // missed day resets the streak to 1, so "8-day streak" already means "consistent")
+        // earn the same free 14-day Verified Badge trial as the manual "Start Trial" button in
+        // Settings (see grantStreakTrialBadge / TRIAL_BADGE_DURATION_MS below) — one nudge to
+        // reward the habit, not a separate badge type.
+        const STREAK_TRIAL_THRESHOLD = 8;
         const STREAK_MILESTONES = {
             3: "Nice, 3 days in a row! 🔥",
             7: "One week strong! 🎉",
+            8: "8-day streak — you've unlocked a free 14-day Verified Badge! ✅",
             14: "Two weeks running — great habit!",
             30: "A whole month streak! 🏆",
             60: "60 days of showing up. Incredible.",
@@ -7195,12 +7204,32 @@
         document.getElementById('btn-close-streak-modal').addEventListener('click', () => {
             document.getElementById('streak-modal-overlay').classList.remove('active');
         });
+        // Rewards an account that's kept an STREAK_TRIAL_THRESHOLD-day-or-longer daily streak
+        // with the free 14-day Verified Badge trial, the exact same grant the manual "Start
+        // Trial" button in Settings makes (see refreshTrialBadgeUI) — same one-time rule too:
+        // callers only invoke this when trialBadgeActivatedAt isn't already set, so an account
+        // can never re-trigger it once used (whether via streak or the manual button).
+        async function grantStreakTrialBadge(uid) {
+            await update(ref(database, `users/${uid}`), { trialBadgeActivatedAt: serverTimestamp() });
+            // Optimistic local estimate, same reasoning as the manual "Start Trial" button —
+            // the server's own clock (serverTimestamp() above) is what's actually stored.
+            if (cachedUsers[uid]) cachedUsers[uid].trialBadgeActivatedAt = Date.now();
+            notify(`${STREAK_TRIAL_THRESHOLD}-day streak! Your free 14-day Verified Badge trial is active 🎉`);
+            const user = auth.currentUser;
+            if (user && user.uid === uid) {
+                const myProfile = cachedUsers[uid] || { trialBadgeActivatedAt: Date.now() };
+                refreshTrialBadgeUI(myProfile);
+                refreshVerifiedBadgeSettingsRow(myProfile);
+            }
+        }
+
         // Called once per onAuthStateChanged sign-in with whatever streak data was already on
         // the profile (avoids a second DB read — the caller already fetched the profile). Only
         // writes to the DB and pops the celebration modal the first time this local day sees the
         // person open the app; every other app-open/tab-switch today just re-renders from
-        // currentStreakData with no network call.
-        async function processDailyStreak(uid, existingStreak) {
+        // currentStreakData with no network call. `trialBadgeActivatedAt` (also from that same
+        // already-fetched profile) gates the STREAK_TRIAL_THRESHOLD-day badge grant below.
+        async function processDailyStreak(uid, existingStreak, trialBadgeActivatedAt) {
             const today = streakLocalDateStr();
             const streak = existingStreak || {};
             let count = streak.count || 0;
@@ -7211,6 +7240,12 @@
             if (lastCheckIn === today) {
                 currentStreakData = { count, longest, lastCheckIn, history };
                 updateStreakBadgeUI();
+                // Covers an account that already had a long-enough streak before this feature
+                // existed (or a previous grant attempt failed) — catches it up next time they
+                // open the app, not just on the exact day the count first crosses the threshold.
+                if (count >= STREAK_TRIAL_THRESHOLD && !trialBadgeActivatedAt) {
+                    grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
+                }
                 return;
             }
 
@@ -7224,6 +7259,9 @@
             await update(ref(database, `users/${uid}/streak`), { count, longest, lastCheckIn: today, history });
             currentStreakData = { count, longest, lastCheckIn: today, history };
             updateStreakBadgeUI();
+            if (count >= STREAK_TRIAL_THRESHOLD && !trialBadgeActivatedAt) {
+                grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
+            }
             showStreakModal(true);
         }
 
@@ -22735,7 +22773,7 @@
 
                 // Fire-and-forget: today's check-in shouldn't hold up the rest of login. Reuses
                 // existingProfileData fetched just above instead of a second DB read.
-                processDailyStreak(user.uid, existingProfileData.streak).catch((err) => console.error('Daily streak check-in failed', err));
+                processDailyStreak(user.uid, existingProfileData.streak, existingProfileData.trialBadgeActivatedAt).catch((err) => console.error('Daily streak check-in failed', err));
 
                 try {
                     const username = await ensureUsername(user);

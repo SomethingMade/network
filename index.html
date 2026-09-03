@@ -3871,19 +3871,41 @@
 
         /* ── HABA AI VOICE OVERLAY (Agora Conversational AI Engine) ──
            Standalone voice-chat-with-the-AI feature, separate from the human-to-human
-           #call-overlay/#group-call-overlay above. Reuses their .call-* classes for a
-           consistent look but is driven by its own Agora RTC client (see
-           startHabaAIVoiceSession) since the far end is a server-managed Conversational
-           AI Engine agent, not a peer signaled through Firebase. */
+           #call-overlay/#group-call-overlay above. Reuses their .call-* classes for the
+           control row but has its own black/glow visual language (abstract gradient wave
+           instead of an avatar) — driven by the same aiVoiceIsActive/ai-speaking state,
+           just re-skinned. See startHabaAIVoiceOverlay/setAIVoiceStatus in the script for
+           the JS side; #ai-voice-status-label doubles as the on-screen status/transcript
+           text, unchanged from before. */
         #ai-voice-overlay {
             position: fixed; inset: 0; z-index: 100005; display: none;
             flex-direction: column; align-items: center; justify-content: space-between;
-            background: linear-gradient(160deg, #0B1F17 0%, #0E2A1F 55%, #0B1F17 100%);
-            color: #fff; padding: 60px 24px 44px; text-align: center;
+            background: #000;
+            color: #fff; padding: 64px 24px 40px; text-align: center; overflow: hidden;
         }
         #ai-voice-overlay.active { display: flex; }
-        #ai-voice-overlay .call-ring-pulse { display: none; }
-        #ai-voice-overlay.ai-speaking .call-ring-pulse { display: block; }
+        .ai-voice-top { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+        .ai-voice-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+        .ai-voice-timer { font-size: 13px; color: rgba(255,255,255,0.45); font-variant-numeric: tabular-nums; }
+        .ai-voice-transcript {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 21px; font-weight: 500; line-height: 1.4; color: rgba(255,255,255,0.45);
+            max-width: 300px; margin: 0 auto; transition: color 0.4s ease; padding: 20px 0;
+        }
+        #ai-voice-overlay.ai-speaking .ai-voice-transcript { color: rgba(255,255,255,0.95); }
+        .ai-voice-wave-wrap { width: 100%; max-width: 440px; height: 140px; margin-bottom: 34px; flex-shrink: 0; }
+        .ai-voice-wave-svg { width: 100%; height: 100%; overflow: visible; }
+        .ai-wave-path { fill: none; stroke: url(#aiWaveGradient); stroke-linecap: round; transform-origin: 240px 110px; animation: aiWaveBreathe 5s ease-in-out infinite; }
+        .ai-wave-path-glow { stroke-width: 26px; opacity: 0.32; filter: blur(16px); }
+        .ai-wave-path-core { stroke-width: 5px; opacity: 0.8; filter: blur(0.4px); }
+        #ai-voice-overlay.ai-speaking .ai-wave-path { animation: aiWaveSpeak 1.4s ease-in-out infinite; }
+        #ai-voice-overlay.ai-speaking .ai-wave-path-glow { opacity: 0.55; }
+        #ai-voice-overlay.ai-speaking .ai-wave-path-core { opacity: 1; }
+        @keyframes aiWaveBreathe { 0%, 100% { transform: scaleY(0.7) translateY(0); } 50% { transform: scaleY(1) translateY(-5px); } }
+        @keyframes aiWaveSpeak { 0%, 100% { transform: scaleY(1) translateY(0); } 25% { transform: scaleY(1.4) translateY(-11px); } 50% { transform: scaleY(0.65) translateY(7px); } 75% { transform: scaleY(1.2) translateY(-7px); } }
+        #ai-voice-overlay .call-controls-row { flex-shrink: 0; }
+        #ai-voice-overlay .call-btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
+        #ai-voice-overlay .call-btn-secondary.on { background: rgba(255,255,255,0.25); }
         .gc-top { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 20px; flex-shrink: 0; }
         .gc-title { font-size: 18px; font-weight: 700; }
         .gc-sub { font-size: 13px; color: rgba(255,255,255,0.65); }
@@ -6635,19 +6657,24 @@
     </div>
 
     <div id="ai-voice-overlay">
-        <div class="call-top">
-            <span class="call-status-label" id="ai-voice-status-label">Connecting...</span>
-            <h2 class="call-peer-name">Haba AI</h2>
-            <span class="call-timer" id="ai-voice-timer" style="display:none;">0:00</span>
+        <div class="ai-voice-top">
+            <span class="ai-voice-title">Haba AI</span>
+            <span class="ai-voice-timer" id="ai-voice-timer" style="display:none;">0:00</span>
         </div>
-        <div class="call-overlay-mid">
-            <div class="call-avatar-wrap">
-                <div class="call-ring-pulse"></div>
-                <div class="call-ring-pulse"></div>
-                <div class="call-avatar ai-avatar-black" style="display:flex; align-items:center; justify-content:center;">
-                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><circle cx="12" cy="12" r="9.4"/></svg>
-                </div>
-            </div>
+        <div class="ai-voice-transcript" id="ai-voice-status-label">Connecting...</div>
+        <div class="ai-voice-wave-wrap">
+            <svg class="ai-voice-wave-svg" viewBox="0 0 480 200" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <linearGradient id="aiWaveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#F3E8FF"/>
+                        <stop offset="30%" stop-color="#FF4FD8"/>
+                        <stop offset="60%" stop-color="#8B5CF6"/>
+                        <stop offset="100%" stop-color="#FF8A3D"/>
+                    </linearGradient>
+                </defs>
+                <path class="ai-wave-path ai-wave-path-glow" d="M0,110 C80,45 160,175 240,110 C320,45 400,175 480,110" />
+                <path class="ai-wave-path ai-wave-path-core" d="M0,110 C80,45 160,175 240,110 C320,45 400,175 480,110" />
+            </svg>
         </div>
         <div class="call-controls-row">
             <button type="button" class="call-btn call-btn-secondary" id="btn-ai-voice-mute" title="Mute">

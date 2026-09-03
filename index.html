@@ -4811,6 +4811,7 @@
             </div>
             <button type="button" id="btn-invite-to-group" class="btn-pill btn-outline" style="margin-bottom:12px; display:none;">Invite by ID</button>
             <button type="button" id="btn-leave-group" class="btn-pill" style="background:rgba(255,69,58,0.1); color:var(--danger-red);">Leave Group</button>
+            <button type="button" id="btn-delete-community" class="btn-pill" style="background:var(--danger-red); color:#fff; margin-top:10px; display:none;">Delete Community</button>
         </div>
     </div>
 
@@ -20608,6 +20609,10 @@
             });
 
             document.getElementById('btn-invite-to-group').style.display = (!group.isPublic) ? 'block' : 'none';
+            // Owner can't leave their own community (see btn-leave-group's guard below) — swap
+            // it for a Delete option instead of showing a button that just errors when tapped.
+            document.getElementById('btn-leave-group').style.display = isOwner ? 'none' : 'block';
+            document.getElementById('btn-delete-community').style.display = isOwner ? 'block' : 'none';
             groupInfoSheet.classList.add('active');
         });
         groupInfoSheet.addEventListener('click', (e) => {
@@ -21265,6 +21270,41 @@
                 history.back();
             } catch (err) {
                 notify('Could not leave the group', 'error');
+            }
+        });
+
+        document.getElementById('btn-delete-community').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user || !activeGroupId) return;
+            const group = cachedCommunities[activeGroupId];
+            if (!group || group.ownerUid !== user.uid) return;
+
+            const confirmed = await showCustomModal(
+                'Delete Community',
+                `This will permanently delete "${group.name}" for everyone — all messages, posts, and members. This can't be undone.`,
+                true
+            );
+            if (!confirmed) return;
+
+            const groupId = activeGroupId;
+            try {
+                const updates = {};
+                updates[`communities/${groupId}`] = null;
+                updates[`group_threads/${groupId}`] = null;
+                // group_invites is keyed by invitee uid first (group_invites/{uid}/{groupId}), so
+                // there's no single path to strike this group from — sweep every cached user's
+                // entry instead. Best-effort: users not yet in cachedUsers just keep a dead invite
+                // that silently no-ops when opened, same as the old-groups-node cleanup elsewhere.
+                Object.keys(cachedUsers).forEach(uid => {
+                    updates[`group_invites/${uid}/${groupId}`] = null;
+                });
+                await update(ref(database), updates);
+                delete cachedCommunities[groupId];
+                groupInfoSheet.classList.remove('active');
+                notify('Community deleted');
+                history.back();
+            } catch (err) {
+                notify('Could not delete this community', 'error');
             }
         });
 

@@ -3827,6 +3827,24 @@
         .call-action-col { display: flex; flex-direction: column; align-items: center; }
         #call-remote-audio { display: none; }
 
+        /* Video-call layer: full-bleed remote video behind everything, small local PiP on
+           top. Hidden by default (audio calls) — #call-overlay.is-video shows them and fades
+           the avatar out, since Agora's remoteVideoTrack.play()/localVideoTrack.play() inject
+           their own <video> tag into these containers rather than us managing one directly. */
+        .call-video-remote, .call-video-local-pip { display: none; }
+        .call-video-remote { position: absolute; inset: 0; background: #000; }
+        .call-video-remote video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+        .call-video-local-pip { position: absolute; top: calc(20px + env(safe-area-inset-top)); right: 16px; width: 96px; height: 128px; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.35); background: #111; z-index: 2; }
+        .call-video-local-pip video { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+        #call-overlay.is-video .call-video-remote,
+        #call-overlay.is-video .call-video-local-pip { display: block; }
+        #call-overlay.is-video .call-avatar-wrap { opacity: 0; pointer-events: none; }
+        #call-overlay.is-video .call-top,
+        #call-overlay.is-video .call-controls-row,
+        #call-overlay.is-video .call-incoming-actions { position: relative; z-index: 3; }
+        #call-overlay.is-video .call-top { background: linear-gradient(rgba(0,0,0,0.5), transparent); margin: -60px -24px 0; padding: 60px 24px 30px; }
+        #call-overlay.is-video.connected .call-top { margin-top: 0; }
+
         /* ── GROUP CALL BANNER (pinned inside a group chat while a call is live) ── */
         .group-call-banner { display: none; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(52,199,89,0.12); border-bottom: 1px solid var(--border-color); cursor: pointer; }
 
@@ -6407,6 +6425,7 @@
                 <div class="about-bubble" id="chat-view-about-bubble" style="display:none;"></div>
             </div>
             <svg id="btn-call-voice" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Voice call"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            <svg id="btn-call-video" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Video call"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
             <svg id="btn-group-call-voice" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Voice call"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             <div class="chat-view-hidden-controls">
                 <svg id="btn-view-once-toggle" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;" title="Send as view once">
@@ -6519,13 +6538,15 @@
     </div>
 
     <div id="call-overlay">
+        <div class="call-video-remote" id="call-video-remote"></div>
+        <div class="call-video-local-pip" id="call-video-local-pip"></div>
         <div class="call-top">
             <span class="call-status-label" id="call-status-label">Calling...</span>
             <h2 class="call-peer-name" id="call-peer-name">Contact</h2>
             <span class="call-timer" id="call-timer" style="display:none;">0:00</span>
         </div>
         <div class="call-overlay-mid">
-            <div class="call-avatar-wrap">
+            <div class="call-avatar-wrap" id="call-avatar-wrap">
                 <div class="call-ring-pulse" id="call-pulse-1" style="display:none;"></div>
                 <div class="call-ring-pulse" id="call-pulse-2" style="display:none;"></div>
                 <div class="call-avatar" id="call-avatar">?</div>
@@ -6534,6 +6555,9 @@
         <div id="call-incall-controls" class="call-controls-row" style="display:none;">
             <button type="button" class="call-btn call-btn-secondary" id="btn-call-mute" title="Mute">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+            <button type="button" class="call-btn call-btn-secondary" id="btn-call-camera" title="Camera" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
             </button>
             <button type="button" class="call-btn call-btn-end" id="btn-call-end" title="End call">
                 <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><g transform="rotate(135 12 12)"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></g></svg>
@@ -6561,7 +6585,6 @@
                 <span class="call-action-label">Accept</span>
             </div>
         </div>
-        <audio id="call-remote-audio" autoplay playsinline></audio>
     </div>
 
     <div id="group-call-overlay">
@@ -21046,6 +21069,7 @@
             document.getElementById('btn-group-info').style.display = 'block';
             document.getElementById('btn-user-info').style.display = 'none';
             document.getElementById('btn-call-voice').style.display = 'none';
+            document.getElementById('btn-call-video').style.display = 'none';
             document.getElementById('btn-group-call-voice').style.display = 'flex';
             document.getElementById('chat-attach-btn').style.display = 'flex';
             document.getElementById('chat-sticker-btn').style.display = 'flex';
@@ -23514,7 +23538,7 @@
             const peerUid = btn.getAttribute('data-uid');
             if (peerUid) {
                 const profile = cachedUsers[peerUid] || {};
-                startVoiceCall(peerUid, profile.name || 'User', profile.photoURL || '');
+                startCall(peerUid, profile.name || 'User', profile.photoURL || '', false);
             } else {
                 const groupId = btn.getAttribute('data-group');
                 if (groupId) openGroupChatView(groupId);
@@ -23840,7 +23864,16 @@
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 
-        // --- VOICE CALLS (WebRTC, signaled over Firebase Realtime Database) ---
+        // --- DM CALLS (Agora RTC, same App ID/project as the Live feature) ---
+        // Firebase Realtime Database still handles signaling/state (ringing, accept, decline,
+        // busy, hang up, call log) exactly as before — only the media transport changed from
+        // raw peer-to-peer WebRTC to Agora. Since Agora handles connection negotiation itself,
+        // there's no more SDP offer/answer or ICE candidate exchange: once both sides agree the
+        // call is "accepted", they each independently join the same Agora channel (named after
+        // the call) and publish/subscribe tracks.
+        //
+        // ICE_SERVERS is still used below by the (unchanged) group-call code, which remains on
+        // raw mesh WebRTC — only 1:1 DM calls moved to Agora.
         const ICE_SERVERS = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -23849,22 +23882,47 @@
         };
         const CALL_RING_TIMEOUT_MS = 35000;
 
-        let callPC = null;
-        let callLocalStream = null;
+        let callClient = null;
+        let callLocalAudioTrack = null, callLocalVideoTrack = null;
         let callId = null;
         let callRole = null; // 'caller' | 'callee'
         let callPeerUid = null;
         let callPeerName = '';
         let callPeerAvatar = '';
+        let callIsVideo = false;
+        let callCameraOn = true;
         let callConnectedAt = null;
         let callTimerInterval = null;
         let callRingTimeout = null;
         let callIsMuted = false;
         let callIsSpeaker = false;
         let callStatusUnsub = null;
-        let callCandidatesUnsub = null;
         let callInviteUnsub = null;
         let callLogged = false;
+
+        function ensureCallClient() {
+            if (callClient) return callClient;
+            if (typeof AgoraRTC === 'undefined') {
+                notify('Calling failed to load. Check your connection and try again.', 'error');
+                return null;
+            }
+            callClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+            callClient.on('user-published', async (remoteUser, mediaType) => {
+                await callClient.subscribe(remoteUser, mediaType);
+                if (mediaType === 'video') {
+                    document.getElementById('call-overlay').classList.add('is-video');
+                    remoteUser.videoTrack && remoteUser.videoTrack.play('call-video-remote');
+                }
+                if (mediaType === 'audio') remoteUser.audioTrack && remoteUser.audioTrack.play();
+            });
+            callClient.on('user-unpublished', (remoteUser, mediaType) => {
+                if (mediaType === 'video') {
+                    const el = document.getElementById('call-video-remote');
+                    if (el) el.innerHTML = '';
+                }
+            });
+            return callClient;
+        }
 
         function initIncomingCallListener() {
             const user = auth.currentUser;
@@ -23909,6 +23967,7 @@
             document.getElementById('call-pulse-1').style.display = 'none';
             document.getElementById('call-pulse-2').style.display = 'none';
             document.getElementById('call-timer').style.display = 'none';
+            document.getElementById('btn-call-camera').style.display = 'none';
         }
 
         function showIncomingCall(invite) {
@@ -23917,10 +23976,12 @@
             callPeerUid = invite.callerUid;
             callPeerName = invite.callerName || 'Unknown';
             callPeerAvatar = invite.callerAvatar || '';
+            callIsVideo = !!invite.isVideo;
             callLogged = false;
 
             resetCallControlsUI();
-            document.getElementById('call-status-label').textContent = 'Incoming voice call';
+            document.getElementById('call-overlay').classList.toggle('is-video', callIsVideo);
+            document.getElementById('call-status-label').textContent = callIsVideo ? 'Incoming video call' : 'Incoming voice call';
             document.getElementById('call-peer-name').textContent = callPeerName;
             callAvatarHtml(callPeerName, callPeerAvatar);
             document.getElementById('call-pulse-1').style.display = 'block';
@@ -23932,33 +23993,30 @@
             // Watch the call doc so we auto-dismiss if the caller cancels before we answer.
             callStatusUnsub = onValue(ref(database, `calls/${callId}/status`), (snap) => {
                 const status = snap.val();
-                if (status && status !== 'ringing' && callRole === 'callee' && !callPC) {
+                if (status && status !== 'ringing' && callRole === 'callee' && !callConnectedAt) {
                     stopRingtone();
                     teardownCall();
                 }
             });
         }
 
-        async function startVoiceCall(otherUid, otherName, otherAvatar) {
+        async function startCall(otherUid, otherName, otherAvatar, isVideo) {
             const user = auth.currentUser;
             if (!user || !otherUid || otherUid === AI_UID) return;
             if (callId || groupCallId) { notify('You are already on a call', 'error'); return; }
-
-            try {
-                callLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            } catch (err) {
-                notify('Microphone access was denied', 'error');
-                return;
-            }
+            if (!ensureCallClient()) return;
 
             callRole = 'caller';
             callPeerUid = otherUid;
             callPeerName = otherName || 'Contact';
             callPeerAvatar = otherAvatar || '';
+            callIsVideo = !!isVideo;
+            callCameraOn = true;
             callLogged = false;
             const myProfile = cachedUsers[user.uid] || {};
 
             resetCallControlsUI();
+            document.getElementById('call-overlay').classList.toggle('is-video', callIsVideo);
             document.getElementById('call-status-label').textContent = 'Calling...';
             document.getElementById('call-peer-name').textContent = callPeerName;
             callAvatarHtml(callPeerName, callPeerAvatar);
@@ -23968,14 +24026,7 @@
             const newCallRef = push(ref(database, 'calls'));
             callId = newCallRef.key;
 
-            callPC = new RTCPeerConnection(ICE_SERVERS);
-            callLocalStream.getTracks().forEach(track => callPC.addTrack(track, callLocalStream));
-            attachPeerConnectionHandlers();
-
             try {
-                const offer = await callPC.createOffer();
-                await callPC.setLocalDescription(offer);
-
                 const updates = {};
                 updates[`calls/${callId}`] = {
                     callerUid: user.uid,
@@ -23984,13 +24035,14 @@
                     calleeUid: otherUid,
                     calleeName: callPeerName,
                     status: 'ringing',
-                    offer: { type: offer.type, sdp: offer.sdp },
+                    isVideo: callIsVideo,
                     createdAt: serverTimestamp()
                 };
                 updates[`call_invites/${otherUid}`] = {
                     callId, callerUid: user.uid,
                     callerName: myProfile.name || user.displayName || 'Someone',
                     callerAvatar: myProfile.photoURL || '',
+                    isVideo: callIsVideo,
                     createdAt: serverTimestamp()
                 };
                 await update(ref(database), updates);
@@ -24005,21 +24057,14 @@
                 return;
             }
 
-            callCandidatesUnsub = onChildAdded(ref(database, `calls/${callId}/candidates/${otherUid}`), (snap) => {
-                const cand = snap.val();
-                if (cand && callPC) callPC.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
-            });
-
             callStatusUnsub = onValue(ref(database, `calls/${callId}`), async (snap) => {
                 const data = snap.val();
                 if (!data) return;
-                if (data.status === 'accepted' && data.answer && callPC && !callPC.currentRemoteDescription) {
+                if (data.status === 'accepted' && !callConnectedAt) {
                     clearTimeout(callRingTimeout);
                     stopRingback();
-                    try {
-                        await callPC.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    } catch (err) { /* ignore */ }
-                    enterConnectedCallUI();
+                    const joined = await joinCallChannel();
+                    if (joined) enterConnectedCallUI();
                 } else if (data.status === 'declined') {
                     stopRingback();
                     document.getElementById('call-status-label').textContent = 'Call declined';
@@ -24049,32 +24094,12 @@
             const user = auth.currentUser;
             if (!user || !callId) return;
             stopRingtone();
-
-            try {
-                callLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            } catch (err) {
-                notify('Microphone access was denied', 'error');
-                declineIncomingCall();
-                return;
-            }
+            if (!ensureCallClient()) { declineIncomingCall(); return; }
 
             if (callStatusUnsub) { off(ref(database, `calls/${callId}/status`)); callStatusUnsub = null; }
 
-            const callSnap = await get(ref(database, `calls/${callId}`));
-            const callData = callSnap.val();
-            if (!callData || !callData.offer) { teardownCall(); return; }
-
-            callPC = new RTCPeerConnection(ICE_SERVERS);
-            callLocalStream.getTracks().forEach(track => callPC.addTrack(track, callLocalStream));
-            attachPeerConnectionHandlers();
-
             try {
-                await callPC.setRemoteDescription(new RTCSessionDescription(callData.offer));
-                const answer = await callPC.createAnswer();
-                await callPC.setLocalDescription(answer);
-
                 const updates = {};
-                updates[`calls/${callId}/answer`] = { type: answer.type, sdp: answer.sdp };
                 updates[`calls/${callId}/status`] = 'accepted';
                 updates[`call_invites/${user.uid}`] = null;
                 await update(ref(database), updates);
@@ -24084,10 +24109,8 @@
                 return;
             }
 
-            callCandidatesUnsub = onChildAdded(ref(database, `calls/${callId}/candidates/${callData.callerUid}`), (snap) => {
-                const cand = snap.val();
-                if (cand && callPC) callPC.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
-            });
+            const joined = await joinCallChannel();
+            if (!joined) return;
 
             callStatusUnsub = onValue(ref(database, `calls/${callId}/status`), (snap) => {
                 const status = snap.val();
@@ -24100,6 +24123,61 @@
             enterConnectedCallUI();
         }
 
+        // Joins the Agora channel for the current callId and publishes local tracks. Both
+        // caller and callee call this independently once the call moves to 'accepted' — Agora
+        // handles pairing them up on the channel, no manual signaling needed. Returns true on
+        // success so callers know it's safe to move the UI into the connected state.
+        async function joinCallChannel() {
+            const client = ensureCallClient();
+            if (!client) { teardownCall(); return false; }
+            try {
+                if (client.connectionState && client.connectionState !== 'DISCONNECTED') {
+                    await client.leave().catch(() => {});
+                }
+                const channelName = `call_${callId}`;
+                const agoraUid = Math.floor(Math.random() * 100000000) + 1;
+                const tokenResult = await generateAgoraTokenCallable({ channelName, uid: agoraUid });
+                const token = tokenResult.data && tokenResult.data.token;
+                if (!token) throw new Error('No token returned');
+                await client.join(AGORA_APP_ID, channelName, token, agoraUid);
+
+                try {
+                    if (callIsVideo) {
+                        [callLocalAudioTrack, callLocalVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
+                        const pip = document.getElementById('call-video-local-pip');
+                        if (pip) callLocalVideoTrack.play('call-video-local-pip');
+                        document.getElementById('btn-call-camera').style.display = 'flex';
+                        await client.publish([callLocalAudioTrack, callLocalVideoTrack]);
+                    } else {
+                        callLocalAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                        await client.publish([callLocalAudioTrack]);
+                    }
+                } catch (mediaErr) {
+                    console.error('Camera/mic access failed', mediaErr);
+                    notify(callIsVideo ? 'Camera/mic access was blocked. Allow camera and microphone access to make video calls.' : 'Microphone access was denied', 'error');
+                    teardownCall();
+                    return false;
+                }
+                return true;
+            } catch (joinErr) {
+                console.error('Agora call join failed', joinErr);
+                const code = joinErr && (joinErr.code || joinErr.name);
+                let msg = 'Could not connect the call.';
+                if (code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/unavailable') {
+                    msg = "Couldn't reach the call token server — make sure generateAgoraToken is deployed.";
+                } else if (code === 'functions/unauthenticated') {
+                    msg = 'You need to be signed in to call.';
+                } else if (code === 'CAN_NOT_GET_GATEWAY_SERVER' || code === 'INVALID_VENDOR_KEY' || code === 'INVALID_PARAMS') {
+                    msg = 'Call setup issue: check the Agora App ID in the console matches the one in the app.';
+                } else if (code === 'DYNAMIC_KEY_TIMEOUT' || code === 'TOKEN_EXPIRED' || code === 'CAN_NOT_GET_GATEWAY_SERVER_WITH_INVALID_APP_ID' || code === 'INVALID_TOKEN') {
+                    msg = "Call token was rejected — the token server's App Certificate may not match this project.";
+                }
+                notify(msg, 'error');
+                teardownCall();
+                return false;
+            }
+        }
+
         function declineIncomingCall() {
             const user = auth.currentUser;
             if (!callId) return;
@@ -24109,30 +24187,14 @@
             teardownCall();
         }
 
-        function attachPeerConnectionHandlers() {
-            const user = auth.currentUser;
-            callPC.onicecandidate = (e) => {
-                if (e.candidate && callId && user) {
-                    push(ref(database, `calls/${callId}/candidates/${user.uid}`), e.candidate.toJSON()).catch(() => {});
-                }
-            };
-            callPC.ontrack = (e) => {
-                const audioEl = document.getElementById('call-remote-audio');
-                audioEl.srcObject = e.streams[0];
-            };
-            callPC.oniceconnectionstatechange = () => {
-                if (callPC && (callPC.iceConnectionState === 'failed' || callPC.iceConnectionState === 'disconnected')) {
-                    if (callPC.iceConnectionState === 'failed') endActiveCall();
-                }
-            };
-        }
-
         function enterConnectedCallUI() {
             callConnectedAt = Date.now();
             resetCallControlsUI();
-            document.getElementById('call-status-label').textContent = 'Voice call';
+            document.getElementById('call-overlay').classList.add('connected');
+            document.getElementById('call-status-label').textContent = callIsVideo ? 'Video call' : 'Voice call';
             document.getElementById('call-timer').style.display = 'block';
             document.getElementById('call-incall-controls').style.display = 'flex';
+            document.getElementById('btn-call-camera').style.display = callIsVideo ? 'flex' : 'none';
             callTimerInterval = setInterval(() => {
                 const secs = Math.floor((Date.now() - callConnectedAt) / 1000);
                 const m = Math.floor(secs / 60), s = secs % 60;
@@ -24172,22 +24234,27 @@
             if (callTimerInterval) { clearInterval(callTimerInterval); callTimerInterval = null; }
             stopRingtone(); stopRingback();
 
-            if (callPC) { try { callPC.close(); } catch (e) {} callPC = null; }
-            if (callLocalStream) { callLocalStream.getTracks().forEach(t => t.stop()); callLocalStream = null; }
-            const audioEl = document.getElementById('call-remote-audio');
-            if (audioEl) audioEl.srcObject = null;
+            if (callClient) {
+                try { callClient.leave(); } catch (e) {}
+            }
+            if (callLocalAudioTrack) { try { callLocalAudioTrack.close(); } catch (e) {} callLocalAudioTrack = null; }
+            if (callLocalVideoTrack) { try { callLocalVideoTrack.close(); } catch (e) {} callLocalVideoTrack = null; }
+            const remoteVideoEl = document.getElementById('call-video-remote');
+            if (remoteVideoEl) remoteVideoEl.innerHTML = '';
+            const localPipEl = document.getElementById('call-video-local-pip');
+            if (localPipEl) localPipEl.innerHTML = '';
 
             if (callStatusUnsub) { try { off(ref(database, `calls/${callId}/status`)); off(ref(database, `calls/${callId}`)); } catch (e) {} callStatusUnsub = null; }
-            if (callCandidatesUnsub) { callCandidatesUnsub = null; }
 
-            document.getElementById('call-overlay').classList.remove('active');
+            document.getElementById('call-overlay').classList.remove('active', 'is-video', 'connected');
             resetCallControlsUI();
-            callIsMuted = false; callIsSpeaker = false;
+            callIsMuted = false; callIsSpeaker = false; callCameraOn = true;
             document.getElementById('btn-call-mute') && document.getElementById('btn-call-mute').classList.remove('on');
             document.getElementById('btn-call-speaker') && document.getElementById('btn-call-speaker').classList.remove('on');
+            document.getElementById('btn-call-camera') && document.getElementById('btn-call-camera').classList.remove('on');
 
             callId = null; callRole = null; callPeerUid = null; callPeerName = ''; callPeerAvatar = '';
-            callConnectedAt = null; callLogged = false;
+            callConnectedAt = null; callLogged = false; callIsVideo = false;
         }
 
         // Synthesized call tones (no external audio files, so calls always sound the
@@ -24276,6 +24343,7 @@
             if (!user || !otherUid) return;
             const theCallId = callId;
             const isCaller = callRole === 'caller';
+            const wasVideo = callIsVideo;
             try {
                 // Both sides of a call independently reach finalizeCallAndCleanup (the ender via
                 // endActiveCall, the other side via the status listener), so without a shared gate
@@ -24296,12 +24364,15 @@
                     createdAt: Date.now(),
                     mediaType: 'call',
                     callStatus: outcome,
-                    callDuration: durationSec || 0
+                    callDuration: durationSec || 0,
+                    callIsVideo: wasVideo
                 };
-                let previewText = '📞 Voice call';
-                if (outcome === 'missed') previewText = '📞 Missed voice call';
-                else if (outcome === 'declined') previewText = '📞 Voice call declined';
-                else if (outcome === 'cancelled') previewText = '📞 Voice call';
+                const icon = wasVideo ? '📹' : '📞';
+                const label = wasVideo ? 'Video call' : 'Voice call';
+                let previewText = `${icon} ${label}`;
+                if (outcome === 'missed') previewText = `${icon} Missed ${label.toLowerCase()}`;
+                else if (outcome === 'declined') previewText = `${icon} ${label} declined`;
+                else if (outcome === 'cancelled') previewText = `${icon} ${label}`;
 
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
@@ -24316,13 +24387,13 @@
                 // person's own direction (outgoing vs incoming) on the same call.
                 const myLogKey = push(ref(database, `call_log/${user.uid}`)).key;
                 updates[`call_log/${user.uid}/${myLogKey}`] = {
-                    type: 'dm', peerUid: otherUid,
+                    type: 'dm', peerUid: otherUid, isVideo: wasVideo,
                     direction: isCaller ? 'outgoing' : 'incoming',
                     status: outcome, duration: durationSec || 0, timestamp: msgPayload.createdAt
                 };
                 const otherLogKey = push(ref(database, `call_log/${otherUid}`)).key;
                 updates[`call_log/${otherUid}/${otherLogKey}`] = {
-                    type: 'dm', peerUid: user.uid,
+                    type: 'dm', peerUid: user.uid, isVideo: wasVideo,
                     direction: isCaller ? 'incoming' : 'outgoing',
                     status: outcome, duration: durationSec || 0, timestamp: msgPayload.createdAt
                 };
@@ -24334,25 +24405,32 @@
         document.getElementById('btn-call-voice').addEventListener('click', () => {
             if (!activeChatUid || activeChatUid === AI_UID) return;
             const profile = cachedUsers[activeChatUid] || {};
-            startVoiceCall(activeChatUid, profile.name || document.getElementById('chat-view-name').textContent, profile.photoURL || '');
+            startCall(activeChatUid, profile.name || document.getElementById('chat-view-name').textContent, profile.photoURL || '', false);
+        });
+        document.getElementById('btn-call-video').addEventListener('click', () => {
+            if (!activeChatUid || activeChatUid === AI_UID) return;
+            const profile = cachedUsers[activeChatUid] || {};
+            startCall(activeChatUid, profile.name || document.getElementById('chat-view-name').textContent, profile.photoURL || '', true);
         });
         document.getElementById('btn-call-cancel').addEventListener('click', () => endActiveCall());
         document.getElementById('btn-call-end').addEventListener('click', () => endActiveCall());
         document.getElementById('btn-call-decline').addEventListener('click', () => declineIncomingCall());
         document.getElementById('btn-call-accept').addEventListener('click', () => acceptIncomingCall());
         document.getElementById('btn-call-mute').addEventListener('click', () => {
-            if (!callLocalStream) return;
+            if (!callLocalAudioTrack) return;
             callIsMuted = !callIsMuted;
-            callLocalStream.getAudioTracks().forEach(t => t.enabled = !callIsMuted);
+            callLocalAudioTrack.setEnabled(!callIsMuted);
             document.getElementById('btn-call-mute').classList.toggle('on', callIsMuted);
+        });
+        document.getElementById('btn-call-camera').addEventListener('click', () => {
+            if (!callLocalVideoTrack) return;
+            callCameraOn = !callCameraOn;
+            callLocalVideoTrack.setEnabled(callCameraOn);
+            document.getElementById('btn-call-camera').classList.toggle('on', !callCameraOn);
         });
         document.getElementById('btn-call-speaker').addEventListener('click', async () => {
             callIsSpeaker = !callIsSpeaker;
             document.getElementById('btn-call-speaker').classList.toggle('on', callIsSpeaker);
-            const audioEl = document.getElementById('call-remote-audio');
-            if (audioEl && typeof audioEl.setSinkId === 'function') {
-                try { await audioEl.setSinkId(callIsSpeaker ? 'default' : ''); } catch (e) {}
-            }
         });
 
         // --- GROUP VOICE CALLS (full-mesh WebRTC, signaled over Firebase Realtime Database) ---
@@ -26228,6 +26306,7 @@
             const isAIChat = otherUid === AI_UID;
             document.getElementById('btn-user-info').style.display = isAIChat ? 'none' : 'block';
             document.getElementById('btn-call-voice').style.display = isAIChat ? 'none' : 'flex';
+            document.getElementById('btn-call-video').style.display = isAIChat ? 'none' : 'flex';
             document.getElementById('btn-group-call-voice').style.display = 'none';
             unwatchGroupCallBanner();
             document.getElementById('chat-attach-btn').style.display = isAIChat ? 'none' : 'flex';

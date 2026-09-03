@@ -23330,9 +23330,10 @@
                 const profile = cachedUsers[entry.peerUid] || { name: 'Unknown User', photoURL: '' };
                 displayName = profile.name || 'Unknown User';
                 avatarHtml = callHistoryAvatarHtml(displayName, profile.photoURL);
-                const statusLabel = entry.status === 'missed' ? 'Missed voice call'
-                    : entry.status === 'declined' ? (entry.direction === 'outgoing' ? 'Voice call declined' : 'Declined voice call')
-                    : 'Voice call';
+                const callLabel = entry.isVideo ? 'Video call' : 'Voice call';
+                const statusLabel = entry.status === 'missed' ? `Missed ${callLabel.toLowerCase()}`
+                    : entry.status === 'declined' ? (entry.direction === 'outgoing' ? `${callLabel} declined` : `Declined ${callLabel.toLowerCase()}`)
+                    : callLabel;
                 subLabel = statusLabel;
                 iconHtml = callDirectionIconSvg(entry.direction, entry.status);
                 callAgainUid = entry.peerUid;
@@ -26675,22 +26676,24 @@
                         } else if (msg.mediaType === 'call') {
                             const isOutgoing = msg.senderUid === user.uid;
                             const missed = msg.callStatus === 'missed' || msg.callStatus === 'declined';
+                            const isVideoCall = !!msg.callIsVideo;
                             const card = document.createElement('div');
                             card.className = 'msg-call-card';
                             const iconPath = isOutgoing
                                 ? '<path d="M17 7L7 17"></path><path d="M8 7h9v9"></path>'
                                 : '<path d="M7 17L17 7"></path><path d="M16 17H7V8"></path>';
+                            const callLabel = isVideoCall ? 'Video call' : 'Voice call';
                             let subText;
                             if (msg.callStatus === 'completed') subText = formatVoiceTime(msg.callDuration || 0);
-                            else if (msg.callStatus === 'missed') subText = isOutgoing ? 'No answer' : 'Missed call';
+                            else if (msg.callStatus === 'missed') subText = isOutgoing ? 'No answer' : `Missed ${callLabel.toLowerCase()}`;
                             else if (msg.callStatus === 'declined') subText = isOutgoing ? 'Declined' : 'You declined';
-                            else subText = 'Voice call';
+                            else subText = callLabel;
                             card.innerHTML = `
                                 <div class="msg-call-icon${missed ? ' missed' : ''}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${iconPath}</svg>
                                 </div>
                                 <div class="msg-call-text">
-                                    <span class="msg-call-title${missed ? ' missed' : ''}">Voice call</span>
+                                    <span class="msg-call-title${missed ? ' missed' : ''}">${callLabel}</span>
                                     <span class="msg-call-sub">${subText}</span>
                                 </div>`;
                             bubble.appendChild(card);

@@ -603,3 +603,146 @@ exports.generateAgoraToken = onCall({ secrets: [AGORA_APP_CERTIFICATE] }, (reque
 
     return { token, uid, appId: AGORA_APP_ID };
 });
+
+// --- HABA AI VOICE (Agora Conversational AI Engine) ---
+//
+// "Talk to Haba AI" voice feature. Starts/stops a Conversational AI Engine agent that joins
+// the same Agora channel as the human (who joins client-side via generateAgoraToken above)
+// and talks with them using the same xAI/Grok personality as habaAIChat's text chat.
+//
+// Reuses this file's existing AGORA_APP_ID, AGORA_APP_CERTIFICATE, XAI_API_KEY, and XAI_MODEL
+// bindings — no separate secrets for those. New secrets needed, only for these two functions:
+//  - AGORA_CUSTOMER_ID     — RESTful API auth Customer ID (Agora Console), DIFFERENT from the
+//                            App Certificate — used only to authenticate server-to-server calls
+//                            to the Conversational AI REST API (start/stop the agent).
+//  - AGORA_CUSTOMER_SECRET — the paired Customer Secret from the same place.
+// Setup: enable "Conversational AI Engine" on the haba Agora project, create the Customer
+// ID/Secret under RESTful API auth, then:
+//   firebase functions:secrets:set AGORA_CUSTOMER_ID
+//   firebase functions:secrets:set AGORA_CUSTOMER_SECRET
+//   npm install agora-token   (already a dependency, used by generateAgoraToken above)
+//
+// Two things worth double-checking before this goes live:
+// - `llm.vendor: 'custom'` below is a best-effort read of Agora's docs for a BYOK,
+//   OpenAI-compatible endpoint (xAI's API is OpenAI-compatible) — check
+//   https://docs.agora.io/en/conversational-ai/models/llm/overview before deploying and
+//   adjust the vendor string if Agora expects something else.
+// - `credential_mode` is deliberately left off the `llm` block (only `asr`/`tts` use
+//   `credential_mode: 'managed'`, Agora's own hosted providers) since BYOK is the default when
+//   you supply your own `api_key`/`url`. If Agora's API rejects the request, it likely wants an
+//   explicit value there instead — check the same docs page.
+
+const AGORA_CUSTOMER_ID = defineSecret("AGORA_CUSTOMER_ID");
+const AGORA_CUSTOMER_SECRET = defineSecret("AGORA_CUSTOMER_SECRET");
+
+// Fixed numeric uid the agent joins as — the human's uid is always a random 1..1e8 value
+// generated client-side (see generateAgoraToken call sites), so 0 never collides with it.
+const AGENT_RTC_UID = 0;
+const AGENT_TOKEN_TTL_SECONDS = 3600;
+
+/**
+ * Called after the human has already joined the Agora channel (client-side, using the
+ * existing generateAgoraToken flow). Starts a Conversational AI Engine agent that joins the
+ * same channel and begins talking with them.
+ *
+ * @param {{ channelName: string, remoteUid: number }} request.data
+ * @returns {{ agentId: string }}
+ */
+exports.startHabaAIVoiceCall = onCall(
+    { secrets: [AGORA_APP_CERTIFICATE, AGORA_CUSTOMER_ID, AGORA_CUSTOMER_SECRET, XAI_API_KEY] },
+    async (request) => {
+        if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+        const { channelName, remoteUid } = request.data || {};
+        if (!channelName || !remoteUid) {
+            throw new HttpsError("invalid-argument", "channelName and remoteUid are required.");
+        }
+
+        const appCertificate = AGORA_APP_CERTIFICATE.value();
+        const expireTs = Math.floor(Date.now() / 1000) + AGENT_TOKEN_TTL_SECONDS;
+
+        // Token the agent itself uses to authenticate when it joins the channel.
+        const agentToken = RtcTokenBuilder.buildTokenWithUid(
+            AGORA_APP_ID, appCertificate, channelName, AGENT_RTC_UID, RtcRole.PUBLISHER, expireTs, expireTs
+        );
+
+        const basicAuth = Buffer.from(`${AGORA_CUSTOMER_ID.value()}:${AGORA_CUSTOMER_SECRET.value()}`).toString("base64");
+
+        const body = {
+            name: `haba-ai-${request.auth.uid}-${Date.now()}`,
+            properties: {
+                channel: channelName,
+                token: agentToken,
+                agent_rtc_uid: String(AGENT_RTC_UID),
+                remote_rtc_uids: [String(remoteUid)],
+                idle_timeout: 60,
+                asr: {
+                    credential_mode: "managed",
+                    vendor: "deepgram",
+                    params: { model: "nova-3", language: "en-US" }
+                },
+                llm: {
+                    vendor: "custom", // see the note above before going live
+                    style: "openai",  // xAI's API is OpenAI-compatible
+                    url: XAI_ENDPOINT,
+                    api_key: XAI_API_KEY.value(),
+                    system_messages: [{
+                        role: "system",
+                        content: "You are Haba AI, the friendly built-in voice assistant inside the Haba app. Keep replies short, warm, and conversational — you're being heard, not read."
+                    }],
+                    greeting_message: "Hey, it's Haba AI — what's up?",
+                    failure_message: "Sorry, I didn't catch that — can you say it again?",
+                    max_history: 10,
+                    params: { model: XAI_MODEL }
+                },
+                tts: {
+                    credential_mode: "managed",
+                    vendor: "minimax",
+                    params: { model: "speech-2.6-turbo", voice_setting: { voice_id: "English_captivating_female1" } }
+                }
+            }
+        };
+
+        const resp = await fetch(`https://api.agora.io/api/conversational-ai-agent/v2/projects/${AGORA_APP_ID}/join`, {
+            method: "POST",
+            headers: { Authorization: `Basic ${basicAuth}`, "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            logger.error("Agora Conversational AI join failed", { status: resp.status, data });
+            throw new HttpsError("internal", data.message || data.detail || "Could not start Haba AI voice agent.");
+        }
+
+        return { agentId: data.agent_id };
+    }
+);
+
+/**
+ * Stops a running Conversational AI Engine agent.
+ *
+ * @param {{ agentId: string }} request.data
+ * @returns {{ stopped: true }}
+ */
+exports.stopHabaAIVoiceCall = onCall(
+    { secrets: [AGORA_CUSTOMER_ID, AGORA_CUSTOMER_SECRET] },
+    async (request) => {
+        if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
+        const { agentId } = request.data || {};
+        if (!agentId) throw new HttpsError("invalid-argument", "agentId is required.");
+
+        const basicAuth = Buffer.from(`${AGORA_CUSTOMER_ID.value()}:${AGORA_CUSTOMER_SECRET.value()}`).toString("base64");
+
+        const resp = await fetch(
+            `https://api.agora.io/api/conversational-ai-agent/v2/projects/${AGORA_APP_ID}/agents/${agentId}/leave`,
+            { method: "POST", headers: { Authorization: `Basic ${basicAuth}` } }
+        );
+        if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            logger.error("Agora Conversational AI leave failed", { status: resp.status, data });
+            // Don't throw — the client is already tearing its own UI down at this point, and a
+            // stuck agent will still self-terminate via idle_timeout even if this call fails.
+        }
+
+        return { stopped: true };
+    }
+);

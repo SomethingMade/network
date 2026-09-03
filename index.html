@@ -6921,7 +6921,7 @@
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <!-- Agora Web SDK (RTC) — powers the Live feature: single host broadcasting to viewers,
          with the host able to pull viewers up on-stage as co-hosts mid-broadcast. -->
-    <script src="https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.20.2/AgoraRTC_N-production.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.2.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
@@ -16774,8 +16774,31 @@
             document.getElementById('btn-live-room-end').textContent = isLiveHost ? 'End' : 'Leave';
 
             try {
+                // A stale session (e.g. a previous join that didn't clean up, or a page
+                // refresh mid-call) can leave the client already connected — Agora throws
+                // if you join again on top of that, so clear it first.
+                if (client.connectionState && client.connectionState !== 'DISCONNECTED') {
+                    await client.leave().catch(() => {});
+                }
+
                 await client.setClientRole(role === 'audience' ? 'audience' : 'host');
-                const agoraUid = await client.join(AGORA_APP_ID, `live_${liveId}`, null, null);
+
+                let agoraUid;
+                try {
+                    agoraUid = await client.join(AGORA_APP_ID, `live_${liveId}`, null, null);
+                } catch (joinErr) {
+                    console.error('Agora join failed', joinErr);
+                    const code = joinErr && (joinErr.code || joinErr.name);
+                    let msg = 'Could not connect to the live server.';
+                    if (code === 'CAN_NOT_GET_GATEWAY_SERVER' || code === 'INVALID_VENDOR_KEY' || code === 'INVALID_PARAMS') {
+                        msg = 'Live setup issue: check the Agora App ID and that Primary Certificate is off in the Agora Console.';
+                    } else if (code === 'DYNAMIC_KEY_TIMEOUT' || code === 'TOKEN_EXPIRED' || code === 'CAN_NOT_GET_GATEWAY_SERVER_WITH_INVALID_APP_ID' || code === 'INVALID_TOKEN') {
+                        msg = 'This Agora project requires a token. Disable Primary Certificate in the Agora Console, or add a token server.';
+                    }
+                    notify(msg, 'error');
+                    joinErr.__liveNotified = true;
+                    throw joinErr;
+                }
 
                 const myProfile = cachedUsers[user.uid] || {};
                 const myParticipantRef = ref(database, `lives/${liveId}/participants/${user.uid}`);
@@ -16790,13 +16813,20 @@
                 onDisconnect(myViewerRef).remove();
 
                 if (role !== 'audience') {
-                    [liveLocalAudioTrack, liveLocalVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
+                    try {
+                        [liveLocalAudioTrack, liveLocalVideoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
+                    } catch (mediaErr) {
+                        console.error('Camera/mic access failed', mediaErr);
+                        notify('Camera/mic access was blocked. Allow camera and microphone access to go live.', 'error');
+                        mediaErr.__liveNotified = true;
+                        throw mediaErr;
+                    }
                     renderLiveLocalTile();
                     await client.publish([liveLocalAudioTrack, liveLocalVideoTrack]);
                 }
             } catch (err) {
                 console.error('Live join failed', err);
-                notify('Could not join this live.', 'error');
+                if (!err || !err.__liveNotified) notify(err && err.message ? `Could not join this live: ${err.message}` : 'Could not join this live.', 'error');
                 leaveLiveRoom(true);
                 return;
             }

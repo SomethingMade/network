@@ -471,6 +471,7 @@ const XAI_API_KEY = defineSecret("XAI_API_KEY");
 const XAI_MODEL = "grok-4";
 const XAI_ENDPOINT = "https://api.x.ai/v1/chat/completions";
 
+
 const HABA_AI_SYSTEM_PROMPT = `You are Haba AI, the assistant built into the Haba messaging app.
 You chat with users right inside their DMs, the same as any other contact would.
 Be helpful, direct, and conversational — short, natural replies rather than long essays,
@@ -607,11 +608,18 @@ exports.generateAgoraToken = onCall({ secrets: [AGORA_APP_CERTIFICATE] }, (reque
 // --- HABA AI VOICE (Agora Conversational AI Engine) ---
 //
 // "Talk to Haba AI" voice feature. Starts/stops a Conversational AI Engine agent that joins
-// the same Agora channel as the human (who joins client-side via generateAgoraToken above)
-// and talks with them using the same xAI/Grok personality as habaAIChat's text chat.
+// the same Agora channel as the human (who joins client-side via generateAgoraToken above).
 //
-// Reuses this file's existing AGORA_APP_ID, AGORA_APP_CERTIFICATE, XAI_API_KEY, and XAI_MODEL
-// bindings — no separate secrets for those. New secrets needed, only for these two functions:
+// Runs on Agora-managed OpenAI (credential_mode: "managed") — no API key, custom endpoint,
+// or proxy needed on our side. This is deliberately NOT the same backend as habaAIChat's text
+// chat (which uses xAI/Grok, see XAI_API_KEY/XAI_MODEL above): an earlier version tried
+// routing this through xAI directly (and then through a proxy Cloud Function to work around
+// xAI rejecting fields Agora sends, like stream_options) but managed OpenAI is simpler and
+// has one less moving part to break. The system_messages/greeting/failure text below is what
+// keeps the "Haba AI" persona consistent between the two even though the model differs.
+//
+// Reuses this file's existing AGORA_APP_ID and AGORA_APP_CERTIFICATE bindings. New secrets
+// needed, only for these two functions:
 //  - AGORA_CUSTOMER_ID     — RESTful API auth Customer ID (Agora Console), DIFFERENT from the
 //                            App Certificate — used only to authenticate server-to-server calls
 //                            to the Conversational AI REST API (start/stop the agent).
@@ -621,16 +629,6 @@ exports.generateAgoraToken = onCall({ secrets: [AGORA_APP_CERTIFICATE] }, (reque
 //   firebase functions:secrets:set AGORA_CUSTOMER_ID
 //   firebase functions:secrets:set AGORA_CUSTOMER_SECRET
 //   npm install agora-token   (already a dependency, used by generateAgoraToken above)
-//
-// Two things worth double-checking before this goes live:
-// - `llm.vendor: 'custom'` below is a best-effort read of Agora's docs for a BYOK,
-//   OpenAI-compatible endpoint (xAI's API is OpenAI-compatible) — check
-//   https://docs.agora.io/en/conversational-ai/models/llm/overview before deploying and
-//   adjust the vendor string if Agora expects something else.
-// - `credential_mode` is deliberately left off the `llm` block (only `asr`/`tts` use
-//   `credential_mode: 'managed'`, Agora's own hosted providers) since BYOK is the default when
-//   you supply your own `api_key`/`url`. If Agora's API rejects the request, it likely wants an
-//   explicit value there instead — check the same docs page.
 
 const AGORA_CUSTOMER_ID = defineSecret("AGORA_CUSTOMER_ID");
 const AGORA_CUSTOMER_SECRET = defineSecret("AGORA_CUSTOMER_SECRET");
@@ -649,7 +647,7 @@ const AGENT_TOKEN_TTL_SECONDS = 3600;
  * @returns {{ agentId: string }}
  */
 exports.startHabaAIVoiceCall = onCall(
-    { secrets: [AGORA_APP_CERTIFICATE, AGORA_CUSTOMER_ID, AGORA_CUSTOMER_SECRET, XAI_API_KEY] },
+    { secrets: [AGORA_APP_CERTIFICATE, AGORA_CUSTOMER_ID, AGORA_CUSTOMER_SECRET] },
     async (request) => {
         if (!request.auth) throw new HttpsError("unauthenticated", "Sign in required.");
         const { channelName, remoteUid } = request.data || {};
@@ -684,18 +682,18 @@ exports.startHabaAIVoiceCall = onCall(
                     params: { url: "wss://api.deepgram.com/v1/listen", model: "nova-3", language: "en-US" }
                 },
                 llm: {
-                    vendor: "custom", // see the note above before going live
-                    style: "openai",  // xAI's API is OpenAI-compatible
-                    url: XAI_ENDPOINT,
-                    api_key: XAI_API_KEY.value(),
+                    credential_mode: "managed", // Agora-hosted OpenAI — no API key or custom
+                    vendor: "openai",           // endpoint needed, and no xAI compatibility
+                    style: "openai",            // quirks to work around (see git history for
+                    url: "https://api.openai.com/v1/chat/completions", // the xAI proxy this replaced).
+                    params: { model: "gpt-4o-mini" },
                     system_messages: [{
                         role: "system",
                         content: "You are Haba AI, the friendly built-in voice assistant inside the Haba app. Keep replies short, warm, and conversational — you're being heard, not read."
                     }],
                     greeting_message: "Hey, it's Haba AI — what's up?",
                     failure_message: "Sorry, I didn't catch that — can you say it again?",
-                    max_history: 10,
-                    params: { model: XAI_MODEL }
+                    max_history: 10
                 },
                 tts: {
                     credential_mode: "managed",

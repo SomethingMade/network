@@ -24113,7 +24113,11 @@
                 startAIVoiceTimer();
             } catch (err) {
                 console.error('Haba AI voice call failed to start', err);
-                notify("Couldn't start the call with Haba AI. Please try again.", 'error');
+                // Surface the real reason (e.g. Firebase callable HttpsError message from
+                // startHabaAIVoiceCall, or an Agora join failure) instead of a generic string,
+                // so this is debuggable from the toast alone without needing Cloud Function logs.
+                const reason = (err && err.message) ? err.message : 'Unknown error';
+                notify(`Couldn't start the call with Haba AI: ${reason}`, 'error');
                 closeHabaAIVoiceOverlay();
             }
         }

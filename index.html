@@ -13380,10 +13380,11 @@
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
             if (!btn) return;
             triggerHaptic(10);
-            // "Haba AI" is a shortcut into the AI chat, not a feed filter — it doesn't take
-            // over the active/selected state from For you / Following.
+            // "Haba AI" is a shortcut into a live voice call with Haba AI (Agora Conversational
+            // AI Engine), not a feed filter — it doesn't take over the active/selected state
+            // from For you / Following.
             if (btn.dataset.feedSubtab === 'ai') {
-                openChatView(AI_UID, AI_NAME, '');
+                openHabaAIVoiceOverlay();
                 return;
             }
             if (btn.classList.contains('active')) return;
@@ -23349,8 +23350,8 @@
             let snippetHtml = "";
             let badgeHtml = "";
 
-            if (isAI && !isChatPane) {
-                snippetHtml = `<p>Ask me anything</p>`;
+            if (isAI) {
+                snippetHtml = `<p>Tap to start a voice call</p>`;
             } else if (isChatPane && metaData && metaData.timestamp) {
                 const d = new Date(metaData.timestamp);
                 const timeStr = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
@@ -23769,15 +23770,15 @@
                 } catch (err) { console.error('Username assignment failed', err); }
 
                 // Seed a Haba AI entry in the chat list the first time this user logs in, so
-                // there's something to tap — a real message only gets added once they actually
-                // send one (see sendMessageToAI). Checked-then-set so repeat logins don't
-                // clobber it, and so a user who deletes/archives the AI chat isn't forced back
-                // into it on their next login.
+                // there's something to tap — tapping it opens a live voice call (see
+                // openHabaAIVoiceOverlay), not a text thread. Checked-then-set so repeat logins
+                // don't clobber it, and so a user who deletes/archives the AI entry isn't
+                // forced back into it on their next login.
                 try {
                     const aiChatSnap = await get(ref(database, `user_chats/${user.uid}/${AI_UID}`));
                     if (!aiChatSnap.exists()) {
                         await update(ref(database), {
-                            [`user_chats/${user.uid}/${AI_UID}`]: { text: 'Ask me anything', timestamp: Date.now(), unreadCount: 0 }
+                            [`user_chats/${user.uid}/${AI_UID}`]: { text: 'Tap to start a voice call', timestamp: Date.now(), unreadCount: 0 }
                         });
                     }
                 } catch (err) { console.error('Failed to seed Haba AI chat entry', err); }
@@ -26538,6 +26539,13 @@
         });
 
         function openChatView(otherUid, otherName, otherAvatar) {
+            // Haba AI no longer has a text-chat surface — every entry point that used to land
+            // here for AI_UID (feed subtab, the seeded row in the Chats list, etc.) now opens
+            // a live voice call instead, so route it there and never render the AI chat pane.
+            if (otherUid === AI_UID) {
+                openHabaAIVoiceOverlay();
+                return;
+            }
             const user = auth.currentUser;
             if (!user) return;
             activeChatUid = otherUid;

@@ -700,7 +700,14 @@ exports.startHabaAIVoiceCall = onCall(
                 tts: {
                     credential_mode: "managed",
                     vendor: "minimax",
-                    params: { model: "speech-2.6-turbo", voice_setting: { voice_id: "English_captivating_female1" } }
+                    // Same as asr.params.url above — Agora's join API requires this explicitly
+                    // even in managed mode, or it fails with "Invalid value at
+                    // properties.tts.params.url: required field is missing".
+                    params: {
+                        url: "wss://api.minimax.io/ws/v1/t2a_v2",
+                        model: "speech-2.6-turbo",
+                        voice_setting: { voice_id: "English_captivating_female1" }
+                    }
                 }
             }
         };

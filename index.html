@@ -9795,6 +9795,10 @@
         // Haba's own Cloud Function (see functions/index.js) — calls xAI directly, with the
         // system prompt and API key kept server-side. Not shared with any other app.
         const habaAIChatCallable = httpsCallable(functionsClient, 'habaAIChat');
+        // Agora's Primary Certificate is enabled on the haba project (mandatory — Agora no
+        // longer offers certificate-free projects), so every join needs a signed token minted
+        // server-side. See functions/index.js (generateAgoraToken) for the token-minting side.
+        const generateAgoraTokenCallable = httpsCallable(functionsClient, 'generateAgoraToken');
 
         // --- HABA AI ASSISTANT (xAI/Grok, via Haba's own habaAIChat Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
@@ -16785,15 +16789,25 @@
 
                 let agoraUid;
                 try {
-                    agoraUid = await client.join(AGORA_APP_ID, `live_${liveId}`, null, null);
+                    // Random 32-bit-safe uid we control client-side, so we can tie the minted
+                    // token to it and pass the SAME uid into client.join() below.
+                    agoraUid = Math.floor(Math.random() * 100000000) + 1;
+                    const tokenResult = await generateAgoraTokenCallable({ channelName: `live_${liveId}`, uid: agoraUid });
+                    const token = tokenResult.data && tokenResult.data.token;
+                    if (!token) throw new Error('No token returned');
+                    await client.join(AGORA_APP_ID, `live_${liveId}`, token, agoraUid);
                 } catch (joinErr) {
                     console.error('Agora join failed', joinErr);
                     const code = joinErr && (joinErr.code || joinErr.name);
                     let msg = 'Could not connect to the live server.';
-                    if (code === 'CAN_NOT_GET_GATEWAY_SERVER' || code === 'INVALID_VENDOR_KEY' || code === 'INVALID_PARAMS') {
-                        msg = 'Live setup issue: check the Agora App ID and that Primary Certificate is off in the Agora Console.';
+                    if (code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/unavailable') {
+                        msg = "Couldn't reach the live token server — make sure generateAgoraToken is deployed.";
+                    } else if (code === 'functions/unauthenticated') {
+                        msg = 'You need to be signed in to go live.';
+                    } else if (code === 'CAN_NOT_GET_GATEWAY_SERVER' || code === 'INVALID_VENDOR_KEY' || code === 'INVALID_PARAMS') {
+                        msg = 'Live setup issue: check the Agora App ID in the console matches the one in the app.';
                     } else if (code === 'DYNAMIC_KEY_TIMEOUT' || code === 'TOKEN_EXPIRED' || code === 'CAN_NOT_GET_GATEWAY_SERVER_WITH_INVALID_APP_ID' || code === 'INVALID_TOKEN') {
-                        msg = 'This Agora project requires a token. Disable Primary Certificate in the Agora Console, or add a token server.';
+                        msg = 'Live token was rejected — the token server\'s App Certificate may not match this project.';
                     }
                     notify(msg, 'error');
                     joinErr.__liveNotified = true;

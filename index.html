@@ -5484,9 +5484,24 @@
         </div>
     </div>
 
+    <!-- GO LIVE SHEET: title prompt shown when tapping the red "Go Live" card, replacing a
+         native window.prompt() with the app's normal bottom-sheet pattern. -->
+    <div id="go-live-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">What are you going live about?</div>
+            <input type="text" id="go-live-title-input" class="pill-input" placeholder="Give your live a title" maxlength="80" autocomplete="off">
+            <div class="modal-actions">
+                <button type="button" id="btn-cancel-go-live" class="btn-pill btn-outline">Cancel</button>
+                <button type="button" id="btn-confirm-go-live" class="btn-pill btn-primary">Go Live</button>
+            </div>
+        </div>
+    </div>
+
     <!-- LIVE ROOM: shared by host + guests + viewers. Video grid (host tile always first,
          approved guest tiles appended), live chat, and host-only guest-request management. -->
     <div id="live-room-overlay" class="live-room-overlay">
+
         <div class="live-room-stage" id="live-room-stage"></div>
         <div class="live-room-top">
             <div class="live-room-host-chip">
@@ -16702,26 +16717,37 @@
             return card;
         }
 
-        async function startLive() {
+        function openGoLiveSheet() {
             const user = auth.currentUser;
             if (!user) return;
             if (!AGORA_APP_ID || AGORA_APP_ID === 'YOUR_AGORA_APP_ID') {
                 notify('Live isn\'t set up yet — add an Agora App ID first.', 'error');
                 return;
             }
-            const title = window.prompt('What are you going live about?', '');
-            if (title === null) return; // cancelled
+            const input = document.getElementById('go-live-title-input');
+            input.value = '';
+            document.getElementById('go-live-sheet-overlay').classList.add('active');
+            setTimeout(() => input.focus(), 300);
+        }
+        function closeGoLiveSheet() {
+            document.getElementById('go-live-sheet-overlay').classList.remove('active');
+        }
+        async function confirmGoLive() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const title = document.getElementById('go-live-title-input').value.trim();
+            closeGoLiveSheet();
+            closeLiveHub();
             const myProfile = cachedUsers[user.uid] || {};
             const liveRef = push(ref(database, 'lives'));
             await set(liveRef, {
                 hostUid: user.uid,
                 hostName: user.displayName || myProfile.username || 'Host',
                 hostAvatar: user.photoURL || DEFAULT_AVATAR_URL,
-                title: title.trim() || 'Live now',
+                title: title || 'Live now',
                 startedAt: serverTimestamp(),
                 status: 'live'
             });
-            closeLiveHub();
             await joinLiveChannel(liveRef.key, 'host');
         }
 
@@ -17038,7 +17064,15 @@
         }
 
         document.getElementById('btn-close-live-hub').addEventListener('click', closeLiveHub);
-        document.getElementById('btn-start-live').addEventListener('click', startLive);
+        document.getElementById('btn-start-live').addEventListener('click', openGoLiveSheet);
+        document.getElementById('btn-cancel-go-live').addEventListener('click', closeGoLiveSheet);
+        document.getElementById('btn-confirm-go-live').addEventListener('click', confirmGoLive);
+        document.getElementById('go-live-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('go-live-sheet-overlay')) closeGoLiveSheet();
+        });
+        document.getElementById('go-live-title-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') confirmGoLive();
+        });
         document.getElementById('btn-live-room-close').addEventListener('click', () => { isLiveHost ? endLive() : leaveLiveRoom(true); });
         document.getElementById('btn-live-room-end').addEventListener('click', () => { isLiveHost ? endLive() : leaveLiveRoom(true); });
         document.getElementById('btn-live-room-mic').addEventListener('click', toggleLiveMic);

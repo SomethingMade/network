@@ -9028,6 +9028,45 @@
             closingSheetViaBackButton = false;
         });
 
+        // --- LIVE OVERLAY BACK-BUTTON HANDLING ---
+        // live-hub-overlay and live-room-overlay (and its nested requests sheet) are full-screen
+        // overlays, not `.bottom-sheet-overlay`s, so the generic tracker above doesn't cover them
+        // — and closing them for real needs an actual cleanup call (unsubscribing the live list
+        // listener, or leaving/ending the Agora session), not just toggling the 'active' class.
+        // Without this, the device back button while any of these are open fell through to the
+        // browser/OS default and closed the whole app instead of just the overlay.
+        const liveOverlayStack = [];
+        let closingLiveOverlayViaBackButton = false;
+        let suppressNextLivePopstateClose = false;
+        function pushLiveOverlay(id) {
+            liveOverlayStack.push(id);
+            history.pushState({ liveNav: liveOverlayStack.slice() }, '', location.href);
+        }
+        // Called from the overlay's own close/end/leave function once it's finished its cleanup —
+        // consumes this overlay's history entry so a later back press doesn't land on a dead entry.
+        function popLiveOverlayForClose(id) {
+            const i = liveOverlayStack.lastIndexOf(id);
+            if (i === -1) return; // not tracked, or the back-button path below already popped it
+            liveOverlayStack.splice(i, 1);
+            if (closingLiveOverlayViaBackButton) return; // browser already moved the history pointer
+            suppressNextLivePopstateClose = true;
+            history.back();
+        }
+        window.addEventListener('popstate', () => {
+            if (suppressNextLivePopstateClose) { suppressNextLivePopstateClose = false; return; }
+            if (!liveOverlayStack.length) return;
+            const topId = liveOverlayStack[liveOverlayStack.length - 1];
+            closingLiveOverlayViaBackButton = true;
+            if (topId === 'live-room-requests-sheet') {
+                closeLiveRequestsSheet();
+            } else if (topId === 'live-room-overlay') {
+                isLiveHost ? endLive() : leaveLiveRoom(true);
+            } else if (topId === 'live-hub-overlay') {
+                closeLiveHub();
+            }
+            closingLiveOverlayViaBackButton = false;
+        });
+
 
         // --- SLIDING NAV INDICATOR ---
         function updateNavIndicator() {
@@ -16709,6 +16748,7 @@
         // --- Live hub: browse/start ---
         function openLiveHub() {
             document.getElementById('live-hub-overlay').classList.add('active');
+            pushLiveOverlay('live-hub-overlay');
             const livesRef = ref(database, 'lives');
             liveHubListUnsub = onValue(livesRef, (snap) => {
                 const grid = document.getElementById('live-hub-list');
@@ -16723,6 +16763,7 @@
         function closeLiveHub() {
             document.getElementById('live-hub-overlay').classList.remove('active');
             if (liveHubListUnsub) { liveHubListUnsub(); liveHubListUnsub = null; }
+            popLiveOverlayForClose('live-hub-overlay');
         }
         function buildLiveHubCard(liveId, data) {
             const card = document.createElement('div');
@@ -16792,6 +16833,7 @@
             liveMicOn = true; liveCamOn = true; liveGuestRequestPending = false;
 
             document.getElementById('live-room-overlay').classList.add('active');
+            pushLiveOverlay('live-room-overlay');
             document.getElementById('live-room-stage').innerHTML = '';
             document.getElementById('live-room-chat-log').innerHTML = '';
             document.getElementById('btn-live-room-requests').style.display = isLiveHost ? 'flex' : 'none';
@@ -17129,6 +17171,11 @@
             document.getElementById('live-room-chat-log').innerHTML = '';
             currentLiveId = null; currentLiveRole = null; isLiveHost = false; liveGuestRequestPending = false;
             liveParticipantsCache = {}; liveAgoraUidToFbUid = {};
+            // The requests sheet may have its own history entry pushed on top of the room's —
+            // drop it from the stack too so a later back press doesn't land on a dead entry.
+            const reqIdx = liveOverlayStack.lastIndexOf('live-room-requests-sheet');
+            if (reqIdx !== -1) liveOverlayStack.splice(reqIdx, 1);
+            popLiveOverlayForClose('live-room-overlay');
         }
 
         document.getElementById('btn-close-live-hub').addEventListener('click', closeLiveHub);
@@ -17146,8 +17193,16 @@
         document.getElementById('btn-live-room-mic').addEventListener('click', toggleLiveMic);
         document.getElementById('btn-live-room-cam').addEventListener('click', toggleLiveCam);
         document.getElementById('btn-live-room-ask-join').addEventListener('click', requestToJoinLive);
-        document.getElementById('btn-live-room-requests').addEventListener('click', () => document.getElementById('live-room-requests-sheet').classList.add('active'));
-        document.getElementById('btn-close-live-requests').addEventListener('click', () => document.getElementById('live-room-requests-sheet').classList.remove('active'));
+        function openLiveRequestsSheet() {
+            document.getElementById('live-room-requests-sheet').classList.add('active');
+            pushLiveOverlay('live-room-requests-sheet');
+        }
+        function closeLiveRequestsSheet() {
+            document.getElementById('live-room-requests-sheet').classList.remove('active');
+            popLiveOverlayForClose('live-room-requests-sheet');
+        }
+        document.getElementById('btn-live-room-requests').addEventListener('click', openLiveRequestsSheet);
+        document.getElementById('btn-close-live-requests').addEventListener('click', closeLiveRequestsSheet);
         document.getElementById('live-room-chat-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.target.value.trim()) {
                 sendLiveChatMsg(e.target.value);

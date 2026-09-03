@@ -3868,6 +3868,22 @@
         /* ── GROUP CALL OVERLAY ── */
         #group-call-overlay { position: fixed; inset: 0; z-index: 100005; display: none; flex-direction: column; background: linear-gradient(160deg, #0B1F17 0%, #0E2A1F 55%, #0B1F17 100%); color: #fff; padding: 50px 20px 40px; }
         #group-call-overlay.active { display: flex; }
+
+        /* ── HABA AI VOICE OVERLAY (Agora Conversational AI Engine) ──
+           Standalone voice-chat-with-the-AI feature, separate from the human-to-human
+           #call-overlay/#group-call-overlay above. Reuses their .call-* classes for a
+           consistent look but is driven by its own Agora RTC client (see
+           startHabaAIVoiceSession) since the far end is a server-managed Conversational
+           AI Engine agent, not a peer signaled through Firebase. */
+        #ai-voice-overlay {
+            position: fixed; inset: 0; z-index: 100005; display: none;
+            flex-direction: column; align-items: center; justify-content: space-between;
+            background: linear-gradient(160deg, #0B1F17 0%, #0E2A1F 55%, #0B1F17 100%);
+            color: #fff; padding: 60px 24px 44px; text-align: center;
+        }
+        #ai-voice-overlay.active { display: flex; }
+        #ai-voice-overlay .call-ring-pulse { display: none; }
+        #ai-voice-overlay.ai-speaking .call-ring-pulse { display: block; }
         .gc-top { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 20px; flex-shrink: 0; }
         .gc-title { font-size: 18px; font-weight: 700; }
         .gc-sub { font-size: 13px; color: rgba(255,255,255,0.65); }
@@ -6345,6 +6361,16 @@
                             <input type="search" id="search-calls" placeholder="Search calls..." autocomplete="off" name="haba-search-calls" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
                         </div>
                     </div>
+                    <!-- Standalone entry point for the Agora Conversational AI Engine voice feature.
+                         Sits outside #calls-list-container (which is fully re-rendered from Firebase
+                         call-history data) so it always stays pinned above the log. -->
+                    <div class="chat-item" id="btn-open-ai-voice" style="cursor:pointer;">
+                        <div class="avatar ai-avatar-black" style="border: none; display:flex; align-items:center; justify-content:center;"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></div>
+                        <div class="chat-preview">
+                            <h3>Talk to Haba AI</h3>
+                            <div class="chat-preview-line"><p>Start a live voice conversation</p></div>
+                        </div>
+                    </div>
                     <div class="chat-list-container" id="calls-list-container"></div>
                 </div>
 
@@ -6606,6 +6632,31 @@
             </button>
         </div>
         <div id="gc-remote-audios"></div>
+    </div>
+
+    <div id="ai-voice-overlay">
+        <div class="call-top">
+            <span class="call-status-label" id="ai-voice-status-label">Connecting...</span>
+            <h2 class="call-peer-name">Haba AI</h2>
+            <span class="call-timer" id="ai-voice-timer" style="display:none;">0:00</span>
+        </div>
+        <div class="call-overlay-mid">
+            <div class="call-avatar-wrap">
+                <div class="call-ring-pulse"></div>
+                <div class="call-ring-pulse"></div>
+                <div class="call-avatar ai-avatar-black" style="display:flex; align-items:center; justify-content:center;">
+                    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4"><circle cx="12" cy="12" r="9.4"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="call-controls-row">
+            <button type="button" class="call-btn call-btn-secondary" id="btn-ai-voice-mute" title="Mute">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </button>
+            <button type="button" class="call-btn call-btn-end" id="btn-ai-voice-end" title="End">
+                <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><g transform="rotate(135 12 12)"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></g></svg>
+            </button>
+        </div>
     </div>
 
     <div id="attach-sheet-overlay" class="bottom-sheet-overlay">
@@ -9864,6 +9915,12 @@
         // longer offers certificate-free projects), so every join needs a signed token minted
         // server-side. See functions/index.js (generateAgoraToken) for the token-minting side.
         const generateAgoraTokenCallable = httpsCallable(functionsClient, 'generateAgoraToken');
+        // Starts/stops a live Agora Conversational AI Engine agent (a server-managed voice AI
+        // that joins an Agora channel and talks in real time) for the standalone "Talk to Haba
+        // AI" feature in the Calls tab. See functions/index.js (startHabaAIVoiceCall /
+        // stopHabaAIVoiceCall) — separate from habaAIChat, which powers the text-chat AI.
+        const startHabaAIVoiceCallCallable = httpsCallable(functionsClient, 'startHabaAIVoiceCall');
+        const stopHabaAIVoiceCallCallable = httpsCallable(functionsClient, 'stopHabaAIVoiceCall');
 
         // --- HABA AI ASSISTANT (xAI/Grok, via Haba's own habaAIChat Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
@@ -23956,6 +24013,130 @@
         let callInviteUnsub = null;
         let callLogged = false;
 
+        // --- HABA AI VOICE CALL (Agora Conversational AI Engine) ---
+        // Standalone feature: a live voice conversation with Haba AI, separate from the
+        // human-to-human calling above and from the text-based habaAIChat thread. Runs its
+        // own Agora RTC client/session state so it can't interfere with an in-progress human
+        // call. Flow: join the Agora channel as the human first (existing generateAgoraToken
+        // callable, same as human calls), then ask the server to start a Conversational AI
+        // Engine agent in that same channel (startHabaAIVoiceCall), which joins and starts
+        // talking. Ending the call tears both down.
+        let aiVoiceClient = null;
+        let aiVoiceLocalAudioTrack = null;
+        let aiVoiceAgentId = null;
+        let aiVoiceChannelName = null;
+        let aiVoiceConnectedAt = null;
+        let aiVoiceTimerInterval = null;
+        let aiVoiceIsMuted = false;
+        let aiVoiceIsActive = false;
+
+        function ensureAIVoiceClient() {
+            if (aiVoiceClient) return aiVoiceClient;
+            if (typeof AgoraRTC === 'undefined') {
+                notify('Voice calling failed to load. Check your connection and try again.', 'error');
+                return null;
+            }
+            aiVoiceClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+            aiVoiceClient.on('user-published', async (remoteUser, mediaType) => {
+                await aiVoiceClient.subscribe(remoteUser, mediaType);
+                if (mediaType !== 'audio' || !remoteUser.audioTrack) return;
+                remoteUser.audioTrack.play();
+                // Toggle the pulse-ring "speaking" animation off the agent's own volume level
+                // rather than a fixed timer, so it tracks pauses/turn-taking reasonably well.
+                clearInterval(remoteUser._aiVoiceSpeakingPoll);
+                remoteUser._aiVoiceSpeakingPoll = setInterval(() => {
+                    const overlay = document.getElementById('ai-voice-overlay');
+                    if (!overlay || !remoteUser.audioTrack) return;
+                    const level = remoteUser.audioTrack.getVolumeLevel ? remoteUser.audioTrack.getVolumeLevel() : 0;
+                    overlay.classList.toggle('ai-speaking', level > 0.06);
+                    if (level > 0.06) setAIVoiceStatus('Haba AI is speaking...');
+                    else if (aiVoiceIsActive) setAIVoiceStatus('Listening...');
+                }, 250);
+            });
+            aiVoiceClient.on('user-unpublished', (remoteUser) => {
+                clearInterval(remoteUser._aiVoiceSpeakingPoll);
+            });
+            return aiVoiceClient;
+        }
+
+        function setAIVoiceStatus(text) {
+            const el = document.getElementById('ai-voice-status-label');
+            if (el) el.textContent = text;
+        }
+
+        function startAIVoiceTimer() {
+            aiVoiceConnectedAt = Date.now();
+            const timerEl = document.getElementById('ai-voice-timer');
+            if (timerEl) timerEl.style.display = 'block';
+            clearInterval(aiVoiceTimerInterval);
+            aiVoiceTimerInterval = setInterval(() => {
+                if (!timerEl || !aiVoiceConnectedAt) return;
+                timerEl.textContent = formatVoiceTime(Math.floor((Date.now() - aiVoiceConnectedAt) / 1000));
+            }, 1000);
+        }
+
+        async function openHabaAIVoiceOverlay() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const overlay = document.getElementById('ai-voice-overlay');
+            if (!overlay) return;
+            overlay.classList.add('active');
+            overlay.classList.remove('ai-speaking');
+            setAIVoiceStatus('Connecting...');
+            document.getElementById('ai-voice-timer').style.display = 'none';
+            document.getElementById('btn-ai-voice-mute').classList.remove('on');
+            aiVoiceIsMuted = false;
+
+            const client = ensureAIVoiceClient();
+            if (!client) { closeHabaAIVoiceOverlay(); return; }
+
+            try {
+                aiVoiceChannelName = `haba_ai_${user.uid}_${Date.now()}`;
+                const agoraUid = Math.floor(Math.random() * 100000000) + 1;
+
+                const tokenResult = await generateAgoraTokenCallable({ channelName: aiVoiceChannelName, uid: agoraUid });
+                const token = tokenResult.data && tokenResult.data.token;
+                if (!token) throw new Error('No token returned');
+
+                await client.join(AGORA_APP_ID, aiVoiceChannelName, token, agoraUid);
+                aiVoiceLocalAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                await client.publish([aiVoiceLocalAudioTrack]);
+
+                setAIVoiceStatus('Bringing Haba AI in...');
+                const startResult = await startHabaAIVoiceCallCallable({ channelName: aiVoiceChannelName, remoteUid: agoraUid });
+                aiVoiceAgentId = startResult.data && startResult.data.agentId;
+                if (!aiVoiceAgentId) throw new Error('Agent did not start');
+
+                aiVoiceIsActive = true;
+                setAIVoiceStatus('Listening...');
+                startAIVoiceTimer();
+            } catch (err) {
+                console.error('Haba AI voice call failed to start', err);
+                notify("Couldn't start the call with Haba AI. Please try again.", 'error');
+                closeHabaAIVoiceOverlay();
+            }
+        }
+
+        async function closeHabaAIVoiceOverlay() {
+            const overlay = document.getElementById('ai-voice-overlay');
+            if (overlay) { overlay.classList.remove('active', 'ai-speaking'); }
+            aiVoiceIsActive = false;
+            clearInterval(aiVoiceTimerInterval);
+            aiVoiceTimerInterval = null;
+            aiVoiceConnectedAt = null;
+
+            const agentIdToStop = aiVoiceAgentId;
+            aiVoiceAgentId = null;
+            if (agentIdToStop) {
+                stopHabaAIVoiceCallCallable({ agentId: agentIdToStop }).catch((err) => console.error('Failed to stop Haba AI agent', err));
+            }
+
+            try { aiVoiceLocalAudioTrack && aiVoiceLocalAudioTrack.close(); } catch (e) {}
+            aiVoiceLocalAudioTrack = null;
+            try { if (aiVoiceClient && aiVoiceClient.connectionState !== 'DISCONNECTED') await aiVoiceClient.leave(); } catch (e) {}
+            aiVoiceChannelName = null;
+        }
+
         function ensureCallClient() {
             if (callClient) return callClient;
             if (typeof AgoraRTC === 'undefined') {
@@ -24477,6 +24658,14 @@
             callIsMuted = !callIsMuted;
             callLocalAudioTrack.setEnabled(!callIsMuted);
             document.getElementById('btn-call-mute').classList.toggle('on', callIsMuted);
+        });
+        document.getElementById('btn-open-ai-voice').addEventListener('click', () => openHabaAIVoiceOverlay());
+        document.getElementById('btn-ai-voice-end').addEventListener('click', () => closeHabaAIVoiceOverlay());
+        document.getElementById('btn-ai-voice-mute').addEventListener('click', () => {
+            if (!aiVoiceLocalAudioTrack) return;
+            aiVoiceIsMuted = !aiVoiceIsMuted;
+            aiVoiceLocalAudioTrack.setEnabled(!aiVoiceIsMuted);
+            document.getElementById('btn-ai-voice-mute').classList.toggle('on', aiVoiceIsMuted);
         });
         document.getElementById('btn-call-camera').addEventListener('click', () => {
             if (!callLocalVideoTrack) return;

@@ -678,7 +678,10 @@ exports.startHabaAIVoiceCall = onCall(
                 asr: {
                     credential_mode: "managed",
                     vendor: "deepgram",
-                    params: { model: "nova-3", language: "en-US" }
+                    // Agora's join API requires this even in managed mode — omitting it fails
+                    // validation with "Invalid value at properties.asr.params.url: required
+                    // field is missing".
+                    params: { url: "wss://api.deepgram.com/v1/listen", model: "nova-3", language: "en-US" }
                 },
                 llm: {
                     vendor: "custom", // see the note above before going live

@@ -1049,6 +1049,19 @@
         .tm-profile-stat-link { cursor: pointer; border-radius: 20px; padding: 6px 14px; background: var(--bg-alt); border: 1px solid var(--border-color); transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease; }
         .tm-profile-stat-link:hover { background: var(--bg-hover); border-color: rgba(var(--primary-rgb), 0.25); text-decoration: none; }
         .tm-profile-stat-link:active { transform: scale(0.96); }
+        .profile-community-pills { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; padding: 1px 0; }
+        .profile-community-pills::-webkit-scrollbar { display: none; }
+        .profile-community-pill {
+            display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+            padding: 5px 12px 5px 5px; border-radius: 20px; border: 1px solid var(--border-color);
+            background: var(--bg-alt); color: var(--text-primary); font-size: 12.5px; font-weight: 600;
+            cursor: pointer; transition: background 0.15s ease, transform 0.15s ease;
+            max-width: 160px; white-space: nowrap;
+        }
+        .profile-community-pill:hover { background: var(--bg-hover); }
+        .profile-community-pill:active { transform: scale(0.96); }
+        .profile-community-pill span:last-child { overflow: hidden; text-overflow: ellipsis; }
+        .profile-community-pill-avatar { width: 20px; height: 20px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; font-size: 10px; }
 
         .tm-profile-actions { display: flex; gap: 10px; margin-bottom: 8px; }
         .tm-profile-actions .btn-pill { padding: 13px 20px; font-size: 14.5px; font-weight: 700; width: auto; flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; }
@@ -4854,6 +4867,8 @@
                     <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                 </div>
 
+                <div class="profile-community-pills" id="my-profile-community-pills" style="display:none;"></div>
+
                 <div style="display:flex; align-items:center; gap:14px; margin-bottom:0;">
                     <p id="my-profile-follow-stats" class="tm-profile-stats" style="margin-bottom:0;"><span class="tm-profile-stat-link" data-follow-tab="followers"><b id="my-profile-followers-count">0</b> followers</span><span class="tm-profile-stat-link" data-follow-tab="following"><b id="my-profile-following-count">0</b> following</span></p>
                     <button type="button" id="btn-share-profile" class="btn-pill" style="width:auto; padding:8px 16px; font-size:13px; display:inline-flex; align-items:center; gap:6px; flex-shrink:0; background:#000; color:#fff; border:none;">
@@ -4949,6 +4964,8 @@
                         <span id="user-info-joined">—</span>
                     </span>
                 </div>
+
+                <div class="profile-community-pills" id="user-info-community-pills" style="display:none;"></div>
 
                 <p class="tm-profile-stats"><span class="tm-profile-stat-link" data-follow-tab="followers"><b id="user-info-followers-count">0</b> followers</span><span class="tm-profile-stat-link" data-follow-tab="following"><b id="user-info-following-count">0</b> following</span></p>
 
@@ -16574,6 +16591,7 @@
                 document.getElementById('new-username-input').value = '';
                 document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
                 document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
+                renderProfileCommunityPills('my-profile-community-pills', user.uid);
                 const usernameLocked = myProfile.usernameChanged && !myProfile.isBusinessAccount;
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
                 document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
@@ -19110,6 +19128,43 @@
             return `${group.name}${groupVerifiedBadge(group)}`;
         }
 
+        // Communities a given user belongs to, newest-joined-looking-first (sorted by the
+        // community's own createdAt, same ordering Explore uses) — derived from cachedCommunities'
+        // members maps rather than a separate reverse index, since the whole communities node is
+        // already cached client-side for the Communities tab.
+        function getJoinedCommunityIds(uid) {
+            if (!uid) return [];
+            return Object.keys(cachedCommunities)
+                .filter(gid => cachedCommunities[gid] && cachedCommunities[gid].members && cachedCommunities[gid].members[uid])
+                .sort((a, b) => (cachedCommunities[b].createdAt || 0) - (cachedCommunities[a].createdAt || 0));
+        }
+
+        // Renders the horizontally-scrollable "joined communities" pill row shown just above the
+        // followers/following stats on both profile sheets (own profile and viewing someone else's).
+        function renderProfileCommunityPills(containerId, uid) {
+            const wrap = document.getElementById(containerId);
+            if (!wrap) return;
+            const ids = getJoinedCommunityIds(uid);
+            if (ids.length === 0) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+            wrap.style.display = 'flex';
+            wrap.innerHTML = ids.map(gid => {
+                const g = cachedCommunities[gid];
+                const avatarHtml = g.photoURL
+                    ? `<span class="profile-community-pill-avatar" style="background-image:url('${g.photoURL}');"></span>`
+                    : `<span class="profile-community-pill-avatar" style="background-color:var(--accent-purple); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;">${groupInitials(g.name)}</span>`;
+                return `<button type="button" class="profile-community-pill" data-group-id="${gid}">${avatarHtml}<span>${groupNameLabel(g)}</span></button>`;
+            }).join('');
+        }
+
+        document.getElementById('my-profile-community-pills').addEventListener('click', (e) => {
+            const pill = e.target.closest('.profile-community-pill');
+            if (pill) openGroupChatView(pill.dataset.groupId);
+        });
+        document.getElementById('user-info-community-pills').addEventListener('click', (e) => {
+            const pill = e.target.closest('.profile-community-pill');
+            if (pill) openGroupChatView(pill.dataset.groupId);
+        });
+
         // Small "people" glyph used to prefix member-count meta lines in the Community tab,
         // matching X's style of pairing a compact icon with follower/member counts.
         const COMMUNITY_MEMBERS_ICON_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
@@ -20873,6 +20928,7 @@
             }
             document.getElementById('user-info-following-count').textContent = formatProfileCount(profile.followingCount);
             document.getElementById('user-info-followers-count').textContent = formatProfileCount(profile.followersCount);
+            renderProfileCommunityPills('user-info-community-pills', uid);
             const msgBtn = document.getElementById('btn-user-info-message');
             const followBtn = document.getElementById('btn-user-info-follow');
             const isMe = auth.currentUser && uid === auth.currentUser.uid;

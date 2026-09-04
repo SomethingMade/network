@@ -756,6 +756,10 @@
 
         /* ── BOTTOM SHEET (Profile & Context Menus) ── */
         .bottom-sheet-overlay { position: fixed; inset: 0; bottom: var(--keyboard-inset, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s, bottom 0.15s ease; display: flex; align-items: flex-end; justify-content: center; }
+        /* These two now open on top of Settings instead of replacing it (see setting-privacy/
+           setting-hidden-ads handlers), so they need to out-rank #settings-bottom-sheet-overlay
+           specifically rather than relying on DOM order within the shared .bottom-sheet-overlay z-index. */
+        #privacy-sheet-overlay, #hidden-ads-sheet-overlay { z-index: 100003; }
         #story-views-sheet-overlay { z-index: 100010; }
         #story-options-sheet-overlay { z-index: 100010; }
         #gif-picker-sheet-overlay { z-index: 100010; }
@@ -5286,7 +5290,7 @@
             <div class="wa-section">
                 <div class="wa-section-title">Privacy</div>
                 <div class="wa-list-row wa-row-clickable" id="setting-privacy">
-                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z"></path><path d="M9 12l2 2 4-4"></path></svg></div>
                     <div class="wa-row-body">
                         <span class="wa-row-title">Privacy</span>
                         <span class="wa-row-sub">Blocked contacts, chat backup</span>
@@ -9479,7 +9483,6 @@
 
         // --- Privacy Settings Shortcut ---
         document.getElementById('setting-privacy').addEventListener('click', () => {
-            settingsSheetOverlay.classList.remove('active');
             document.getElementById('privacy-sheet-overlay').classList.add('active');
         });
         document.getElementById('privacy-sheet-overlay').addEventListener('click', (e) => {
@@ -9525,7 +9528,6 @@
             });
         }
         document.getElementById('setting-hidden-ads').addEventListener('click', () => {
-            settingsSheetOverlay.classList.remove('active');
             renderHiddenAdsList();
             document.getElementById('hidden-ads-sheet-overlay').classList.add('active');
         });

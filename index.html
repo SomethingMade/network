@@ -830,6 +830,7 @@
         /* Opened from btn-start-live inside .live-hub-overlay (z-index 100050), so it needs to
            clear that layer — otherwise the sheet activates but renders behind the live hub. */
         #go-live-sheet-overlay { z-index: 100061; }
+        #create-options-sheet-overlay { z-index: 100011; }
         #story-type-sheet-overlay { z-index: 100011; }
         #story-caption-sheet-overlay { z-index: 100011; }
         #story-music-sheet-overlay { z-index: 100011; }
@@ -6788,6 +6789,34 @@
             <div class="sheet-handle"></div>
             <div id="emoji-cat-tabs" class="emoji-cat-tabs"></div>
             <div class="emoji-picker-scroll" id="emoji-picker-scroll"></div>
+        </div>
+    </div>
+
+    <div id="create-options-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 20px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Create</div>
+            <div class="wa-list-row" id="create-option-post" style="cursor:pointer;">
+                <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">New Post</span>
+                    <span class="wa-row-sub">Share text, photos, or a poll</span>
+                </div>
+            </div>
+            <div class="wa-list-row" id="create-option-story" style="cursor:pointer;">
+                <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Add Story</span>
+                    <span class="wa-row-sub">Shares to your story for 24 hours</span>
+                </div>
+            </div>
+            <div class="wa-list-row" id="create-option-live" style="cursor:pointer;">
+                <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="M4.93 4.93l1.41 1.41"></path><path d="M17.66 17.66l1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="M6.34 17.66l-1.41 1.41"></path><path d="M19.07 4.93l-1.41 1.41"></path></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Go Live</span>
+                    <span class="wa-row-sub">Broadcast to your followers in real time</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -19009,7 +19038,7 @@
                 fab.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
             } else if (hash === 'tab-status') {
                 fab.style.display = 'flex';
-                fab.title = 'New Post';
+                fab.title = 'Create';
                 fab.innerHTML = '+';
                 fab.classList.remove('fab-nav-action-chat');
                 fab.classList.remove('fab-scroll-hidden'); // always start visible on tab entry
@@ -19022,8 +19051,23 @@
             if (hash === 'tab-chats') {
                 goToTab('tab-contacts');
             } else {
-                openPostComposer();
+                document.getElementById('create-options-sheet-overlay').classList.add('active');
             }
+        });
+        document.getElementById('create-options-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'create-options-sheet-overlay') e.target.classList.remove('active');
+        });
+        document.getElementById('create-option-post').addEventListener('click', () => {
+            document.getElementById('create-options-sheet-overlay').classList.remove('active');
+            openPostComposer();
+        });
+        document.getElementById('create-option-story').addEventListener('click', () => {
+            document.getElementById('create-options-sheet-overlay').classList.remove('active');
+            document.getElementById('story-type-sheet-overlay').classList.add('active');
+        });
+        document.getElementById('create-option-live').addEventListener('click', () => {
+            document.getElementById('create-options-sheet-overlay').classList.remove('active');
+            openGoLiveSheet();
         });
         document.getElementById('post-composer-close').addEventListener('click', () => history.back());
 

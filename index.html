@@ -4398,6 +4398,29 @@
             </div>
         </div>
     </div>
+    <!-- Privacy sub-screen off the main Settings list — holds Blocked Contacts and Chat Backup,
+         which used to be flat rows directly under a "Privacy" heading in Settings itself. -->
+    <div id="privacy-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 4px;">Privacy</div>
+            <div class="wa-section" style="margin-top: 8px;">
+                <div class="wa-list-row wa-row-clickable" id="setting-chat-backup">
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Chat Backup</span>
+                        <span class="wa-row-sub">Restore encrypted DM history on new devices</span>
+                    </div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="setting-blocked-contacts">
+                    <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Blocked Contacts</span></div>
+                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Lists everyone in not_interested/{me} — the same list "Not interested in this post" and
          "Hide This Ad" (above) both write to — so people can undo either kind of hide from one
          place instead of it being a one-way action. -->
@@ -5262,17 +5285,12 @@
 
             <div class="wa-section">
                 <div class="wa-section-title">Privacy</div>
-                <div class="wa-list-row wa-row-clickable" id="setting-chat-backup">
+                <div class="wa-list-row wa-row-clickable" id="setting-privacy">
                     <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
                     <div class="wa-row-body">
-                        <span class="wa-row-title">Chat Backup</span>
-                        <span class="wa-row-sub">Restore encrypted DM history on new devices</span>
+                        <span class="wa-row-title">Privacy</span>
+                        <span class="wa-row-sub">Blocked contacts, chat backup</span>
                     </div>
-                    <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </div>
-                <div class="wa-list-row wa-row-clickable" id="setting-blocked-contacts">
-                    <div class="wa-row-icon chip-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></div>
-                    <div class="wa-row-body"><span class="wa-row-title">Blocked Contacts</span></div>
                     <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
             </div>
@@ -9459,8 +9477,18 @@
             } catch (err) { console.error('Could not play notification sound', err); }
         }
 
+        // --- Privacy Settings Shortcut ---
+        document.getElementById('setting-privacy').addEventListener('click', () => {
+            settingsSheetOverlay.classList.remove('active');
+            document.getElementById('privacy-sheet-overlay').classList.add('active');
+        });
+        document.getElementById('privacy-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'privacy-sheet-overlay') e.target.classList.remove('active');
+        });
+
         // --- Blocked Contacts Settings Shortcut ---
         document.getElementById('setting-blocked-contacts').addEventListener('click', () => {
+            document.getElementById('privacy-sheet-overlay').classList.remove('active');
             settingsSheetOverlay.classList.remove('active');
             profileSheetOverlay.classList.remove('active');
             goToTab('tab-contacts');

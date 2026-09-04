@@ -3596,13 +3596,11 @@
                 transition: transform 0.25s ease;
             }
             .side-nav.nav-scroll-hidden { transform: translateY(140%); }
-            /* Reels no longer has its own bottom-nav tab — every entry point now passes
-               fullscreen:true (see openReelViewer), so this bottom:60px case is just a
-               defensive fallback and shouldn't normally be hit. */
+            /* Default: leave the reserved nav-bar strip at the bottom uncovered so the
+               bottom nav bar stays visible while viewing reels. */
             #reel-viewer-overlay { bottom: 52px; }
-            /* Opened from a feed post's expand button (not the Reels tab) — cover the
-               full screen instead of leaving the reserved nav-bar strip at the bottom,
-               which otherwise can show whatever's behind it instead of the nav bar. */
+            /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
+               reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
             .nav-item { padding: 6px 8px; color: var(--nav-active-black); }
             .nav-item svg { stroke: var(--nav-active-black); opacity: 0.75; }
@@ -8221,9 +8219,9 @@
             track.querySelectorAll('.reel-item').forEach(el => reelObserver.observe(el));
 
             const overlay = document.getElementById('reel-viewer-overlay');
-            // Always opened from a feed post's expand button now (Reels has no bottom-nav
-            // slot anymore) — cover the full screen like the plain video/image viewers do,
-            // instead of leaving the reserved nav-bar strip at the bottom.
+            // Leave the reserved nav-bar strip at the bottom uncovered so the bottom nav
+            // stays visible while viewing reels (pass fullscreen:true to override this and
+            // cover the whole screen instead).
             overlay.classList.toggle('reel-viewer-fullscreen', !!(opts && opts.fullscreen));
             overlay.classList.add('active');
             if (window.location.hash !== '#reel-viewer') window.location.hash = 'reel-viewer';
@@ -14499,7 +14497,7 @@
                 if (card.closest('.bottom-sheet-overlay.active')) {
                     document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
                 }
-                openReelViewer(targetId, { fullscreen: true });
+                openReelViewer(targetId, { fullscreen: false });
             });
             const popoutBtn = card.querySelector('.feed-video-popout-btn');
             if (popoutBtn) popoutBtn.addEventListener('click', (e) => {
@@ -20958,7 +20956,7 @@
                         // generic video-viewer-overlay, which falls back to the browser's
                         // bare native <video controls> UI.
                         document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
-                        openReelViewer(item.dataset.postId, { fullscreen: true });
+                        openReelViewer(item.dataset.postId, { fullscreen: false });
                     } else {
                         const clickedUrl = item.dataset.imgUrl || post.imageUrl;
                         document.getElementById('image-viewer-overlay').classList.add('above-sheet');

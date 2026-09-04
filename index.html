@@ -2303,11 +2303,18 @@
            pointer-events: none) so it never intercepts taps meant for the profile button or the
            icon row it now sits just left of; reuses the splash screen's mark geometry, without
            its drop-shadow filter, tinted to the app's accent color instead of splash white. */
-        .home-header-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); cursor: pointer; z-index: 1; transition: transform 0.1s ease; }
-        .home-header-logo:active { transform: translate(-50%, -50%) scale(0.88); }
-        .home-header-logo svg { width: 24px; height: 24px; display: block; }
-        .home-header-settings-btn { position: absolute; right: 44px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); background: none; border: none; padding: 0; z-index: 1; }
+        /* Simplified Home header: title row is the single left-anchored tap target (avatar +
+           "Home" text; tapping either scrolls the feed to top, replacing the old separate
+           absolute-centered logo mark). Settings now sits in-flow in the icon row as a plain
+           32px icon button, matching .search-icon-btn sizing instead of being absolutely
+           positioned and colliding with the title. */
+        .home-header-title-row { cursor: pointer; }
+        .home-header-settings-btn { border: none; background: none; padding: 0; color: var(--text-primary); }
         .home-header-settings-btn svg { width: 20px; height: 20px; }
+        /* Streak pill lives directly in the header icon row (not buried in the "more options"
+           menu) since it's a daily-return hook — worth a permanent glanceable spot, styled via
+           the existing .streak-badge-btn pill look already used elsewhere. */
+        #tab-status .chat-header-icons .streak-badge-btn { padding: 5px 9px; font-size: 12px; }
         .chat-header-top h1 { font-family: var(--font-brand); font-size: 19px; font-weight: 400; letter-spacing: 0.5px; color: var(--text-primary); }
         .chat-header-title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
         .chat-header-logo { height: 19px; width: auto; object-fit: contain; display: block; }
@@ -6267,31 +6274,24 @@
                 <div id="tab-status" class="tab-content active-tab">
                     <div class="chat-header-area">
                         <div class="chat-header-top">
-                            <div class="home-header-logo" id="home-header-logo" role="button" tabindex="0" aria-label="Scroll to top" title="Scroll to top">
-                                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                                    <polygon points="20,80 170,30 80,110" fill="var(--primary-blue)" fill-opacity="0.75" />
-                                    <polygon points="120,180 170,30 80,110" fill="var(--primary-blue)" />
-                                    <polygon points="20,80 80,110 80,140" fill="var(--primary-blue)" fill-opacity="0.55" />
-                                </svg>
-                            </div>
-                            <button type="button" class="home-header-settings-btn" id="home-header-settings-btn" aria-label="Settings" title="Settings">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                            </button>
-                            <div class="chat-header-title-row">
+                            <div class="chat-header-title-row home-header-title-row" id="home-header-title-row" role="button" tabindex="0" aria-label="Scroll to top" title="Scroll to top">
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                                 <h1>Home</h1>
                             </div>
                             <div class="chat-header-icons">
+                                <button type="button" class="streak-badge-btn" id="streak-badge-btn" title="Daily streak" style="display:none;">
+                                    <svg class="streak-flame" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2c1 3-2 4.5-2 7a3 3 0 0 0 6 0c1.5 1.5 2 3.5 2 5.5A6.5 6.5 0 0 1 11.5 21 6.5 6.5 0 0 1 5 14.5C5 9 9 6 12 2z"/></svg>
+                                    <span id="streak-badge-count">0</span>
+                                </button>
                                 <div class="search-icon-btn js-search-open" id="home-search-icon-btn" data-search-list="discover-grid-scroll" title="Search" style="display:none;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
+                                <button type="button" class="search-icon-btn" id="home-header-settings-btn" aria-label="Settings" title="Settings">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                </button>
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="home-header-menu-dropdown">
-                                        <button type="button" class="chats-menu-item streak-badge-btn" id="streak-badge-btn" title="Daily streak" style="display:none;">
-                                            <svg class="streak-flame" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c1 3-2 4.5-2 7a3 3 0 0 0 6 0c1.5 1.5 2 3.5 2 5.5A6.5 6.5 0 0 1 11.5 21 6.5 6.5 0 0 1 5 14.5C5 9 9 6 12 2z"/></svg>
-                                            <span>Streak · <span id="streak-badge-count">0</span> days</span>
-                                        </button>
                                         <button type="button" class="chats-menu-item" id="home-header-menu-edit-profile">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
@@ -17763,18 +17763,25 @@
             if (e.target === settingsSheetOverlay) settingsSheetOverlay.classList.remove('active');
         });
 
-        // Tapping the Home header logo scrolls the feed back to the top, same shortcut as
-        // X/Instagram's wordmark tap. The logo used to be purely decorative (pointer-events:
-        // none, aria-hidden) since it just sits absolute-centered over the header row — see its
-        // CSS/HTML for the matching changes that made it interactive.
-        const homeHeaderLogo = document.getElementById('home-header-logo');
-        if (homeHeaderLogo) {
+        // Tapping the Home header title (avatar + "Home" text) scrolls the feed back to the
+        // top, same shortcut as X/Instagram's wordmark tap — previously lived on a separate
+        // decorative logo mark that sat absolute-centered over the header row and collided
+        // with the settings gear; folded into the title row itself so the header has one
+        // clean left-anchored tap target instead of overlapping absolutely-positioned pieces.
+        const homeHeaderTitleRow = document.getElementById('home-header-title-row');
+        if (homeHeaderTitleRow) {
             const scrollHomeFeedToTop = () => {
                 document.getElementById('discover-grid-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
             };
-            homeHeaderLogo.addEventListener('click', scrollHomeFeedToTop);
-            homeHeaderLogo.addEventListener('keydown', (e) => {
+            homeHeaderTitleRow.addEventListener('click', (e) => {
+                // Let the avatar keep opening the profile sheet — only the title text itself
+                // should trigger the scroll-to-top shortcut.
+                if (e.target.closest('[data-profile-trigger]')) return;
+                scrollHomeFeedToTop();
+            });
+            homeHeaderTitleRow.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
+                if (e.target.closest('[data-profile-trigger]')) return;
                 e.preventDefault();
                 scrollHomeFeedToTop();
             });

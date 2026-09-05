@@ -2437,6 +2437,21 @@
         #discover-stories-label, #stories-scroll-discover { display: none; }
         #search-fullscreen-body #discover-stories-label { display: block; }
         #search-fullscreen-body #stories-scroll-discover { display: flex; }
+
+        /* X-style Explore tabs (Trending / People) — like the Status row above, these only
+           ever render while parked inside the search fullscreen view; on the plain Home tab
+           they stay hidden so nothing changes there. */
+        .explore-tabs-bar, .explore-panel { display: none; }
+        #search-fullscreen-body .explore-tabs-bar { display: flex; margin: 4px 0 2px; border-bottom: 1px solid var(--border-color); }
+        #search-fullscreen-body .explore-panel.active { display: block; }
+        .explore-tabs-bar .feed-subtab-btn { padding: 12px 0 10px; font-size: 14.5px; }
+        .trend-item { padding: 10px 2px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
+        .trend-item:last-child { border-bottom: none; }
+        .trend-item:hover { background: var(--bg-hover); }
+        .trend-item-eyebrow { font-size: 12px; color: var(--text-secondary); margin-bottom: 1px; }
+        .trend-item-tag { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+        .trend-item-count { font-size: 12.5px; color: var(--text-secondary); margin-top: 1px; }
+        .explore-empty { padding: 24px 4px; text-align: center; font-size: 13.5px; color: var(--text-secondary); }
         .story-card-scroll::-webkit-scrollbar { display: none; }
         .story-card-scroll.uploading { opacity: 0.5; pointer-events: none; }
         .story-card { position: relative; flex-shrink: 0; width: 108px; height: 168px; border-radius: 14px; overflow: hidden; cursor: pointer; background: var(--bg-hover); }
@@ -6322,6 +6337,20 @@
                         <p class="discover-section-label" id="discover-stories-label">Status</p>
                         <div class="story-card-scroll" id="stories-scroll-discover"></div>
 
+                        <!-- X-style Explore tabs — only ever visible inside the search fullscreen
+                             view (see #search-fullscreen-body .explore-tabs-bar CSS), so the plain
+                             Home tab looks exactly as it did before. -->
+                        <div class="explore-tabs-bar" id="explore-tabs-bar">
+                            <button type="button" class="feed-subtab-btn active" data-explore-tab="trending">Trending</button>
+                            <button type="button" class="feed-subtab-btn" data-explore-tab="people">People</button>
+                        </div>
+                        <div class="explore-panel active" id="explore-panel-trending">
+                            <div id="explore-trending-list"></div>
+                        </div>
+                        <div class="explore-panel" id="explore-panel-people">
+                            <div class="discover-grid" id="explore-people-grid"></div>
+                        </div>
+
                         <!-- People-search results: only shown while the person is actively searching;
                              otherwise the feed below (with suggestion cards sprinkled through it) is
                              how people get discovered, X-style. -->
@@ -8848,6 +8877,14 @@
                     body.appendChild(el);
                 });
 
+                // Explore (Trending/People) only lives inside this Home search overlay — refresh
+                // it with the latest cached data every time it's opened, so a trend/suggestion
+                // list from an earlier session never lingers stale.
+                if (btn.id === 'home-search-icon-btn') {
+                    renderExploreTrending();
+                    renderExplorePeople();
+                }
+
                 pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the search sheet
 
                 // Some search bars (e.g. Discover) carry a history/results panel that's normally
@@ -11272,18 +11309,26 @@
             if (!grid) return;
 
             const term = (searchTerm || '').trim().toLowerCase();
+            const exploreTabsBar = document.getElementById('explore-tabs-bar');
+            const explorePanels = document.querySelectorAll('.explore-panel');
 
             // No search term: the feed (with suggestion cards woven through it) is how people
-            // get discovered, so hide the standalone results list and let the feed show.
+            // get discovered, so hide the standalone results list and let the feed show. Inside
+            // the search overlay specifically, the Explore tabs (Trending/People) take that same
+            // "nothing typed yet" slot instead of the feed (which stays hidden there regardless).
             if (!term) {
                 if (searchResultsWrap) searchResultsWrap.style.display = 'none';
                 if (feedContainer) feedContainer.style.display = '';
+                if (exploreTabsBar) exploreTabsBar.style.display = '';
+                explorePanels.forEach(p => p.style.display = '');
                 sprinkleSuggestedPeople();
                 sprinkleNewsCards();
                 return;
             }
             if (searchResultsWrap) searchResultsWrap.style.display = '';
             if (feedContainer) feedContainer.style.display = 'none';
+            if (exploreTabsBar) exploreTabsBar.style.display = 'none';
+            explorePanels.forEach(p => p.style.display = 'none');
 
             let uids = getDiscoverableUsers();
             uids = uids.filter(uid => {
@@ -11332,8 +11377,97 @@
             if (tab && tab.classList.contains('active-tab')) {
                 const searchEl = document.getElementById('search-discover');
                 renderDiscoverGrid(searchEl ? searchEl.value : '');
+                renderExploreTrending();
             }
         }
+
+        // --- Explore tabs (Trending / People) ---
+        // X-style Explore, built entirely from real app data: trending hashtags are counted
+        // live from post captions (no news/sports feed exists in the app, so those categories
+        // are intentionally left out), and People reuses the same suggested-users pool as the
+        // rest of Discover. Only ever visible inside the search fullscreen view (see CSS).
+        function renderExploreTrending() {
+            const list = document.getElementById('explore-trending-list');
+            if (!list) return;
+            const counts = {}; // hashtag -> number of posts using it
+            Object.keys(cachedPosts || {}).forEach(postId => {
+                const post = cachedPosts[postId];
+                if (!post) return;
+                extractHashtags(post.text).forEach(tag => {
+                    counts[tag] = (counts[tag] || 0) + 1;
+                });
+            });
+            const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 12);
+            if (!tags.length) {
+                list.innerHTML = `<div class="explore-empty">No trending hashtags yet — post something with a #hashtag to kick one off</div>`;
+                return;
+            }
+            list.innerHTML = tags.map(tag => `
+                <div class="trend-item" data-action="trend" data-tag="${escapeHtmlForSearch(tag)}">
+                    <div class="trend-item-eyebrow">Trending on Haba</div>
+                    <div class="trend-item-tag">#${escapeHtmlForSearch(tag)}</div>
+                    <div class="trend-item-count">${counts[tag]} post${counts[tag] === 1 ? '' : 's'}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderExplorePeople() {
+            const grid = document.getElementById('explore-people-grid');
+            if (!grid) return;
+            const uids = shuffleWithSeed(getSuggestableUsers(), 'explore-people-' + discoverShuffleSeed).slice(0, 15);
+            if (!uids.length) {
+                grid.innerHTML = `<div class="explore-empty">No one new to find right now</div>`;
+                return;
+            }
+            grid.innerHTML = uids.map(uid => {
+                const profile = cachedUsers[uid] || {};
+                const name = profile.name || 'Haba User';
+                const isBusiness = !!profile.isBusinessAccount;
+                return `
+                    <div class="discover-card" data-uid="${uid}">
+                        <div class="discover-card-avatar-wrap${isBusiness ? ' is-business' : ''}">
+                            ${feedAvatarHtml(profile, 'discover-card-avatar')}
+                        </div>
+                        <div class="discover-card-body">
+                            <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
+                            ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
+                            ${isBusiness ? `<span class="group-badge-pill gold-business discover-card-business-pill">Business</span>` : ''}
+                            <p class="discover-card-bio">${profile.about ? escapeHtmlForPost(profile.about) : 'On Haba'}</p>
+                        </div>
+                        <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        (function initExploreTabs() {
+            const bar = document.getElementById('explore-tabs-bar');
+            const trendingList = document.getElementById('explore-trending-list');
+            if (!bar) return;
+            bar.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-explore-tab]');
+                if (!btn) return;
+                bar.querySelectorAll('.feed-subtab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const target = btn.dataset.exploreTab;
+                document.getElementById('explore-panel-trending').classList.toggle('active', target === 'trending');
+                document.getElementById('explore-panel-people').classList.toggle('active', target === 'people');
+                if (target === 'people') renderExplorePeople();
+            });
+            if (trendingList) {
+                trendingList.addEventListener('click', (e) => {
+                    const item = e.target.closest('[data-action="trend"]');
+                    if (!item) return;
+                    const tag = '#' + item.dataset.tag;
+                    const input = document.getElementById('search-discover');
+                    if (!input) return;
+                    input.value = tag;
+                    input.focus();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    addDiscoverSearchHistory(tag);
+                });
+            }
+        })();
 
         document.getElementById('discover-grid-scroll').addEventListener('click', async (e) => {
             const btn = e.target.closest('.discover-card-add-btn');

@@ -2389,7 +2389,15 @@
            The old rule that hid every later sibling while the dropdown was active would have
            hidden the stories row too, so it's replaced by hiding just the feed below. */
         #search-fullscreen-body > .chat-search-dropdown#discover-search-dropdown { order: 2; }
-        #search-fullscreen-body > #discover-grid-scroll { order: 1; flex: 0 0 auto; overflow: visible; padding-bottom: 0; }
+        /* flex-shrink:0 (the old "0 0 auto" shorthand) meant this box never shrank to fit the
+           column's available height and had overflow:visible (no scroll region of its own) —
+           so once the People/Trending panel's content (e.g. a long people list) grew taller
+           than the space left under the search bar, its bottom got silently clipped by the
+           search-fullscreen-body's overflow:hidden with no way to scroll and see the rest.
+           Allowing it to shrink (flex-shrink:1, min-height:0) and scroll internally fixes that
+           while keeping its content-based sizing/order — i.e. it still hugs the stories row
+           above instead of stretching to grab the dropdown's leftover space. */
+        #search-fullscreen-body > #discover-grid-scroll { order: 1; flex: 0 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
         /* The posts feed (For you / Following) is never shown in the search view — only
            stories and the search history/results belong there. */
         #search-fullscreen-body #feed-subtabs,

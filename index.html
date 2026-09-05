@@ -14987,7 +14987,14 @@
                 || videoViewer.classList.contains('active') && videoViewer.classList.contains('above-sheet');
             const profileSheetOpen = document.getElementById('profile-bottom-sheet-overlay').classList.contains('active')
                 || document.getElementById('user-info-sheet-overlay').classList.contains('active');
-            sheetEl.classList.toggle('above-viewer', viewerElevated || profileSheetOpen);
+            // The full-page Post view (post-comments-sheet-overlay opened with fullView — see
+            // openPostComments) now covers the whole screen like a profile page. It sits later in
+            // the DOM than Post Options/Repost Options/Community Post Options, so on the shared
+            // z-index tier it would otherwise win ties and bury any of those sheets opened from
+            // within it. Treat it as an elevating factor too, same as an open profile sheet.
+            const postCommentsOverlay = document.getElementById('post-comments-sheet-overlay');
+            const postViewOpen = sheetEl !== postCommentsOverlay && postCommentsOverlay.classList.contains('active');
+            sheetEl.classList.toggle('above-viewer', viewerElevated || profileSheetOpen || postViewOpen);
         }
         function openPostComments(postId, opts = {}) {
             const fullView = !!opts.fullView;

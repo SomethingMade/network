@@ -15682,7 +15682,11 @@
 
         function scrollToAndHighlightPost(postId) {
             const card = document.querySelector(`#feed-posts-list .feed-post-card[data-post-id="${postId}"], #feed-posts-list .feed-post-card[data-content-post-id="${postId}"]`);
-            if (!card) return false;
+            // offsetParent is null while the card (or an ancestor, e.g. #feed-posts-container
+            // while it's still forced hidden inside the search overlay) isn't actually rendered —
+            // treat that the same as "not found yet" so the caller keeps retrying instead of
+            // declaring success on a card nobody can see.
+            if (!card || card.offsetParent === null) return false;
             requestAnimationFrame(() => {
                 card.scrollIntoView({ block: 'center', behavior: 'smooth' });
                 card.classList.add('post-highlight');

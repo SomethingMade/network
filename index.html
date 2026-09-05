@@ -2359,6 +2359,15 @@
         .search-dropdown-item .search-dropdown-remove:hover { background: var(--bg-input); color: var(--text-primary); }
         .search-dropdown-item mark { background: none; color: var(--primary-blue); font-weight: 700; }
 
+        /* Post results in the search dropdown render as scrollable cards (not compact list
+           rows) so a caption preview + thumbnail both have room to breathe. */
+        .search-post-card { display: flex; align-items: flex-start; gap: 10px; padding: 12px; margin: 0 0 8px; border-radius: 14px; background: var(--bg-alt); cursor: pointer; transition: background 0.15s ease; }
+        .search-post-card:hover, .search-post-card:active { background: var(--bg-hover); }
+        .search-post-card-body { flex: 1; min-width: 0; }
+        .search-post-card-author { font-size: 13.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+        .search-post-card-caption { font-size: 14px; color: var(--text-primary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .search-post-card-thumb { flex-shrink: 0; width: 56px; height: 56px; border-radius: 10px; background-size: cover; background-position: center; }
+
         /* When the search bar is opened full-screen (see initFullscreenSearch), its history/
            results panel is moved out of the input and into the scrollable body so it reads as
            a normal full page of content — not a small floating dropdown sitting on top of the
@@ -2377,6 +2386,7 @@
            stories and the search history/results belong there. */
         #search-fullscreen-body #feed-subtabs,
         #search-fullscreen-body #stories-scroll-feed,
+        #search-fullscreen-body #feed-sticky-header,
         #search-fullscreen-body #feed-posts-container { display: none !important; }
 
         /* ── WHATSAPP-STYLE FILTER CHIPS & ARCHIVED ROW ── */
@@ -11594,10 +11604,12 @@
                 const post = cachedPosts[postId];
                 if (!post || !post.text || !post.text.toLowerCase().includes(q)) return;
                 const author = cachedUsers[post.uid] || {};
-                posts.push({ postId, caption: post.text, authorName: author.name || post.name || 'Someone', avatarUrl: author.photoURL || '' });
+                const images = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+                const thumbUrl = images.length ? images[0] : (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+                posts.push({ postId, caption: post.text, authorName: author.name || post.name || 'Someone', avatarUrl: author.photoURL || '', thumbUrl });
             });
 
-            return { people: people.slice(0, 6), posts: posts.slice(0, 6) };
+            return { people: people.slice(0, 6), posts: posts.slice(0, 20) };
         }
         function hideDiscoverSearchDropdown() {
             discoverSearchDropdownEl.classList.remove('active');
@@ -11647,9 +11659,13 @@
                     </div>
                 `) +
                 section('Posts', posts, ps => `
-                    <div class="search-dropdown-item" data-action="post" data-post-id="${ps.postId}">
+                    <div class="search-post-card" data-action="post" data-post-id="${ps.postId}">
                         ${buildSearchDropdownAvatar(ps.authorName, ps.avatarUrl)}
-                        <div class="search-dropdown-text"><b>${escapeHtmlForSearch(ps.authorName)}</b>: ${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
+                        <div class="search-post-card-body">
+                            <div class="search-post-card-author">${escapeHtmlForSearch(ps.authorName)}</div>
+                            <div class="search-post-card-caption">${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
+                        </div>
+                        ${ps.thumbUrl ? `<div class="search-post-card-thumb" style="background-image:url('${ps.thumbUrl}')"></div>` : ''}
                     </div>
                 `);
             discoverSearchDropdownEl.classList.add('active');

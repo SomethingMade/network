@@ -1506,6 +1506,14 @@
         .feed-subtab-btn.active { color: var(--text-primary); }
         .feed-subtab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; width: 100%; height: 3px; border-radius: 0; background: var(--primary-blue); }
         .feed-subtab-ai-icon { width: 16px; height: 16px; border-radius: 50%; display: inline-block; vertical-align: -3px; margin-right: 6px; }
+        /* Small pulsing red dot in front of the "Live" feed subtab label, echoing the LIVE
+           badge used in the live hub drawer/cards so the tab reads as "live" at a glance. */
+        .feed-subtab-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #FF3B5C; display: inline-block; vertical-align: 1px; margin-right: 6px; }
+        .feed-subtab-btn.feed-subtab-live.active .feed-subtab-live-dot { animation: feedLiveDotPulse 1.4s ease-in-out infinite; }
+        @keyframes feedLiveDotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        /* Live tab panel reuses the drawer's live-list-grid/card styles but sits inline in the
+           feed body instead of a full-screen overlay, so it just needs its own top padding. */
+        #feed-live-panel { padding: 14px 2px 20px; }
         /* Profile posts sit inside .tm-profile-content, which has 20px of side padding for the
            rest of the profile (bio, stats, etc). Feed cards, by contrast, live in a zero-padding
            container and get their edge-to-edge look purely from .feed-post-card's own 12px/16px
@@ -6383,7 +6391,7 @@
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                                <button type="button" class="feed-subtab-btn feed-subtab-ai" data-feed-subtab="ai"><span class="ai-avatar-black feed-subtab-ai-icon" aria-hidden="true"></span>Haba AI</button>
+                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><span class="feed-subtab-live-dot" aria-hidden="true"></span>Live</button>
                             </div>
                         </div>
                         <div id="feed-posts-container">
@@ -6393,6 +6401,23 @@
                             <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
                                 <p>No posts yet. Be the first to share something!</p>
                             </div>
+                        </div>
+                        <!-- Live tab panel: same "browse/join a live broadcast" surface as the
+                             sidebar drawer's live hub (#live-hub-overlay), just rendered inline
+                             here instead of as a full-screen overlay. Hidden unless the Live
+                             subtab above is active (see feed-subtabs click handler). -->
+                        <div id="feed-live-panel" style="display:none;">
+                            <div class="live-golive-card" id="btn-start-live-feed">
+                                <div class="live-golive-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                                </div>
+                                <div class="live-golive-text">
+                                    <h4>Go Live</h4>
+                                    <p>Start broadcasting — invite viewers up as co-hosts anytime</p>
+                                </div>
+                            </div>
+                            <div class="live-list-grid" id="feed-live-list"></div>
+                            <p class="live-hub-empty" id="feed-live-empty" style="display:none;">No one's live right now. Be the first!</p>
                         </div>
                     </div>
                 </div>
@@ -11341,62 +11366,16 @@
                 return;
             }
 
-            // Hashtag searches (typed, or from tapping a Trending item) are never about people —
-            // showing the name/username grid here just means a permanent "No one found" empty
-            // state eating the top of the screen above the real results. Skip it entirely and
-            // let the dropdown's Posts section be the whole result, starting right at the top.
-            if (term.startsWith('#')) {
-                if (searchResultsWrap) searchResultsWrap.style.display = 'none';
-                if (feedContainer) feedContainer.style.display = 'none';
-                if (exploreTabsBar) exploreTabsBar.style.display = 'none';
-                explorePanels.forEach(p => p.style.display = 'none');
-                return;
-            }
-            if (searchResultsWrap) searchResultsWrap.style.display = '';
+            // Any typed search term (name/username or hashtag) is fully handled by the unified
+            // People/Posts dropdown below the search bar (see renderDiscoverSearchDropdown),
+            // which already shows its own "No results for ..." message when nothing matches.
+            // This older name/username grid+empty-state would otherwise stack a second, redundant
+            // "No one found" block above those real results. Skip it entirely while a term is
+            // typed so the dropdown's results start right at the top, directly below the search bar.
+            if (searchResultsWrap) searchResultsWrap.style.display = 'none';
             if (feedContainer) feedContainer.style.display = 'none';
             if (exploreTabsBar) exploreTabsBar.style.display = 'none';
             explorePanels.forEach(p => p.style.display = 'none');
-
-            let uids = getDiscoverableUsers();
-            uids = uids.filter(uid => {
-                const p = cachedUsers[uid] || {};
-                return (p.name && p.name.toLowerCase().includes(term)) ||
-                       (p.username && p.username.toLowerCase().includes(term));
-            });
-
-            grid.innerHTML = '';
-
-            if (!uids.length) {
-                if (sectionLabel) sectionLabel.textContent = '';
-                document.getElementById('discover-empty-title').textContent = term ? 'No one found' : 'No one new to find right now';
-                document.getElementById('discover-empty-sub').textContent = term ? 'Try a different name or username' : 'Check back later, or invite friends to join Haba';
-                if (emptyState) emptyState.style.display = 'flex';
-                return;
-            }
-            if (emptyState) emptyState.style.display = 'none';
-            if (sectionLabel) sectionLabel.textContent = term ? `Results for "${searchTerm.trim()}"` : 'People you may know';
-
-            uids.forEach(uid => {
-                const profile = cachedUsers[uid] || {};
-                const name = profile.name || 'Haba User';
-                const isBusiness = !!profile.isBusinessAccount;
-                const card = document.createElement('div');
-                card.className = 'discover-card';
-                card.dataset.uid = uid;
-                card.innerHTML = `
-                    <div class="discover-card-avatar-wrap${isBusiness ? ' is-business' : ''}">
-                        ${feedAvatarHtml(profile, 'discover-card-avatar')}
-                    </div>
-                    <div class="discover-card-body">
-                        <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
-                        ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
-                        ${isBusiness ? `<span class="group-badge-pill gold-business discover-card-business-pill">Business</span>` : ''}
-                        <p class="discover-card-bio">${profile.about ? escapeHtmlForPost(profile.about) : 'On Haba'}</p>
-                    </div>
-                    <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
-                `;
-                grid.appendChild(card);
-            });
         }
 
         function renderDiscoverGridIfActive() {
@@ -13680,23 +13659,51 @@
             updateFeedEmptyState();
         }
 
+        // --- Feed "Live" subtab: an inline version of the sidebar drawer's live hub (browse
+        // people currently broadcasting, tap one to join, or start your own). Reuses the same
+        // `lives` DB node and buildLiveHubCard renderer as #live-hub-overlay — this just points
+        // them at a grid living in the feed body instead of the full-screen overlay, so the two
+        // surfaces always show the same broadcasts without duplicating any logic.
+        let feedLiveListUnsub = null;
+        function showFeedLivePanel() {
+            document.getElementById('feed-posts-container').style.display = 'none';
+            document.getElementById('feed-empty-state').style.display = 'none';
+            document.getElementById('feed-live-panel').style.display = 'block';
+            if (feedLiveListUnsub) return; // already subscribed
+            const livesRef = ref(database, 'lives');
+            feedLiveListUnsub = onValue(livesRef, (snap) => {
+                const grid = document.getElementById('feed-live-list');
+                const empty = document.getElementById('feed-live-empty');
+                if (!grid || !empty) return;
+                grid.innerHTML = '';
+                const all = snap.val() || {};
+                const activeEntries = Object.entries(all).filter(([, v]) => v && v.status === 'live');
+                empty.style.display = activeEntries.length ? 'none' : 'block';
+                activeEntries.forEach(([liveId, data]) => grid.appendChild(buildLiveHubCard(liveId, data)));
+            });
+        }
+        function hideFeedLivePanel() {
+            document.getElementById('feed-live-panel').style.display = 'none';
+            document.getElementById('feed-posts-container').style.display = '';
+            if (feedLiveListUnsub) { feedLiveListUnsub(); feedLiveListUnsub = null; }
+        }
+
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
             if (!btn) return;
             triggerHaptic(10);
-            // "Haba AI" is a shortcut into a live voice call with Haba AI (Agora Conversational
-            // AI Engine), not a feed filter — it doesn't take over the active/selected state
-            // from For you / Following.
-            if (btn.dataset.feedSubtab === 'ai') {
-                openHabaAIVoiceOverlay();
-                return;
-            }
             if (btn.classList.contains('active')) return;
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
-            applyFeedSubtabFilter();
+            if (feedActiveSubtab === 'live') {
+                showFeedLivePanel();
+            } else {
+                hideFeedLivePanel();
+                applyFeedSubtabFilter();
+            }
         });
+        document.getElementById('btn-start-live-feed')?.addEventListener('click', () => openGoLiveSheet());
 
         function updateFeedEmptyState() {
             const emptyState = document.getElementById('feed-empty-state');

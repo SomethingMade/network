@@ -10788,6 +10788,9 @@
         }
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
+        // Tracks whether the currently-open post-comments sheet is showing the full X-style
+        // Post detail view (true) or the small Comments-only drawer (false) — see openPostComments.
+        let activeCommentsIsFullView = false;
         let postCommentsUnsub = null;
         let activeReplyToComment = null; // { id, name } or null
         let oldestLoadedPostTimestamp = Infinity;
@@ -15104,8 +15107,23 @@
         }
         function openPostComments(postId, opts = {}) {
             const fullView = !!opts.fullView;
-            activeCommentsPostId = postId;
             const overlay = document.getElementById('post-comments-sheet-overlay');
+            // Guard against downgrading an already-open full Post view. The preview post card
+            // rendered INSIDE the full view (see previewEl.appendChild below) is built with the
+            // same buildFeedPostCard() used everywhere else, so it carries the same comment-icon
+            // button that plainly calls openPostComments(postId) with no opts — same as tapping
+            // a comment icon on a card out in the feed. Without this guard, tapping that icon
+            // while already viewing that exact post's full view re-ran this function in
+            // Comments-only mode (fullView false), which strips the post content, back button,
+            // and full-screen styling, effectively closing the Post view even though the sheet
+            // never actually closed. If the sheet is already open, already showing THIS post,
+            // and already in full view, a plain (non-fullView) call is that redundant tap —
+            // ignore it and leave the full view exactly as it is.
+            if (overlay.classList.contains('active') && activeCommentsPostId === postId && activeCommentsIsFullView && !fullView) {
+                return;
+            }
+            activeCommentsPostId = postId;
+            activeCommentsIsFullView = fullView;
             const sheetBox = overlay.querySelector('.bottom-sheet');
             syncSheetAboveViewer(overlay);
             overlay.classList.add('active');
@@ -15184,6 +15202,7 @@
             document.getElementById('post-comment-input').blur(); // don't leave the keyboard's owner focused for whichever post opens next
             if (postCommentsUnsub) { postCommentsUnsub(); postCommentsUnsub = null; }
             activeCommentsPostId = null;
+            activeCommentsIsFullView = false;
             setReplyToComment(null);
             clearCommentGif();
         }

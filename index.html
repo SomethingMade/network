@@ -1395,12 +1395,15 @@
         .feed-new-posts-pill-avatars .avatar:first-child { margin-left: 0; }
         .feed-new-posts-pill-avatars .feed-new-posts-avatar-extra { background: rgba(255,255,255,0.9); color: var(--primary-blue); font-size: 10.5px; }
         .feed-new-posts-pill-text { white-space: nowrap; }
-        .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
+        .feed-post-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: pointer; }
         .feed-post-card.post-highlight { animation: postHighlightFlash 2s ease-out; }
         /* Barely-there tint so a sponsored post reads as slightly distinct from organic ones
            without looking like a separate promo unit stapled into the feed. */
-        .feed-post-card[data-is-ad="1"] { background: rgba(var(--primary-rgb), 0.02); }
+        .feed-post-card[data-is-ad="1"] { background: rgba(var(--primary-rgb), 0.02); cursor: default; }
         .feed-post-card[data-is-ad="1"]:hover { background: rgba(var(--primary-rgb), 0.045); }
+        /* The read-only post preview atop the full Post view itself doesn't open anything on
+           tap (see buildFeedPostCard's opts.isPreview) — keep the cursor from implying it does. */
+        #post-comments-post-preview .feed-post-card { cursor: default; }
         @keyframes postHighlightFlash {
             0% { background: rgba(var(--primary-rgb), 0.16); }
             100% { background: var(--bg-surface); }
@@ -14380,7 +14383,7 @@
             if (totalEl) totalEl.textContent = `${total} vote${total === 1 ? '' : 's'}`;
         }
 
-        function buildFeedPostCard(postId, post) {
+        function buildFeedPostCard(postId, post, opts = {}) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
 
@@ -14639,7 +14642,7 @@
             });
 
             bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), targetId);
-            card.querySelector('.feed-comment-btn').addEventListener('click', () => openPostComments(targetId));
+            card.querySelector('.feed-comment-btn').addEventListener('click', (e) => { e.stopPropagation(); openPostComments(targetId); });
             card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(targetId); });
             const repostBtn = card.querySelector('.feed-repost-btn');
             if (repostBtn) repostBtn.addEventListener('click', (e) => {
@@ -14709,13 +14712,30 @@
             initFeedPostMusic(card);
 
             const menuBtn = card.querySelector('.feed-post-menu-btn');
-            if (menuBtn) menuBtn.addEventListener('click', () => openPostOptions(postId, wrapperPost, card));
+            if (menuBtn) menuBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostOptions(postId, wrapperPost, card); });
 
             const whyAdInline = card.querySelector('.feed-post-why-ad-inline');
             if (whyAdInline) whyAdInline.addEventListener('click', (e) => {
                 e.stopPropagation();
                 openWhyAdSheetForPost(postId, wrapperPost, card);
             });
+
+            // Tapping anywhere else on the card opens the full-page Post view (same one used
+            // from search results — see openPostComments's fullView option), X/Threads-style.
+            // Every other interactive element on the card (avatar, hashtags, like/comment/save/
+            // repost buttons, images, video controls, poll options, menu, "Why this ad") calls
+            // e.stopPropagation() in its own handler above, so this only fires for a tap on the
+            // card's remaining "dead space" — caption text, padding, the post's outer area.
+            // Skipped for the read-only preview card rendered INSIDE the full view itself
+            // (opts.isPreview — see openPostComments) since it's already that view; tapping its
+            // dead space would just re-open/re-render the same sheet on top of itself.
+            if (card.dataset.isAd !== '1' && !opts.isPreview) {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('a')) return; // let a real link (e.g. in the caption) navigate normally
+                    pauseAllFeedMedia();
+                    openPostComments(targetId, { fullView: true });
+                });
+            }
 
             return card;
         }
@@ -14977,7 +14997,8 @@
 
         // Simple click-to-like — no long-press reaction picker.
         function bindPostLikeButtonPress(likeBtn, postId) {
-            likeBtn.addEventListener('click', () => {
+            likeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 triggerHaptic(15);
                 toggleLikePost(postId);
             });
@@ -15063,7 +15084,7 @@
             if (previewEl) {
                 previewEl.innerHTML = '';
                 if (fullView && post) {
-                    previewEl.appendChild(buildFeedPostCard(postId, post));
+                    previewEl.appendChild(buildFeedPostCard(postId, post, { isPreview: true }));
                     previewEl.style.display = '';
                 } else {
                     previewEl.style.display = 'none';

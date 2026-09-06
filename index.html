@@ -15054,6 +15054,12 @@
             overlay.classList.add('active');
             const commentInput = document.getElementById('post-comment-input');
             commentInput.value = '';
+            // Blur defensively: this input is a single shared element reused across every post's
+            // comments sheet, so if it was still focused from a previous post (e.g. the user typed
+            // then tapped the post-card body instead of sending/closing), the keyboard would pop
+            // back open immediately on the next post's view with no tap at all. Opening should
+            // never itself invite the keyboard — only an explicit tap into the input should.
+            commentInput.blur();
             document.getElementById('btn-send-comment').disabled = true;
             setReplyToComment(null);
             clearCommentGif();
@@ -15077,8 +15083,14 @@
             if (spacer) spacer.style.display = fullView ? 'none' : 'block';
             if (handle) handle.style.display = fullView ? 'none' : 'block';
             if (sheetBox) {
-                sheetBox.style.maxHeight = fullView ? '100vh' : '85vh';
-                sheetBox.style.height = fullView ? '100vh' : '';
+                // Fixed 100vh here doesn't account for the overlay's own `bottom: var(--keyboard-
+                // inset)` shrinking (see .bottom-sheet-overlay CSS) once the keyboard opens — the
+                // sheet is bottom-anchored inside a now-shorter container but insists on its full
+                // original height, so it overflows past the TOP of the screen, i.e. the post at
+                // the top effectively vanishes off-screen. height:100% instead tracks whatever
+                // height the (already keyboard-aware) parent overlay actually has.
+                sheetBox.style.maxHeight = fullView ? '100%' : '85vh';
+                sheetBox.style.height = fullView ? '100%' : '';
                 sheetBox.style.borderRadius = fullView ? '0' : '';
             }
             if (previewEl) {
@@ -15105,6 +15117,7 @@
 
         function closePostComments() {
             document.getElementById('post-comments-sheet-overlay').classList.remove('active', 'above-viewer');
+            document.getElementById('post-comment-input').blur(); // don't leave the keyboard's owner focused for whichever post opens next
             if (postCommentsUnsub) { postCommentsUnsub(); postCommentsUnsub = null; }
             activeCommentsPostId = null;
             setReplyToComment(null);

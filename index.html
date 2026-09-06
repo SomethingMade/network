@@ -1822,17 +1822,24 @@
         .feed-comment-header-row .pinned-tag { font-size: 12px; color: var(--text-secondary); }
         .feed-comment-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.4; word-break: break-word; margin-top: 2px; }
         .feed-comment-reply-tag { font-size: 12.5px; font-weight: 600; color: var(--primary-blue); display: block; margin-bottom: 2px; }
-        .feed-comment-meta-row { display: flex; align-items: center; gap: 16px; margin-top: 6px; }
-        .feed-comment-meta-row .likes-count { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
-        .feed-comment-action-btn { background: none; border: none; padding: 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
-        .feed-comment-action-btn:hover { color: var(--text-primary); }
+        .feed-comment-meta-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; margin-left: -8px; }
+        .feed-comment-action-btn { background: none; border: none; padding: 4px 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-pill); }
+        .feed-comment-action-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
         .feed-comment-view-replies { display: flex; align-items: center; gap: 8px; margin-top: 10px; background: none; border: none; padding: 0; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
         .feed-comment-view-replies::before { content: ''; width: 24px; height: 1px; background: var(--border-color); flex-shrink: 0; }
         .feed-comment-view-replies:hover { color: var(--text-primary); }
-        .feed-comment-like-btn { background: none; border: none; padding: 4px; margin-top: 2px; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; display: flex; }
-        .feed-comment-like-btn svg { width: 14px; height: 14px; }
-        .feed-comment-like-btn.liked { color: var(--danger-red); }
-        .feed-comment-like-btn.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
+        /* X-style engagement row (reply / repost / like / views) under a comment's text —
+           same idea as .feed-post-actions on a full post, scaled down to comment size. */
+        .feed-comment-icon-btn { display: flex; align-items: center; gap: 4px; background: none; border: none; padding: 4px 8px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+        .feed-comment-icon-btn svg { width: 15px; height: 15px; stroke-width: 1.8; flex-shrink: 0; }
+        .feed-comment-icon-btn.js-comment-reply:hover { color: var(--primary-blue); background: rgba(29,161,242,0.1); }
+        .feed-comment-icon-btn.js-comment-repost:hover { color: var(--success-green); background: rgba(52,199,89,0.1); }
+        .feed-comment-icon-btn.js-comment-repost.reposted { color: var(--success-green); }
+        .feed-comment-icon-btn.js-comment-like:hover { color: var(--danger-red); background: rgba(249,24,128,0.1); }
+        .feed-comment-icon-btn.js-comment-like.liked { color: var(--danger-red); }
+        .feed-comment-icon-btn.js-comment-like.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
+        .feed-comment-view-stat { cursor: default; }
+        .feed-comment-view-stat:hover { background: none; color: var(--text-secondary); }
         .feed-comment-reaction-bar { display: flex; align-items: center; gap: 2px; padding: 8px 14px; border-top: 1px solid var(--border-color); overflow-x: auto; scrollbar-width: none; }
         .feed-comment-reaction-bar::-webkit-scrollbar { display: none; }
         .feed-comment-reaction-bar button { background: none; border: none; font-size: 21px; line-height: 1; padding: 6px; border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: background 0.12s ease, transform 0.12s ease; }
@@ -13138,6 +13145,11 @@
                     toggleCommentReaction(activeCommentsPostId, likeBtn.dataset.commentId);
                     return;
                 }
+                const repostBtn = e.target.closest('.js-comment-repost');
+                if (repostBtn) {
+                    toggleCommentRepost(activeCommentsPostId, repostBtn.dataset.commentId);
+                    return;
+                }
                 const deleteBtn = e.target.closest('.js-comment-delete');
                 if (deleteBtn) {
                     deleteComment(activeCommentsPostId, deleteBtn.dataset.commentId);
@@ -15329,6 +15341,7 @@
             const item = document.createElement('div');
             item.className = 'feed-comment-item' + (isReply ? ' is-reply' : '') + (hasNextReply ? ' has-next-reply' : '');
             item.dataset.commentId = commentId;
+            item.dataset.uid = comment.uid || '';
             if (isReply) {
                 item.dataset.parentId = comment.parentId || '';
                 item.style.display = 'none'; // replies start collapsed behind "view replies"
@@ -15337,6 +15350,9 @@
             const reactions = comment.reactions || {};
             const likeCount = Object.keys(reactions).length;
             const likedByMe = !!(user && reactions[user.uid]);
+            const reposts = comment.reposts || {};
+            const repostCount = Object.keys(reposts).length;
+            const repostedByMe = !!(user && reposts[user.uid]);
             const isMine = !!(user && comment.uid === user.uid);
             const liveCommenter = cachedUsers[comment.uid] || {};
             const displayName = liveCommenter.name || comment.name || 'User';
@@ -15357,17 +15373,30 @@
                     </div>
                     <div class="feed-comment-text"></div>
                     ${comment.gifUrl ? `<img class="feed-comment-gif" src="${comment.gifUrl}" alt="GIF" loading="lazy">` : ''}
-                    <div class="feed-comment-meta-row">
-                        ${likeCount > 0 ? `<span class="likes-count">${likeCount} ${likeCount === 1 ? 'like' : 'likes'}</span>` : ''}
-                        <button type="button" class="feed-comment-action-btn js-comment-reply" data-comment-id="${commentId}" data-comment-name="${replyName}" data-comment-uid="${comment.uid || ''}">Reply</button>
+                    <div class="feed-comment-actions-row">
+                        <button type="button" class="feed-comment-icon-btn js-comment-reply" data-comment-id="${commentId}" data-comment-name="${replyName}" data-comment-uid="${comment.uid || ''}" title="Reply">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                            ${replyCount ? `<span>${formatFeedCount(replyCount)}</span>` : ''}
+                        </button>
+                        <button type="button" class="feed-comment-icon-btn js-comment-repost${repostedByMe ? ' reposted' : ''}" data-comment-id="${commentId}" title="Repost">
+                            ${repostArrowsSvg()}
+                            ${repostCount ? `<span>${formatFeedCount(repostCount)}</span>` : ''}
+                        </button>
+                        <button type="button" class="feed-comment-icon-btn js-comment-like${likedByMe ? ' liked' : ''}" data-comment-id="${commentId}" title="Like">
+                            <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
+                            ${likeCount ? `<span>${formatFeedCount(likeCount)}</span>` : ''}
+                        </button>
+                        <div class="feed-comment-icon-btn feed-comment-view-stat" title="Views">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                            <span>${formatFeedCount(comment.impressionCount || 0)}</span>
+                        </div>
+                    </div>
+                    ${(isPostAuthor || isMine) ? `<div class="feed-comment-meta-row">
                         ${isPostAuthor ? `<button type="button" class="feed-comment-action-btn js-comment-pin" data-comment-id="${commentId}">${comment.pinned ? 'Unpin' : 'Pin'}</button>` : ''}
                         ${isMine ? `<button type="button" class="feed-comment-action-btn js-comment-delete" data-comment-id="${commentId}">Delete</button>` : ''}
-                    </div>
+                    </div>` : ''}
                     ${!isReply && replyCount ? `<button type="button" class="feed-comment-view-replies" data-parent-id="${commentId}" data-default-label="${repliesLabel}">${repliesLabel}</button>` : ''}
                 </div>
-                <button type="button" class="feed-comment-like-btn js-comment-like${likedByMe ? ' liked' : ''}" data-comment-id="${commentId}">
-                    <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg>
-                </button>
             `;
             item.querySelector('.name').innerHTML = escapeHtmlForPost(displayName) + verifiedBadgeFor(comment.uid, comment.uid === AI_UID);
             setExpandableFeedText(item.querySelector('.feed-comment-text'), comment.text, FEED_COMMENT_TRUNCATE_LIMIT);
@@ -15400,12 +15429,66 @@
 
             topLevel.forEach(([commentId, comment]) => {
                 const replies = repliesByParent[commentId] || [];
-                list.appendChild(buildCommentEl(commentId, comment, false, replies.length));
+                const el = buildCommentEl(commentId, comment, false, replies.length);
+                list.appendChild(el);
+                getCommentImpressionObserver().observe(el);
                 replies.forEach(([replyId, reply], idx) => {
-                    list.appendChild(buildCommentEl(replyId, reply, true, 0, idx < replies.length - 1));
+                    const replyEl = buildCommentEl(replyId, reply, true, 0, idx < replies.length - 1);
+                    list.appendChild(replyEl);
+                    getCommentImpressionObserver().observe(replyEl);
                 });
             });
             list.scrollTop = list.scrollHeight;
+        }
+
+        // Same 1s-dwell-then-count-once approach as getFeedImpressionObserver, scoped to
+        // comments/replies inside the post-comments sheet. The comments list is rebuilt from
+        // scratch (list.innerHTML = '') on every single Firebase update to the thread — even one
+        // unrelated to this comment, e.g. someone else liking a different reply — so this re-runs
+        // observe() on fresh elements often; impressedCommentIds (session-scoped, independent of
+        // the DOM) keeps that from ever double-counting the same comment for this viewer.
+        const impressedCommentIds = new Set();
+        let commentImpressionObserver = null;
+        function getCommentImpressionObserver() {
+            if (commentImpressionObserver) return commentImpressionObserver;
+            commentImpressionObserver = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    const el = entry.target;
+                    const commentId = el.dataset.commentId;
+                    if (!commentId) return;
+                    if (entry.isIntersecting) {
+                        if (el.__impressionTimer || impressedCommentIds.has(commentId)) return;
+                        el.__impressionTimer = setTimeout(() => {
+                            el.__impressionTimer = null;
+                            if (impressedCommentIds.has(commentId)) return;
+                            impressedCommentIds.add(commentId);
+                            const user = auth.currentUser;
+                            if (!user || el.dataset.uid === user.uid) return;
+                            registerCommentImpression(activeCommentsPostId, commentId, user.uid);
+                        }, 1000);
+                    } else if (el.__impressionTimer) {
+                        clearTimeout(el.__impressionTimer);
+                        el.__impressionTimer = null;
+                    }
+                });
+            }, { threshold: 0.5 });
+            return commentImpressionObserver;
+        }
+
+        // Mirrors registerPostImpression: view flag lives in a separate comment_views/{postId}/
+        // {commentId}/{uid} path (not on the comment node) so reading a comment thread doesn't
+        // balloon with view-count metadata, and a transaction guards against double-counting a
+        // race (e.g. two tabs).
+        function registerCommentImpression(postId, commentId, uid) {
+            if (!postId || !commentId) return;
+            runTransaction(ref(database, `comment_views/${postId}/${commentId}/${uid}`), (current) => {
+                if (current === true) return; // already viewed by this user — abort, no write
+                return true;
+            }).then((result) => {
+                if (result.committed) {
+                    update(ref(database, `postComments/${postId}/${commentId}`), { impressionCount: increment(1) }).catch(() => {});
+                }
+            }).catch(() => {});
         }
 
         // Only the post's own author can pin/unpin a comment on it (mirrors Instagram's rule).
@@ -15437,6 +15520,28 @@
                 }
             } catch (err) {
                 notify('Could not react to comment', 'error');
+            }
+        }
+
+        // A plain repost of a comment/reply — same on/off toggle as the reaction above, just
+        // tracked in its own reposts/{uid} map so it has an independent count. Unlike reposting a
+        // full post (see toggleRepostPost/onRepostButtonTap), this doesn't create a new feed
+        // entry or offer a quote option — a comment isn't its own feed item, so there's nowhere
+        // for a "quote" of it to live; this covers the plain-repost half of that action.
+        async function toggleCommentRepost(postId, commentId) {
+            const user = auth.currentUser;
+            if (!user || !postId || !commentId) return;
+            triggerHaptic(15);
+            const myRepostRef = ref(database, `postComments/${postId}/${commentId}/reposts/${user.uid}`);
+            try {
+                const snap = await get(myRepostRef);
+                if (snap.exists()) {
+                    await remove(myRepostRef);
+                } else {
+                    await set(myRepostRef, true);
+                }
+            } catch (err) {
+                notify('Could not repost comment', 'error');
             }
         }
 

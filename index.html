@@ -14712,6 +14712,12 @@
             card.querySelectorAll('.x-media-grid-item img').forEach(imgEl => {
                 imgEl.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    // The read-only preview card rendered INSIDE the full Post view (see
+                    // opts.isPreview a bit further down, and openPostComments's fullView option)
+                    // already shows this same image inline at full card width — opening the
+                    // full-screen image viewer on top of the Post view it's already part of adds
+                    // a redundant layer with its own back-navigation to manage, so skip it there.
+                    if (opts.isPreview) return;
                     // Same card markup/logic is reused for post cards rendered inside a bottom
                     // sheet (e.g. a profile's Posts subtab, see buildProfilePostsList) as for the
                     // main feed — elevate the viewer above that sheet when that's where the tap
@@ -14748,7 +14754,12 @@
             const videoWrap = card.querySelector('.feed-post-video-wrap');
             if (videoWrap) initFeedVideoPlayer(videoWrap);
             const expandBtn = card.querySelector('.feed-video-expand-btn');
-            if (expandBtn) expandBtn.addEventListener('click', (e) => {
+            // Same reasoning as the image click guard above: the preview card inside the full
+            // Post view already shows the video inline, so the full-screen expand/reel view
+            // isn't offered there — hide the button rather than just no-op its click, since a
+            // visible control that does nothing reads as broken.
+            if (expandBtn && opts.isPreview) expandBtn.style.display = 'none';
+            if (expandBtn && !opts.isPreview) expandBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();

@@ -6263,6 +6263,24 @@
                     <p class="toggle-auth" style="margin-top:8px;"><span id="btn-forgot-password">Forgot password?</span> &nbsp;·&nbsp; <span id="btn-back-to-phone">Use phone instead</span></p>
                 </div>
 
+                <!-- ── SET NAME STEP (first-time signup only — see promptSetName()) ──
+                     Shown before the account-type picker so a display name is always chosen
+                     deliberately by the person, never defaulted. This closes the gap where a
+                     phone signup (which never gets a Firebase Auth displayName) would otherwise
+                     fall back to showing the person's raw phone number as their public name —
+                     see the safety-net fallback in onAuthStateChanged for the defense-in-depth
+                     side of this fix. -->
+                <div id="auth-step-name" style="display:none;">
+                    <h2>What should we call you?</h2>
+                    <p>This is the name people will see on your posts, chats, and profile</p>
+
+                    <div class="input-group">
+                        <input type="text" id="auth-name-input" class="pill-input" placeholder="Your name" maxlength="50" autocomplete="off">
+                    </div>
+
+                    <button type="button" id="btn-set-name-continue" class="btn-pill btn-primary" style="margin-top: 20px;" disabled>Continue</button>
+                </div>
+
                 <!-- ── ACCOUNT TYPE STEP (first-time signup only — see promptAccountType()) ── -->
                 <div id="auth-step-account-type" style="display:none;">
                     <h2>How will you use Haba?</h2>
@@ -16789,6 +16807,7 @@
         const stepOtp = document.getElementById('auth-step-otp');
         const stepEmail = document.getElementById('auth-step-email');
         const stepAccountType = document.getElementById('auth-step-account-type');
+        const stepName = document.getElementById('auth-step-name');
         const authCardBrand = document.querySelector('.auth-card-brand');
 
         function showAuthStep(step) {
@@ -16797,6 +16816,7 @@
             stepOtp.style.display = step === 'otp' ? 'block' : 'none';
             stepEmail.style.display = step === 'email' ? 'block' : 'none';
             if (stepAccountType) stepAccountType.style.display = step === 'account-type' ? 'block' : 'none';
+            if (stepName) stepName.style.display = step === 'name' ? 'block' : 'none';
             const formSide = document.getElementById('auth-form-side');
             if (formSide) formSide.classList.toggle('auth-landing-active', step === 'landing');
             // The landing step carries its own logo/wordmark, so hide the generic mobile
@@ -16826,6 +16846,41 @@
             const resolveFn = accountTypeChoiceResolve;
             accountTypeChoiceResolve = null;
             resolveFn('business');
+        });
+
+        // First-time-signup-only display name choice — shown from onAuthStateChanged (see
+        // authGatePromise), right after a genuinely new account is created and BEFORE
+        // promptAccountType(). This exists specifically so phone signups (which never get a
+        // Firebase Auth displayName from OTP verification alone) can't fall through to the
+        // "User" defaulting logic in onAuthStateChanged and end up with their raw phone number
+        // showing as their public name on posts/chats/profile. Resolves once the person submits
+        // a non-empty name; onAuthStateChanged then calls updateProfile() with it before the
+        // very first profile write happens.
+        let setNameResolve = null;
+        function promptSetName() {
+            const input = document.getElementById('auth-name-input');
+            const continueBtn = document.getElementById('btn-set-name-continue');
+            input.value = '';
+            continueBtn.disabled = true;
+            showAuthStep('name');
+            setTimeout(() => input.focus(), 50);
+            return new Promise(resolve => { setNameResolve = resolve; });
+        }
+        document.getElementById('auth-name-input').addEventListener('input', (e) => {
+            document.getElementById('btn-set-name-continue').disabled = !e.target.value.trim();
+        });
+        document.getElementById('auth-name-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('btn-set-name-continue').disabled) {
+                document.getElementById('btn-set-name-continue').click();
+            }
+        });
+        document.getElementById('btn-set-name-continue').addEventListener('click', () => {
+            if (!setNameResolve) return;
+            const name = document.getElementById('auth-name-input').value.trim();
+            if (!name) return;
+            const resolveFn = setNameResolve;
+            setNameResolve = null;
+            resolveFn(name);
         });
 
         // Landing screen ("See what's happening" — X/Twitter-style splash before any input
@@ -17093,6 +17148,8 @@
                 await playOtpSuccessAnimation();
                 const addInfo = getAdditionalUserInfo(cred);
                 if (addInfo && addInfo.isNewUser) {
+                    const chosenName = await promptSetName();
+                    try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
                     const chosenType = await promptAccountType();
                     if (chosenType === 'business') {
                         try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
@@ -17160,6 +17217,8 @@
                 if (isSignupAttempt) {
                     const cred = await createUserWithEmailAndPassword(auth, email, password);
                     hideLoading();
+                    const chosenName = await promptSetName();
+                    try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
                     const chosenType = await promptAccountType();
                     if (chosenType === 'business') {
                         try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
@@ -24815,6 +24874,29 @@
                     authGatePromise = null;
                 }
 
+                // Accounts flagged by the phone-number-name backfill (see the standalone
+                // backfill script) need to pick a real display name before the app appears,
+                // same as a brand new signup — otherwise the safe placeholder name the backfill
+                // left in place would just sit there unnoticed. Must happen before the screen
+                // reveal below, so a targeted read of just this one field keeps the check cheap
+                // for every other (unflagged) login.
+                try {
+                    const needsNamePromptSnap = await get(ref(database, 'users/' + user.uid + '/needsNamePrompt'));
+                    if (needsNamePromptSnap.exists() && needsNamePromptSnap.val()) {
+                        // Unlike the signup flows above, this can fire on a plain page load with
+                        // an already-persisted session (no phone/OTP UI was ever shown this
+                        // visit), so #auth-screen may still be at its default display:none —
+                        // force it visible or the name step would render invisibly underneath
+                        // the not-yet-hidden messenger screen. The reveal logic right below this
+                        // block sets both screens back to their normal post-login state once we
+                        // resolve, so nothing needs to be undone here.
+                        document.getElementById('auth-screen').style.display = 'flex';
+                        const chosenName = await promptSetName();
+                        try { await updateProfile(user, { displayName: chosenName }); } catch (err) { console.error('Failed to save re-prompted display name', err); }
+                        try { await update(ref(database, 'users/' + user.uid), { needsNamePrompt: null }); } catch (err) { console.error('Failed to clear needsNamePrompt', err); }
+                    }
+                } catch (err) { console.error('Failed to check needsNamePrompt', err); }
+
                 if (!window.location.hash) {
                     const restoreHash = window.__initialHash || '#tab-status';
                     history.replaceState(null, '', restoreHash.startsWith('#') ? restoreHash : '#' + restoreHash);
@@ -24872,7 +24954,13 @@
                 } catch (err) { console.error('Failed to read existing profile before defaulting', err); }
 
                 await update(ref(database, 'users/' + user.uid), {
-                    name: user.displayName || (user.email ? user.email.split('@')[0] : (user.phoneNumber || "User")),
+                    // Defense in depth: even with promptSetName() above guaranteeing a real
+                    // display name gets chosen at signup, this still runs on every login, so it
+                    // must never be able to fall back to the person's raw phone number the way
+                    // it used to. A short uid-based placeholder is safe to show publicly and
+                    // still lets the account be recognized (e.g. in support conversations)
+                    // without leaking a real number.
+                    name: user.displayName || (user.email ? user.email.split('@')[0] : ('User' + user.uid.slice(-4))),
                     photoURL: user.photoURL || existingProfileData.photoURL || DEFAULT_AVATAR_URL,
                     email: user.email || "",
                     phoneNumber: user.phoneNumber || "",

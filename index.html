@@ -9584,28 +9584,36 @@
         }
         initTabs();
 
-        // --- SWIPE LEFT/RIGHT TO SWITCH MAIN TABS ---
-        // Attached to the shared .chat-pane wrapper that holds every top-level tab panel
-        // (Home/Chats/Groups/Contacts — see TAB_ORDER above). Tracks horizontal vs. vertical
-        // intent from the first meaningful move, same pattern as initImageViewerSwipe, so a
-        // vertical scroll (feed, chat list) never gets mistaken for a tab-switch swipe.
+        // --- SWIPE LEFT/RIGHT TO SWITCH SUBTABS (never the bottom nav bar) ---
+        // Generic, not tied to any one screen: works wherever a subtab row is currently on
+        // screen — the Feed's For you/Following/Live row, a profile sheet's Posts/Replies/
+        // Media/Saved row, Contacts' Following/Followers/Phone/Blocked row, Communities'
+        // Home/Explore row, the Explore search tabs, and any future one built on the same
+        // .feed-subtabs / .profile-subtabs / .segmented-control patterns — without needing a
+        // per-screen special case. It finds the subtab bar that lives inside whichever screen
+        // the touch actually landed in (that screen being the nearest .tab-content /
+        // .bottom-sheet-overlay / .modal-overlay ancestor), then advances/retreats it by one.
         //
-        // Deliberately skips tracking a gesture at all when it starts on an element that owns
-        // its own horizontal interaction — most importantly the feed video's progress/seek bar
-        // (.feed-video-progress-track): dragging the scrubber to seek must never be hijacked
-        // into a tab change. Also skips any native horizontally-scrollable strip under the
-        // touch point (story rail, multi-image post carousels, etc.) so those keep scrolling
-        // normally instead of fighting this gesture — checked generically by scrollWidth so it
-        // covers current and future horizontal scrollers without having to name each one.
-        (function initTabSwipeGesture() {
-            const pane = document.querySelector('.chat-pane');
-            if (!pane) return;
-
+        // The bottom nav bar (.side-nav) is a sibling of those containers, not a descendant of
+        // any of them, so a swipe starting there never matches a screen and is always a no-op —
+        // switching Home/Chats/Groups/Contacts stays tap-only, exactly as requested.
+        //
+        // Tracks horizontal vs. vertical intent from the first meaningful move, same pattern as
+        // initImageViewerSwipe, so a vertical scroll (feed, chat list) never gets mistaken for a
+        // subtab swipe. Also skips tracking entirely when a gesture starts on an element that
+        // owns its own horizontal interaction — most importantly the feed video's progress/seek
+        // bar (.feed-video-progress-track), so dragging the scrubber to seek is never hijacked —
+        // plus any native horizontally-scrollable strip under the touch point (story rail,
+        // multi-image post carousels, etc.), checked generically by scrollWidth so it covers
+        // current and future horizontal scrollers without having to name each one.
+        (function initSubtabSwipeGesture() {
             const SWIPE_EXEMPT_SELECTOR = '.feed-video-progress-track, input, textarea, [contenteditable="true"]';
+            const SCREEN_SELECTOR = '.tab-content, .bottom-sheet-overlay, .modal-overlay';
+            const SUBTAB_BAR_SELECTOR = '.feed-subtabs, .profile-subtabs, .segmented-control';
 
             function startsOnHorizontalScroller(el) {
                 let node = el;
-                while (node && node !== pane) {
+                while (node && node !== document.body) {
                     if (node.scrollWidth > node.clientWidth + 1) {
                         const overflowX = getComputedStyle(node).overflowX;
                         if (overflowX === 'auto' || overflowX === 'scroll') return true;
@@ -9615,10 +9623,23 @@
                 return false;
             }
 
-            let startX = 0, startY = 0, tracking = false, isHorizontal = null;
+            // A screen can hold more than one subtab bar in its DOM at once (e.g. Home's
+            // normally-hidden Explore-search tabs sit alongside its regular Feed tabs) —
+            // offsetParent narrows that down to whichever one is actually visible right now.
+            function findActiveSubtabBar(target) {
+                const screen = target.closest(SCREEN_SELECTOR);
+                if (!screen) return null; // e.g. the nav bar, a 1:1 chat thread — no subtabs there
+                const bars = screen.querySelectorAll(SUBTAB_BAR_SELECTOR);
+                for (const bar of bars) {
+                    if (bar.offsetParent !== null) return bar;
+                }
+                return null;
+            }
+
+            let startX = 0, startY = 0, startTarget = null, tracking = false, isHorizontal = null;
             const SWIPE_THRESHOLD = 60;
 
-            pane.addEventListener('touchstart', (e) => {
+            document.addEventListener('touchstart', (e) => {
                 const target = e.target;
                 if (target.closest(SWIPE_EXEMPT_SELECTOR) || startsOnHorizontalScroller(target)) {
                     tracking = false;
@@ -9626,11 +9647,12 @@
                 }
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
+                startTarget = target;
                 tracking = true;
                 isHorizontal = null;
             }, { passive: true });
 
-            pane.addEventListener('touchmove', (e) => {
+            document.addEventListener('touchmove', (e) => {
                 if (!tracking) return;
                 const dx = e.touches[0].clientX - startX;
                 const dy = e.touches[0].clientY - startY;
@@ -9640,19 +9662,22 @@
                 }
             }, { passive: true });
 
-            pane.addEventListener('touchend', (e) => {
+            document.addEventListener('touchend', (e) => {
                 if (!tracking || !isHorizontal) { tracking = false; return; }
                 tracking = false;
                 const dx = e.changedTouches[0].clientX - startX;
                 if (Math.abs(dx) < SWIPE_THRESHOLD) return;
 
-                const currentHash = window.location.hash.replace('#', '') || 'tab-status';
-                const idx = TAB_ORDER.indexOf(currentHash);
-                if (idx === -1) return; // e.g. the Calls sub-tab, which isn't part of the swipe order
-                const nextIdx = dx < 0 ? idx + 1 : idx - 1; // swipe left -> next tab, swipe right -> previous
-                if (nextIdx < 0 || nextIdx >= TAB_ORDER.length) return;
+                const bar = findActiveSubtabBar(startTarget);
+                if (!bar) return; // no subtab row on this screen — no-op (bottom nav bar included)
+
+                const buttons = Array.from(bar.querySelectorAll(':scope > button'));
+                const activeIdx = buttons.findIndex(b => b.classList.contains('active'));
+                if (activeIdx === -1) return;
+                const nextIdx = dx < 0 ? activeIdx + 1 : activeIdx - 1; // swipe left -> next, right -> previous
+                if (nextIdx < 0 || nextIdx >= buttons.length) return;
                 triggerHaptic(12);
-                goToTab(TAB_ORDER[nextIdx]);
+                buttons[nextIdx].click();
             });
         })();
 

@@ -9162,8 +9162,30 @@
         let lastKnownHash = window.location.hash.replace('#', '') || 'tab-status';
         const HASH_OVERLAY_NAMES = ['image-viewer', 'video-viewer', 'reel-viewer', 'view-once-audio', 'user-info', 'chat', 'story', 'post-composer'];
 
+        // Which system currently owns the entry sitting on TOP of the browser history stack:
+        // a hash-driven overlay (HASH_OVERLAY_NAMES) or one of the generic tracked bottom
+        // sheets (sheetOpenStack, declared further down). A device back press always consumes
+        // whichever one is actually on top — but a bottom sheet (e.g. the full-page Post view)
+        // can be opened WHILE a hash overlay (e.g. "#user-info") is already showing, without
+        // the hash changing at all. In that case `lastKnownHash` alone is misleading: it still
+        // reads as a HASH_OVERLAY_NAMES value even though the sheet's own pushState is what's
+        // really on top now, so a naive check against lastKnownHash would wrongly assume the
+        // hash overlay is what the next back press closes and do nothing. This flag is kept in
+        // sync at both places history actually gets pushed/replaced — handleHashChange (hash
+        // overlays) and syncSheetHistory (bottom sheets) — so the popstate listeners below can
+        // tell the two cases apart correctly regardless of which was opened first.
+        let topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(lastKnownHash) ? 'hash' : null; // 'hash' | 'sheet' | null
+
         function handleHashChange(isInitialSync) {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
+
+            // Re-derive which system now owns the top-of-history entry now that the hash has
+            // settled. If we've landed on a hash-overlay hash, that overlay's own entry is on
+            // top. Otherwise, if a bottom sheet is still open (sheetOpenStack tracked further
+            // down), it must be sitting on top instead — e.g. going back from an image viewer
+            // that was opened on top of the full Post view lands back on the Post view's own
+            // hash-unchanged entry, not on "nothing". See topHistoryEntryKind's declaration.
+            topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(hash) ? 'hash' : (sheetOpenStack.length ? 'sheet' : null);
 
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');
@@ -9348,6 +9370,12 @@
             if (!opened.length && !closed.length) return;
             closed.forEach(id => { const i = sheetOpenStack.indexOf(id); if (i !== -1) sheetOpenStack.splice(i, 1); });
             opened.forEach(id => sheetOpenStack.push(id));
+            // Keep topHistoryEntryKind in sync every time the sheet stack changes, whether this
+            // was a programmatic open/close or the result of a device back press consuming a
+            // sheet's own entry — see its declaration for why this can't just be inferred from
+            // lastKnownHash. A sheet on the stack is always what's on top; once the stack empties,
+            // the hash overlay underneath (if any) is on top again.
+            topHistoryEntryKind = sheetOpenStack.length ? 'sheet' : (HASH_OVERLAY_NAMES.includes(lastKnownHash) ? 'hash' : null);
             if (closingSheetViaBackButton) return; // browser already moved the history pointer for us
             if (opened.length && closed.length) {
                 history.replaceState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
@@ -9365,18 +9393,26 @@
         window.addEventListener('popstate', () => {
             if (suppressNextPopstateClose) { suppressNextPopstateClose = false; return; }
             if (!sheetOpenStack.length) return;
-            // If we were sitting on a hash-driven overlay (image/video/reel viewer, chat,
-            // story, etc. — see HASH_OVERLAY_NAMES) right before this back press, that overlay
-            // is what this press is closing, and handleHashChange (which runs right after this,
-            // via the separate 'hashchange' event) will close it. Popping a bottom-sheet here
-            // too would be wrong: those overlays open with their own pushed history entry ON
-            // TOP of whichever sheet was already open (e.g. tapping a photo from the full Post
-            // view pushes '#image-viewer' on top of the Post view's own entry), so a single
-            // back press should only close the topmost one — the viewer — not both. Without
-            // this guard, opening the image/video viewer from the full Post view and pressing
-            // back closed the viewer AND the Post view together, dropping straight to the feed
-            // instead of landing back on the post.
-            if (HASH_OVERLAY_NAMES.includes(lastKnownHash)) return;
+            // If a hash-driven overlay (image/video/reel viewer, chat, story, etc. — see
+            // HASH_OVERLAY_NAMES) is what's actually on top of the history stack right now,
+            // that overlay is what this back press is closing, and handleHashChange (which runs
+            // right after this, via the separate 'hashchange' event) will close it. Popping a
+            // bottom-sheet here too would be wrong: those overlays open with their own pushed
+            // history entry ON TOP of whichever sheet was already open (e.g. tapping a photo
+            // from the full Post view pushes '#image-viewer' on top of the Post view's own
+            // entry), so a single back press should only close the topmost one — the viewer —
+            // not both. Without this guard, opening the image/video viewer from the full Post
+            // view and pressing back closed the viewer AND the Post view together, dropping
+            // straight to the feed instead of landing back on the post.
+            //
+            // This checks topHistoryEntryKind rather than lastKnownHash directly: a bottom
+            // sheet can be opened WHILE a hash overlay is already showing (e.g. opening the
+            // full Post view from the "#user-info" profile sheet) without the hash changing at
+            // all, which would make lastKnownHash still read as a hash-overlay name even though
+            // the sheet's own entry is now genuinely on top. Checking lastKnownHash there would
+            // wrongly defer to handleHashChange — which has nothing to close, since the hash
+            // never changes — so the back press appeared to do nothing at all.
+            if (topHistoryEntryKind === 'hash') return;
             closingSheetViaBackButton = true;
             const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
             if (overlay) overlay.classList.remove('active');

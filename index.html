@@ -1055,6 +1055,14 @@
         .tm-profile-stat-link { cursor: pointer; border-radius: 20px; padding: 6px 14px; background: var(--bg-alt); border: 1px solid var(--border-color); transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease; }
         .tm-profile-stat-link:hover { background: var(--bg-hover); border-color: rgba(var(--primary-rgb), 0.25); text-decoration: none; }
         .tm-profile-stat-link:active { transform: scale(0.96); }
+        /* "Followed by A, B, and N others" row — X-style social proof, shown on someone ELSE's
+           profile (never my own) listing who among the people I follow also follow them. Sits
+           right under the followers/following pills, above the Message/Follow buttons. */
+        .tm-profile-followed-by { display: flex; align-items: center; gap: 8px; margin: -8px 0 18px; font-size: 13px; color: var(--text-secondary); }
+        .tm-profile-followed-by-avatars { display: flex; flex-shrink: 0; }
+        .tm-profile-followed-by-avatars .avatar { width: 20px; height: 20px; border-radius: 50%; background-size: cover; background-position: center; border: 2px solid var(--bg-primary); margin-left: -8px; }
+        .tm-profile-followed-by-avatars .avatar:first-child { margin-left: 0; }
+        .tm-profile-followed-by-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .profile-community-pills { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 0 12px; padding: 1px 0; }
         .profile-community-pills::-webkit-scrollbar { display: none; }
         .profile-community-pill {
@@ -1506,10 +1514,10 @@
         .feed-subtab-btn.active { color: var(--text-primary); }
         .feed-subtab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; width: 100%; height: 3px; border-radius: 0; background: var(--primary-blue); }
         .feed-subtab-ai-icon { width: 16px; height: 16px; border-radius: 50%; display: inline-block; vertical-align: -3px; margin-right: 6px; }
-        /* Small pulsing red dot in front of the "Live" feed subtab label, echoing the LIVE
-           badge used in the live hub drawer/cards so the tab reads as "live" at a glance. */
-        .feed-subtab-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #FF3B5C; display: inline-block; vertical-align: 1px; margin-right: 6px; }
-        .feed-subtab-btn.feed-subtab-live.active .feed-subtab-live-dot { animation: feedLiveDotPulse 1.4s ease-in-out infinite; }
+        /* Live video-camera icon in front of the "Live" feed subtab label, echoing the icon
+           used on the "Go Live" card so the tab reads as "live broadcasting" at a glance. */
+        .feed-subtab-live-icon { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; margin-right: 5px; }
+        .feed-subtab-btn.feed-subtab-live.active .feed-subtab-live-icon { color: #FF3B5C; animation: feedLiveDotPulse 1.4s ease-in-out infinite; }
         @keyframes feedLiveDotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
         /* Live tab panel reuses the drawer's live-list-grid/card styles but sits inline in the
            feed body instead of a full-screen overlay, so it just needs its own top padding. */
@@ -5051,6 +5059,11 @@
 
                 <p class="tm-profile-stats"><span class="tm-profile-stat-link" data-follow-tab="followers"><b id="user-info-followers-count">0</b> followers</span><span class="tm-profile-stat-link" data-follow-tab="following"><b id="user-info-following-count">0</b> following</span></p>
 
+                <div class="tm-profile-followed-by" id="user-info-followed-by" style="display:none;">
+                    <span class="tm-profile-followed-by-avatars" id="user-info-followed-by-avatars"></span>
+                    <span class="tm-profile-followed-by-text" id="user-info-followed-by-text"></span>
+                </div>
+
                 <div class="tm-profile-actions">
                     <button type="button" id="btn-user-info-follow" class="btn-pill btn-primary">
                         <svg id="btn-user-info-follow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
@@ -6399,7 +6412,7 @@
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><span class="feed-subtab-live-dot" aria-hidden="true"></span>Live</button>
+                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live</button>
                             </div>
                         </div>
                         <div id="feed-posts-container">
@@ -21235,6 +21248,7 @@
             }
             document.getElementById('user-info-following-count').textContent = formatProfileCount(profile.followingCount);
             document.getElementById('user-info-followers-count').textContent = formatProfileCount(profile.followersCount);
+            renderFollowedByRow(uid);
             renderProfileCommunityPills('user-info-community-pills', uid);
             const msgBtn = document.getElementById('btn-user-info-message');
             const followBtn = document.getElementById('btn-user-info-follow');
@@ -21255,6 +21269,62 @@
 
         function closeUserInfoSheet() {
             userInfoSheet.classList.remove('active');
+        }
+
+        // "Followed by A, B, and N others" — X-style social proof for someone else's profile:
+        // among the people I follow (cachedContacts), which ones also follow this profile.
+        // followers/{uid} isn't kept in a live cache for arbitrary uids (only my own, at
+        // cachedFollowers), so this does a one-time read each time a profile sheet opens rather
+        // than subscribing — it's a cosmetic row, not something that needs to update live while
+        // the sheet is open. A stale request from a since-closed sheet is guarded against below.
+        let followedByRequestId = 0;
+        async function renderFollowedByRow(uid) {
+            const row = document.getElementById('user-info-followed-by');
+            const avatarsEl = document.getElementById('user-info-followed-by-avatars');
+            const textEl = document.getElementById('user-info-followed-by-text');
+            if (!row || !avatarsEl || !textEl) return;
+            row.style.display = 'none';
+            const me = auth.currentUser;
+            if (!me || !uid || uid === me.uid) return;
+            const requestId = ++followedByRequestId;
+            let mutualUids;
+            try {
+                const snap = await get(ref(database, `followers/${uid}`));
+                const theirFollowers = snap.exists() ? snap.val() : {};
+                mutualUids = Object.keys(theirFollowers).filter(fUid => cachedContacts[fUid] && fUid !== me.uid);
+            } catch (err) {
+                return; // best effort — just skip the row rather than surface an error for a cosmetic feature
+            }
+            if (requestId !== followedByRequestId || userInfoSheetUid !== uid) return; // sheet moved on to a different profile (or closed) while this was in flight
+            if (!mutualUids.length) return;
+
+            // Fetch profiles for anyone not already cached (e.g. a mutual follower I've never
+            // otherwise loaded into cachedUsers), so we always have a name/avatar to show.
+            const uidsToFetch = mutualUids.slice(0, 3).filter(u => !cachedUsers[u]);
+            if (uidsToFetch.length) {
+                try {
+                    const fetched = await Promise.all(uidsToFetch.map(u => get(ref(database, `users/${u}`))));
+                    fetched.forEach((s, i) => { if (s.exists()) cachedUsers[uidsToFetch[i]] = s.val(); });
+                } catch (err) { /* best effort */ }
+            }
+            if (requestId !== followedByRequestId || userInfoSheetUid !== uid) return;
+
+            const shown = mutualUids.slice(0, 3).map(u => cachedUsers[u]).filter(Boolean);
+            if (!shown.length) return;
+            const extraCount = Math.max(0, mutualUids.length - shown.length);
+
+            avatarsEl.innerHTML = shown.map(p => feedAvatarHtml(p)).join('');
+            const names = shown.map(p => p.name || 'Someone');
+            let text;
+            if (extraCount > 0) {
+                text = `Followed by ${names.join(', ')}, and ${extraCount} ${extraCount === 1 ? 'other' : 'others'}`;
+            } else if (names.length === 1) {
+                text = `Followed by ${names[0]}`;
+            } else {
+                text = `Followed by ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+            }
+            textEl.textContent = text;
+            row.style.display = 'flex';
         }
 
         // Reflects whether I currently follow `uid` onto the profile sheet's toggle button.

@@ -9111,6 +9111,15 @@
         const TAB_ORDER = ['tab-status', 'tab-chats', 'tab-groups', 'tab-contacts'];
         let previousActiveTabHash = null;
 
+        // Tracks whatever the hash was immediately before the CURRENT handleHashChange call
+        // processes it (updated at the very end of the function, below). popstate always fires
+        // before hashchange for the same back-navigation, so the generic sheet-stack popstate
+        // listener (further down) can read this to tell "this back press is closing a
+        // hash-driven overlay (image/video/reel viewer, chat, story, etc.)" from "this back
+        // press is closing an ordinary bottom-sheet" — see the comment at that listener.
+        let lastKnownHash = window.location.hash.replace('#', '') || 'tab-status';
+        const HASH_OVERLAY_NAMES = ['image-viewer', 'video-viewer', 'reel-viewer', 'view-once-audio', 'user-info', 'chat', 'story', 'post-composer'];
+
         function handleHashChange(isInitialSync) {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
 
@@ -9249,6 +9258,7 @@
 
                 updateNavIndicator();
             }
+            lastKnownHash = hash;
         }
         window.addEventListener('hashchange', handleHashChange);
 
@@ -9313,6 +9323,18 @@
         window.addEventListener('popstate', () => {
             if (suppressNextPopstateClose) { suppressNextPopstateClose = false; return; }
             if (!sheetOpenStack.length) return;
+            // If we were sitting on a hash-driven overlay (image/video/reel viewer, chat,
+            // story, etc. — see HASH_OVERLAY_NAMES) right before this back press, that overlay
+            // is what this press is closing, and handleHashChange (which runs right after this,
+            // via the separate 'hashchange' event) will close it. Popping a bottom-sheet here
+            // too would be wrong: those overlays open with their own pushed history entry ON
+            // TOP of whichever sheet was already open (e.g. tapping a photo from the full Post
+            // view pushes '#image-viewer' on top of the Post view's own entry), so a single
+            // back press should only close the topmost one — the viewer — not both. Without
+            // this guard, opening the image/video viewer from the full Post view and pressing
+            // back closed the viewer AND the Post view together, dropping straight to the feed
+            // instead of landing back on the post.
+            if (HASH_OVERLAY_NAMES.includes(lastKnownHash)) return;
             closingSheetViaBackButton = true;
             const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
             if (overlay) overlay.classList.remove('active');

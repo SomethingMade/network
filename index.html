@@ -13165,7 +13165,7 @@
                 }
                 const repostBtn = e.target.closest('.js-comment-repost');
                 if (repostBtn) {
-                    toggleCommentRepost(activeCommentsPostId, repostBtn.dataset.commentId);
+                    onCommentRepostButtonTap(activeCommentsPostId, repostBtn.dataset.commentId, repostBtn);
                     return;
                 }
                 const deleteBtn = e.target.closest('.js-comment-delete');
@@ -14408,6 +14408,50 @@
             });
         }
 
+        // Compact read-only preview of the original COMMENT/reply, embedded below a comment
+        // quote's own text (see openCommentQuoteComposer/submitCommentQuoteRepost and
+        // buildFeedPostCard's isCommentQuote branch). Same layout as buildQuoteEmbedHtmlInner's
+        // post preview, just sourced from a comment — a GIF (comments' only attachment type)
+        // stands in for the image/video thumb.
+        function buildCommentQuoteEmbedHtmlInner(commentId, comment) {
+            const liveAuthor = cachedUsers[comment.uid] || {};
+            const name = escapeHtmlForPost(liveAuthor.name || comment.name || 'User');
+            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || comment.name, photoURL: liveAuthor.photoURL || comment.photoURL }, 'quote-embed-avatar');
+            const text = comment.text ? linkifyHashtags(comment.text) : '';
+            return `
+                <div class="quote-embed-header">
+                    ${avatarHtml}
+                    <span class="quote-embed-name">${name}</span>
+                    <span class="quote-embed-time"><span data-rel-ts="${comment.timestamp}">${formatTime(comment.timestamp)}</span></span>
+                </div>
+                ${text ? `<div class="quote-embed-text">${text}</div>` : ''}
+                ${comment.gifUrl ? `<img class="quote-embed-thumb" src="${comment.gifUrl}" alt="">` : ''}
+            `;
+        }
+        // Fills a comment-quote card's embedded original-comment preview, fetching the comment
+        // from Firebase (comments aren't kept in a client-side cache the way posts are) — same
+        // not-found fallback pattern as fillQuoteEmbed. Tapping it opens the comment's parent
+        // post's comment thread, same destination a quoted post's embed opens the post itself.
+        async function fillCommentQuoteEmbed(card, postId, commentId) {
+            const embedEl = card.querySelector('.quote-embed-card');
+            if (!embedEl) return;
+            let comment = null;
+            try {
+                const snap = await get(ref(database, `postComments/${postId}/${commentId}`));
+                comment = snap.exists() ? snap.val() : null;
+            } catch (e) { comment = null; }
+            if (!card.isConnected) return;
+            if (!comment) {
+                embedEl.innerHTML = `<div class="quote-embed-loading">This comment is no longer available.</div>`;
+                return;
+            }
+            embedEl.innerHTML = buildCommentQuoteEmbedHtmlInner(commentId, comment);
+            embedEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPostComments(postId);
+            });
+        }
+
         // Builds the poll block for a feed post card. Options are rendered as clickable bars —
         // percentage fill and label text are re-applied after innerHTML is set (same pattern
         // as the music chip) so option text is never interpolated raw into the HTML string.
@@ -14497,6 +14541,12 @@
             const wrapperPost = post;
             const isRepost = !!wrapperPost.repostOf;
             const isQuote = isRepost && !!(wrapperPost.text && wrapperPost.text.trim());
+            // A comment quote (see openCommentQuoteComposer/submitCommentQuoteRepost) is a
+            // distinct third case: a genuinely new post, like a quote repost, but pointing at a
+            // single comment/reply via quotedCommentPostId/quotedCommentId instead of repostOf
+            // — rendered the same way (own content + a small embedded preview below the text),
+            // just with that preview built from the comment (see fillCommentQuoteEmbed).
+            const isCommentQuote = !isRepost && !!(wrapperPost.quotedCommentPostId && wrapperPost.quotedCommentId);
             const originalId = isRepost ? wrapperPost.repostOf : postId;
             // targetId is what likes/comments/saves/reposts on THIS card act on: the original
             // post for a plain repost (the card shows the original's content), or the wrapper
@@ -14644,6 +14694,7 @@
                     ${pollHtml}
                     ${linkPreviewHtml}
                     ${isQuote ? `<div class="quote-embed-card" data-quote-original-id="${originalId}"></div>` : ''}
+                    ${isCommentQuote ? `<div class="quote-embed-card" data-quote-comment-post-id="${wrapperPost.quotedCommentPostId}" data-quote-comment-id="${wrapperPost.quotedCommentId}"></div>` : ''}
                 </div>
                 ${imageHtml}
                 ${videoHtml}
@@ -14683,6 +14734,7 @@
             renderPostReactors(card, post);
             if (isRepost && !isQuote) bindRepostBannerClick(card);
             if (isQuote) fillQuoteEmbed(card, originalId);
+            if (isCommentQuote) fillCommentQuoteEmbed(card, wrapperPost.quotedCommentPostId, wrapperPost.quotedCommentId);
             getFeedImpressionObserver().observe(card);
             if (textHtml) setExpandableFeedText(card.querySelector('.feed-post-text'), post.text, FEED_CAPTION_TRUNCATE_LIMIT);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
@@ -14946,7 +14998,26 @@
             openRepostOptionsSheet(postId);
         }
 
-        let pendingRepostOriginalId = null;
+        // Tapping a comment/reply's repost icon: same X-style choice as a feed post's repost
+        // button above — already-reposted (plain or quote, see toggleCommentRepost) just
+        // undoes it, otherwise open the same Repost/Quote sheet scoped to this one comment.
+        function onCommentRepostButtonTap(postId, commentId, btn) {
+            if (!auth.currentUser) { notify('Please log in to repost', 'error'); return; }
+            if (btn && btn.classList.contains('reposted')) {
+                btn.disabled = true;
+                toggleCommentRepost(postId, commentId).finally(() => { btn.disabled = false; });
+                return;
+            }
+            const commentItem = btn && btn.closest('.feed-comment-item');
+            openCommentRepostOptionsSheet(postId, commentId, commentItem ? commentItem.dataset.uid : null);
+        }
+
+        // pendingRepostTarget holds whichever thing the shared repost-options-sheet is
+        // currently offering to Repost/Quote: a full feed post ({ kind: 'post', id }) or a
+        // single comment/reply ({ kind: 'comment', postId, commentId }) — set by
+        // openRepostOptionsSheet/openCommentRepostOptionsSheet just below, and read back out
+        // by the sheet's two buttons so one sheet/composer pair serves both flows.
+        let pendingRepostTarget = null;
 
         function openRepostOptionsSheet(originalId) {
             const cachedOriginal = cachedPosts[originalId];
@@ -14954,23 +15025,38 @@
                 notify("You can't repost your own post", 'error');
                 return;
             }
-            pendingRepostOriginalId = originalId;
+            pendingRepostTarget = { kind: 'post', id: originalId };
+            const overlay = document.getElementById('repost-options-sheet-overlay');
+            syncSheetAboveViewer(overlay);
+            overlay.classList.add('active');
+        }
+        function openCommentRepostOptionsSheet(postId, commentId, commentUid) {
+            if (commentUid && auth.currentUser && commentUid === auth.currentUser.uid) {
+                notify("You can't repost your own comment", 'error');
+                return;
+            }
+            pendingRepostTarget = { kind: 'comment', postId, commentId };
             const overlay = document.getElementById('repost-options-sheet-overlay');
             syncSheetAboveViewer(overlay);
             overlay.classList.add('active');
         }
         function closeRepostOptionsSheet() {
             document.getElementById('repost-options-sheet-overlay').classList.remove('active', 'above-viewer');
+            pendingRepostTarget = null;
         }
         document.getElementById('btn-repost-plain').addEventListener('click', () => {
-            const id = pendingRepostOriginalId;
+            const target = pendingRepostTarget;
             closeRepostOptionsSheet();
-            if (id) toggleRepostPost(id);
+            if (!target) return;
+            if (target.kind === 'comment') toggleCommentRepost(target.postId, target.commentId);
+            else toggleRepostPost(target.id);
         });
         document.getElementById('btn-repost-quote').addEventListener('click', () => {
-            const id = pendingRepostOriginalId;
+            const target = pendingRepostTarget;
             closeRepostOptionsSheet();
-            if (id) openQuoteComposer(id);
+            if (!target) return;
+            if (target.kind === 'comment') openCommentQuoteComposer(target.postId, target.commentId);
+            else openQuoteComposer(target.id);
         });
         document.getElementById('repost-options-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'repost-options-sheet-overlay') closeRepostOptionsSheet();
@@ -15012,6 +15098,10 @@
         // carries its own `text` — see buildFeedPostCard's isQuote branch for how that's
         // rendered back out (own content + a small embedded preview of the original).
         let activeQuoteOriginalId = null;
+        // Set instead of activeQuoteOriginalId when the shared composer is quoting a single
+        // comment/reply rather than a whole post — see openCommentQuoteComposer/
+        // submitCommentQuoteRepost and submitActiveQuoteRepost's dispatch below.
+        let activeCommentQuoteTarget = null;
 
         async function openQuoteComposer(originalId) {
             const user = auth.currentUser;
@@ -15043,7 +15133,91 @@
         function closeQuoteComposer() {
             document.getElementById('quote-composer-overlay').classList.remove('active');
             activeQuoteOriginalId = null;
+            activeCommentQuoteTarget = null;
         }
+
+        // Same composer/overlay as quoting a full post, opened instead for a single
+        // comment/reply (see openCommentRepostOptionsSheet → btn-repost-quote). The embedded
+        // preview is built from the comment's own author/text (buildCommentQuoteEmbedHtmlInner)
+        // rather than a post's content.
+        async function openCommentQuoteComposer(postId, commentId) {
+            const user = auth.currentUser;
+            if (!user) return;
+            let comment = null;
+            try {
+                const snap = await get(ref(database, `postComments/${postId}/${commentId}`));
+                comment = snap.exists() ? snap.val() : null;
+            } catch (e) { comment = null; }
+            if (!comment) { notify('Comment not found', 'error'); return; }
+            if (comment.uid === user.uid) { notify("You can't repost your own comment", 'error'); return; }
+
+            activeCommentQuoteTarget = { postId, commentId };
+            const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+            const avatarEl = document.getElementById('quote-composer-avatar');
+            if (avatarEl) avatarEl.outerHTML = feedAvatarHtml(myProfile).replace('class="avatar', 'id="quote-composer-avatar" class="avatar');
+            const input = document.getElementById('quote-composer-input');
+            input.value = '';
+            input.style.height = 'auto';
+            document.getElementById('quote-composer-submit').disabled = true;
+            document.getElementById('quote-composer-charcount').style.display = 'none';
+            document.getElementById('quote-composer-embed-preview').innerHTML = buildCommentQuoteEmbedHtmlInner(commentId, comment);
+
+            document.getElementById('quote-composer-overlay').classList.add('active');
+            setTimeout(() => input.focus(), 60);
+        }
+
+        // Quoting a comment creates a genuinely new top-level post — same as quoting a full
+        // post, just pointed at the comment via quotedCommentPostId/quotedCommentId instead of
+        // repostOf (a comment isn't itself a posts/{id} entry, so it can't use that field) —
+        // see buildFeedPostCard's isCommentQuote branch for how that's rendered back out. The
+        // comment's own reposts/{uid} is set to this new post's key so its repost icon shows
+        // "reposted" and toggling it again undoes the quote (see toggleCommentRepost).
+        async function submitCommentQuoteRepost() {
+            const user = auth.currentUser;
+            const target = activeCommentQuoteTarget;
+            if (!user || !target) return;
+            const input = document.getElementById('quote-composer-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const submitBtn = document.getElementById('quote-composer-submit');
+            submitBtn.disabled = true;
+            try {
+                const commentSnap = await get(ref(database, `postComments/${target.postId}/${target.commentId}`));
+                const comment = commentSnap.exists() ? commentSnap.val() : null;
+                if (!comment) { notify('Comment not found', 'error'); closeQuoteComposer(); return; }
+
+                const myProfile = cachedUsers[user.uid] || { name: user.displayName || 'You', photoURL: user.photoURL || '' };
+                const newPostRef = push(ref(database, 'posts'));
+                await set(newPostRef, {
+                    uid: user.uid,
+                    name: myProfile.name || user.displayName || 'User',
+                    photoURL: myProfile.photoURL || user.photoURL || '',
+                    text,
+                    quotedCommentPostId: target.postId,
+                    quotedCommentId: target.commentId,
+                    timestamp: serverTimestamp(),
+                    likeCount: 0,
+                    commentCount: 0
+                });
+                await set(ref(database, `postComments/${target.postId}/${target.commentId}/reposts/${user.uid}`), newPostRef.key);
+                createNotification(comment.uid, { type: 'repost', postId: target.postId, commentId: target.commentId, text: comment.text || '' });
+                notify('Quoted');
+                closeQuoteComposer();
+            } catch (e) {
+                notify('Could not post quote', 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        // The composer's single submit button is shared by both flows — dispatch to whichever
+        // target is currently set (see openQuoteComposer vs openCommentQuoteComposer).
+        function submitActiveQuoteRepost() {
+            if (activeCommentQuoteTarget) return submitCommentQuoteRepost();
+            return submitQuoteRepost();
+        }
+
         async function submitQuoteRepost() {
             const user = auth.currentUser;
             const originalId = activeQuoteOriginalId;
@@ -15083,7 +15257,7 @@
                 submitBtn.disabled = false;
             }
         }
-        document.getElementById('quote-composer-submit').addEventListener('click', submitQuoteRepost);
+        document.getElementById('quote-composer-submit').addEventListener('click', submitActiveQuoteRepost);
         document.getElementById('quote-composer-close').addEventListener('click', closeQuoteComposer);
         (function initQuoteComposerInput() {
             const input = document.getElementById('quote-composer-input');
@@ -15575,11 +15749,14 @@
             }
         }
 
-        // A plain repost of a comment/reply — same on/off toggle as the reaction above, just
-        // tracked in its own reposts/{uid} map so it has an independent count. Unlike reposting a
-        // full post (see toggleRepostPost/onRepostButtonTap), this doesn't create a new feed
-        // entry or offer a quote option — a comment isn't its own feed item, so there's nowhere
-        // for a "quote" of it to live; this covers the plain-repost half of that action.
+        // A plain repost of a comment/reply — same on/off toggle as the reaction above, tracked
+        // in its own reposts/{uid} map so it has an independent count (derived at render time,
+        // see buildCommentEl) from the parent post's reposts. The value is `true` for a plain
+        // repost, or the quote post's key (string) when the existing repost is actually a Quote
+        // made via openCommentQuoteComposer/submitCommentQuoteRepost — see
+        // onCommentRepostButtonTap for the Repost-vs-Quote choice this toggles the "off" half
+        // of; tapping an already-reposted icon (either kind) undoes it here, deleting the quote
+        // post too if there is one.
         async function toggleCommentRepost(postId, commentId) {
             const user = auth.currentUser;
             if (!user || !postId || !commentId) return;
@@ -15588,9 +15765,16 @@
             try {
                 const snap = await get(myRepostRef);
                 if (snap.exists()) {
+                    const existing = snap.val();
                     await remove(myRepostRef);
+                    if (typeof existing === 'string') {
+                        await remove(ref(database, `posts/${existing}`));
+                        await remove(ref(database, `postComments/${existing}`));
+                    }
+                    notify('Repost removed');
                 } else {
                     await set(myRepostRef, true);
+                    notify('Reposted');
                 }
             } catch (err) {
                 notify('Could not repost comment', 'error');

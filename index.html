@@ -9219,7 +9219,7 @@
         let topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(lastKnownHash) ? 'hash' : null; // 'hash' | 'sheet' | null
 
         function handleHashChange(isInitialSync) {
-            const hash = window.location.hash.replace('#', '') || 'tab-status';
+            let hash = window.location.hash.replace('#', '') || 'tab-status';
 
             // Re-derive which system now owns the top-of-history entry now that the hash has
             // settled. If we've landed on a hash-overlay hash, that overlay's own entry is on
@@ -9294,6 +9294,17 @@
                 document.getElementById('story-music-chip').style.display = 'none';
                 document.getElementById('story-viewer-overlay').classList.remove('active');
                 document.getElementById('story-views-sheet-overlay').classList.remove('active');
+
+                // Stories can be launched from several places (the Messages ring bar, Home's
+                // Discover strip, the Feed's Stories subtab), but there's only one Stories/
+                // Status home — so however the viewer gets closed (X button, tap-to-exit, or
+                // the device/browser back button), always land back there instead of stranding
+                // the person on whatever tab happened to be underneath in the history stack.
+                if (hash !== 'tab-status') {
+                    history.replaceState(null, '', '#tab-status');
+                    onNonHomeTab = false;
+                    hash = 'tab-status';
+                }
             }
 
             if (hash.startsWith('tab-')) {

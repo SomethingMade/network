@@ -1388,6 +1388,40 @@
         .applicant-item-msg { font-size: 13px; color: var(--text-secondary); line-height: 1.4; margin-top: 2px; }
         .applicant-item-time { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; }
 
+        /* Market — a directory of shops run by Business Accounts (see isBusinessAccount),
+           in the spirit of Uber Eats' vendor listings. Anyone can browse shops/items; only
+           the owning Business Account can create/edit its own shop and manage its items. */
+        .market-search-wrap { padding: 4px 20px 10px; }
+        .market-shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 20px 24px; }
+        .market-shop-card { border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; cursor: pointer; background: var(--bg-surface); transition: background 0.15s ease; }
+        .market-shop-card:active { background: var(--bg-hover); }
+        .market-shop-cover { height: 92px; background: var(--gradient-brand); background-size: cover; background-position: center; }
+        .market-shop-body { padding: 10px 12px 12px; }
+        .market-shop-name { font-size: 13.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .market-shop-category { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .market-my-shop-banner { display: flex; align-items: center; gap: 10px; margin: 4px 20px 14px; padding: 12px 14px; border-radius: 14px; background: var(--bg-alt); border: 1px solid var(--border-color); cursor: pointer; }
+        .market-my-shop-banner svg { flex-shrink: 0; color: var(--primary-blue); }
+        .market-my-shop-banner-text h5 { margin: 0 0 1px; font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+        .market-my-shop-banner-text p { margin: 0; font-size: 12px; color: var(--text-secondary); }
+
+        .shop-detail-cover { height: 150px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; position: relative; }
+        .shop-detail-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 20px 4px; }
+        .shop-detail-name { font-size: 19px; font-weight: 800; display: flex; align-items: center; gap: 5px; margin: 0 0 3px; }
+        .shop-detail-category { font-size: 12.5px; color: var(--text-secondary); }
+        .shop-detail-desc { font-size: 13.5px; color: var(--text-primary); line-height: 1.5; padding: 10px 20px 4px; white-space: pre-wrap; }
+        .shop-items-section-title { font-size: 14px; font-weight: 800; padding: 16px 20px 8px; display: flex; align-items: center; justify-content: space-between; }
+        .shop-item-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px 24px; }
+        .shop-item-card { border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; cursor: pointer; background: var(--bg-surface); }
+        .shop-item-photo { height: 84px; background: var(--bg-alt); background-size: cover; background-position: center; }
+        .shop-item-body { padding: 9px 10px 10px; }
+        .shop-item-name { font-size: 12.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .shop-item-price { font-size: 12.5px; font-weight: 800; color: var(--primary-blue); margin-top: 2px; }
+        .shop-item-card-owner-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+        .shop-item-card-owner-actions button { flex: 1; border: none; border-radius: 8px; padding: 5px 0; font-size: 11px; font-weight: 700; cursor: pointer; background: var(--bg-alt); color: var(--text-secondary); }
+        .shop-item-card-owner-actions button.danger { color: var(--danger-red); }
+        .market-photo-picker { width: 100%; height: 120px; border-radius: 14px; background: var(--bg-alt); border: 1px dashed var(--border-color); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; cursor: pointer; background-size: cover; background-position: center; color: var(--text-secondary); font-size: 12.5px; font-weight: 600; overflow: hidden; }
+        .market-photo-picker svg { flex-shrink: 0; }
+
         /* ── MENTION AUTOCOMPLETE ── */
         .mention-autocomplete-dropdown { position: absolute; z-index: 30; left: 0; right: 0; bottom: 100%; margin-bottom: 6px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-soft); max-height: 220px; overflow-y: auto; display: none; }
         .mention-suggestion-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }
@@ -4930,6 +4964,130 @@
         </div>
     </div>
 
+    <!-- ── MARKET ──
+         A directory of shops, opened from the sidebar drawer. Anyone can browse shops and
+         their items; only a Business Account (isBusinessAccount) can open/manage a shop, and
+         each Business Account gets exactly one shop (see users/$uid/myShopId), the way an
+         Uber Eats vendor gets one storefront. Firebase paths:
+           shops/$shopId              — the shop itself (name, category, description, cover)
+           shops/$shopId/items/$id    — one product/menu item belonging to that shop
+           users/$uid/myShopId        — quick pointer from a business owner to their own shop -->
+    <div id="market-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet notif-page-sheet">
+            <div class="notif-sheet-header">
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" id="btn-close-market-sheet" class="tm-profile-back-btn" aria-label="Close" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <h3 style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.3px;">Market</h3>
+                </div>
+                <svg id="btn-market-my-shop" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer; display:none;" title="My Shop"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <div class="market-search-wrap">
+                <div class="search-box" style="margin-bottom:0;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="market-search-input" placeholder="Search shops" autocomplete="off">
+                </div>
+            </div>
+            <div id="market-my-shop-banner" class="market-my-shop-banner" style="display:none;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                <div class="market-my-shop-banner-text">
+                    <h5>Set up your shop</h5>
+                    <p>Business Accounts can open a shop and list items for sale.</p>
+                </div>
+            </div>
+            <div id="market-shop-grid" class="market-shop-grid"></div>
+            <div id="market-empty" class="notif-empty-state" style="display:none;">No shops yet.</div>
+        </div>
+    </div>
+
+    <div id="shop-detail-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet notif-page-sheet">
+            <div class="notif-sheet-header">
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" id="btn-close-shop-detail-sheet" class="tm-profile-back-btn" aria-label="Close" title="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <h3 style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.3px;">Shop</h3>
+                </div>
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <svg id="btn-edit-shop" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer; display:none;" title="Edit shop"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <svg id="btn-delete-shop" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer; display:none;" title="Delete shop"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+                </div>
+            </div>
+            <div style="flex:1; overflow-y:auto;">
+                <div class="shop-detail-cover" id="shop-detail-cover"></div>
+                <div class="shop-detail-header-row">
+                    <div style="min-width:0;">
+                        <div class="shop-detail-name" id="shop-detail-name"></div>
+                        <div class="shop-detail-category" id="shop-detail-category"></div>
+                    </div>
+                </div>
+                <p class="shop-detail-desc" id="shop-detail-desc"></p>
+                <div class="shop-items-section-title">
+                    <span>Items</span>
+                    <svg id="btn-add-shop-item" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="cursor:pointer; display:none;" title="Add item"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </div>
+                <div id="shop-item-grid" class="shop-item-grid"></div>
+                <div id="shop-items-empty" class="notif-empty-state" style="display:none;">No items listed yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="shop-edit-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;" id="shop-edit-title">Set Up Your Shop</h3>
+                <svg id="btn-close-shop-edit-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 16px 20px 4px;">
+                <div class="market-photo-picker" id="shop-cover-picker">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Add cover photo</span>
+                </div>
+                <input type="file" id="shop-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <input type="text" id="shop-edit-name" class="pill-input" placeholder="Shop name" maxlength="60" autocomplete="off" style="margin-top:14px;">
+                <select id="shop-edit-category" class="pill-select">
+                    <option value="Food & Drink">Food &amp; Drink</option>
+                    <option value="Groceries">Groceries</option>
+                    <option value="Fashion">Fashion</option>
+                    <option value="Electronics">Electronics</option>
+                    <option value="Beauty">Beauty</option>
+                    <option value="Home & Living">Home &amp; Living</option>
+                    <option value="Services">Services</option>
+                    <option value="Other">Other</option>
+                </select>
+                <textarea id="shop-edit-description" class="pill-textarea" placeholder="Tell people what your shop offers" maxlength="500" autocomplete="off" style="min-height:90px;"></textarea>
+            </div>
+            <div style="padding: 4px 20px 24px;">
+                <button type="button" id="btn-submit-shop-edit" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Save Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="shop-item-edit-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;" id="shop-item-edit-title">Add Item</h3>
+                <svg id="btn-close-shop-item-edit-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 16px 20px 4px;">
+                <div class="market-photo-picker" id="shop-item-photo-picker">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Add photo</span>
+                </div>
+                <input type="file" id="shop-item-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <input type="text" id="shop-item-edit-name" class="pill-input" placeholder="Item name" maxlength="80" autocomplete="off" style="margin-top:14px;">
+                <input type="text" id="shop-item-edit-price" class="pill-input" placeholder="Price, e.g. R120" maxlength="30" autocomplete="off">
+                <textarea id="shop-item-edit-description" class="pill-textarea" placeholder="Describe the item (optional)" maxlength="300" autocomplete="off" style="min-height:80px;"></textarea>
+            </div>
+            <div style="padding: 4px 20px 24px; display:flex; gap:10px;">
+                <button type="button" id="btn-delete-shop-item" class="btn-pill" style="display:none; background: var(--bg-alt); color:var(--danger-red); border:none;">Delete</button>
+                <button type="button" id="btn-submit-shop-item" class="btn-pill" style="flex:1; background: var(--gradient-brand); color:#fff; border:none;">Save Item</button>
+            </div>
+        </div>
+    </div>
+
     <div id="tag-people-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 12px 0 0;">
             <div class="notif-sheet-header">
@@ -5710,6 +5868,10 @@
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-jobs">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><line x1="2" y1="13" x2="22" y2="13"/></svg>
                     <span>Jobs</span>
+                </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-market">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                    <span>Market</span>
                 </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -16894,6 +17056,351 @@
             }
         }
 
+        // --- MARKET ---
+        // A directory of shops, in the spirit of Uber Eats: anyone can browse shops and their
+        // items, but only a Business Account (isBusinessAccount, same flag Jobs uses) can open
+        // and manage a shop, and each Business Account gets exactly one. Firebase paths:
+        //   shops/$shopId              — the shop itself (name, category, description, cover)
+        //   shops/$shopId/items/$id    — one product/menu item belonging to that shop
+        //   users/$uid/myShopId        — quick pointer from a business owner to their own shop
+        let cachedShops = {};
+        let cachedShopItems = {};
+        let myShopId = null;
+        let marketListenersAttached = false;
+        let activeShopDetailId = null;
+        let activeShopItemsUnsub = null;
+        let shopCoverFile = null;
+        let shopCoverPreviewUrl = '';
+        let shopItemPhotoFile = null;
+        let shopItemPhotoPreviewUrl = '';
+        let editingShopItemId = null;
+
+        function initMarketListener() {
+            const user = auth.currentUser;
+            if (!user || marketListenersAttached) return;
+            marketListenersAttached = true;
+            onValue(query(ref(database, 'shops'), limitToLast(200)), (snap) => {
+                cachedShops = snap.exists() ? snap.val() : {};
+                if (document.getElementById('market-sheet-overlay').classList.contains('active')) renderMarketShopGrid();
+                if (activeShopDetailId && cachedShops[activeShopDetailId]) renderShopDetailHeader(activeShopDetailId);
+            });
+            onValue(ref(database, `users/${user.uid}/myShopId`), (snap) => {
+                myShopId = snap.exists() ? snap.val() : null;
+                if (document.getElementById('market-sheet-overlay').classList.contains('active')) refreshMarketHeaderForMe();
+            });
+        }
+
+        function renderMarketShopGrid() {
+            const grid = document.getElementById('market-shop-grid');
+            const empty = document.getElementById('market-empty');
+            const q = (document.getElementById('market-search-input').value || '').trim().toLowerCase();
+            let shops = Object.entries(cachedShops);
+            if (q) shops = shops.filter(([, s]) => (s.name || '').toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q));
+            shops.sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+            if (!shops.length) {
+                grid.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+            grid.innerHTML = shops.map(([shopId, shop]) => `
+                <div class="market-shop-card" data-shop-id="${shopId}">
+                    <div class="market-shop-cover" style="${shop.coverPhoto ? `background-image:url('${shop.coverPhoto}');` : ''}"></div>
+                    <div class="market-shop-body">
+                        <div class="market-shop-name">${escapeHtmlForPost(shop.name || 'Shop')}${verifiedBadgeFor(shop.uid, false)}</div>
+                        <div class="market-shop-category">${escapeHtmlForPost(shop.category || '')}</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        // Header "+" opens straight to my own shop (create flow if I don't have one yet, or
+        // the manage view if I do); the banner beneath search nudges eligible business
+        // accounts who haven't set one up. Neither shows for non-business accounts.
+        function refreshMarketHeaderForMe() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            const btn = document.getElementById('btn-market-my-shop');
+            const banner = document.getElementById('market-my-shop-banner');
+            if (!myProfile.isBusinessAccount) {
+                btn.style.display = 'none';
+                banner.style.display = 'none';
+                return;
+            }
+            btn.style.display = '';
+            banner.style.display = myShopId ? 'none' : 'flex';
+        }
+
+        function openMarketSheet() {
+            pauseAllAppMedia();
+            document.getElementById('market-search-input').value = '';
+            renderMarketShopGrid();
+            refreshMarketHeaderForMe();
+            document.getElementById('market-sheet-overlay').classList.add('active');
+        }
+
+        function closeMarketSheet() {
+            document.getElementById('market-sheet-overlay').classList.remove('active');
+        }
+
+        function openMyShopFromMarket() {
+            if (myShopId) openShopDetail(myShopId);
+            else openShopEditSheet(null);
+        }
+
+        // --- Shop detail (browsable by anyone; owner sees edit/delete/add-item controls) ---
+        function openShopDetail(shopId) {
+            const shop = cachedShops[shopId];
+            if (!shop) return;
+            activeShopDetailId = shopId;
+            renderShopDetailHeader(shopId);
+            document.getElementById('shop-detail-sheet-overlay').classList.add('active');
+
+            if (activeShopItemsUnsub) { activeShopItemsUnsub(); activeShopItemsUnsub = null; }
+            const itemsRef = ref(database, `shops/${shopId}/items`);
+            activeShopItemsUnsub = onValue(itemsRef, (snap) => {
+                cachedShopItems = snap.exists() ? snap.val() : {};
+                renderShopItemGrid(shopId);
+            });
+        }
+
+        function closeShopDetail() {
+            document.getElementById('shop-detail-sheet-overlay').classList.remove('active');
+            if (activeShopItemsUnsub) { activeShopItemsUnsub(); activeShopItemsUnsub = null; }
+            activeShopDetailId = null;
+            cachedShopItems = {};
+        }
+
+        function renderShopDetailHeader(shopId) {
+            const shop = cachedShops[shopId];
+            if (!shop) return;
+            const user = auth.currentUser;
+            const isOwner = !!(user && shop.uid === user.uid);
+            document.getElementById('shop-detail-cover').style.backgroundImage = shop.coverPhoto ? `url('${shop.coverPhoto}')` : '';
+            document.getElementById('shop-detail-name').innerHTML = escapeHtmlForPost(shop.name || 'Shop') + verifiedBadgeFor(shop.uid, false);
+            document.getElementById('shop-detail-category').textContent = shop.category || '';
+            document.getElementById('shop-detail-desc').textContent = shop.description || '';
+            document.getElementById('shop-detail-desc').style.display = shop.description ? '' : 'none';
+            document.getElementById('btn-edit-shop').style.display = isOwner ? '' : 'none';
+            document.getElementById('btn-delete-shop').style.display = isOwner ? '' : 'none';
+            document.getElementById('btn-add-shop-item').style.display = isOwner ? '' : 'none';
+        }
+
+        function renderShopItemGrid(shopId) {
+            const grid = document.getElementById('shop-item-grid');
+            const empty = document.getElementById('shop-items-empty');
+            const shop = cachedShops[shopId];
+            const user = auth.currentUser;
+            const isOwner = !!(shop && user && shop.uid === user.uid);
+            const items = Object.entries(cachedShopItems).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+            if (!items.length) {
+                grid.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+            grid.innerHTML = items.map(([itemId, item]) => `
+                <div class="shop-item-card" data-item-id="${itemId}">
+                    <div class="shop-item-photo" style="${item.photo ? `background-image:url('${item.photo}');` : ''}"></div>
+                    <div class="shop-item-body">
+                        <div class="shop-item-name">${escapeHtmlForPost(item.name || 'Item')}</div>
+                        ${item.price ? `<div class="shop-item-price">${escapeHtmlForPost(item.price)}</div>` : ''}
+                    </div>
+                    ${isOwner ? `<div class="shop-item-card-owner-actions"><button type="button" data-edit-item="${itemId}">Edit</button></div>` : ''}
+                </div>`).join('');
+        }
+
+        // --- Create/edit shop (Business Accounts only, one shop per account) ---
+        function resetShopCoverPicker() {
+            shopCoverFile = null;
+            shopCoverPreviewUrl = '';
+            const picker = document.getElementById('shop-cover-picker');
+            picker.style.backgroundImage = '';
+            picker.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg><span>Add cover photo</span>`;
+        }
+
+        function openShopEditSheet(shopId) {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            if (!myProfile.isBusinessAccount) { notify('Only Business Accounts can open a shop', 'error'); return; }
+            if (!shopId && myShopId) { notify('You already have a shop — edit it instead', 'error'); return; }
+
+            const shop = shopId ? cachedShops[shopId] : null;
+            document.getElementById('shop-edit-title').textContent = shop ? 'Edit Shop' : 'Set Up Your Shop';
+            document.getElementById('shop-edit-name').value = shop ? (shop.name || '') : '';
+            document.getElementById('shop-edit-category').value = shop ? (shop.category || 'Other') : 'Food & Drink';
+            document.getElementById('shop-edit-description').value = shop ? (shop.description || '') : '';
+            resetShopCoverPicker();
+            if (shop && shop.coverPhoto) {
+                const picker = document.getElementById('shop-cover-picker');
+                picker.style.backgroundImage = `url('${shop.coverPhoto}')`;
+                picker.innerHTML = '';
+            }
+            document.getElementById('shop-edit-sheet-overlay').dataset.editingShopId = shopId || '';
+            document.getElementById('shop-edit-sheet-overlay').classList.add('active');
+        }
+
+        function closeShopEditSheet() {
+            document.getElementById('shop-edit-sheet-overlay').classList.remove('active');
+        }
+
+        async function submitShopEdit() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            if (!user || !myProfile.isBusinessAccount) { notify('Only Business Accounts can open a shop', 'error'); return; }
+            const overlay = document.getElementById('shop-edit-sheet-overlay');
+            const editingShopId = overlay.dataset.editingShopId || null;
+            if (!editingShopId && myShopId) { notify('You already have a shop — edit it instead', 'error'); return; }
+
+            const name = document.getElementById('shop-edit-name').value.trim();
+            if (!name) { notify('Add a shop name', 'error'); return; }
+            const category = document.getElementById('shop-edit-category').value;
+            const description = document.getElementById('shop-edit-description').value.trim();
+
+            const submitBtn = document.getElementById('btn-submit-shop-edit');
+            submitBtn.disabled = true;
+            submitBtn.textContent = shopCoverFile ? 'Uploading…' : 'Saving…';
+            try {
+                const shopId = editingShopId || push(ref(database, 'shops')).key;
+                let coverPhoto = editingShopId ? (cachedShops[editingShopId] || {}).coverPhoto || '' : '';
+                if (shopCoverFile) {
+                    coverPhoto = await uploadToFirebaseStorage(shopCoverFile, `shop_covers/${shopId}/${Date.now()}_${shopCoverFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
+                }
+                const updates = {
+                    [`shops/${shopId}/uid`]: user.uid,
+                    [`shops/${shopId}/name`]: name.slice(0, 60),
+                    [`shops/${shopId}/category`]: category,
+                    [`shops/${shopId}/description`]: description.slice(0, 500),
+                    [`shops/${shopId}/coverPhoto`]: coverPhoto,
+                };
+                if (!editingShopId) {
+                    updates[`shops/${shopId}/timestamp`] = serverTimestamp();
+                    updates[`users/${user.uid}/myShopId`] = shopId;
+                }
+                await update(ref(database), updates);
+                closeShopEditSheet();
+                notify(editingShopId ? 'Shop updated' : 'Shop created');
+                openShopDetail(shopId);
+            } catch (err) {
+                console.error('submitShopEdit failed', err);
+                notify("Couldn't save shop", 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Shop';
+            }
+        }
+
+        async function deleteShop(shopId) {
+            const user = auth.currentUser;
+            const shop = cachedShops[shopId];
+            if (!user || !shop || shop.uid !== user.uid) return;
+            const confirmed = await showCustomModal('Delete Shop', 'This removes your shop and all its items. This cannot be undone.', true);
+            if (!confirmed) return;
+            try {
+                await update(ref(database), {
+                    [`shops/${shopId}`]: null,
+                    [`users/${user.uid}/myShopId`]: null
+                });
+                closeShopDetail();
+                notify('Shop deleted');
+            } catch (err) {
+                console.error('deleteShop failed', err);
+                notify("Couldn't delete shop", 'error');
+            }
+        }
+
+        // --- Add/edit item within my shop ---
+        function resetShopItemPhotoPicker() {
+            shopItemPhotoFile = null;
+            shopItemPhotoPreviewUrl = '';
+            const picker = document.getElementById('shop-item-photo-picker');
+            picker.style.backgroundImage = '';
+            picker.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg><span>Add photo</span>`;
+        }
+
+        function openShopItemEditSheet(itemId) {
+            const shopId = activeShopDetailId;
+            const shop = shopId && cachedShops[shopId];
+            const user = auth.currentUser;
+            if (!shop || !user || shop.uid !== user.uid) { notify('Only the shop owner can manage items', 'error'); return; }
+
+            const item = itemId ? cachedShopItems[itemId] : null;
+            editingShopItemId = itemId || null;
+            document.getElementById('shop-item-edit-title').textContent = item ? 'Edit Item' : 'Add Item';
+            document.getElementById('shop-item-edit-name').value = item ? (item.name || '') : '';
+            document.getElementById('shop-item-edit-price').value = item ? (item.price || '') : '';
+            document.getElementById('shop-item-edit-description').value = item ? (item.description || '') : '';
+            document.getElementById('btn-delete-shop-item').style.display = item ? '' : 'none';
+            resetShopItemPhotoPicker();
+            if (item && item.photo) {
+                const picker = document.getElementById('shop-item-photo-picker');
+                picker.style.backgroundImage = `url('${item.photo}')`;
+                picker.innerHTML = '';
+            }
+            document.getElementById('shop-item-edit-sheet-overlay').classList.add('active');
+        }
+
+        function closeShopItemEditSheet() {
+            document.getElementById('shop-item-edit-sheet-overlay').classList.remove('active');
+            editingShopItemId = null;
+        }
+
+        async function submitShopItem() {
+            const shopId = activeShopDetailId;
+            const shop = shopId && cachedShops[shopId];
+            const user = auth.currentUser;
+            if (!shop || !user || shop.uid !== user.uid) { notify('Only the shop owner can manage items', 'error'); return; }
+
+            const name = document.getElementById('shop-item-edit-name').value.trim();
+            if (!name) { notify('Add an item name', 'error'); return; }
+            const price = document.getElementById('shop-item-edit-price').value.trim();
+            const description = document.getElementById('shop-item-edit-description').value.trim();
+
+            const submitBtn = document.getElementById('btn-submit-shop-item');
+            submitBtn.disabled = true;
+            submitBtn.textContent = shopItemPhotoFile ? 'Uploading…' : 'Saving…';
+            try {
+                const itemId = editingShopItemId || push(ref(database, `shops/${shopId}/items`)).key;
+                let photo = editingShopItemId ? (cachedShopItems[editingShopItemId] || {}).photo || '' : '';
+                if (shopItemPhotoFile) {
+                    photo = await uploadToFirebaseStorage(shopItemPhotoFile, `shop_items/${shopId}/${itemId}/${Date.now()}_${shopItemPhotoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
+                }
+                const updates = {
+                    [`shops/${shopId}/items/${itemId}/name`]: name.slice(0, 80),
+                    [`shops/${shopId}/items/${itemId}/price`]: price.slice(0, 30),
+                    [`shops/${shopId}/items/${itemId}/description`]: description.slice(0, 300),
+                    [`shops/${shopId}/items/${itemId}/photo`]: photo,
+                };
+                if (!editingShopItemId) updates[`shops/${shopId}/items/${itemId}/timestamp`] = serverTimestamp();
+                await update(ref(database), updates);
+                closeShopItemEditSheet();
+                notify(editingShopItemId ? 'Item updated' : 'Item added');
+            } catch (err) {
+                console.error('submitShopItem failed', err);
+                notify("Couldn't save item", 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Item';
+            }
+        }
+
+        async function deleteShopItem() {
+            const shopId = activeShopDetailId;
+            const itemId = editingShopItemId;
+            const shop = shopId && cachedShops[shopId];
+            const user = auth.currentUser;
+            if (!shop || !user || shop.uid !== user.uid || !itemId) return;
+            try {
+                await update(ref(database, `shops/${shopId}/items`), { [itemId]: null });
+                closeShopItemEditSheet();
+                notify('Item deleted');
+            } catch (err) {
+                console.error('deleteShopItem failed', err);
+                notify("Couldn't delete item", 'error');
+            }
+        }
+
         function markAllNotificationsRead() {
             const user = auth.currentUser;
             if (!user) return;
@@ -17487,6 +17994,78 @@
         });
         document.getElementById('btn-submit-post-job').addEventListener('click', submitPostJob);
 
+        // --- MARKET wiring ---
+        document.getElementById('btn-close-market-sheet').addEventListener('click', closeMarketSheet);
+        document.getElementById('market-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'market-sheet-overlay') closeMarketSheet();
+        });
+        document.getElementById('market-search-input').addEventListener('input', renderMarketShopGrid);
+        document.getElementById('btn-market-my-shop').addEventListener('click', openMyShopFromMarket);
+        document.getElementById('market-my-shop-banner').addEventListener('click', openMyShopFromMarket);
+        document.getElementById('market-shop-grid').addEventListener('click', (e) => {
+            const card = e.target.closest('.market-shop-card');
+            if (card) openShopDetail(card.dataset.shopId);
+        });
+
+        document.getElementById('btn-close-shop-detail-sheet').addEventListener('click', closeShopDetail);
+        document.getElementById('shop-detail-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'shop-detail-sheet-overlay') closeShopDetail();
+        });
+        document.getElementById('btn-edit-shop').addEventListener('click', () => {
+            if (activeShopDetailId) openShopEditSheet(activeShopDetailId);
+        });
+        document.getElementById('btn-delete-shop').addEventListener('click', () => {
+            if (activeShopDetailId) deleteShop(activeShopDetailId);
+        });
+        document.getElementById('btn-add-shop-item').addEventListener('click', () => openShopItemEditSheet(null));
+        document.getElementById('shop-item-grid').addEventListener('click', (e) => {
+            const editBtn = e.target.closest('[data-edit-item]');
+            if (editBtn) { openShopItemEditSheet(editBtn.dataset.editItem); return; }
+            const card = e.target.closest('.shop-item-card');
+            if (card) openShopItemEditSheet(card.dataset.itemId);
+        });
+
+        document.getElementById('btn-close-shop-edit-sheet').addEventListener('click', closeShopEditSheet);
+        document.getElementById('shop-edit-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'shop-edit-sheet-overlay') closeShopEditSheet();
+        });
+        document.getElementById('btn-submit-shop-edit').addEventListener('click', submitShopEdit);
+        document.getElementById('shop-cover-picker').addEventListener('click', () => {
+            document.getElementById('shop-cover-input').click();
+        });
+        document.getElementById('shop-cover-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { notify('Cover must be an image', 'error'); e.target.value = ''; return; }
+            shopCoverFile = file;
+            if (shopCoverPreviewUrl) URL.revokeObjectURL(shopCoverPreviewUrl);
+            shopCoverPreviewUrl = URL.createObjectURL(file);
+            const picker = document.getElementById('shop-cover-picker');
+            picker.style.backgroundImage = `url('${shopCoverPreviewUrl}')`;
+            picker.innerHTML = '';
+        });
+
+        document.getElementById('btn-close-shop-item-edit-sheet').addEventListener('click', closeShopItemEditSheet);
+        document.getElementById('shop-item-edit-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'shop-item-edit-sheet-overlay') closeShopItemEditSheet();
+        });
+        document.getElementById('btn-submit-shop-item').addEventListener('click', submitShopItem);
+        document.getElementById('btn-delete-shop-item').addEventListener('click', deleteShopItem);
+        document.getElementById('shop-item-photo-picker').addEventListener('click', () => {
+            document.getElementById('shop-item-photo-input').click();
+        });
+        document.getElementById('shop-item-photo-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { notify('Photo must be an image', 'error'); e.target.value = ''; return; }
+            shopItemPhotoFile = file;
+            if (shopItemPhotoPreviewUrl) URL.revokeObjectURL(shopItemPhotoPreviewUrl);
+            shopItemPhotoPreviewUrl = URL.createObjectURL(file);
+            const picker = document.getElementById('shop-item-photo-picker');
+            picker.style.backgroundImage = `url('${shopItemPhotoPreviewUrl}')`;
+            picker.innerHTML = '';
+        });
+
         document.getElementById('btn-mark-all-notifs-read').addEventListener('click', markAllNotificationsRead);
 
         document.getElementById('notif-filter-row').addEventListener('click', (e) => {
@@ -17894,6 +18473,10 @@
         document.getElementById('sidebar-drawer-jobs').addEventListener('click', () => {
             closeSidebarDrawer();
             openJobsSheet();
+        });
+        document.getElementById('sidebar-drawer-market').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openMarketSheet();
         });
         document.getElementById('sidebar-drawer-settings').addEventListener('click', () => {
             closeSidebarDrawer();
@@ -25311,6 +25894,7 @@
                 initFeedListeners();
                 initNotificationsListener();
                 initJobsListener();
+                initMarketListener();
                 initIncomingCallListener();
                 ['feed-posts-list', 'my-profile-posts-list', 'my-profile-replies-list', 'my-profile-saved-list', 'user-info-posts-list', 'user-info-replies-list'].forEach(watchThreadConnectors);
             } else {

@@ -11,6 +11,13 @@
         if (window.location.hash) {
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
+
+        // Community invite links (see communityInviteUrl / btn-share-community) point back at
+        // this same app with ?joinCommunity=<id>. Grabbed here, once, before anything else runs,
+        // so it survives the login flow if the person isn't signed in yet — the actual "Join
+        // this community?" prompt happens later, once that community's data has loaded (see
+        // maybeHandlePendingCommunityJoin, wired into the communities listener).
+        window.__pendingCommunityJoinId = new URLSearchParams(window.location.search).get('joinCommunity');
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -4975,6 +4982,7 @@
                 <div class="group-info-section-label" id="group-info-members-label">Members</div>
                 <div id="group-info-members-list"></div>
             </div>
+            <button type="button" id="btn-share-community" class="btn-pill btn-outline" style="margin-bottom:12px;">Share Invite Link</button>
             <button type="button" id="btn-invite-to-group" class="btn-pill btn-outline" style="margin-bottom:12px; display:none;">Invite by ID</button>
             <button type="button" id="btn-leave-group" class="btn-pill" style="background:rgba(255,69,58,0.1); color:var(--danger-red);">Leave Group</button>
             <button type="button" id="btn-delete-community" class="btn-pill" style="background:var(--danger-red); color:#fff; margin-top:10px; display:none;">Delete Community</button>
@@ -21507,6 +21515,76 @@
             } finally { hideLoading(); }
         });
 
+        // Community invite links point back at the app itself with ?joinCommunity=<id> — unlike
+        // Share Profile's PROFILE_WEB_BASE_URL (a separate read-only page served by a Cloud
+        // Function), there's no public community-landing endpoint here, so opening this link just
+        // boots the app straight in and, once that community's data has loaded, surfaces a "Join
+        // this community?" prompt (see maybeHandlePendingCommunityJoin near the communities
+        // listener). Works for public and private communities alike — unlike "Invite by ID"
+        // (private groups only), this is meant to be freely shared and joined by anyone who opens
+        // it, so use "Invite by ID" instead for a private group you want to keep closed off.
+        function communityInviteUrl(groupId) {
+            return `${window.location.origin}${window.location.pathname}?joinCommunity=${groupId}`;
+        }
+        document.getElementById('btn-share-community').addEventListener('click', async () => {
+            if (!activeGroupId) return;
+            const group = cachedCommunities[activeGroupId];
+            if (!group) return;
+            const inviteUrl = communityInviteUrl(activeGroupId);
+            const shareText = `Join "${group.name}" on Haba!`;
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Haba', text: shareText, url: inviteUrl }); }
+                catch (err) { /* user cancelled share, ignore */ }
+            } else {
+                try {
+                    await navigator.clipboard.writeText(`${shareText} ${inviteUrl}`);
+                    notify('Invite link copied to clipboard!');
+                } catch (err) {
+                    showCustomModal('Share Invite Link', `${shareText} ${inviteUrl}`);
+                }
+            }
+        });
+
+        // Turns a ?joinCommunity=<id> link (window.__pendingCommunityJoinId, captured at load —
+        // see the head script) into an actual "Join this community?" prompt. Called every time
+        // the communities listener fires, but only ever acts once — it bails out and waits for
+        // the next update if that community's data hasn't arrived yet (fresh community, slow
+        // connection, or simply not loaded on this pass), and a bad/unknown id just never
+        // matches, so it silently does nothing rather than erroring.
+        let communityJoinPromptShown = false;
+        function maybeHandlePendingCommunityJoin() {
+            const groupId = window.__pendingCommunityJoinId;
+            if (!groupId || communityJoinPromptShown) return;
+            const group = cachedCommunities[groupId];
+            if (!group) return;
+            communityJoinPromptShown = true;
+            history.replaceState(null, '', window.location.pathname + window.location.hash); // drop ?joinCommunity= so a refresh doesn't reprompt
+
+            const user = auth.currentUser;
+            const alreadyMember = !!(user && group.members && group.members[user.uid]);
+            if (alreadyMember) {
+                goToTab('tab-groups');
+                openGroupChatView(groupId);
+                return;
+            }
+            const memberCount = group.members ? Object.keys(group.members).length : 0;
+            showCustomModal('Join Community', `Join "${group.name}" — ${memberCount} member${memberCount === 1 ? '' : 's'}?`, true)
+                .then(async (confirmed) => {
+                    if (!confirmed || !user) return;
+                    try {
+                        await set(ref(database, `communities/${groupId}/members/${user.uid}`), true);
+                        cachedCommunities[groupId] = cachedCommunities[groupId] || group;
+                        cachedCommunities[groupId].members = cachedCommunities[groupId].members || {};
+                        cachedCommunities[groupId].members[user.uid] = true;
+                        notify(`You joined ${group.name}`);
+                        goToTab('tab-groups');
+                        openGroupChatView(groupId);
+                    } catch (err) {
+                        notify('Could not join this community', 'error');
+                    }
+                });
+        }
+
         // Group info sheet
         const groupInfoSheet = document.getElementById('group-info-sheet-overlay');
         const groupAvatarUpload = document.getElementById('group-avatar-upload');
@@ -29538,6 +29616,7 @@
                 renderGroupsLists();
                 if (userChatsInitialized) renderChatListFromCache();
                 renderCallList(cachedCallLogEntries); // group names/photos may have just arrived
+                maybeHandlePendingCommunityJoin();
             });
 
             // ONE-TIME CLEANUP — communities now live under the "communities" node (see the

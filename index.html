@@ -15066,8 +15066,17 @@
             if (card.dataset.isAd !== '1' && !opts.isPreview) {
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('a')) return; // let a real link (e.g. in the caption) navigate normally
+                    // If this card's own video is mid-playback, carry its position over to the
+                    // preview video the Post view is about to build (see openPostComments's
+                    // resumeVideoState) so it picks up exactly where this one left off instead of
+                    // restarting from 0 — pauseAllFeedMedia() below stops this element but leaves
+                    // currentTime untouched, so read it first.
+                    const tappedVideo = videoWrap ? videoWrap.querySelector('.feed-post-video') : null;
+                    const resumeVideoState = (tappedVideo && !tappedVideo.paused)
+                        ? { time: tappedVideo.currentTime }
+                        : null;
                     pauseAllFeedMedia();
-                    openPostComments(targetId, { fullView: true });
+                    openPostComments(targetId, { fullView: true, resumeVideoState });
                 });
             }
 
@@ -15607,6 +15616,23 @@
                 if (fullView && post) {
                     previewEl.appendChild(buildFeedPostCard(postId, post, { isPreview: true }));
                     previewEl.style.display = '';
+                    // Picks up playback where the feed card's own video left off (see the tap
+                    // handler in buildFeedPostCard that fills opts.resumeVideoState) instead of
+                    // this fresh preview video defaulting to a restart from 0. currentTime can
+                    // only be set once metadata has loaded (readyState >= 1) — on this
+                    // brand-new element that's essentially never true yet, but check anyway
+                    // rather than assume, and fall back to the loadedmetadata event.
+                    if (opts.resumeVideoState) {
+                        const previewVideo = previewEl.querySelector('.feed-post-video');
+                        if (previewVideo) {
+                            const resume = () => {
+                                previewVideo.currentTime = opts.resumeVideoState.time;
+                                previewVideo.play().catch(() => {});
+                            };
+                            if (previewVideo.readyState >= 1) resume();
+                            else previewVideo.addEventListener('loadedmetadata', resume, { once: true });
+                        }
+                    }
                 } else {
                     previewEl.style.display = 'none';
                 }

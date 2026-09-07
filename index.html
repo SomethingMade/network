@@ -5913,11 +5913,11 @@
                     <div class="vb-promo-plan-head">
                         <span class="vb-promo-plan-name">Buy Verified <span class="group-badge-pill gold-business" id="paid-verified-pill" style="display:none; margin-left:6px; background:rgba(10,132,255,0.18); color:#0A84FF;">Verified</span></span>
                     </div>
-                    <p class="vb-promo-plan-sub" id="buy-verified-badge-status">A permanent blue badge on your personal account — R19.99 once-off</p>
-                    <button type="button" id="btn-buy-verified-badge" class="vb-promo-cta vb-promo-cta-primary">Buy · R19.99</button>
+                    <p class="vb-promo-plan-sub" id="buy-verified-badge-status">A permanent blue badge on your personal account — R2.99 once-off</p>
+                    <button type="button" id="btn-buy-verified-badge" class="vb-promo-cta vb-promo-cta-primary">Buy · R2.99</button>
                 </div>
 
-                <p class="vb-promo-terms">Payments are processed securely by Yoco. The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
+                <p class="vb-promo-terms">Payments are processed securely by Paystack. The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
             </div>
         </div>
     </div>
@@ -7307,12 +7307,12 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <!-- Yoco Web SDK (client-side card-tokenizing popup) — used to sell the paid Verified
-         Badge for personal accounts. The popup only tokenizes the card in the browser; the
-         actual charge is created server-side via the chargeYocoBadgePurchase Cloud Function,
-         which is the only place the Yoco SECRET key is used (see YOCO_PUBLIC_KEY / buyVerifiedBadge
-         below, and functions/index.js). -->
-    <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
+    <!-- Paystack Inline JS (client-side checkout popup) — used to sell the paid Verified
+         Badge for personal accounts. Client-only integration: on a successful popup callback
+         the app writes paidVerifiedAt to Firebase directly, with no server-side check that a
+         charge actually went through (see the NOTE on PAYSTACK_PUBLIC_KEY / buyVerifiedBadge
+         below for the tradeoff). -->
+    <script src="https://js.paystack.co/v1/inline.js"></script>
     <!-- Agora Web SDK (RTC) — powers the Live feature: single host broadcasting to viewers,
          with the host able to pull viewers up on-stage as co-hosts mid-broadcast. -->
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.2.js"></script>
@@ -10490,29 +10490,29 @@
 
         // --- PAID VERIFIED BADGE (personal accounts) ---
         // A permanent blue badge (VERIFIED_BADGE_SVG) any personal account can buy outright for
-        // R19.99, independent of the free 14-day trial and of follower count. Business accounts
+        // R2.99, independent of the free 14-day trial and of follower count. Business accounts
         // already get the gold badge for free, so the purchase option is hidden for them.
         //
-        // Payment is collected client-side via the Yoco Web SDK (https://js.yoco.com/sdk/v1/yoco-sdk-web.js,
-        // loaded in <head>), which pops up a hosted card form and hands back a single-use token —
-        // it never touches or sees the raw card details itself.
+        // Payment is collected client-side via Paystack Inline (https://js.paystack.co/v1/inline.js,
+        // loaded in <head>), which pops up a hosted checkout and hands back a transaction
+        // reference once the person has paid.
         //
-        // The Yoco PUBLIC key is safe to expose in the browser (it can only tokenize cards,
-        // not charge them) — set it to your real key before going live:
-        const YOCO_PUBLIC_KEY = 'pk_test_REPLACE_WITH_YOUR_YOCO_PUBLIC_KEY';
-        const VERIFIED_BADGE_PRICE_ZAR = 19.99;
-        // Yoco amounts are in the smallest currency unit (cents, for ZAR), same as Paystack was.
+        // The Paystack PUBLIC key is safe to expose in the browser (it can only open a checkout,
+        // not confirm or move money) — set it to your real key before going live:
+        const PAYSTACK_PUBLIC_KEY = 'pk_live_13901900b52860e08c9ae496afdb0bde8e0f42c5';
+        const VERIFIED_BADGE_PRICE_ZAR = 2.99;
+        // Paystack amounts are in the smallest currency unit (cents, for ZAR).
         const VERIFIED_BADGE_PRICE_CENTS = Math.round(VERIFIED_BADGE_PRICE_ZAR * 100);
         //
-        // SECURITY NOTE: unlike Paystack Inline, the Yoco popup below only TOKENIZES the card —
-        // it never actually charges it. The token is single-use and worthless without also
-        // calling Yoco's Charges API with your SECRET key, which must never be shipped to the
-        // browser. So the client here does not write paidVerifiedAt itself: it hands the token to
-        // the chargeYocoBadgePurchase Cloud Function (see functions/index.js), which charges the
-        // card server-side with the secret key and — only once Yoco confirms the charge
-        // succeeded — sets paidVerifiedAt itself via the Admin SDK. Lock users/$uid/paidVerifiedAt
-        // to admin-only writes in your Firebase security rules so nothing else can set it.
-        const chargeYocoBadgePurchaseCallable = httpsCallable(functionsClient, 'chargeYocoBadgePurchase');
+        // NOTE: this is a client-only integration — there is no server-side verification of the
+        // Paystack transaction. On a successful callback the client writes paidVerifiedAt to
+        // Firebase directly (see the click handler below), trusting the popup's callback and
+        // Firebase security rules alone. That means anyone able to call Firebase's client SDK
+        // directly (e.g. via devtools) can set paidVerifiedAt on their own account without
+        // actually paying, and a modified client could fire the "success" callback without a
+        // real charge going through. Revisit with a Cloud Function that verifies the transaction
+        // reference against Paystack's API (using the SECRET key) before trusting this in
+        // production.
 
         // Same seal shape again but rendered in gold. Shown next to the name of any user who has
         // switched their personal account to a Business Account (see verifiedBadgeFor).
@@ -17727,7 +17727,7 @@
             }
         });
 
-        // --- Paid Verified Badge (see YOCO_PUBLIC_KEY / verifiedBadgeFor for background) ---
+        // --- Paid Verified Badge (see PAYSTACK_PUBLIC_KEY / verifiedBadgeFor for background) ---
         // Business accounts already have a badge (gold, free), so the purchase row is only
         // relevant — and only shown — for personal accounts that haven't already bought it.
         function refreshVerifiedBadgePurchaseUI(myProfile) {
@@ -17782,11 +17782,11 @@
             const myProfile = cachedUsers[user.uid] || {};
             if (myProfile.paidVerifiedAt || myProfile.isBusinessAccount) return;
 
-            if (!YOCO_PUBLIC_KEY || YOCO_PUBLIC_KEY.includes('REPLACE_WITH_YOUR')) {
+            if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('REPLACE_WITH_YOUR')) {
                 showCustomModal('Payments Not Set Up', "The app owner hasn't connected a payment provider yet, so badge purchases aren't available right now.");
                 return;
             }
-            if (typeof YocoSDK === 'undefined') {
+            if (typeof PaystackPop === 'undefined') {
                 notify('Payment system failed to load. Check your connection and try again.', 'error');
                 return;
             }
@@ -17795,44 +17795,45 @@
             btn.disabled = true;
             btn.textContent = 'Opening…';
 
-            const yoco = new YocoSDK({ publicKey: YOCO_PUBLIC_KEY });
-            yoco.showPopup({
-                amountInCents: VERIFIED_BADGE_PRICE_CENTS,
+            const paystackHandler = PaystackPop.setup({
+                key: PAYSTACK_PUBLIC_KEY,
+                email: user.email || `${user.uid}@haba.app`,
+                amount: VERIFIED_BADGE_PRICE_CENTS,
                 currency: 'ZAR',
-                name: 'Haba Verified Badge',
-                description: 'Permanent blue Verified Badge — once-off',
-                metadata: { uid: user.uid, product: 'verified_badge' },
-                callback: (result) => {
+                metadata: {
+                    uid: user.uid,
+                    product: 'verified_badge',
+                    custom_fields: [
+                        { display_name: 'Product', variable_name: 'product', value: 'Haba Verified Badge' }
+                    ]
+                },
+                callback: (response) => {
                     (async () => {
-                        if (result.error) {
-                            notify(result.error.message || 'Card was not charged. Please try again.', 'error');
-                            btn.disabled = false;
-                            btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
-                            return;
-                        }
-                        // The token only proves the card is valid — it does not move any money
-                        // yet. chargeYocoBadgePurchase (see functions/index.js) creates the actual
-                        // charge server-side with the SECRET key, and only sets paidVerifiedAt
-                        // itself once Yoco confirms the charge succeeded (see SECURITY NOTE on
-                        // YOCO_PUBLIC_KEY above) — the client never writes that field directly.
-                        btn.textContent = 'Charging…';
+                        // Client-only flow: trusting Paystack's callback directly and writing
+                        // paidVerifiedAt ourselves (see the NOTE on PAYSTACK_PUBLIC_KEY above for
+                        // why this is weaker than server-side verification).
+                        btn.textContent = 'Finishing up…';
                         try {
-                            const res = await chargeYocoBadgePurchaseCallable({ token: result.id, amountInCents: VERIFIED_BADGE_PRICE_CENTS });
-                            if (res.data && res.data.success) {
-                                notify("You're verified! Your blue badge is live.");
-                                refreshVerifiedBadgePurchaseUI({ ...myProfile, paidVerifiedAt: Date.now() });
-                                refreshVerifiedBadgeSettingsRow({ ...myProfile, paidVerifiedAt: Date.now() });
-                            } else {
-                                throw new Error((res.data && res.data.message) || 'Charge failed');
-                            }
+                            await update(ref(database, `users/${user.uid}`), {
+                                paidVerifiedAt: serverTimestamp(),
+                                paidVerifiedRef: response.reference
+                            });
+                            notify("You're verified! Your blue badge is live.");
+                            refreshVerifiedBadgePurchaseUI({ ...myProfile, paidVerifiedAt: Date.now() });
+                            refreshVerifiedBadgeSettingsRow({ ...myProfile, paidVerifiedAt: Date.now() });
                         } catch (err) {
-                            notify(err.message || 'Could not charge your card. Please try again.', 'error');
+                            notify(err.message || 'Payment went through, but we could not update your badge. Contact support.', 'error');
                             btn.disabled = false;
                             btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
                         }
                     })();
+                },
+                onClose: () => {
+                    btn.disabled = false;
+                    btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
                 }
             });
+            paystackHandler.openIframe();
         });
 
         // Header avatars ([data-profile-trigger], all tab headers) now open the sidebar

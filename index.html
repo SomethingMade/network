@@ -11671,7 +11671,16 @@
             // "nothing typed yet" slot instead of the feed (which stays hidden there regardless).
             if (!term) {
                 if (searchResultsWrap) searchResultsWrap.style.display = 'none';
-                if (feedContainer) feedContainer.style.display = '';
+                // Only force the plain post feed back into view when that's actually the
+                // active feed subtab. Blindly un-hiding it here (regardless of subtab) used
+                // to stomp on the Stories/Live subtab panels: this function runs on every
+                // landing on tab-status — including the forced redirect back to Home after
+                // closing a story — so closing a story while on the Feed's Stories subtab
+                // was silently swapping the visible panel back to feed posts underneath the
+                // still-highlighted "Stories" button.
+                if (feedContainer && feedActiveSubtab !== 'stories' && feedActiveSubtab !== 'live') {
+                    feedContainer.style.display = '';
+                }
                 if (exploreTabsBar) exploreTabsBar.style.display = '';
                 explorePanels.forEach(p => p.style.display = '');
                 sprinkleSuggestedPeople();

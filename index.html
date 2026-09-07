@@ -12155,6 +12155,9 @@
             return (Math.abs(hash) % 10000) / 10000;
         }
 
+        // "For You": a discovery-style ranking that blends recency with engagement, affinity to
+        // your contacts, verified status, and a per-viewer random jitter — favors fresh AND
+        // popular/relevant posts, with enough randomness that ordering isn't perfectly stable.
         function computeFeedScore(postId, post) {
             const user = auth.currentUser;
             const myUid = user ? user.uid : 'anon';
@@ -12177,6 +12180,20 @@
             const jitter = seededRandom01(postId + ':' + myUid) * 20;
 
             return recencyScore + engagementScore + contactBonus + verifiedBonus + jitter;
+        }
+
+        // "Following": deliberately a different algorithm from For You, not just a filtered
+        // view of the same order. This subtab is already scoped to people you follow (see
+        // feedCardMatchesSubtab), so the point is to see what they posted in the order they
+        // posted it — not have it reshuffled by engagement or verified status the way For You
+        // is. Effectively reverse-chronological: timestamp does all the work, with only a
+        // hairline per-viewer jitter to break exact-timestamp ties, not to meaningfully reorder.
+        function computeFollowingFeedScore(postId, post) {
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : 'anon';
+            const ts = post.timestamp || Date.now();
+            const tieBreakJitter = seededRandom01(postId + ':following:' + myUid) * 0.001;
+            return ts + tieBreakJitter;
         }
 
         // Reorders existing post cards in place (moves DOM nodes, doesn't rebuild them) so any
@@ -12256,11 +12273,15 @@
             // or it ends up mid-list instead of pinned to the bottom, which silently breaks
             // the IntersectionObserver that drives loading older pages.
             const cards = Array.from(list.children).filter(el => el.dataset.postId);
+            // Following gets its own scoring pass (see computeFollowingFeedScore) rather than
+            // reusing For You's order and just hiding non-matching cards — otherwise the two
+            // subtabs would always show the same relative ordering for whichever posts overlap.
+            const scoreFn = feedActiveSubtab === 'following' ? computeFollowingFeedScore : computeFeedScore;
             cards.sort((a, b) => {
                 const postIdA = a.dataset.postId, postIdB = b.dataset.postId;
                 const postA = cachedPosts[postIdA], postB = cachedPosts[postIdB];
                 if (!postA || !postB) return 0;
-                return computeFeedScore(postIdB, postB) - computeFeedScore(postIdA, postA);
+                return scoreFn(postIdB, postB) - scoreFn(postIdA, postA);
             });
             cards.forEach(card => list.appendChild(card));
             const sentinel = document.getElementById('feed-load-more-sentinel');
@@ -14049,6 +14070,10 @@
             } else if (feedActiveSubtab === 'stories') {
                 showFeedStoriesPanel();
             } else {
+                // Re-sort with the subtab's own algorithm (see computeFeedScore vs
+                // computeFollowingFeedScore) before filtering visibility, so switching between
+                // For You and Following actually reorders posts rather than just hiding some.
+                reorderFeedCards();
                 applyFeedSubtabFilter();
             }
         });

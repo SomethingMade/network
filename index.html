@@ -2543,6 +2543,11 @@
         .explore-empty { padding: 24px 4px; text-align: center; font-size: 13.5px; color: var(--text-secondary); }
         .story-card-scroll::-webkit-scrollbar { display: none; }
         .story-card-scroll.uploading { opacity: 0.5; pointer-events: none; }
+        /* Feed tab's Stories subtab: same .story-card items as the horizontal strip, reflowed
+           into a responsive grid since this panel owns the full feed width/height instead of
+           sitting as a thin row above the post list. */
+        .story-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 10px; padding: 12px 14px 24px; }
+        .story-grid .story-card { width: 100%; height: 0; padding-bottom: 155%; }
         .story-card { position: relative; flex-shrink: 0; width: 108px; height: 168px; border-radius: 14px; overflow: hidden; cursor: pointer; background: var(--bg-hover); }
         .story-card-media { position: absolute; inset: 0; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box; }
         .story-card-media video, .story-card-media img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
@@ -6515,6 +6520,7 @@
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
+                                <button type="button" class="feed-subtab-btn" data-feed-subtab="stories">Stories</button>
                                 <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live</button>
                             </div>
                         </div>
@@ -6542,6 +6548,16 @@
                             </div>
                             <div class="live-list-grid" id="feed-live-list"></div>
                             <p class="live-hub-empty" id="feed-live-empty" style="display:none;">No one's live right now. Be the first!</p>
+                        </div>
+                        <!-- Feed tab's "Stories" subtab panel: same status/story cards as the
+                             Discover tab's story-card-scroll (#stories-scroll-discover), just
+                             reflowed into a grid instead of a horizontal strip since this panel
+                             owns the full feed body. Reuses buildStoryCardItem/buildAddStoryCardItem
+                             so a story posted anywhere shows up identically in both places. Hidden
+                             unless the Stories subtab above is active (see feed-subtabs click handler). -->
+                        <div id="feed-stories-panel" style="display:none;">
+                            <div class="story-grid" id="feed-stories-grid"></div>
+                            <p class="live-hub-empty" id="feed-stories-empty" style="display:none;">No stories yet. Be the first to share one!</p>
                         </div>
                     </div>
                 </div>
@@ -13983,6 +13999,21 @@
             if (feedLiveListUnsub) { feedLiveListUnsub(); feedLiveListUnsub = null; }
         }
 
+        // --- Feed "Stories" subtab: reuses the same cachedUsers/cachedStories kept live by the
+        // "users"/"stories" DB listeners in initChatListeners() (renderFeedStoryCards is already
+        // called there on every update), so opening the panel just needs an immediate render from
+        // whatever's cached — no separate subscription to manage.
+        function showFeedStoriesPanel() {
+            document.getElementById('feed-posts-container').style.display = 'none';
+            document.getElementById('feed-empty-state').style.display = 'none';
+            document.getElementById('feed-stories-panel').style.display = 'block';
+            renderFeedStoryCards(cachedUsers, cachedStories);
+        }
+        function hideFeedStoriesPanel() {
+            document.getElementById('feed-stories-panel').style.display = 'none';
+            document.getElementById('feed-posts-container').style.display = '';
+        }
+
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
             if (!btn) return;
@@ -13991,10 +14022,13 @@
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
+            hideFeedLivePanel();
+            hideFeedStoriesPanel();
             if (feedActiveSubtab === 'live') {
                 showFeedLivePanel();
+            } else if (feedActiveSubtab === 'stories') {
+                showFeedStoriesPanel();
             } else {
-                hideFeedLivePanel();
                 applyFeedSubtabFilter();
             }
         });
@@ -23458,6 +23492,51 @@
             });
         }
 
+        // --- Feed tab's Stories subtab: same story data/cards as the Discover strip, just
+        // rendered into #feed-stories-grid's responsive grid instead of a horizontal scroller.
+        function renderFeedStoryCards(usersData, storiesData) {
+            const grid = document.getElementById('feed-stories-grid');
+            const empty = document.getElementById('feed-stories-empty');
+            const user = auth.currentUser;
+            if (!grid || !user) return;
+            grid.innerHTML = "";
+            const now = Date.now();
+
+            const ownProfile = (usersData && usersData[user.uid]) || {};
+            grid.appendChild(buildAddStoryCardItem(ownProfile.photoURL || user.photoURL || ""));
+
+            let othersCount = 0;
+            const ownRaw = [];
+            if (storiesData && storiesData[user.uid]) {
+                Object.entries(storiesData[user.uid]).forEach(([key, val]) => ownRaw.push({ ...val, key }));
+            }
+            const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
+
+            if (ownItems.length > 0) {
+                grid.appendChild(buildStoryCardItem(
+                    user.uid,
+                    ownProfile.name || user.displayName || "You",
+                    ownProfile.photoURL || user.photoURL || "",
+                    ownItems,
+                    true
+                ));
+            }
+
+            Object.keys(storiesData || {}).forEach(uid => {
+                if (uid === user.uid) return;
+                const raw = [];
+                Object.entries(storiesData[uid]).forEach(([key, val]) => raw.push({ ...val, key }));
+                const items = raw.filter(s => now - s.createdAt < STORY_TTL);
+                if (items.length === 0) return;
+
+                othersCount++;
+                const profile = (usersData && usersData[uid]) || {};
+                grid.appendChild(buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false));
+            });
+
+            if (empty) empty.style.display = (ownItems.length === 0 && othersCount === 0) ? 'block' : 'none';
+        }
+
         document.getElementById('story-file-input').addEventListener('change', (e) => {
             e.preventDefault();
             const files = e.target.files;
@@ -29610,6 +29689,7 @@
                 });
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
+                renderFeedStoryCards(cachedUsers, cachedStories);
                 renderChatRequests();
                 if (activeChatUid) updateActiveChatStatus();
                 applyChatWallpaperToDOM(currentWallpaperValue());
@@ -29634,6 +29714,7 @@
                 });
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
+                renderFeedStoryCards(cachedUsers, cachedStories);
                 if (userChatsInitialized) renderChatListFromCache();
             });
 

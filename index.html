@@ -4054,6 +4054,10 @@
 
         /* ── GROUP CALL BANNER (pinned inside a group chat while a call is live) ── */
         .group-call-banner { display: none; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(52,199,89,0.12); border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .disappearing-banner { display: none; align-items: center; gap: 8px; padding: 9px 16px; background: var(--bg-alt); border-bottom: 1px solid var(--border-color); cursor: pointer; color: var(--text-secondary); font-size: 12.5px; font-weight: 600; }
+        .disappearing-banner svg { flex-shrink: 0; }
+        .disappearing-option.disappearing-selected { color: var(--primary-blue); }
+        .disappearing-option.disappearing-selected svg:first-child { color: var(--primary-blue); }
 
         /* Floating "messages are end-to-end encrypted" pill, shown just under the chat header
            for DM threads (DMs are the only chats that are actually E2E encrypted). */
@@ -6314,6 +6318,36 @@
         </div>
     </div>
 
+    <div id="disappearing-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title" style="margin-bottom: 4px;">Disappearing Messages</div>
+            <p style="color:var(--text-secondary); font-size:13px; text-align:center; margin-bottom:16px;">New messages you send in this chat will disappear after the timer you pick. This doesn't affect messages already sent, and applies only to this chat.</p>
+            <div id="disappearing-options-list" style="display:flex; flex-direction:column; gap:2px;">
+                <button type="button" class="chats-menu-item disappearing-option" data-seconds="0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <span style="flex:1;">Off</span>
+                    <svg class="disappearing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;flex-shrink:0;display:none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="chats-menu-item disappearing-option" data-seconds="86400">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span style="flex:1;">24 hours</span>
+                    <svg class="disappearing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;flex-shrink:0;display:none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="chats-menu-item disappearing-option" data-seconds="604800">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span style="flex:1;">7 days</span>
+                    <svg class="disappearing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;flex-shrink:0;display:none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="chats-menu-item disappearing-option" data-seconds="7776000">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span style="flex:1;">90 days</span>
+                    <svg class="disappearing-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:16px;height:16px;flex-shrink:0;display:none;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <div id="auth-screen">
         <!-- Desktop-only left panel: solid brand-black background with just the centered
@@ -6925,6 +6959,10 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">1</text></svg>
                         <span id="chat-view-menu-viewonce-label">Send as view once</span>
                     </button>
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-disappearing">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <span id="chat-view-menu-disappearing-label">Disappearing messages</span>
+                    </button>
                     <button type="button" class="chats-menu-item" id="chat-view-menu-music">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                         <span>Share music</span>
@@ -6935,6 +6973,11 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <div id="disappearing-banner" class="disappearing-banner">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span id="disappearing-banner-text">Disappearing messages: 24 hours</span>
         </div>
 
         <div id="group-call-active-banner" class="group-call-banner">
@@ -10219,6 +10262,13 @@
                 viewOnceItem.classList.toggle('viewonce-active', !!isArmed);
                 document.getElementById('chat-view-menu-viewonce-label').textContent = isArmed ? 'View once is on' : 'Send as view once';
 
+                const isAIChat = typeof activeChatUid !== 'undefined' && activeChatUid === AI_UID;
+                const disappearingItem = document.getElementById('chat-view-menu-disappearing');
+                disappearingItem.style.display = (!isGroup && !isAIChat) ? 'flex' : 'none';
+                document.getElementById('chat-view-menu-disappearing-label').textContent = activeChatDisappearingSeconds > 0
+                    ? `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`
+                    : 'Disappearing messages';
+
                 dropdown.classList.toggle('open');
             });
             document.addEventListener('click', (e) => {
@@ -10251,6 +10301,11 @@
                     if (!music) return;
                     sendMusicMessage(music);
                 });
+            });
+
+            document.getElementById('chat-view-menu-disappearing').addEventListener('click', () => {
+                closeMenu();
+                openDisappearingSheet();
             });
 
             document.getElementById('chat-view-menu-wallpaper').addEventListener('click', () => {
@@ -23149,6 +23204,14 @@
             disarmViewOnce();
             document.getElementById('btn-view-once-toggle').style.display = 'none';
             cancelReplyMode(); cancelEditMode();
+
+            // Disappearing messages are a DM-only concept — tear down the listener and hide
+            // the banner when landing on a group thread instead.
+            if (typeof unsubscribeDisappearingSetting === 'function') unsubscribeDisappearingSetting();
+            unsubscribeDisappearingSetting = null;
+            clearTimeout(disappearingSweepTimeout);
+            activeChatDisappearingSeconds = 0;
+            updateDisappearingBannerUI();
             
             // Unbind active Chat block checks if any
             if (activeChatBlockListenerRef) {
@@ -25986,6 +26049,10 @@
         let unsubscribeReadReceipt = null;
         let activeChatOtherLastRead = 0;
         let isActiveThreadInitialLoad = true;
+        // --- Disappearing messages (DMs only) ---
+        let unsubscribeDisappearingSetting = null;
+        let activeChatDisappearingSeconds = 0;
+        let disappearingSweepTimeout = null;
         let chatListTypingUnsubscribers = {};
         let chatListReadReceiptUnsubscribers = {};
         let groupListTypingUnsubscribers = {};
@@ -28409,6 +28476,10 @@
                     msgPayload.mediaType = activeContextMenuMsg.mediaType;
                 }
                 previewText = await encryptForPeer(targetUid, previewText);
+                // Forwarding can target a different DM than the one currently open, so the
+                // timer has to be looked up per target thread rather than trusting whichever
+                // chat's setting happens to be cached in activeChatDisappearingSeconds.
+                withDisappearingExpiry(msgPayload, targetUid === activeChatUid ? activeChatDisappearingSeconds : await getThreadDisappearingSeconds(threadId));
 
                 const updates = {};
                 updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
@@ -28469,6 +28540,7 @@
                 const plainText = `📤 Shared ${authorName}'s post: "${snippet}"`;
 
                 const msgPayload = { senderUid: user.uid, createdAt: Date.now(), sharedPostId: postId, text: await encryptForPeer(targetUid, plainText) };
+                withDisappearingExpiry(msgPayload, targetUid === activeChatUid ? activeChatDisappearingSeconds : await getThreadDisappearingSeconds(threadId));
                 const previewText = await encryptForPeer(targetUid, plainText);
 
                 const updates = {};
@@ -28677,6 +28749,93 @@
             if (e.target.id === 'view-once-audio-overlay') history.back();
         });
 
+        // --- DISAPPEARING MESSAGES (DMs only) ---
+        // Setting lives at dm_threads/{threadId}/settings/disappearingSeconds, visible/writable
+        // by either participant (mirrors read receipts/typing, which already use this same
+        // per-thread settings-style node). 0 (or absent) means off. New messages sent while a
+        // timer is active get an expiresAt stamp; expired messages are filtered out of the
+        // render immediately and swept out of the database on a best-effort basis by whichever
+        // participant has the thread open (see scheduleDisappearingSweep).
+        const DISAPPEARING_OPTIONS = [
+            { seconds: 0, label: 'Off' },
+            { seconds: 86400, label: '24 hours' },
+            { seconds: 604800, label: '7 days' },
+            { seconds: 7776000, label: '90 days' }
+        ];
+        function disappearingLabelFor(seconds) {
+            const opt = DISAPPEARING_OPTIONS.find(o => o.seconds === seconds);
+            return opt ? opt.label : 'Off';
+        }
+
+        // One-off read of another thread's timer — used by Forward/Share-post, which can target
+        // a DM other than the one currently open, so the live-cached activeChatDisappearingSeconds
+        // (which only tracks the open thread) doesn't apply there.
+        async function getThreadDisappearingSeconds(threadId) {
+            try {
+                const snap = await get(ref(database, `dm_threads/${threadId}/settings/disappearingSeconds`));
+                return snap.exists() ? (snap.val() || 0) : 0;
+            } catch (err) { return 0; }
+        }
+
+        function withDisappearingExpiry(msgPayload, disappearingSeconds) {
+            if (disappearingSeconds > 0) msgPayload.expiresAt = msgPayload.createdAt + disappearingSeconds * 1000;
+            return msgPayload;
+        }
+
+        function updateDisappearingBannerUI() {
+            const banner = document.getElementById('disappearing-banner');
+            if (!banner) return;
+            if (activeChatUid && activeChatUid !== AI_UID && activeChatDisappearingSeconds > 0) {
+                document.getElementById('disappearing-banner-text').textContent = `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`;
+                banner.style.display = 'flex';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
+        function openDisappearingSheet() {
+            if (!activeChatUid || activeChatUid === AI_UID) return;
+            document.querySelectorAll('#disappearing-options-list .disappearing-option').forEach(btn => {
+                const match = Number(btn.dataset.seconds) === activeChatDisappearingSeconds;
+                btn.classList.toggle('disappearing-selected', match);
+                btn.querySelector('.disappearing-check').style.display = match ? 'block' : 'none';
+            });
+            document.getElementById('disappearing-sheet-overlay').classList.add('active');
+        }
+        document.getElementById('disappearing-banner').addEventListener('click', openDisappearingSheet);
+        document.getElementById('disappearing-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'disappearing-sheet-overlay') e.target.classList.remove('active');
+        });
+        document.getElementById('disappearing-options-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('.disappearing-option');
+            if (!btn) return;
+            document.getElementById('disappearing-sheet-overlay').classList.remove('active');
+            setDisappearingTimer(Number(btn.dataset.seconds));
+        });
+
+        // Writes the new timer plus a small system-style notice line (rendered as a centered
+        // pill, same as a date separator) so both participants see when/why the setting changed
+        // — same UX convention as WhatsApp/Signal-style disappearing message toggles.
+        async function setDisappearingTimer(seconds) {
+            const user = auth.currentUser;
+            if (!user || !activeChatUid || activeChatUid === AI_UID) return;
+            const threadId = threadIdFor(user.uid, activeChatUid);
+            const senderName = (cachedUsers[user.uid] && cachedUsers[user.uid].name) || user.displayName || 'You';
+            const label = disappearingLabelFor(seconds);
+            const systemText = seconds > 0 ? `${senderName} set disappearing messages to ${label}` : `${senderName} turned off disappearing messages`;
+            try {
+                const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                const updates = {};
+                updates[`dm_threads/${threadId}/settings/disappearingSeconds`] = seconds;
+                updates[`dm_threads/${threadId}/settings/disappearingSetBy`] = user.uid;
+                updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = { systemText, createdAt: Date.now(), senderUid: user.uid };
+                await update(ref(database), updates);
+                notify(seconds > 0 ? `Disappearing messages set to ${label}` : 'Disappearing messages turned off');
+            } catch (err) {
+                notify("Couldn't update disappearing messages", 'error');
+            }
+        }
+
         function openChatView(otherUid, otherName, otherAvatar) {
             // Haba AI no longer has a text-chat surface — every entry point that used to land
             // here for AI_UID (feed subtab, the seeded row in the Chats list, etc.) now opens
@@ -28750,6 +28909,8 @@
             if (typeof unsubscribeChatMessages === 'function') unsubscribeChatMessages();
             if (typeof unsubscribeTyping === 'function') unsubscribeTyping();
             if (typeof unsubscribeReadReceipt === 'function') unsubscribeReadReceipt();
+            if (typeof unsubscribeDisappearingSetting === 'function') unsubscribeDisappearingSetting();
+            clearTimeout(disappearingSweepTimeout);
 
             let currentChatIsTyping = false;
             const threadId = threadIdFor(user.uid, otherUid);
@@ -28757,6 +28918,21 @@
 
             // Mark this thread as read by me, right now
             if (!isAIThread && isReadReceiptsEnabled()) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
+
+            // Disappearing-messages timer listener: kept live so either participant toggling it
+            // updates the other's compose behavior/banner immediately, same as read receipts.
+            activeChatDisappearingSeconds = 0;
+            if (!isAIThread) {
+                const disappearingSettingRef = ref(database, `dm_threads/${threadId}/settings/disappearingSeconds`);
+                const disappearingCb = onValue(disappearingSettingRef, (snap) => {
+                    activeChatDisappearingSeconds = snap.exists() ? (snap.val() || 0) : 0;
+                    updateDisappearingBannerUI();
+                });
+                unsubscribeDisappearingSetting = () => off(disappearingSettingRef, 'value', disappearingCb);
+            } else {
+                unsubscribeDisappearingSetting = null;
+            }
+            updateDisappearingBannerUI();
 
             // Read-receipt listener: track when the other person last read this thread
             activeChatOtherLastRead = 0;
@@ -28850,13 +29026,43 @@
             // messages listener below and by loadOlderDmMessages after a paginated fetch — this
             // way scrolled-in history survives the live listener's re-renders instead of getting
             // wiped by the next new message/edit/reaction.
+            // Filters expired messages out of the render (called from renderDmThread, closure
+            // access to threadId) and, in the background, deletes them from the database and
+            // arms a timer for the next-soonest expiry so a message vanishes live if it expires
+            // while the chat stays open — instead of waiting on the next unrelated re-render.
+            function scheduleDisappearingSweep(itemsList) {
+                clearTimeout(disappearingSweepTimeout);
+                const sweepThreadId = threadId;
+                const now = Date.now();
+                const withExpiry = itemsList.filter(m => m.expiresAt);
+                const expired = withExpiry.filter(m => m.expiresAt <= now);
+                if (expired.length) {
+                    const updates = {};
+                    expired.forEach(m => {
+                        updates[`dm_threads/${sweepThreadId}/messages/${m.key}`] = null;
+                        delete cachedThreadMessages[m.key];
+                    });
+                    update(ref(database), updates).catch(() => {});
+                }
+                const future = withExpiry.filter(m => m.expiresAt > now).map(m => m.expiresAt);
+                if (future.length) {
+                    const nextAt = Math.min(...future);
+                    disappearingSweepTimeout = setTimeout(() => {
+                        if (activeChatUid === otherUid) renderDmThread();
+                    }, Math.min(Math.max(nextAt - now, 0), 2147483647));
+                }
+            }
+
             function renderDmThread() {
                 const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
                 const prevScrollTop = messagesEl.scrollTop;
                 const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
-                const items = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                const allItems = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                if (!isAIThread) scheduleDisappearingSweep(allItems);
+                const now = Date.now();
+                const items = isAIThread ? allItems : allItems.filter(m => !m.expiresAt || m.expiresAt > now);
                 if (items.length) {
                     let lastDateKey = null;
 
@@ -28866,6 +29072,15 @@
                             messagesEl.appendChild(buildDateSeparator(msg.createdAt));
                             lastDateKey = msgDateKey;
                         }
+
+                        if (msg.systemText) {
+                            const sysEl = document.createElement('div');
+                            sysEl.className = 'date-separator';
+                            sysEl.innerHTML = `<span>${msg.systemText}</span>`;
+                            messagesEl.appendChild(sysEl);
+                            return;
+                        }
+
                         const bubble = document.createElement('div');
                         bubble.className = 'msg-bubble ' + (msg.senderUid === user.uid ? 'out' : 'in');
                         
@@ -29369,7 +29584,7 @@
             learnWordsFromText(text);
             const threadId = threadIdFor(user.uid, activeChatUid);
             const encryptedText = await encryptForPeer(activeChatUid, text);
-            const msgPayload = { text: encryptedText, senderUid: user.uid, createdAt: Date.now() };
+            const msgPayload = withDisappearingExpiry({ text: encryptedText, senderUid: user.uid, createdAt: Date.now() }, activeChatDisappearingSeconds);
             
             if (replyingToMessage) {
                 msgPayload.replyToMessage = {
@@ -29568,7 +29783,7 @@
             } else if (activeChatUid) {
                 const chatUid = activeChatUid;
                 const threadId = threadIdFor(user.uid, chatUid);
-                const msgPayload = { senderUid: user.uid, createdAt: Date.now(), mediaURL: stickerURL, mediaType: 'sticker' };
+                const msgPayload = withDisappearingExpiry({ senderUid: user.uid, createdAt: Date.now(), mediaURL: stickerURL, mediaType: 'sticker' }, activeChatDisappearingSeconds);
                 try {
                     const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
                     const updates = {};
@@ -29628,6 +29843,11 @@
 
             try {
                 const threadId = threadIdFor(user.uid, chatUid);
+                // Uploads can take a while, so re-check the thread's timer here rather than
+                // trusting the cached activeChatDisappearingSeconds (which tracks whichever
+                // chat is open *now*, not necessarily still this one if the user navigated away
+                // mid-upload).
+                const disappearingSeconds = chatUid === activeChatUid ? activeChatDisappearingSeconds : await getThreadDisappearingSeconds(threadId);
                 let url, msgPayload = { senderUid: user.uid, createdAt: Date.now() };
                 let previewText;
 
@@ -29683,6 +29903,9 @@
                 // way as a regular text message, since DM media/text are both end-to-end
                 // encrypted per-peer (see encryptForPeer / encryptFileForPeer above).
                 if (caption) msgPayload.text = await encryptForPeer(chatUid, caption);
+                // View-once media already disappears after it's opened, so the disappearing-
+                // messages timer only applies to regular (non-view-once) media.
+                if (!applyViewOnce) withDisappearingExpiry(msgPayload, disappearingSeconds);
 
                 previewText = await encryptForPeer(chatUid, previewText);
 
@@ -30068,6 +30291,15 @@
                     msgPayload.duration = duration || fallbackDuration || 0;
                     msgPayload.viewOnce = true;
                     msgPayload.viewOnceViewed = false;
+                }
+
+                // View-once notes already disappear after playback, so the timer only applies
+                // to regular voice notes; re-check the thread's setting rather than trusting the
+                // cached activeChatDisappearingSeconds, since recording/uploading can outlast
+                // the user staying on this chat.
+                if (!isViewOnce) {
+                    const disappearingSeconds = chatUid === activeChatUid ? activeChatDisappearingSeconds : await getThreadDisappearingSeconds(threadId);
+                    withDisappearingExpiry(msgPayload, disappearingSeconds);
                 }
 
                 const previewText = isViewOnce ? '🔒 Voice message (view once)' : '🎤 Voice message';

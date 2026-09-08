@@ -894,6 +894,12 @@
         .live-list-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .live-list-card { position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(160deg, #1C1C1E, #000); border: 1px solid var(--border-color); aspect-ratio: 3/4; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; box-sizing: border-box; }
         .live-list-card-badge { align-self: flex-start; background: #FF3B5C; color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px; }
+        /* Live count badge: shows how many broadcasts are currently active, next to the
+           "Live" entry point in the sidebar drawer and the feed's Live subtab. Hidden
+           (via inline display:none, toggled in JS) whenever the count is zero. */
+        .live-count-badge { background: #FF3B5C; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; border-radius: 50px; padding: 3px 7px; min-width: 17px; text-align: center; box-sizing: border-box; }
+        .sidebar-drawer-item .live-count-badge { margin-left: auto; }
+        .feed-subtab-btn.feed-subtab-live .live-count-badge { margin-left: 5px; vertical-align: 1px; }
         .live-list-card-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
         .live-list-card-viewers { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.12); color: #fff; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
         .live-list-card-info { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -5874,6 +5880,7 @@
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-live">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
                     <span>Live</span>
+                    <span class="live-count-badge" id="sidebar-drawer-live-count" style="display:none;">0</span>
                 </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-insights">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
@@ -6727,7 +6734,7 @@
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="stories">Stories</button>
-                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live</button>
+                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live<span class="live-count-badge" id="feed-subtab-live-count" style="display:none;">0</span></button>
                             </div>
                         </div>
                         <div id="feed-posts-container">
@@ -18618,6 +18625,19 @@
             });
             liveClient.on('user-left', (remoteUser) => removeLiveRemoteTile(remoteUser.uid));
             return liveClient;
+        }
+
+        // Shows/hides + fills in a live-count-badge element (sidebar drawer item, feed subtab).
+        // Caps the displayed number at 99+ so the pill doesn't stretch the row on a big spike.
+        function updateLiveCountBadge(elId, count) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            if (count > 0) {
+                el.textContent = count > 99 ? '99+' : String(count);
+                el.style.display = '';
+            } else {
+                el.style.display = 'none';
+            }
         }
 
         // --- Live hub: browse/start ---
@@ -30599,6 +30619,18 @@
                 if (userChatsInitialized) renderChatListFromCache();
                 renderCallList(cachedCallLogEntries); // group names/photos may have just arrived
                 maybeHandlePendingCommunityJoin();
+            });
+
+            // Live count badges: how many broadcasts are active right now, surfaced next to
+            // both entry points (sidebar drawer "Live" item and the feed's "Live" subtab) so
+            // people can tell at a glance whether it's worth opening, without needing the
+            // hub/panel itself to be open. Both entry points share this one listener rather
+            // than each subscribing separately.
+            onValue(ref(database, "lives"), (snap) => {
+                const all = snap.val() || {};
+                const count = Object.values(all).filter(v => v && v.status === 'live').length;
+                updateLiveCountBadge('sidebar-drawer-live-count', count);
+                updateLiveCountBadge('feed-subtab-live-count', count);
             });
 
             // ONE-TIME CLEANUP — communities now live under the "communities" node (see the

@@ -3439,7 +3439,14 @@
         .story-video-loading-overlay span { color: #fff; font-size: 13px; font-weight: 500; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 
         /* Story Like Button, Reply Bar & Floating Hearts */
-        .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 16px; pointer-events: none; }
+        .story-controls-bottom { position: absolute; bottom: 20px; left: 0; right: 0; z-index: 10; display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: 100%; padding: 0 16px; pointer-events: none; }
+        /* Horizontal scrollable strip of animated stickers, sat just below the reply input — tap one to fire it off as an instant story reply. */
+        .story-sticker-row { display: flex; align-items: center; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 4px; pointer-events: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .story-sticker-row::-webkit-scrollbar { display: none; }
+        .story-sticker-row-item { flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; padding: 5px; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease; }
+        .story-sticker-row-item:active { transform: scale(0.88); background: rgba(255,255,255,0.28); }
+        .story-sticker-row-item img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .floating-sticker { position: absolute; width: 44px; height: 44px; opacity: 0; animation: floatUp 1.2s ease-out forwards; z-index: 11; pointer-events: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35)); }
 
         /* TikTok-style vertical action rail: avatar, then reaction, then reshare, stacked bottom-right */
         .story-action-rail { position: absolute; right: 14px; bottom: 88px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 14px; pointer-events: none; }
@@ -3936,6 +3943,7 @@
             .story-reshare-btn { width: 24px; height: 24px; }
             .story-mute-btn, .story-viewer-more, .story-viewer-delete { width: 20px; height: 20px; }
             .story-viewer-close { width: 22px; height: 22px; }
+            .story-sticker-row-item { width: 40px; height: 40px; border-radius: 12px; }
             .story-reply-send { width: 18px; height: 18px; }
             .story-card-add-icon { width: 30px; height: 30px; font-size: 17px; }
 
@@ -7406,6 +7414,7 @@
                     <input type="text" id="story-reply-input" class="story-reply-input" placeholder="Reply to story..." autocomplete="off">
                     <svg class="story-reply-send" id="story-reply-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </div>
+                <div class="story-sticker-row story-interactive" id="story-sticker-row"></div>
             </div>
 
             <div class="story-views-bar story-interactive" id="story-views-bar" style="display:none;">
@@ -10826,6 +10835,32 @@
             ] }
         ];
         function stickerUrlFor(cp) { return `https://fonts.gstatic.com/s/e/notoemoji/latest/${cp}/512.gif`; }
+
+        // Same catalog as the full sticker sheet, flattened into one list for the horizontal
+        // quick-tap strip shown under the story reply bar — no categories, just fast scroll-and-tap.
+        const STORY_QUICK_STICKERS = STICKER_CATALOG.flatMap(cat => cat.stickers);
+        let storyStickerRowBuilt = false;
+        function renderStoryStickerRow() {
+            const row = document.getElementById('story-sticker-row');
+            if (!row || storyStickerRowBuilt) return;
+            storyStickerRowBuilt = true;
+            STORY_QUICK_STICKERS.forEach(sticker => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'story-sticker-row-item';
+                btn.title = sticker.ch;
+                const img = document.createElement('img');
+                img.src = stickerUrlFor(sticker.cp);
+                img.alt = sticker.ch;
+                img.loading = 'lazy';
+                btn.appendChild(img);
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    sendStoryReplySticker(sticker.cp, sticker.ch, btn);
+                });
+                row.appendChild(btn);
+            });
+        }
         function buildStickerMsgElement(url) {
             const img = document.createElement('img');
             img.className = 'msg-sticker-img';
@@ -24919,6 +24954,8 @@
         storyReplyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendStoryReply(); } });
         storyReplySend.addEventListener('click', (e) => { e.stopPropagation(); sendStoryReply(); });
 
+        renderStoryStickerRow();
+
         async function sendStoryReply() {
             const text = storyReplyInput.value.trim();
             const user = auth.currentUser;
@@ -24953,6 +24990,53 @@
                 await update(ref(database), updates);
                 notify('Reply sent');
             } catch (err) { showCustomModal('Error', 'Could not send your reply.'); }
+        }
+
+        async function sendStoryReplySticker(cp, ch, btnEl) {
+            const user = auth.currentUser;
+            const current = storyState.items[storyState.index];
+            const otherUid = storyState.currentUid;
+            if (!user || !current || storyState.isOwn || !otherUid) return;
+
+            const stickerURL = stickerUrlFor(cp);
+            const previewText = ch ? `${ch} Sticker` : 'Sticker';
+            const threadId = threadIdFor(user.uid, otherUid);
+            const msgPayload = {
+                senderUid: user.uid,
+                createdAt: Date.now(),
+                mediaURL: stickerURL,
+                mediaType: 'sticker',
+                replyToStory: current.type === 'text'
+                    ? { type: 'text', text: current.text || '', bgColor: current.bgColor || TEXT_STORY_BACKGROUNDS[0], ownerUid: otherUid, storyKey: current.key || null }
+                    : { mediaURL: current.mediaURL, type: current.type || 'image', ownerUid: otherUid, storyKey: current.key || null }
+            };
+            const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+
+            const updates = {};
+            updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+            updates[`user_chats/${user.uid}/${otherUid}`] = { text: `You replied: ${previewText}`, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: user.uid };
+            updates[`user_chats/${otherUid}/${user.uid}/text`] = `Replied to your story with ${previewText}`;
+            updates[`user_chats/${otherUid}/${user.uid}/timestamp`] = msgPayload.createdAt;
+            updates[`user_chats/${otherUid}/${user.uid}/unreadCount`] = increment(1);
+            updates[`user_chats/${otherUid}/${user.uid}/senderUid`] = user.uid;
+
+            // Quick fly-up animation from the tapped sticker, mirroring the like button's floating-heart feedback.
+            if (btnEl) {
+                const overlay = document.getElementById('story-viewer-overlay');
+                const btnRect = btnEl.getBoundingClientRect();
+                const overlayRect = overlay.getBoundingClientRect();
+                const fly = btnEl.querySelector('img').cloneNode();
+                fly.className = 'floating-sticker';
+                fly.style.left = (btnRect.left - overlayRect.left) + 'px';
+                fly.style.top = (btnRect.top - overlayRect.top) + 'px';
+                overlay.appendChild(fly);
+                setTimeout(() => fly.remove(), 1200);
+            }
+
+            try {
+                await update(ref(database), updates);
+                notify('Sticker sent');
+            } catch (err) { showCustomModal('Error', 'Could not send your sticker.'); }
         }
 
         const storyOptionsSheet = document.getElementById('story-options-sheet-overlay');

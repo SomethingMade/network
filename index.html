@@ -3465,7 +3465,8 @@
             100% { transform: translateY(-200px) scale(1); opacity: 0; }
         }
 
-        .story-reply-tag { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.3); }
+        .story-reply-tag { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.3); cursor: pointer; }
+        .story-reply-tag:active { opacity: 0.7; }
         .msg-bubble.in .story-reply-tag { border-bottom-color: rgba(0,0,0,0.1); }
         .story-reply-tag img, .story-reply-tag video { width: 34px; height: 46px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: rgba(0,0,0,0.05); }
         .story-reply-text-thumb { width: 34px; height: 46px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 8px; font-weight: 700; line-height: 1.15; text-align: center; padding: 3px; overflow: hidden; }
@@ -24517,10 +24518,42 @@
             if (storyMusic && !storyMusic.paused) storyMusic.pause();
         }
 
-        function openStoryViewer(uid, name, photoURL, items, isOwn) {
+        // Reopens the exact story a DM's "Replied to story" tag points to. Falls back
+        // gracefully when the story has since expired (24h TTL) or was deleted, since
+        // cachedStories only ever holds what's currently live in the DB.
+        function openStoryFromReplyTag(replyToStory) {
+            const ownerUid = replyToStory && replyToStory.ownerUid;
+            if (!ownerUid) {
+                notify('This story is no longer available', 'error');
+                return;
+            }
+            const now = Date.now();
+            const raw = [];
+            if (cachedStories && cachedStories[ownerUid]) {
+                Object.entries(cachedStories[ownerUid]).forEach(([key, val]) => raw.push({ ...val, key }));
+            }
+            const items = raw.filter(s => now - s.createdAt < STORY_TTL);
+            if (items.length === 0) {
+                notify('This story is no longer available', 'error');
+                return;
+            }
+            const sorted = items.slice().sort((a, b) => a.createdAt - b.createdAt);
+            let startIndex = replyToStory.storyKey ? sorted.findIndex(s => s.key === replyToStory.storyKey) : -1;
+            if (startIndex < 0) startIndex = 0; // that specific story expired, but the person still has others live
+
+            const user = auth.currentUser;
+            const isOwn = !!(user && ownerUid === user.uid);
+            const profile = (cachedUsers && cachedUsers[ownerUid]) || {};
+            const name = isOwn ? (profile.name || user.displayName || 'You') : (profile.name || 'User');
+            const photoURL = isOwn ? (profile.photoURL || user.photoURL || '') : (profile.photoURL || '');
+
+            openStoryViewer(ownerUid, name, photoURL, sorted, isOwn, startIndex);
+        }
+
+        function openStoryViewer(uid, name, photoURL, items, isOwn, startIndex) {
             pauseAllAppMedia();
             storyState.items = items.slice().sort((a, b) => a.createdAt - b.createdAt);
-            storyState.index = 0;
+            storyState.index = (typeof startIndex === 'number' && startIndex >= 0 && startIndex < storyState.items.length) ? startIndex : 0;
             storyState.isOwn = isOwn;
             storyState.currentUid = uid;
 
@@ -24899,8 +24932,8 @@
                 senderUid: user.uid,
                 createdAt: Date.now(),
                 replyToStory: current.type === 'text'
-                    ? { type: 'text', text: current.text || '', bgColor: current.bgColor || TEXT_STORY_BACKGROUNDS[0] }
-                    : { mediaURL: current.mediaURL, type: current.type || 'image' }
+                    ? { type: 'text', text: current.text || '', bgColor: current.bgColor || TEXT_STORY_BACKGROUNDS[0], ownerUid: otherUid, storyKey: current.key || null }
+                    : { mediaURL: current.mediaURL, type: current.type || 'image', ownerUid: otherUid, storyKey: current.key || null }
             };
             const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
 
@@ -29143,6 +29176,10 @@
                                     : `<img src="${msg.replyToStory.mediaURL}" alt="Story">`;
                             }
                             tag.innerHTML = `${thumb}<span>Replied to story</span>`;
+                            tag.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                openStoryFromReplyTag(msg.replyToStory);
+                            });
                             bubble.appendChild(tag);
                         }
 

@@ -9867,7 +9867,15 @@
         const sheetTrackedOverlays = Array.from(document.querySelectorAll('.bottom-sheet-overlay'))
             // user-info-sheet-overlay already manages its own history entry via the hash system
             // above (see 'user-info' handling in handleHashChange) — don't double-track it here.
-            .filter(overlay => overlay.id !== 'user-info-sheet-overlay');
+            // live-gift-sheet-overlay / buy-coins-sheet-overlay open ON TOP of live-room-overlay,
+            // which has its own separate history stack (see LIVE OVERLAY BACK-BUTTON HANDLING
+            // below) — closing them via this generic system's history.back() fired BOTH
+            // popstate listeners off the same event, and the live one (seeing live-room-overlay
+            // still on its stack, with no matching suppress flag set) treated it as a real back
+            // press and ended the live. They're pushed/popped via pushLiveOverlay/
+            // popLiveOverlayForClose instead (same pattern as live-room-requests-sheet, which
+            // isn't .bottom-sheet-overlay-classed for the same reason).
+            .filter(overlay => overlay.id !== 'user-info-sheet-overlay' && overlay.id !== 'live-gift-sheet-overlay' && overlay.id !== 'buy-coins-sheet-overlay');
         const sheetOpenStack = [];
         let closingSheetViaBackButton = false;
         let sheetSyncScheduled = false;
@@ -9977,6 +9985,10 @@
             closingLiveOverlayViaBackButton = true;
             if (topId === 'live-room-requests-sheet') {
                 closeLiveRequestsSheet();
+            } else if (topId === 'live-gift-sheet-overlay') {
+                closeLiveGiftSheet();
+            } else if (topId === 'buy-coins-sheet-overlay') {
+                closeBuyCoinsSheet();
             } else if (topId === 'live-room-overlay') {
                 isLiveHost ? endLive() : leaveLiveRoom(true);
             } else if (topId === 'live-hub-overlay') {
@@ -19432,9 +19444,11 @@
         function openBuyCoinsSheet() {
             renderCoinBundles();
             document.getElementById('buy-coins-sheet-overlay').classList.add('active');
+            pushLiveOverlay('buy-coins-sheet-overlay');
         }
         function closeBuyCoinsSheet() {
             document.getElementById('buy-coins-sheet-overlay').classList.remove('active');
+            popLiveOverlayForClose('buy-coins-sheet-overlay');
         }
         function renderCoinBundles() {
             const list = document.getElementById('coin-bundle-list');
@@ -19511,9 +19525,11 @@
             renderGiftCatalog();
             updateCoinBalanceUI();
             document.getElementById('live-gift-sheet-overlay').classList.add('active');
+            pushLiveOverlay('live-gift-sheet-overlay');
         }
         function closeLiveGiftSheet() {
             document.getElementById('live-gift-sheet-overlay').classList.remove('active');
+            popLiveOverlayForClose('live-gift-sheet-overlay');
         }
         function renderGiftCatalog() {
             const grid = document.getElementById('gift-catalog-grid');
@@ -19763,16 +19779,20 @@
             document.getElementById('live-room-overlay').classList.remove('active');
             document.getElementById('live-room-requests-sheet').classList.remove('active');
             document.getElementById('live-gift-sheet-overlay').classList.remove('active');
+            document.getElementById('buy-coins-sheet-overlay').classList.remove('active');
             document.getElementById('live-gift-banner').classList.remove('show');
             document.getElementById('live-room-stage').innerHTML = '';
             document.getElementById('live-room-chat-log').innerHTML = '';
             currentLiveId = null; currentLiveRole = null; isLiveHost = false; liveGuestRequestPending = false;
             currentLiveHostUid = null;
             liveParticipantsCache = {}; liveAgoraUidToFbUid = {};
-            // The requests sheet may have its own history entry pushed on top of the room's —
-            // drop it from the stack too so a later back press doesn't land on a dead entry.
-            const reqIdx = liveOverlayStack.lastIndexOf('live-room-requests-sheet');
-            if (reqIdx !== -1) liveOverlayStack.splice(reqIdx, 1);
+            // Any of these nested sheets may still have their own history entry pushed on top
+            // of the room's (e.g. ending the live while the gift sheet was open) — drop them
+            // from the stack too so a later back press doesn't land on a dead entry.
+            ['live-room-requests-sheet', 'live-gift-sheet-overlay', 'buy-coins-sheet-overlay'].forEach((id) => {
+                const i = liveOverlayStack.lastIndexOf(id);
+                if (i !== -1) liveOverlayStack.splice(i, 1);
+            });
             popLiveOverlayForClose('live-room-overlay');
         }
 

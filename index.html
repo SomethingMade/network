@@ -16233,6 +16233,12 @@
             // fullView (the Post view) or the small Comments-only drawer alike.
             const commentsElevated = target === 'comment' && document.getElementById('post-comments-sheet-overlay').classList.contains('active');
             gifOverlay.classList.toggle('above-viewer', commentsElevated);
+            // Belt-and-suspenders on top of the z-index tier above: physically move the sheet to
+            // the very end of <body> so it's last in DOM/paint order too, not just numerically
+            // higher. Two prior fixes here (checking .active instead of requiring .above-viewer
+            // already set, then this) were both aimed at the same "still opens underneath the
+            // Post view" report, so this removes any remaining dependence on z-index alone.
+            document.body.appendChild(gifOverlay);
             gifOverlay.classList.add('active');
             document.getElementById('gif-picker-search').value = '';
             document.getElementById('gif-picker-empty').textContent = 'No GIFs found.';

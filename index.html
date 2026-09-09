@@ -1898,11 +1898,7 @@
         .feed-comment-icon-btn.js-comment-like.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
         .feed-comment-view-stat { cursor: default; }
         .feed-comment-view-stat:hover { background: none; color: var(--text-secondary); }
-        .feed-comment-reaction-bar { display: flex; align-items: center; gap: 2px; padding: 8px 14px; border-top: 1px solid var(--border-color); overflow-x: auto; scrollbar-width: none; }
-        .feed-comment-reaction-bar::-webkit-scrollbar { display: none; }
-        .feed-comment-reaction-bar button { background: none; border: none; font-size: 21px; line-height: 1; padding: 6px; border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: background 0.12s ease, transform 0.12s ease; }
-        .feed-comment-reaction-bar button:hover { background: var(--bg-hover); transform: scale(1.12); }
-        .feed-comment-replying-banner { display: none; align-items: center; justify-content: space-between; padding: 8px 20px; background: var(--bg-alt); border-top: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-secondary); }
+                .feed-comment-replying-banner { display: none; align-items: center; justify-content: space-between; padding: 8px 20px; background: var(--bg-alt); border-top: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-secondary); }
         .feed-comment-replying-banner.active { display: flex; }
         .feed-comment-replying-banner b { color: var(--text-primary); }
         .feed-comment-replying-cancel { background: none; border: none; color: var(--text-secondary); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
@@ -1915,11 +1911,18 @@
         .gif-picker-item img { width: 100%; display: block; }
         .gif-picker-item:active { opacity: 0.7; }
         .feed-comment-gif { max-width: 190px; max-height: 190px; border-radius: 12px; margin-top: 6px; display: block; }
-        .feed-comment-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color); position: relative; }
+        .feed-comment-input-row { display: flex; align-items: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border-color); position: relative; }
         .feed-comment-input-row .avatar { border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; }
-        .feed-comment-gif-btn { background: none; border: none; color: #F5A623; font-weight: 700; font-size: 12.5px; letter-spacing: 0.2px; cursor: pointer; flex-shrink: 0; padding: 0; }
-        #post-comment-input, #news-comment-input { flex: 1; border: none; background: var(--bg-alt); border-radius: var(--radius-pill); padding: 9px 16px; font-size: 13.5px; color: var(--text-primary); outline: none; }
-        #btn-send-comment, #btn-send-news-comment { background: none; border: none; color: var(--primary-blue); cursor: pointer; opacity: 0.4; pointer-events: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s ease, transform 0.1s ease; }
+        .feed-comment-gif-btn { background: none; border: none; color: #F5A623; font-weight: 700; font-size: 12.5px; letter-spacing: 0.2px; cursor: pointer; flex-shrink: 0; padding: 0; margin-bottom: 9px; }
+        /* Auto-growing textarea (see autoGrowCommentInput()): starts as a single line and grows
+           with its content up to --comment-input-max-height, then scrolls internally beyond
+           that instead of pushing the sheet's layout around indefinitely. */
+        #post-comment-input, #news-comment-input {
+            flex: 1; border: none; background: var(--bg-alt); border-radius: 20px; padding: 9px 16px;
+            font-size: 13.5px; font-family: inherit; color: var(--text-primary); outline: none;
+            resize: none; line-height: 1.35; max-height: 120px; overflow-y: auto;
+        }
+        #btn-send-comment, #btn-send-news-comment { background: none; border: none; color: var(--primary-blue); cursor: pointer; opacity: 0.4; pointer-events: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s ease, transform 0.1s ease; margin-bottom: 4px; }
         #btn-send-comment:not(:disabled), #btn-send-news-comment:not(:disabled) { opacity: 1; pointer-events: auto; }
         #btn-send-comment:hover:not(:disabled), #btn-send-news-comment:hover:not(:disabled) { background: rgba(var(--primary-rgb), 0.1); }
         #btn-send-comment:active:not(:disabled), #btn-send-news-comment:active:not(:disabled) { transform: scale(0.9); }
@@ -4795,16 +4798,6 @@
                 <div id="post-comments-list"></div>
             </div>
             <div id="post-comments-empty" style="display:none; text-align:center; color: var(--text-secondary); font-size:13px; padding: 24px 0;">No comments yet. Say something!</div>
-            <div class="feed-comment-reaction-bar" id="comment-reaction-bar">
-                <button type="button" data-emoji="❤️">❤️</button>
-                <button type="button" data-emoji="🙌">🙌</button>
-                <button type="button" data-emoji="🔥">🔥</button>
-                <button type="button" data-emoji="👏">👏</button>
-                <button type="button" data-emoji="😍">😍</button>
-                <button type="button" data-emoji="😐">😐</button>
-                <button type="button" data-emoji="😂">😂</button>
-                <button type="button" data-emoji="😖">😖</button>
-            </div>
             <div class="feed-comment-replying-banner" id="feed-comment-replying-banner">
                 <span>Replying to <b id="feed-comment-replying-name"></b></span>
                 <button type="button" class="feed-comment-replying-cancel" id="btn-cancel-comment-reply">&times;</button>
@@ -4816,7 +4809,7 @@
             </div>
             <div class="feed-comment-input-row">
                 <div class="avatar" id="comment-input-avatar" style="width:32px; height:32px; flex-shrink:0;"></div>
-                <input type="text" id="post-comment-input" placeholder="Add a comment..." maxlength="500" autocomplete="off">
+                <textarea id="post-comment-input" placeholder="Add a comment..." maxlength="500" autocomplete="off" rows="1"></textarea>
                 <div class="mention-autocomplete-dropdown" id="comment-mention-dropdown"></div>
                 <button type="button" class="feed-comment-gif-btn" id="btn-comment-gif">GIF</button>
                 <button type="button" id="btn-send-comment" disabled title="Send">
@@ -13733,14 +13726,6 @@
             document.getElementById('btn-share-from-comments').addEventListener('click', () => {
                 if (activeCommentsPostId) openSharePostSheet(activeCommentsPostId);
             });
-            document.getElementById('comment-reaction-bar').addEventListener('click', (e) => {
-                const btn = e.target.closest('button[data-emoji]');
-                if (!btn) return;
-                const input = document.getElementById('post-comment-input');
-                input.value = (input.value + btn.dataset.emoji).slice(0, 500);
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.focus();
-            });
             document.getElementById('btn-comment-gif').addEventListener('click', openGifPickerSheet);
             document.getElementById('gif-picker-sheet-handle').addEventListener('click', closeGifPickerSheet);
             document.getElementById('gif-picker-sheet-overlay').addEventListener('click', (e) => {
@@ -13788,10 +13773,14 @@
             const commentSendBtn = document.getElementById('btn-send-comment');
             commentInput.addEventListener('input', () => {
                 commentSendBtn.disabled = commentInput.value.trim().length === 0 && !selectedCommentGif;
+                autoGrowCommentInput(commentInput);
             });
             commentSendBtn.addEventListener('click', submitActiveComment);
             commentInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') { e.preventDefault(); submitActiveComment(); }
+                // Shift+Enter (or any IME composition, which also fires 'Enter' to confirm a
+                // candidate) inserts a newline like a normal multi-line box; plain Enter still
+                // sends, matching the old single-line input's behavior.
+                if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submitActiveComment(); }
             });
             setupMentionAutocomplete(commentInput, document.getElementById('comment-mention-dropdown'));
 
@@ -16038,6 +16027,15 @@
             const postViewOpen = sheetEl !== postCommentsOverlay && postCommentsOverlay.classList.contains('active');
             sheetEl.classList.toggle('above-viewer', viewerElevated || profileSheetOpen || postViewOpen);
         }
+        // Grows #post-comment-input with its content (up to the 120px cap set in CSS, after
+        // which it scrolls internally) instead of staying a fixed single line. Resetting
+        // height to 'auto' first is required before reading scrollHeight — otherwise a
+        // textarea that's already tall never reports a smaller scrollHeight when text is
+        // deleted, since scrollHeight only reflects growth from the *current* height.
+        function autoGrowCommentInput(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
         function openPostComments(postId, opts = {}) {
             const fullView = !!opts.fullView;
             const overlay = document.getElementById('post-comments-sheet-overlay');
@@ -16062,6 +16060,7 @@
             overlay.classList.add('active');
             const commentInput = document.getElementById('post-comment-input');
             commentInput.value = '';
+            autoGrowCommentInput(commentInput);
             // Blur defensively: this input is a single shared element reused across every post's
             // comments sheet, so if it was still focused from a previous post (e.g. the user typed
             // then tapped the post-card body instead of sending/closing), the keyboard would pop
@@ -16221,7 +16220,18 @@
             const gifOverlay = document.getElementById('gif-picker-sheet-overlay');
             // Only the 'comment' target is launched from a sheet that can itself be elevated
             // (see syncSheetAboveViewer) — other targets (post/chat/group composers) never are.
-            const commentsElevated = target === 'comment' && document.getElementById('post-comments-sheet-overlay').classList.contains('above-viewer');
+            // Bumping to .above-viewer (100015 — deliberately its own tier above the 100013 that
+            // post-comments-sheet-overlay itself can reach) whenever Comments/Post view is simply
+            // *active* — not only when it's already reached .above-viewer — is what's needed here:
+            // gif-picker sits later in the DOM than post-comments-sheet-overlay, so on their
+            // shared base tier (100010) DOM order alone should in principle favor it, but that's
+            // a fragile thing to depend on for a sheet opened from deep inside another one. Tying
+            // the elevation to post-comments' own current tier (100010 or 100013, previously the
+            // only case handled here) leaves the 100010 case resting on that same fragile tie
+            // instead of an explicit win — checking "active" instead of "active AND already
+            // above-viewer" guarantees gif-picker always outranks post-comments outright, in
+            // fullView (the Post view) or the small Comments-only drawer alike.
+            const commentsElevated = target === 'comment' && document.getElementById('post-comments-sheet-overlay').classList.contains('active');
             gifOverlay.classList.toggle('above-viewer', commentsElevated);
             gifOverlay.classList.add('active');
             document.getElementById('gif-picker-search').value = '';
@@ -16531,6 +16541,7 @@
             const replyTarget = activeReplyToComment;
 
             input.value = '';
+            autoGrowCommentInput(input);
             clearCommentGif();
             document.getElementById('btn-send-comment').disabled = true;
             setReplyToComment(null);

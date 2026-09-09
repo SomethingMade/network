@@ -956,8 +956,37 @@
         }
         .live-gift-banner { position: absolute; left: 50%; top: 72px; transform: translate(-50%, -14px); width: max-content; max-width: 84%; display: flex; align-items: center; gap: 6px; background: linear-gradient(90deg, rgba(255,176,32,0.92), rgba(255,107,107,0.92)); color: #fff; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 20px; z-index: 7; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; text-align: center; }
         .live-gift-banner.show { opacity: 1; transform: translate(-50%, 0); }
-        .live-gift-banner-emoji { font-size: 16px; }
         .live-room-chat-msg.gift-msg { background: linear-gradient(90deg, rgba(255,176,32,0.35), rgba(255,107,107,0.3)); }
+
+        /* --- Gift stickers: sizing per context + per-shape looping keyframes. Each gift's SVG
+           (see giftStickerSvg) reuses the same shape-class names across every gift where the
+           shape recurs (e.g. .gs-shine on the crown and diamond), so one keyframe rule covers
+           all of them. */
+        .gift-sticker { display: block; overflow: visible; }
+        .gs-size-catalog { width: 34px; height: 34px; }
+        .gs-size-float { width: 48px; height: 48px; }
+        .gs-size-chat { width: 16px; height: 16px; vertical-align: -3px; margin: 0 3px; display: inline-block; }
+        .gs-size-banner { width: 20px; height: 20px; flex-shrink: 0; }
+        @keyframes gsPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .gs-rose-bloom { transform-origin: 20px 16px; animation: gsPulse 1.6s ease-in-out infinite; }
+        @keyframes gsHeartBeat { 0%, 100% { transform: scale(1); } 25% { transform: scale(1.15); } 40% { transform: scale(0.96); } 60% { transform: scale(1.1); } }
+        .gs-heart-beat { transform-origin: 20px 20px; animation: gsHeartBeat 1s ease-in-out infinite; }
+        @keyframes gsClapL { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-16deg); } }
+        @keyframes gsClapR { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(16deg); } }
+        .gs-clap-l { transform-origin: 20px 22px; animation: gsClapL 0.5s ease-in-out infinite; }
+        .gs-clap-r { transform-origin: 20px 22px; animation: gsClapR 0.5s ease-in-out infinite; }
+        @keyframes gsTwinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+        .gs-clap-sparkle { animation: gsTwinkle 0.5s ease-in-out infinite; }
+        @keyframes gsFireOuter { 0%, 100% { transform: scaleY(1) scaleX(1); } 50% { transform: scaleY(1.08) scaleX(0.95); } }
+        @keyframes gsFireInner { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.15); } }
+        .gs-fire-outer { transform-origin: 20px 30px; animation: gsFireOuter 0.5s ease-in-out infinite; }
+        .gs-fire-inner { transform-origin: 20px 28px; animation: gsFireInner 0.4s ease-in-out infinite; }
+        @keyframes gsShine { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.3); } }
+        .gs-shine { transform-origin: center; animation: gsShine 1.2s ease-in-out infinite; }
+        @keyframes gsRocketBody { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+        @keyframes gsRocketFlame { 0%, 100% { transform: scaleY(1); opacity: 1; } 50% { transform: scaleY(1.3); opacity: 0.7; } }
+        .gs-rocket-body { animation: gsRocketBody 0.6s ease-in-out infinite; }
+        .gs-rocket-flame { transform-origin: 20px 26px; animation: gsRocketFlame 0.3s ease-in-out infinite; }
 
         /* Gift sheet: balance row + emoji catalog grid */
         .gift-sheet-balance-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px 14px; font-size: 14px; font-weight: 600; color: var(--text-primary); }
@@ -965,7 +994,6 @@
         .gift-catalog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding-bottom: 6px; }
         .gift-catalog-item { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--bg-alt); border-radius: 16px; padding: 12px 6px; cursor: pointer; }
         .gift-catalog-item:active { transform: scale(0.96); }
-        .gift-catalog-emoji { font-size: 28px; }
         .gift-catalog-label { font-size: 12px; font-weight: 600; color: var(--text-primary); }
         .gift-catalog-cost { font-size: 11.5px; color: var(--text-secondary); }
 
@@ -11014,17 +11042,20 @@
             { coins: 1200, priceZar: 100 },
             { coins: 2800, priceZar: 200 }
         ];
-        // Gift catalog: emoji-based so there's no extra media hosting/CDN dependency. Ordered
-        // cheapest-first; cost is in coins. `bigMoment: true` gifts also trigger the full-width
-        // banner announcement (see showLiveGiftBanner) on top of the normal floating animation.
+        // Gift catalog: each gift renders as a small looping SVG "sticker" (see giftStickerSvg
+        // below) built from inline shapes + CSS keyframe animations — no external asset/CDN
+        // dependency and no copyright risk, consistent with how every other icon in this app
+        // is hand-authored inline SVG. Ordered cheapest-first; cost is in coins. `bigMoment:
+        // true` gifts also trigger the full-width banner announcement (see showLiveGiftBanner)
+        // on top of the normal floating animation.
         const GIFT_CATALOG = [
-            { id: 'rose', emoji: '🌹', label: 'Rose', cost: 10 },
-            { id: 'heart', emoji: '❤️', label: 'Heart', cost: 25 },
-            { id: 'clap', emoji: '👏', label: 'Clap', cost: 40 },
-            { id: 'fire', emoji: '🔥', label: 'Fire', cost: 60 },
-            { id: 'crown', emoji: '👑', label: 'Crown', cost: 150, bigMoment: true },
-            { id: 'diamond', emoji: '💎', label: 'Diamond', cost: 500, bigMoment: true },
-            { id: 'rocket', emoji: '🚀', label: 'Rocket', cost: 1000, bigMoment: true }
+            { id: 'rose', label: 'Rose', cost: 10 },
+            { id: 'heart', label: 'Heart', cost: 25 },
+            { id: 'clap', label: 'Clap', cost: 40 },
+            { id: 'fire', label: 'Fire', cost: 60 },
+            { id: 'crown', label: 'Crown', cost: 150, bigMoment: true },
+            { id: 'diamond', label: 'Diamond', cost: 500, bigMoment: true },
+            { id: 'rocket', label: 'Rocket', cost: 1000, bigMoment: true }
         ];
         // Share of a gift's coin value credited to the host's giftCoinsEarned tally — the rest
         // is the platform's cut. 0.6 means a host keeps 60% of what's spent on them.
@@ -19403,18 +19434,18 @@
             if (stage) {
                 const el = document.createElement('div');
                 el.className = 'live-gift-float';
-                el.textContent = g.emoji || '🎁';
+                el.innerHTML = giftStickerSvg(g.giftId, 'gs-size-float');
                 el.style.left = `${10 + Math.random() * 60}%`;
                 el.addEventListener('animationend', () => el.remove());
                 stage.appendChild(el);
             }
-            appendLiveChatMsg({ name: g.name, text: `sent a ${g.emoji || '🎁'} ${g.label || 'gift'}!`, isGift: true });
+            appendLiveChatMsg({ name: g.name, giftId: g.giftId, label: g.label || 'gift', isGift: true });
             if (g.bigMoment || (g.cost || 0) >= 150) showLiveGiftBanner(g);
         }
         function showLiveGiftBanner(g) {
             const banner = document.getElementById('live-gift-banner');
             if (!banner) return;
-            banner.innerHTML = `<span class="live-gift-banner-emoji">${g.emoji || '🎁'}</span><span><b>${escapeHtmlForPost(g.name || 'Someone')}</b> sent a ${escapeHtmlForPost(g.label || 'gift')}!</span>`;
+            banner.innerHTML = `${giftStickerSvg(g.giftId, 'gs-size-banner')}<span><b>${escapeHtmlForPost(g.name || 'Someone')}</b> sent a ${escapeHtmlForPost(g.label || 'gift')}!</span>`;
             banner.classList.add('show');
             clearTimeout(showLiveGiftBanner._t);
             showLiveGiftBanner._t = setTimeout(() => banner.classList.remove('show'), 3200);
@@ -19531,6 +19562,32 @@
             document.getElementById('live-gift-sheet-overlay').classList.remove('active');
             popLiveOverlayForClose('live-gift-sheet-overlay');
         }
+        // --- Gift stickers: small looping SVG animations, looked up by gift id at render time
+        // (grid, float, chat line, banner) rather than stored per-gift-event — restyling one
+        // later doesn't require touching historic gift data. sizeClass controls dimensions only
+        // (see .gs-size-* below); the animation itself is driven by per-shape classes/keyframes.
+        function giftStickerSvg(giftId, sizeClass) {
+            const cls = `gift-sticker ${sizeClass || ''}`;
+            switch (giftId) {
+                case 'rose':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><g class="gs-rose-bloom"><circle cx="20" cy="16" r="8" fill="#FF4D6D"/><circle cx="14" cy="14" r="5" fill="#FF6B87"/><circle cx="26" cy="14" r="5" fill="#FF6B87"/></g><rect x="18.5" y="22" width="3" height="14" rx="1.5" fill="#3CA55C"/><path class="gs-rose-leaf" d="M20 28 L27 25" stroke="#3CA55C" stroke-width="2" fill="none"/></svg>`;
+                case 'heart':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><path class="gs-heart-beat" d="M20 33 C6 24 4 14 12 10 C17 7.5 20 12 20 12 C20 12 23 7.5 28 10 C36 14 34 24 20 33Z" fill="#FF3B5C"/></svg>`;
+                case 'clap':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><ellipse class="gs-clap-l" cx="14" cy="22" rx="6" ry="9" fill="#FFC96B"/><ellipse class="gs-clap-r" cx="26" cy="22" rx="6" ry="9" fill="#FFC96B"/><g class="gs-clap-sparkle"><circle cx="20" cy="8" r="1.6" fill="#FFE08A"/><circle cx="14" cy="10" r="1.2" fill="#FFE08A"/><circle cx="26" cy="10" r="1.2" fill="#FFE08A"/></g></svg>`;
+                case 'fire':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><path class="gs-fire-outer" d="M20 4 C12 14 8 20 12 28 C14.5 33 25.5 33 28 28 C32 20 28 14 20 4Z" fill="#FF6B35"/><path class="gs-fire-inner" d="M20 14 C16 20 15 24 18 28 C19 30 21 30 22 28 C25 24 24 20 20 14Z" fill="#FFC847"/></svg>`;
+                case 'crown':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><path d="M8 28 L10 14 L17 20 L20 10 L23 20 L30 14 L32 28 Z" fill="#FFD447"/><rect x="8" y="28" width="24" height="4" rx="1" fill="#FFD447"/><circle class="gs-shine" cx="20" cy="10" r="1.5" fill="#fff"/></svg>`;
+                case 'diamond':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><polygon points="8,14 32,14 20,34" fill="#7DD3FC"/><polygon points="8,14 14,14 20,34" fill="#5AB8EE"/><polygon points="26,14 32,14 20,34" fill="#5AB8EE"/><polygon points="8,14 14,6 26,6 32,14" fill="#A7E4FF"/><polygon class="gs-shine" points="18,10 20,6 22,10 20,14" fill="#fff"/></svg>`;
+                case 'rocket':
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><g class="gs-rocket-body"><path d="M20 4 C26 10 26 20 20 26 C14 20 14 10 20 4Z" fill="#E8ECF1"/><circle cx="20" cy="14" r="3" fill="#5AB8EE"/><path d="M14 22 L10 30 L16 26Z" fill="#FF6B6B"/><path d="M26 22 L30 30 L24 26Z" fill="#FF6B6B"/></g><path class="gs-rocket-flame" d="M17 26 C19 32 21 32 23 26 C21 29 19 29 17 26Z" fill="#FFA83B"/></svg>`;
+                default:
+                    return `<svg class="${cls}" viewBox="0 0 40 40"><circle cx="20" cy="20" r="10" fill="#FF6B6B"/></svg>`;
+            }
+        }
+
         function renderGiftCatalog() {
             const grid = document.getElementById('gift-catalog-grid');
             grid.innerHTML = '';
@@ -19538,7 +19595,7 @@
                 const item = document.createElement('div');
                 item.className = 'gift-catalog-item';
                 item.innerHTML = `
-                    <span class="gift-catalog-emoji">${gift.emoji}</span>
+                    ${giftStickerSvg(gift.id, 'gs-size-catalog')}
                     <span class="gift-catalog-label">${gift.label}</span>
                     <span class="gift-catalog-cost">🪙 ${gift.cost}</span>`;
                 item.addEventListener('click', () => sendLiveGift(gift));
@@ -19581,7 +19638,6 @@
                 name: user.displayName || myProfile.username || 'User',
                 avatar: user.photoURL || DEFAULT_AVATAR_URL,
                 giftId: gift.id,
-                emoji: gift.emoji,
                 label: gift.label,
                 cost: gift.cost,
                 bigMoment: !!gift.bigMoment,
@@ -19649,8 +19705,13 @@
             if (!m) return;
             const log = document.getElementById('live-room-chat-log');
             const row = document.createElement('div');
-            row.className = m.isGift ? 'live-room-chat-msg gift-msg' : 'live-room-chat-msg';
-            row.innerHTML = `<b>${escapeHtmlForPost(m.name || 'User')}</b>${escapeHtmlForPost(m.text || '')}`;
+            if (m.isGift) {
+                row.className = 'live-room-chat-msg gift-msg';
+                row.innerHTML = `<b>${escapeHtmlForPost(m.name || 'User')}</b>sent a ${giftStickerSvg(m.giftId, 'gs-size-chat')}${escapeHtmlForPost(m.label || 'gift')}!`;
+            } else {
+                row.className = 'live-room-chat-msg';
+                row.innerHTML = `<b>${escapeHtmlForPost(m.name || 'User')}</b>${escapeHtmlForPost(m.text || '')}`;
+            }
             log.appendChild(row);
             while (log.children.length > 60) log.removeChild(log.firstChild);
             log.scrollTop = log.scrollHeight;

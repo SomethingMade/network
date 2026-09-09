@@ -2699,9 +2699,11 @@
         .group-badge-pill.sponsored-pill { background: rgba(var(--primary-rgb), 0.08); color: var(--text-secondary); }
         .feed-post-why-ad-inline { background: none; border: none; padding: 0; margin-left: 3px; font-size: 10px; font-weight: 600; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
         .feed-post-why-ad-inline:hover { color: var(--text-primary); }
-        .bio-mention-business { color: #0A84FF; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; vertical-align: middle; }
-        .bio-mention-business:hover { opacity: 0.85; }
-        .bio-mention-business-avatar { display: inline-block; width: 20px; height: 20px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-hover); flex-shrink: 0; vertical-align: middle; }
+        /* Small clickable company-avatar tag shown next to a person's @username on their feed
+           posts, when they've tagged a Business Account in Settings (see getTaggedBusiness). */
+        .feed-post-company-tag { display: inline-flex; align-items: center; margin-left: 6px; cursor: pointer; vertical-align: middle; }
+        .feed-post-company-tag:hover { opacity: 0.85; }
+        .feed-post-company-tag-avatar { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-hover); flex-shrink: 0; vertical-align: middle; }
         .business-page-promo { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px; text-align: left; }
         .business-page-promo h5 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
         .business-page-promo p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 12px; }
@@ -5137,6 +5139,26 @@
         </div>
     </div>
 
+    <div id="choose-business-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Tagged Business</h3>
+                <svg id="btn-close-choose-business-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="padding: 12px 20px 4px;">
+                <div class="input-group">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="choose-business-search-input" class="pill-input" placeholder="Search businesses by name or @handle" autocomplete="off" name="haba-choose-business-search" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
+                </div>
+            </div>
+            <div id="choose-business-remove-row" class="tag-people-item" style="display:none;">
+                <div class="tag-people-item-body"><div class="tag-people-item-name" style="color:var(--danger-red);">Remove tagged business</div></div>
+            </div>
+            <div id="choose-business-list" style="flex:1; overflow-y:auto; padding: 8px 20px 4px;"></div>
+            <div id="choose-business-empty" class="notif-empty-state" style="display:none;">No business accounts found.</div>
+        </div>
+    </div>
+
     <div id="group-info-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet">
             <div class="sheet-handle"></div>
@@ -5499,6 +5521,14 @@
                         <input type="checkbox" id="business-account-toggle">
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+                <div class="wa-list-row" id="open-tagged-business-row" style="cursor:pointer;">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Tagged Business</span>
+                        <span class="wa-row-sub" id="tagged-business-row-sub">Show a business's badge next to your name on your posts</span>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
             </div>
 
@@ -8003,11 +8033,15 @@
         // Settings (see grantStreakTrialBadge / TRIAL_BADGE_DURATION_MS below) — one nudge to
         // reward the habit, not a separate badge type.
         const STREAK_TRIAL_THRESHOLD = 8;
+        // Past this many consecutive days, the Verified Badge stops being something to buy or
+        // trial at all — it's granted permanently and free (see grantStreakPermanentVerified /
+        // verifiedBadgeFor). "More than 13 days" means 14 is the first day it fires.
+        const STREAK_PERMANENT_VERIFY_THRESHOLD = 14;
         const STREAK_MILESTONES = {
             3: "Nice, 3 days in a row! 🔥",
             7: "One week strong! 🎉",
             8: "8-day streak — you've unlocked a free 14-day Verified Badge! ✅",
-            14: "Two weeks running — great habit!",
+            14: "Two weeks running — you've earned a permanent free Verified Badge! ✅",
             30: "A whole month streak! 🏆",
             60: "60 days of showing up. Incredible.",
             100: "100-day streak. Legendary. 🎖️",
@@ -8104,13 +8138,33 @@
             }
         }
 
+        // Rewards an account that's kept a STREAK_PERMANENT_VERIFY_THRESHOLD-day-or-longer daily
+        // streak (14+, i.e. "more than 13 days") with a permanent, free Verified Badge —
+        // `streakVerifiedAt` is checked by verifiedBadgeFor/isVerifiedUid exactly like
+        // `paidVerifiedAt`, with no expiry, so from this point on the person never needs to buy
+        // or trial the badge. Unlike the 14-day trial (grantStreakTrialBadge), this is a strict
+        // one-time-ever grant per account: once streakVerifiedAt is set it's never re-written or
+        // cleared, even if the streak later breaks.
+        async function grantStreakPermanentVerified(uid) {
+            await update(ref(database, `users/${uid}`), { streakVerifiedAt: serverTimestamp() });
+            if (cachedUsers[uid]) cachedUsers[uid].streakVerifiedAt = Date.now();
+            notify(`${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak! You've earned a permanent, free Verified Badge 🎉`);
+            const user = auth.currentUser;
+            if (user && user.uid === uid) {
+                const myProfile = cachedUsers[uid] || { streakVerifiedAt: Date.now() };
+                refreshVerifiedBadgePurchaseUI(myProfile);
+                refreshVerifiedBadgeSettingsRow(myProfile);
+            }
+        }
+
         // Called once per onAuthStateChanged sign-in with whatever streak data was already on
         // the profile (avoids a second DB read — the caller already fetched the profile). Only
         // writes to the DB and pops the celebration modal the first time this local day sees the
         // person open the app; every other app-open/tab-switch today just re-renders from
         // currentStreakData with no network call. `trialBadgeActivatedAt` (also from that same
-        // already-fetched profile) gates the STREAK_TRIAL_THRESHOLD-day badge grant below.
-        async function processDailyStreak(uid, existingStreak, trialBadgeActivatedAt) {
+        // already-fetched profile) gates the STREAK_TRIAL_THRESHOLD-day badge grant below, and
+        // `streakVerifiedAt` gates the STREAK_PERMANENT_VERIFY_THRESHOLD-day permanent grant.
+        async function processDailyStreak(uid, existingStreak, trialBadgeActivatedAt, streakVerifiedAt) {
             const today = streakLocalDateStr();
             const streak = existingStreak || {};
             let count = streak.count || 0;
@@ -8129,6 +8183,9 @@
                 if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
                     grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
                 }
+                if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
+                    grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
+                }
                 return;
             }
 
@@ -8144,6 +8201,9 @@
             updateStreakBadgeUI();
             if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
                 grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
+            }
+            if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
+                grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
             }
             showStreakModal(true);
         }
@@ -10794,20 +10854,22 @@
             const profile = cachedUsers[uid];
             if (profile && profile.isBusinessAccount) return BUSINESS_BADGE_SVG;
             if (profile && profile.paidVerifiedAt) return VERIFIED_BADGE_SVG;
+            if (profile && profile.streakVerifiedAt) return VERIFIED_BADGE_SVG;
             if (profile && profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return VERIFIED_BADGE_SVG;
             if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return VERIFIED_BADGE_SVG;
             return '';
         }
 
         // Boolean counterpart to verifiedBadgeFor, for gating verified-only features (rather than
-        // rendering a badge): true for AI, a Business Account, a purchased or trial Verified Badge,
-        // or reaching FRIENDS_BADGE_THRESHOLD followers organically.
+        // rendering a badge): true for AI, a Business Account, a purchased, streak-earned, or
+        // trial Verified Badge, or reaching FRIENDS_BADGE_THRESHOLD followers organically.
         function isVerifiedUid(uid) {
             if (uid === AI_UID) return true;
             const profile = cachedUsers[uid];
             if (!profile) return false;
             if (profile.isBusinessAccount) return true;
             if (profile.paidVerifiedAt) return true;
+            if (profile.streakVerifiedAt) return true;
             if (profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return true;
             if ((profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return true;
             return false;
@@ -11333,6 +11395,19 @@
             return `<div class="avatar ${sizeClass || ''}" style="background-image: url('${photoURL}');"></div>`;
         }
 
+        // Returns the Business Account a person has chosen (via Settings > Business > Tagged
+        // Business, see openChooseBusinessSheet/setTaggedBusiness) to show next to their name on
+        // their feed posts, as { uid, photoURL, name } — or null if they haven't tagged one.
+        // Used by applyLiveProfileToPostCard. Previously this was inferred from a @mention typed
+        // into the person's bio; that's been replaced by this explicit Settings selection.
+        function getTaggedBusiness(profile) {
+            const buid = profile && profile.taggedBusinessUid;
+            if (!buid) return null;
+            const bu = cachedUsers[buid];
+            if (!bu || !bu.isBusinessAccount) return null;
+            return { uid: buid, photoURL: bu.photoURL || DEFAULT_AVATAR_URL, name: bu.name || '' };
+        }
+
         // Fills in a feed post card's avatar, name, and verified badge from the live `cachedUsers`
         // profile for card.dataset.uid (falling back to the name/photo snapshot stored on the post
         // itself). Called once when the card is built, and again for every visible card whenever
@@ -11361,8 +11436,22 @@
             if (whyAdInlineEl) whyAdInlineEl.style.display = (card.dataset.isAd === '1') ? '' : 'none';
             const adFooterNameEl = card.querySelector('.feed-post-ad-card-footer-name');
             if (adFooterNameEl) adFooterNameEl.textContent = displayName;
-            const usernameEl = card.querySelector('.x-post-username');
+            const usernameEl = card.querySelector('.x-post-username-text');
             if (usernameEl) usernameEl.textContent = profile.username ? '@' + profile.username : '';
+            const companyTagEl = card.querySelector('.feed-post-company-tag');
+            if (companyTagEl) {
+                const taggedBusiness = getTaggedBusiness(profile);
+                if (taggedBusiness) {
+                    companyTagEl.dataset.uid = taggedBusiness.uid;
+                    companyTagEl.title = taggedBusiness.name || '';
+                    companyTagEl.innerHTML = `<span class="feed-post-company-tag-avatar" style="background-image: url('${taggedBusiness.photoURL}')"></span>`;
+                    companyTagEl.style.display = '';
+                } else {
+                    companyTagEl.style.display = 'none';
+                    companyTagEl.innerHTML = '';
+                    delete companyTagEl.dataset.uid;
+                }
+            }
             const avatarCol = card.querySelector('.x-post-avatar-col');
             if (avatarCol) avatarCol.innerHTML = feedAvatarHtml({ name: displayName, photoURL: displayPhoto });
             card.querySelectorAll('.feed-post-tagged-chip').forEach(chip => {
@@ -15208,7 +15297,7 @@
                             </div>
                             ${menuBtnHtml}
                         </div>
-                        <div class="x-post-username"></div>
+                        <div class="x-post-username"><span class="x-post-username-text"></span><span class="feed-post-company-tag" style="display:none;"></span></div>
                     </div>
                 </div>
                 <div class="feed-post-body">
@@ -16442,34 +16531,30 @@
             return uids;
         }
 
-        // Renders an about/bio string as safe HTML, replacing any @username mention that
-        // resolves to a Business Account with that business's avatar shown inline as a small
-        // clickable logo (no text). Clicking the logo opens that business's profile.
+        // Renders an about/bio string as safe HTML, linkifying any URLs it contains. A person's
+        // tagged business (Settings > Business > Tagged Business, see getTaggedBusiness) is a
+        // separate explicit selection now, not inferred from bio text — an @mention typed here
+        // is just left as plain text.
         function linkifyBioMentions(text) {
             const escaped = escapeHtmlForPost(text || '');
-            const withUrls = escaped.replace(MSG_URL_REGEX, (raw) => {
+            return escaped.replace(MSG_URL_REGEX, (raw) => {
                 const cleaned = raw.replace(/[.,!?;:'")\]]+$/, '');
                 const trailing = raw.slice(cleaned.length);
                 if (!cleaned) return raw;
                 const href = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
                 return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="feed-link" onclick="event.stopPropagation()">${cleaned}</a>${trailing}`;
             });
-            return withUrls.replace(/@([a-zA-Z0-9_]{2,20})/g, (match, handle) => {
-                const entry = Object.entries(cachedUsers).find(([, u]) => u && u.username && u.username.toLowerCase() === handle.toLowerCase());
-                if (entry && entry[1].isBusinessAccount) {
-                    const [uid, u] = entry;
-                    const photoURL = u.photoURL || DEFAULT_AVATAR_URL;
-                    return `<span class="bio-mention-business" data-uid="${uid}" role="link" tabindex="0" title="${match}"><span class="bio-mention-business-avatar" style="background-image: url('${photoURL}')"></span></span>`;
-                }
-                return match;
-            });
         }
 
-        // Clicking (or tapping/pressing enter on) a highlighted business mention opens that
-        // business's profile sheet, from wherever the bio text is rendered.
+        // Clicking the small company-avatar tag next to a name on a feed post (see
+        // getTaggedBusiness / applyLiveProfileToPostCard) opens that business's profile.
         document.addEventListener('click', (e) => {
-            const mentionEl = e.target.closest('.bio-mention-business');
-            if (mentionEl && mentionEl.dataset.uid) openUserProfileSheet(mentionEl.dataset.uid);
+            const tagEl = e.target.closest('.feed-post-company-tag');
+            if (tagEl && tagEl.dataset.uid) {
+                e.stopPropagation();
+                pauseAllFeedMedia();
+                openUserProfileSheet(tagEl.dataset.uid);
+            }
         });
 
         // Wires @-mention autocomplete onto a text input/textarea. Shows matching users as the
@@ -16593,6 +16678,84 @@
 
         function closeTagPeopleSheet() {
             document.getElementById('tag-people-sheet-overlay').classList.remove('active');
+        }
+
+        // --- TAGGED BUSINESS (Settings > Business > Tagged Business) ---
+        // Single-select variant of the Tag People sheet, filtered to Business Accounts. Tapping
+        // an entry sets it immediately (no separate "Done" step) and closes the sheet.
+        function renderChooseBusinessList(filterText) {
+            const list = document.getElementById('choose-business-list');
+            const emptyEl = document.getElementById('choose-business-empty');
+            const me = auth.currentUser;
+            const myProfile = (me && cachedUsers[me.uid]) || {};
+            const q = (filterText || '').trim().toLowerCase();
+
+            const entries = Object.entries(cachedUsers).filter(([uid, u]) => {
+                if (!me || uid === me.uid) return false;
+                if (!u || !u.isBusinessAccount) return false;
+                if (!u.name && !u.username) return false;
+                if (!q) return true;
+                return (u.name && u.name.toLowerCase().includes(q)) || (u.username && u.username.toLowerCase().includes(q));
+            }).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+
+            list.innerHTML = '';
+            emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
+
+            entries.forEach(([uid, u]) => {
+                const item = document.createElement('div');
+                item.className = 'tag-people-item' + (myProfile.taggedBusinessUid === uid ? ' selected' : '');
+                item.innerHTML = `
+                    ${feedAvatarHtml(u)}
+                    <div class="tag-people-item-body">
+                        <div class="tag-people-item-name"></div>
+                        <div class="tag-people-item-username"></div>
+                    </div>
+                    <div class="tag-people-item-check"></div>
+                `;
+                item.querySelector('.tag-people-item-name').innerHTML = escapeHtmlForPost(u.name || 'Business') + verifiedBadgeFor(uid, false);
+                item.querySelector('.tag-people-item-username').textContent = u.username ? '@' + u.username : '';
+                item.addEventListener('click', () => setTaggedBusiness(uid));
+                list.appendChild(item);
+            });
+        }
+
+        function openChooseBusinessSheet() {
+            const me = auth.currentUser;
+            const myProfile = (me && cachedUsers[me.uid]) || {};
+            const searchInput = document.getElementById('choose-business-search-input');
+            searchInput.value = '';
+            renderChooseBusinessList('');
+            const removeRow = document.getElementById('choose-business-remove-row');
+            if (removeRow) removeRow.style.display = myProfile.taggedBusinessUid ? 'flex' : 'none';
+            document.getElementById('choose-business-sheet-overlay').classList.add('active');
+        }
+
+        function closeChooseBusinessSheet() {
+            document.getElementById('choose-business-sheet-overlay').classList.remove('active');
+        }
+
+        // Writes (or, if uid is falsy, clears) the Business Account the current user has chosen
+        // to have shown next to their name on their own feed posts — see getTaggedBusiness /
+        // applyLiveProfileToPostCard.
+        async function setTaggedBusiness(uid) {
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await update(ref(database, `users/${user.uid}`), { taggedBusinessUid: uid || null });
+                notify(uid ? 'Business tagged' : 'Business tag removed');
+            } catch (err) {
+                console.error('Failed to update tagged business', err);
+                notify('Something went wrong', 'error');
+            }
+            closeChooseBusinessSheet();
+        }
+
+        // Reflects the current user's taggedBusinessUid into the Settings row's subtitle.
+        function refreshTaggedBusinessSettingsRow(myProfile) {
+            const subEl = document.getElementById('tagged-business-row-sub');
+            if (!subEl) return;
+            const business = myProfile.taggedBusinessUid ? cachedUsers[myProfile.taggedBusinessUid] : null;
+            subEl.textContent = business ? `Tagged: ${business.name || 'Business'}` : "Show a business's badge next to your name on your posts";
         }
 
         // Writes an in-app notification for `toUid` (skips self-notifications). The Realtime DB
@@ -18283,6 +18446,16 @@
             renderTagPeopleList(e.target.value);
         });
 
+        document.getElementById('open-tagged-business-row').addEventListener('click', openChooseBusinessSheet);
+        document.getElementById('btn-close-choose-business-sheet').addEventListener('click', closeChooseBusinessSheet);
+        document.getElementById('choose-business-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'choose-business-sheet-overlay') closeChooseBusinessSheet();
+        });
+        document.getElementById('choose-business-search-input').addEventListener('input', (e) => {
+            renderChooseBusinessList(e.target.value);
+        });
+        document.getElementById('choose-business-remove-row').addEventListener('click', () => setTaggedBusiness(null));
+
         const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
         let pendingPhotoURL = null;
@@ -18374,6 +18547,7 @@
                 const businessToggle = document.getElementById('business-account-toggle');
                 businessToggle.checked = !!myProfile.isBusinessAccount;
                 document.getElementById('business-account-pill').style.display = myProfile.isBusinessAccount ? 'inline-block' : 'none';
+                refreshTaggedBusinessSettingsRow(myProfile);
 
                 refreshTrialBadgeUI(myProfile);
                 refreshVerifiedBadgePurchaseUI(myProfile);
@@ -18449,7 +18623,11 @@
                 return;
             }
             row.style.display = 'block';
-            if (myProfile.paidVerifiedAt) {
+            if (myProfile.streakVerifiedAt) {
+                statusEl.textContent = `You earned a permanent blue Verified Badge with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak — free, no purchase needed`;
+                pill.style.display = 'inline-block';
+                btn.style.display = 'none';
+            } else if (myProfile.paidVerifiedAt) {
                 statusEl.textContent = "You've bought the permanent blue Verified Badge";
                 pill.style.display = 'inline-block';
                 btn.style.display = 'none';
@@ -18473,6 +18651,9 @@
             if (myProfile.isBusinessAccount) {
                 statusEl.textContent = 'Business accounts get a gold badge automatically';
                 pill.style.display = 'none';
+            } else if (myProfile.streakVerifiedAt) {
+                statusEl.textContent = `Earned free with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak`;
+                pill.style.display = 'inline-block';
             } else if (myProfile.paidVerifiedAt) {
                 statusEl.textContent = "You've bought the permanent blue Verified Badge";
                 pill.style.display = 'inline-block';
@@ -18489,7 +18670,7 @@
             const user = auth.currentUser;
             if (!user) return;
             const myProfile = cachedUsers[user.uid] || {};
-            if (myProfile.paidVerifiedAt || myProfile.isBusinessAccount) return;
+            if (myProfile.paidVerifiedAt || myProfile.isBusinessAccount || myProfile.streakVerifiedAt) return;
 
             if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('REPLACE_WITH_YOUR')) {
                 showCustomModal('Payments Not Set Up', "The app owner hasn't connected a payment provider yet, so badge purchases aren't available right now.");
@@ -21958,7 +22139,7 @@
                             </div>
                             ${menuBtnHtml}
                         </div>
-                        <div class="x-post-username"></div>
+                        <div class="x-post-username"><span class="x-post-username-text"></span><span class="feed-post-company-tag" style="display:none;"></span></div>
                     </div>
                 </div>
                 <div class="feed-post-body">
@@ -26096,7 +26277,7 @@
 
                 // Fire-and-forget: today's check-in shouldn't hold up the rest of login. Reuses
                 // existingProfileData fetched just above instead of a second DB read.
-                processDailyStreak(user.uid, existingProfileData.streak, existingProfileData.trialBadgeActivatedAt).catch((err) => console.error('Daily streak check-in failed', err));
+                processDailyStreak(user.uid, existingProfileData.streak, existingProfileData.trialBadgeActivatedAt, existingProfileData.streakVerifiedAt).catch((err) => console.error('Daily streak check-in failed', err));
 
                 try {
                     const username = await ensureUsername(user);

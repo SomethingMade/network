@@ -11392,6 +11392,13 @@
         // load. reorderFeedCards() checks this to skip its scroll-preserving adjustment during
         // that window — see the comment on reorderFeedCards for why that matters.
         let feedInitialBurstActive = false;
+        // False until the initial page's burst (see feedInitialBurstActive) has finished, one
+        // way or another — either the burst went quiet (posts arrived) or its hard-cap timer
+        // fired (nothing arrived, e.g. a dead connection). updateFeedEmptyState() checks this so
+        // "No posts yet" can only ever be the verdict of a completed fetch, never a stand-in for
+        // one that just hasn't come back yet on a slow connection.
+        let feedInitialLoadComplete = false;
+        let feedInitialSkeletonNodes = [];
 
         // --- NOTIFICATIONS (likes, comments, replies, mentions) ---
         let notifListenersAttached = false;
@@ -12912,7 +12919,19 @@
             const FEED_BURST_MAX_MS = 10000;   // hard cap so a stuck connection can't wedge this open
             let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
-            const endFeedInitialBurst = () => { feedInitialBurstActive = false; };
+            // Cover the fetch with shimmer skeletons instead of leaving the list blank (which is
+            // what let a slow/poor connection flash "No posts yet" before the first page ever
+            // arrived) — updateFeedEmptyState() won't render the empty state at all while
+            // feedInitialLoadComplete is still false, so these are the only thing shown here.
+            document.getElementById('feed-empty-state').style.display = 'none';
+            feedInitialSkeletonNodes = showFeedLoadingSkeletons();
+            const endFeedInitialBurst = () => {
+                feedInitialBurstActive = false;
+                feedInitialLoadComplete = true;
+                removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
+                feedInitialSkeletonNodes = [];
+                updateFeedEmptyState();
+            };
             const bumpFeedBurstQuiet = () => {
                 clearTimeout(feedBurstQuietTimer);
                 feedBurstQuietTimer = setTimeout(endFeedInitialBurst, FEED_BURST_QUIET_MS);
@@ -14445,6 +14464,14 @@
         function updateFeedEmptyState() {
             const emptyState = document.getElementById('feed-empty-state');
             if (!emptyState) return;
+            // Never render "No posts yet" off an empty cachedPosts that just hasn't heard back
+            // from the initial fetch yet (slow/poor connection) — the shimmer skeletons shown
+            // for that window (see initFeedListeners) are covering it instead. Once the fetch
+            // genuinely completes, endFeedInitialBurst() flips this and re-runs this function.
+            if (!feedInitialLoadComplete) {
+                emptyState.style.display = 'none';
+                return;
+            }
             const messageEl = emptyState.querySelector('p');
             if (Object.keys(cachedPosts).length === 0) {
                 if (messageEl) messageEl.textContent = 'No posts yet. Be the first to share something!';
@@ -26332,6 +26359,9 @@
                 chatListenersAttached = false;
                 userChatsInitialized = false;
                 feedListenersAttached = false;
+                feedInitialLoadComplete = false;
+                removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
+                feedInitialSkeletonNodes = [];
                 notifListenersAttached = false;
                 emptyOlderFetchCount = 0;
                 cachedNotifications = {};

@@ -3768,14 +3768,26 @@
             }
 
             /* ── Flat, full-width, icon-only bottom nav bar (X-style) ── */
-            :root { --nav-bar-total: 64px; }
+            :root {
+                --nav-bar-total: 64px;
+                /* Actual on-screen height of the nav bar itself. Some phones don't report a
+                   real env(safe-area-inset-bottom) even though they have their own gesture
+                   bar/home-indicator strip overlapping the viewport, so this floors it at
+                   --nav-bar-extra-bottom instead of trusting env() alone — that's also why
+                   .side-nav below adds this to `height`, not just `padding-bottom`: with the
+                   global box-sizing:border-box, padding-bottom alone would eat into the fixed
+                   52px content box and cram the icon row upward instead of growing the bar to
+                   actually clear the device's own bottom navigation. */
+                --nav-bar-safe-bottom: max(env(safe-area-inset-bottom), var(--nav-bar-extra-bottom));
+                --nav-bar-height: calc(52px + var(--nav-bar-safe-bottom));
+            }
             .side-nav {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
                 justify-items: center;
-                height: 52px;
+                height: var(--nav-bar-height);
                 padding: 0;
-                padding-bottom: env(safe-area-inset-bottom);
+                padding-bottom: var(--nav-bar-safe-bottom);
                 position: fixed;
                 left: 0;
                 right: 0;
@@ -3792,8 +3804,9 @@
             }
             .side-nav.nav-scroll-hidden { transform: translateY(140%); }
             /* Default: leave the reserved nav-bar strip at the bottom uncovered so the
-               bottom nav bar stays visible while viewing reels. */
-            #reel-viewer-overlay { bottom: 52px; }
+               bottom nav bar stays visible while viewing reels. Matches the bar's real
+               (possibly safe-area-grown) height, not just its base 52px. */
+            #reel-viewer-overlay { bottom: var(--nav-bar-height); }
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }

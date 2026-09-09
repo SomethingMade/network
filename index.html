@@ -22937,7 +22937,7 @@
             card.querySelector('.profile-reply-context b').textContent = postAuthor;
             card.querySelector('.name').innerHTML = escapeHtmlForPost(displayName) + verifiedBadgeFor(uid, uid === AI_UID);
             card.querySelector('.feed-comment-text').innerHTML = reply.text ? linkifyHashtags(reply.text) : '';
-            card.addEventListener('click', () => openPostComments(reply.postId));
+            card.addEventListener('click', () => openPostComments(reply.postId, { fullView: true }));
             return card;
         }
 
@@ -23031,21 +23031,12 @@
                 item.addEventListener('click', () => {
                     const post = cachedPosts[item.dataset.postId];
                     if (!post) return;
-                    // Opened from inside a bottom sheet (the contact info media grid), so the
-                    // viewer needs the elevated .above-sheet z-index to clear it — see the tier
-                    // comment above #image-viewer-overlay.active.above-sheet.
-                    if (item.dataset.isVideo === '1') {
-                        // Use the same full-view reel player as the feed's expand button
-                        // (custom play/pause, progress bar, mute controls) instead of the
-                        // generic video-viewer-overlay, which falls back to the browser's
-                        // bare native <video controls> UI.
-                        document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
-                        openReelViewer(item.dataset.postId, { fullscreen: false });
-                    } else {
-                        const clickedUrl = item.dataset.imgUrl || post.imageUrl;
-                        document.getElementById('image-viewer-overlay').classList.add('above-sheet');
-                        openImageViewer(clickedUrl, false, imageGallery, imageGallery.indexOf(clickedUrl), item.dataset.postId, imageGalleryPostIds);
-                    }
+                    // Opens the full X-style Post view (post + comments), same as tapping a
+                    // reply row above or a post from search — not a bare image/reel lightbox.
+                    // #post-comments-sheet-overlay's own z-index (100010) already clears the
+                    // profile bottom sheet this grid can live inside (e.g. the contact-info
+                    // media grid), so no .above-sheet elevation class is needed here.
+                    openPostComments(item.dataset.postId, { fullView: true });
                 });
             });
         }

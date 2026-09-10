@@ -935,7 +935,7 @@
            (via inline display:none, toggled in JS) whenever the count is zero. */
         .live-count-badge { background: #FF3B5C; color: #fff; font-size: 11px; font-weight: 800; line-height: 1; border-radius: 50px; padding: 3px 7px; min-width: 17px; text-align: center; box-sizing: border-box; }
         .sidebar-drawer-item .live-count-badge { margin-left: auto; }
-        .feed-subtab-btn.feed-subtab-live .live-count-badge { margin-left: 5px; vertical-align: 1px; }
+        .feed-subtab-btn.feed-subtab-live .live-count-badge, .feed-subtab-btn[data-feed-subtab="stories"] .live-count-badge { margin-left: 5px; vertical-align: 1px; }
         .live-list-card-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
         .live-list-card-viewers { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.12); color: #fff; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
         .live-list-card-info { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -7109,7 +7109,7 @@
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou">For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following">Following</button>
-                                <button type="button" class="feed-subtab-btn" data-feed-subtab="stories">Stories</button>
+                                <button type="button" class="feed-subtab-btn" data-feed-subtab="stories">Stories<span class="live-count-badge" id="feed-subtab-stories-count" style="display:none;">0</span></button>
                                 <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live<span class="live-count-badge" id="feed-subtab-live-count" style="display:none;">0</span></button>
                             </div>
                         </div>
@@ -25212,6 +25212,7 @@
             grid.appendChild(buildAddStoryCardItem(ownProfile.photoURL || user.photoURL || ""));
 
             let othersCount = 0;
+            let unreadCount = 0;
             const ownRaw = [];
             if (storiesData && storiesData[user.uid]) {
                 Object.entries(storiesData[user.uid]).forEach(([key, val]) => ownRaw.push({ ...val, key }));
@@ -25236,11 +25237,16 @@
                 if (items.length === 0) return;
 
                 othersCount++;
+                // Same "unviewed" check buildStoryRing uses per-item — a user counts toward the
+                // subtab's unread badge if ANY of their still-live stories hasn't been viewed yet,
+                // mirroring how their ring shows colored (not greyed out) in the grid below.
+                if (items.some(item => !(item.views && item.views[user.uid]))) unreadCount++;
                 const profile = (usersData && usersData[uid]) || {};
                 grid.appendChild(buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false));
             });
 
             if (empty) empty.style.display = (ownItems.length === 0 && othersCount === 0) ? 'block' : 'none';
+            updateLiveCountBadge('feed-subtab-stories-count', unreadCount);
         }
 
         document.getElementById('story-file-input').addEventListener('change', (e) => {

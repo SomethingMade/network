@@ -1205,9 +1205,6 @@
         .ig-profile-stats-grid .tm-profile-stat-link + .ig-profile-stat::before { content: '·'; display: inline-block; margin: 0 8px; color: var(--text-secondary); font-weight: 700; }
         .ig-profile-stat-num { font-size: 15px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.1px; line-height: 1.2; }
         .ig-profile-stat-label { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
-        .ig-profile-name-row { display: flex; align-items: center; gap: 6px; margin: 0; }
-        .ig-profile-name-row .tm-profile-name-input { font-size: 22px; font-weight: 800; }
-        .ig-profile-name-row .tm-profile-name { margin: 0; font-size: 22px; display: flex; align-items: center; gap: 6px; }
         .ig-profile-verified-badge { display: inline-flex; flex-shrink: 0; }
         .ig-profile-verified-badge:empty { display: none; }
         .ig-profile-actions-row { display: flex; gap: 8px; margin: 14px 0 8px; }
@@ -1224,21 +1221,29 @@
            read-only counterparts so the two panels line up visually, just transparent/
            borderless until focused (reserved-space bottom border avoids a layout shift
            on focus). */
-        .tm-profile-name-input { width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 25px; font-weight: 800; letter-spacing: -0.4px; padding: 0; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease; }
-        .tm-profile-name-input:focus { border-bottom-color: var(--primary-blue); }
-        .tm-profile-name-input::placeholder { color: var(--text-secondary); font-weight: 700; }
-        .tm-profile-bio-input { display: block; width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; line-height: 1.5; padding: 0; margin: 0 0 6px; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease; }
-        .tm-profile-bio-input:focus { border-bottom-color: var(--primary-blue); }
-        .tm-profile-bio-input::placeholder { color: var(--text-secondary); }
-        .tm-profile-link-input { display: block; width: 100%; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; padding: 0; margin-bottom: 14px; opacity: 0.75; font-family: inherit; border-bottom: 1.5px solid transparent; transition: border-color 0.2s ease, opacity 0.2s ease; }
-        .tm-profile-link-input:focus { border-bottom-color: var(--primary-blue); opacity: 1; }
-        .tm-profile-link-input::placeholder { color: var(--text-secondary); opacity: 1; }
+
 
         /* Edit-affordance pencil icon shown alongside editable profile text inputs */
-        .tm-profile-editable-row { display: flex; align-items: center; gap: 8px; }
-        .tm-profile-editable-row > input { flex: 1; min-width: 0; }
-        .tm-profile-edit-icon { flex-shrink: 0; width: 15px; height: 15px; color: var(--text-secondary); opacity: 0.55; pointer-events: none; }
-        .tm-profile-editable-row:focus-within .tm-profile-edit-icon { color: var(--primary-blue); opacity: 0.9; }
+        /* ── Edit Profile form fields ──
+           A proper labeled form (label above a boxed input) rather than the bare
+           underline-on-focus style the always-editable profile used to have — reads as
+           a deliberate settings/edit screen instead of text that merely happens to be
+           clickable. */
+        .tm-edit-field { margin: 0 0 20px; }
+        .tm-edit-field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .tm-edit-field-label { display: block; font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .tm-edit-input {
+            display: block; width: 100%; box-sizing: border-box; font-family: inherit;
+            padding: 14px 16px; border: 1.5px solid var(--border-color); border-radius: 14px;
+            background: var(--bg-alt); color: var(--text-primary); font-size: 16px; line-height: 1.4;
+            outline: none; transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .tm-edit-input:focus { border-color: var(--primary-blue); background: var(--bg-surface); box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.12); }
+        .tm-edit-input::placeholder { color: var(--text-secondary); opacity: 0.65; }
+        textarea.tm-edit-input { resize: none; min-height: 78px; }
+        .tm-edit-field-hint { display: flex; justify-content: flex-end; font-size: 12.5px; color: var(--text-secondary); margin: 6px 2px 0; }
+        .tm-edit-field-hint.limit-near { color: #FF9500; }
+        .tm-edit-field-hint.limit-max { color: #FF3B30; }
 
         /* Own-profile avatar sits in the same spot as Contact Info's tm-profile-avatar,
            and keeps the upload/camera-badge behavior of .sheet-avatar-upload — this just
@@ -5493,20 +5498,23 @@
             </div>
 
             <div class="tm-profile-content" style="margin-top: 0; padding-top: 60px; box-shadow: none;">
-                <div class="tm-profile-editable-row" style="margin-bottom: 4px;">
-                    <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
-                    <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
-                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                <div class="tm-edit-field">
+                    <div class="tm-edit-field-label-row">
+                        <label class="tm-edit-field-label" for="profile-name">Name</label>
+                        <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
+                    </div>
+                    <input type="text" id="profile-name" class="tm-edit-input" placeholder="Your display name" autocomplete="off">
                 </div>
 
-                <div class="tm-profile-editable-row">
-                    <input type="text" id="profile-about" class="tm-profile-bio-input" maxlength="80" placeholder="Hey there! I'm using Haba" autocomplete="off">
-                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                <div class="tm-edit-field">
+                    <label class="tm-edit-field-label" for="profile-about">Bio</label>
+                    <textarea id="profile-about" class="tm-edit-input" maxlength="80" rows="3" placeholder="Hey there! I'm using Haba"></textarea>
+                    <div class="tm-edit-field-hint" id="profile-about-counter">0/80</div>
                 </div>
 
-                <div class="tm-profile-editable-row">
-                    <input type="text" id="profile-website" class="tm-profile-link-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
-                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                <div class="tm-edit-field">
+                    <label class="tm-edit-field-label" for="profile-website">Website</label>
+                    <input type="text" id="profile-website" class="tm-edit-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
                 </div>
             </div>
         </div>
@@ -18994,11 +19002,26 @@
             pendingCoverURL = myProfile.coverPhotoURL || null;
             document.getElementById('sheet-cover-upload').style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
             document.getElementById('my-profile-verified-badge').innerHTML = verifiedBadgeFor(user.uid, false);
-            document.getElementById('profile-about').value = myProfile.about || '';
+            const aboutInput = document.getElementById('profile-about');
+            aboutInput.value = myProfile.about || '';
+            updateProfileAboutCounter();
             document.getElementById('profile-website').value = myProfile.website || '';
 
             editProfileSheetOverlay.classList.add('active');
         }
+
+        // Live "42/80" counter under the Bio field, colored amber near the limit and red
+        // right at it, so it reads as a deliberate constraint rather than a stray number.
+        function updateProfileAboutCounter() {
+            const input = document.getElementById('profile-about');
+            const counter = document.getElementById('profile-about-counter');
+            const max = parseInt(input.getAttribute('maxlength'), 10) || 80;
+            const len = input.value.length;
+            counter.textContent = `${len}/${max}`;
+            counter.classList.toggle('limit-near', len >= max * 0.9 && len < max);
+            counter.classList.toggle('limit-max', len >= max);
+        }
+        document.getElementById('profile-about').addEventListener('input', updateProfileAboutCounter);
 
         // --- Trial Verified Badge: one-time, free 14-day activation of the same blue badge a
         // purchase grants (see TRIAL_BADGE_DURATION_MS / verifiedBadgeFor), independent of follower

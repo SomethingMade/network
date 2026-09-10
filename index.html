@@ -1268,6 +1268,29 @@
         .tm-edit-field-hint.limit-near { color: #FF9500; }
         .tm-edit-field-hint.limit-max { color: #FF3B30; }
 
+        /* ── MODERN EDIT PROFILE FORM (no cover photo) ──
+           Replaces the old cover-photo-banner + overlapping-avatar layout with a plain,
+           centered header: avatar, a text-link photo action, then grouped fields in a
+           single soft card. Scoped to .edit-profile-* so it doesn't touch the read-only
+           profile view sheets, which still use the cover-photo layout. */
+        .edit-profile-body { padding: 8px 4px 28px; }
+        .edit-profile-avatar-block { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 30px; }
+        .edit-profile-avatar-block .sheet-avatar-upload { margin: 0; width: 96px; height: 96px; }
+        .edit-profile-avatar-block .avatar-circle { width: 96px; height: 96px; border: 3px solid var(--bg-alt); }
+        .edit-profile-photo-link { border: none; background: none; padding: 2px 6px; font-size: 13.5px; font-weight: 700; color: var(--primary-blue); cursor: pointer; transition: opacity 0.15s ease; }
+        .edit-profile-photo-link:hover { opacity: 0.7; }
+        .edit-profile-photo-link:active { opacity: 0.5; }
+
+        .edit-profile-fields { background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 20px; padding: 20px 18px 4px; }
+        .edit-profile-fields .tm-edit-input { background: var(--bg-surface); }
+        .edit-profile-fields .tm-edit-input:focus { background: var(--bg-surface); }
+
+        @media (max-width: 480px) {
+            .edit-profile-avatar-block .sheet-avatar-upload,
+            .edit-profile-avatar-block .avatar-circle { width: 84px; height: 84px; }
+            .edit-profile-fields { padding: 18px 14px 2px; border-radius: 18px; }
+        }
+
         /* Own-profile avatar sits in the same spot as Contact Info's tm-profile-avatar,
            and keeps the upload/camera-badge behavior of .sheet-avatar-upload — this just
            resizes it down from the 96px settings-sheet default to match. */
@@ -2262,9 +2285,9 @@
            coverPhotoURL) restores the full-height photo banner with its frosted,
            white-on-photo icon treatment — "even better" than Threads for the people
            who do want a banner, without forcing a gradient placeholder on everyone
-           else. The EDIT sheet's own cover (#sheet-cover-upload) intentionally keeps
-           the original full-height gradient-placeholder look below, since there it's
-           a tap target for uploading one, not just a display. */
+           else. (The Edit Profile sheet no longer has a cover photo at all — see
+           .edit-profile-body below — so these rules only apply to the read-only
+           profile view sheets.) */
         #user-info-cover-photo, #my-profile-cover-photo { height: 64px; background: var(--bg-surface); }
         /* The card's -26px pull-up (see .tm-profile-content above) is tuned for the full
            172px banner; with the plain 64px no-cover bar it would climb high enough to
@@ -2282,9 +2305,6 @@
         #user-info-cover-photo.has-cover .tm-profile-icon-btn, #my-profile-cover-photo.has-cover .tm-profile-icon-btn { background: rgba(17,17,17,0.35); color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
         #user-info-cover-photo.has-cover .tm-profile-back-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-back-btn:hover,
         #user-info-cover-photo.has-cover .tm-profile-icon-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-icon-btn:hover { background: rgba(17,17,17,0.5); }
-        .sheet-cover-upload { cursor: pointer; }
-        .sheet-cover-upload .sheet-upload-spinner { border-radius: 0; }
-        .sheet-cover-upload.uploading .sheet-upload-spinner { display: flex; }
         .cover-camera-badge { position: absolute; bottom: 38px; right: 14px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; background: rgba(17,17,17,0.4); box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; border: none; color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); }
         .cover-camera-badge svg { width: 15px; height: 15px; }
         /* Pulls the avatar up so it overlaps the bottom edge of the cover photo, banner-style */
@@ -5521,39 +5541,38 @@
                 <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
             </div>
 
-            <div class="tm-profile-cover-wrap">
-                <!-- Static decorative banner only (cover photo feature removed) — kept in the
-                     markup purely so the avatar row below still has something to overlap,
-                     bottom-of-cover-banner style. Not clickable, no upload behavior. -->
-                <div class="wa-cover-photo-block" id="sheet-cover-upload"></div>
-                <div class="tm-profile-avatar-row">
+            <!-- Cover photo removed — this is now a plain, centered modern editing form:
+                 avatar up top with a text-link photo action, grouped fields below. -->
+            <div class="edit-profile-body">
+                <div class="edit-profile-avatar-block">
                     <div class="sheet-avatar-upload" id="sheet-avatar-upload">
                         <div class="avatar-circle" id="profile-avatar-preview"></div>
                         <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
                         <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
                     </div>
+                    <button type="button" class="edit-profile-photo-link" id="btn-change-profile-photo">Change photo</button>
+                    <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
                 </div>
-                <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
-            </div>
 
-            <div class="tm-profile-content" style="margin-top: 0; padding-top: 60px; box-shadow: none;">
-                <div class="tm-edit-field">
-                    <div class="tm-edit-field-label-row">
-                        <label class="tm-edit-field-label" for="profile-name">Name</label>
-                        <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
+                <div class="edit-profile-fields">
+                    <div class="tm-edit-field">
+                        <div class="tm-edit-field-label-row">
+                            <label class="tm-edit-field-label" for="profile-name">Name</label>
+                            <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
+                        </div>
+                        <input type="text" id="profile-name" class="tm-edit-input" placeholder="Your display name" autocomplete="off">
                     </div>
-                    <input type="text" id="profile-name" class="tm-edit-input" placeholder="Your display name" autocomplete="off">
-                </div>
 
-                <div class="tm-edit-field">
-                    <label class="tm-edit-field-label" for="profile-about">Bio</label>
-                    <textarea id="profile-about" class="tm-edit-input" maxlength="80" rows="3" placeholder="Hey there! I'm using Haba"></textarea>
-                    <div class="tm-edit-field-hint" id="profile-about-counter">0/80</div>
-                </div>
+                    <div class="tm-edit-field">
+                        <label class="tm-edit-field-label" for="profile-about">Bio</label>
+                        <textarea id="profile-about" class="tm-edit-input" maxlength="80" rows="3" placeholder="Hey there! I'm using Haba"></textarea>
+                        <div class="tm-edit-field-hint" id="profile-about-counter">0/80</div>
+                    </div>
 
-                <div class="tm-edit-field">
-                    <label class="tm-edit-field-label" for="profile-website">Website</label>
-                    <input type="text" id="profile-website" class="tm-edit-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
+                    <div class="tm-edit-field" style="margin-bottom: 0;">
+                        <label class="tm-edit-field-label" for="profile-website">Website</label>
+                        <input type="text" id="profile-website" class="tm-edit-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
+                    </div>
                 </div>
             </div>
         </div>
@@ -20343,6 +20362,10 @@
             e.preventDefault();
             document.getElementById('profile-photo-input').click();
         });
+        document.getElementById('btn-change-profile-photo').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('profile-photo-input').click();
+        });
 
         document.getElementById('profile-photo-input').addEventListener('change', async (e) => {
             e.preventDefault();
@@ -20375,9 +20398,6 @@
                 e.target.value = "";
             }
         });
-
-        // Cover photo upload feature removed — #sheet-cover-upload is now a static
-        // decorative banner with no click/upload behavior (see markup comment above it).
 
         profileSheetOverlay.addEventListener('click', (e) => {
             if (e.target === profileSheetOverlay) profileSheetOverlay.classList.remove('active');

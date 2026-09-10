@@ -20365,10 +20365,23 @@
             wrapper.classList.add('uploading');
             try {
                 const user = auth.currentUser;
+                if (!user) return;
                 const safeName = (file.name || 'cover').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(file, `cover_photos/${user ? user.uid : 'unknown'}/${Date.now()}_${safeName}`);
+                const url = await uploadToFirebaseStorage(file, `cover_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingCoverURL = url;
                 wrapper.style.backgroundImage = `url('${url}')`;
+                // Saved immediately, same as the avatar upload above — otherwise tapping the
+                // back/cancel button (btn-close-edit-profile) instead of "Save Changes" silently
+                // discards the new cover, since pendingCoverURL was only ever a staged, in-memory
+                // value that btn-save-profile picked up.
+                await update(ref(database, 'users/' + user.uid), { coverPhotoURL: url });
+                if (cachedUsers[user.uid]) cachedUsers[user.uid].coverPhotoURL = url;
+                const myProfileCoverDisplay = document.getElementById('my-profile-cover-photo');
+                if (myProfileCoverDisplay) {
+                    myProfileCoverDisplay.style.backgroundImage = `url('${url}')`;
+                    myProfileCoverDisplay.classList.add('has-cover');
+                }
+                notify("Cover photo updated");
             } catch (err) {
                 showCustomModal("Upload Failed", "We couldn't upload that image.");
             } finally {

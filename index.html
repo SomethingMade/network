@@ -5467,7 +5467,7 @@
 
     <!-- Edit Profile — a separate sheet stacked on top of the (read-only) profile view
          above, Threads/Instagram-style, opened by tapping "Edit Profile" there. Holds
-         all the actually-editable fields: avatar, cover, name, bio, website. Save writes
+         all the actually-editable fields: avatar, name, bio, website. Save writes
          through and hands back to the view sheet, which re-renders with the new values. -->
     <div id="edit-profile-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet wa-profile-sheet">
@@ -5482,11 +5482,10 @@
             </div>
 
             <div class="tm-profile-cover-wrap">
-                <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
-                    <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
-                    <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
-                </div>
-                <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <!-- Static decorative banner only (cover photo feature removed) — kept in the
+                     markup purely so the avatar row below still has something to overlap,
+                     bottom-of-cover-banner style. Not clickable, no upload behavior. -->
+                <div class="wa-cover-photo-block" id="sheet-cover-upload"></div>
                 <div class="tm-profile-avatar-row">
                     <div class="sheet-avatar-upload" id="sheet-avatar-upload">
                         <div class="avatar-circle" id="profile-avatar-preview"></div>
@@ -12758,7 +12757,7 @@
             const profile = cachedUsers[uid] || {};
             const name = profile.name || 'Haba User';
             const followers = profile.followersCount || 0;
-            const coverStyle = profile.coverPhotoURL ? ` style="background-image:url('${profile.coverPhotoURL}')"` : '';
+            const coverStyle = ''; // cover photo feature removed — suggested cards always use the default gradient
             const bioText = profile.about
                 ? escapeHtmlForPost(profile.about)
                 : (followers > 0 ? `${formatProfileCount(followers)} followers` : 'New to Haba');
@@ -18869,7 +18868,6 @@
         const editProfileSheetOverlay = document.getElementById('edit-profile-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
         let pendingPhotoURL = null;
-        let pendingCoverURL = null;
 
         function updateAvatarUI(user) {
             if (!user) return;
@@ -18939,9 +18937,6 @@
                 document.getElementById('my-profile-username-display').textContent = myProfile.username ? '@' + myProfile.username : '@—';
                 const avatarDisplay = document.getElementById('my-profile-avatar-display');
                 avatarDisplay.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
-                const coverDisplay = document.getElementById('my-profile-cover-photo');
-                coverDisplay.style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
-                coverDisplay.classList.toggle('has-cover', !!myProfile.coverPhotoURL);
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = myProfile.about || '';
                 aboutDisplay.style.display = myProfile.about ? 'block' : 'none';
@@ -18999,8 +18994,6 @@
             preview.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
             preview.textContent = "";
 
-            pendingCoverURL = myProfile.coverPhotoURL || null;
-            document.getElementById('sheet-cover-upload').style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
             document.getElementById('my-profile-verified-badge').innerHTML = verifiedBadgeFor(user.uid, false);
             const aboutInput = document.getElementById('profile-about');
             aboutInput.value = myProfile.about || '';
@@ -20343,52 +20336,8 @@
             }
         });
 
-        document.getElementById('sheet-cover-upload').addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('profile-cover-input').click();
-        });
-
-        // The back/save buttons live inside the cover photo block (so they can float
-        // over it as an overlay), which means clicks on them would otherwise bubble up
-        // to the handler above and wrongly open the cover file picker. Stop that
-        // bubbling at the header level before it reaches the cover. (Insights/Settings
-        // moved below the cover photo, so they're unaffected by this.)
-        document.querySelectorAll('.wa-cover-photo-block .tm-profile-header').forEach(header => {
-            header.addEventListener('click', (e) => e.stopPropagation());
-        });
-
-        document.getElementById('profile-cover-input').addEventListener('change', async (e) => {
-            e.preventDefault();
-            const file = e.target.files[0];
-            if (!file) return;
-            const wrapper = document.getElementById('sheet-cover-upload');
-            wrapper.classList.add('uploading');
-            try {
-                const user = auth.currentUser;
-                if (!user) return;
-                const safeName = (file.name || 'cover').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(file, `cover_photos/${user.uid}/${Date.now()}_${safeName}`);
-                pendingCoverURL = url;
-                wrapper.style.backgroundImage = `url('${url}')`;
-                // Saved immediately, same as the avatar upload above — otherwise tapping the
-                // back/cancel button (btn-close-edit-profile) instead of "Save Changes" silently
-                // discards the new cover, since pendingCoverURL was only ever a staged, in-memory
-                // value that btn-save-profile picked up.
-                await update(ref(database, 'users/' + user.uid), { coverPhotoURL: url });
-                if (cachedUsers[user.uid]) cachedUsers[user.uid].coverPhotoURL = url;
-                const myProfileCoverDisplay = document.getElementById('my-profile-cover-photo');
-                if (myProfileCoverDisplay) {
-                    myProfileCoverDisplay.style.backgroundImage = `url('${url}')`;
-                    myProfileCoverDisplay.classList.add('has-cover');
-                }
-                notify("Cover photo updated");
-            } catch (err) {
-                showCustomModal("Upload Failed", "We couldn't upload that image.");
-            } finally {
-                wrapper.classList.remove('uploading');
-                e.target.value = "";
-            }
-        });
+        // Cover photo upload feature removed — #sheet-cover-upload is now a static
+        // decorative banner with no click/upload behavior (see markup comment above it).
 
         profileSheetOverlay.addEventListener('click', (e) => {
             if (e.target === profileSheetOverlay) profileSheetOverlay.classList.remove('active');
@@ -21070,8 +21019,6 @@
             const newAbout = document.getElementById('profile-about').value.trim();
             const newWebsite = document.getElementById('profile-website').value.trim();
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || DEFAULT_AVATAR_URL);
-            const existingProfile = cachedUsers[user.uid] || {};
-            const finalCover = pendingCoverURL !== null ? pendingCoverURL : (existingProfile.coverPhotoURL || "");
             const saveBtn = document.getElementById('btn-save-profile');
             const originalLabel = saveBtn.textContent;
 
@@ -21083,7 +21030,6 @@
                 await update(ref(database, 'users/' + user.uid), {
                     name: newName || (user.email ? user.email.split('@')[0] : "User"),
                     photoURL: finalPhoto,
-                    coverPhotoURL: finalCover,
                     about: newAbout,
                     website: newWebsite,
                     email: user.email || ""
@@ -21095,9 +21041,6 @@
                 // the write above.
                 document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
                 document.getElementById('my-profile-avatar-display').style.backgroundImage = `url('${finalPhoto}')`;
-                const coverDisplay = document.getElementById('my-profile-cover-photo');
-                coverDisplay.style.backgroundImage = finalCover ? `url('${finalCover}')` : 'none';
-                coverDisplay.classList.toggle('has-cover', !!finalCover);
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = newAbout;
                 aboutDisplay.style.display = newAbout ? 'block' : 'none';
@@ -23738,11 +23681,6 @@
             pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const profile = cachedUsers[uid] || {};
             userInfoSheetUid = uid;
-            const coverEl = document.getElementById('user-info-cover-photo');
-            if (coverEl) {
-                coverEl.style.backgroundImage = profile.coverPhotoURL ? `url('${profile.coverPhotoURL}')` : 'none';
-                coverEl.classList.toggle('has-cover', !!profile.coverPhotoURL);
-            }
             const avatarEl = document.getElementById('user-info-avatar');
             avatarEl.style.backgroundImage = `url('${profile.photoURL || DEFAULT_AVATAR_URL}')`;
             avatarEl.style.backgroundColor = '';

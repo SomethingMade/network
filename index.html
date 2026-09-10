@@ -781,6 +781,10 @@
         /* Same reasoning: the reel viewer's header has its own avatar trigger, so this
            needs to clear the reel viewer's z-index too, not just the default bottom-sheet layer. */
         #profile-bottom-sheet-overlay { z-index: 100010; }
+        /* Edit Profile opens as its own sheet stacked ON TOP of the (now read-only)
+           profile view sheet — Threads/Instagram style — rather than the profile view
+           itself being editable in place, so it needs to out-rank it. */
+        #edit-profile-sheet-overlay { z-index: 100011; }
         /* Share Profile (QR code + share link) is opened from inside the profile sheet,
            so it needs the same top tier — placed after profile-bottom-sheet-overlay in
            the DOM, so equal z-index still paints it above when both are open. */
@@ -1030,7 +1034,7 @@
            opacity fade running underneath a transform slide at the same time reads as
            a flicker, not a clean single motion. */
         @media (max-width: 767px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -1041,10 +1045,10 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active, #notifications-sheet-overlay.active, #jobs-sheet-overlay.active, #market-sheet-overlay.active {
+            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active, #notifications-sheet-overlay.active, #jobs-sheet-overlay.active, #market-sheet-overlay.active {
                 pointer-events: auto;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -1060,10 +1064,10 @@
                 flex-direction: column;
                 overflow-y: auto;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
                 display: none;
             }
             #notifications-sheet-overlay .notif-sheet-header, #notifications-sheet-overlay #notif-header-selection, #jobs-sheet-overlay .notif-sheet-header, #market-sheet-overlay .notif-sheet-header {
@@ -1108,7 +1112,7 @@
            of rendering the overlap. A soft gradient ring rendered behind the avatar
            (::before) gives it a bit of lift where it crosses the card's rounded edge. */
         .tm-profile-cover-wrap { position: relative; }
-        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -48px; z-index: 3; }
+        .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -46px; z-index: 3; }
         .tm-profile-avatar-row::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: var(--gradient-brand); opacity: 0.9; z-index: -1; }
 
         /* Insights/Settings sit inline with Save on the header's right side (all three
@@ -1253,14 +1257,14 @@
            dropped so the chat stays visible and usable underneath; clicking outside the
            panel still closes it via the existing generic overlay click handler. */
         @media (min-width: 768px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #settings-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
                 align-items: stretch;
                 justify-content: flex-end;
                 background: rgba(0, 0, 0, 0.08);
                 backdrop-filter: none;
                 -webkit-backdrop-filter: none;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
                 width: 400px;
                 max-width: 400px;
                 height: 100%;
@@ -1278,10 +1282,10 @@
                 display: flex;
                 flex-direction: column;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -2206,28 +2210,33 @@
         .wa-cover-photo-block::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 15% 0%, rgba(255,255,255,0.14), transparent 55%), linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.16) 100%); pointer-events: none; }
 
         /* Threads has no cover photo at all — a plain top bar over the page background.
-           On someone else's profile (view-only, #user-info-cover-photo) we match that by
-           default: short bar, no gradient placeholder, dark icons that sit directly on
-           the page. The .has-cover modifier (toggled in JS only when that person actually
-           set a coverPhotoURL) restores the full-height photo banner with its frosted,
-           white-on-photo icon treatment — "even better" than Threads for the people who
-           do want a banner, without forcing a gradient placeholder on everyone else. */
-        #user-info-cover-photo { height: 64px; background: var(--bg-surface); }
+           On a read-only profile VIEW (#user-info-cover-photo for someone else,
+           #my-profile-cover-photo for your own) we match that by default: short bar,
+           no gradient placeholder, dark icons that sit directly on the page. The
+           .has-cover modifier (toggled in JS only when that person actually set a
+           coverPhotoURL) restores the full-height photo banner with its frosted,
+           white-on-photo icon treatment — "even better" than Threads for the people
+           who do want a banner, without forcing a gradient placeholder on everyone
+           else. The EDIT sheet's own cover (#sheet-cover-upload) intentionally keeps
+           the original full-height gradient-placeholder look below, since there it's
+           a tap target for uploading one, not just a display. */
+        #user-info-cover-photo, #my-profile-cover-photo { height: 64px; background: var(--bg-surface); }
         /* The card's -26px pull-up (see .tm-profile-content above) is tuned for the full
            172px banner; with the plain 64px no-cover bar it would climb high enough to
            clip the back button, so ease it off in that state only. */
-        .tm-profile-cover-wrap:has(#user-info-cover-photo:not(.has-cover)) + .tm-profile-content { margin-top: -6px; }
-        #user-info-cover-photo::after { display: none; }
-        #user-info-cover-photo .tm-profile-back-btn,
-        #user-info-cover-photo .tm-profile-icon-btn { background: transparent; color: var(--text-primary); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
-        #user-info-cover-photo .tm-profile-back-btn:hover,
-        #user-info-cover-photo .tm-profile-icon-btn:hover { background: var(--bg-hover); }
-        #user-info-cover-photo.has-cover { height: 172px; background-color: transparent; }
-        #user-info-cover-photo.has-cover::after { display: block; }
-        #user-info-cover-photo.has-cover .tm-profile-back-btn,
-        #user-info-cover-photo.has-cover .tm-profile-icon-btn { background: rgba(17,17,17,0.35); color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
-        #user-info-cover-photo.has-cover .tm-profile-back-btn:hover,
-        #user-info-cover-photo.has-cover .tm-profile-icon-btn:hover { background: rgba(17,17,17,0.5); }
+        .tm-profile-cover-wrap:has(#user-info-cover-photo:not(.has-cover)) + .tm-profile-content,
+        .tm-profile-cover-wrap:has(#my-profile-cover-photo:not(.has-cover)) + .tm-profile-content { margin-top: -6px; }
+        #user-info-cover-photo::after, #my-profile-cover-photo::after { display: none; }
+        #user-info-cover-photo .tm-profile-back-btn, #my-profile-cover-photo .tm-profile-back-btn,
+        #user-info-cover-photo .tm-profile-icon-btn, #my-profile-cover-photo .tm-profile-icon-btn { background: transparent; color: var(--text-primary); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
+        #user-info-cover-photo .tm-profile-back-btn:hover, #my-profile-cover-photo .tm-profile-back-btn:hover,
+        #user-info-cover-photo .tm-profile-icon-btn:hover, #my-profile-cover-photo .tm-profile-icon-btn:hover { background: var(--bg-hover); }
+        #user-info-cover-photo.has-cover, #my-profile-cover-photo.has-cover { height: 172px; background-color: transparent; }
+        #user-info-cover-photo.has-cover::after, #my-profile-cover-photo.has-cover::after { display: block; }
+        #user-info-cover-photo.has-cover .tm-profile-back-btn, #my-profile-cover-photo.has-cover .tm-profile-back-btn,
+        #user-info-cover-photo.has-cover .tm-profile-icon-btn, #my-profile-cover-photo.has-cover .tm-profile-icon-btn { background: rgba(17,17,17,0.35); color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        #user-info-cover-photo.has-cover .tm-profile-back-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-back-btn:hover,
+        #user-info-cover-photo.has-cover .tm-profile-icon-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-icon-btn:hover { background: rgba(17,17,17,0.5); }
         .sheet-cover-upload { cursor: pointer; }
         .sheet-cover-upload .sheet-upload-spinner { border-radius: 0; }
         .sheet-cover-upload.uploading .sheet-upload-spinner { display: flex; }
@@ -5370,7 +5379,7 @@
             <div class="sheet-handle"></div>
 
             <div class="tm-profile-cover-wrap">
-                <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
+                <div class="wa-cover-photo-block" id="my-profile-cover-photo">
                     <div class="tm-profile-header">
                         <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -5382,43 +5391,30 @@
                             <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                             </button>
-                            <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
                         </div>
                     </div>
-                    <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
-                    <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
                 </div>
-                <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
             </div>
-            <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
 
             <div class="tm-profile-content">
                 <div class="ig-profile-toprow">
                     <div class="tm-profile-id">
-                        <div class="ig-profile-name-row tm-profile-editable-row">
-                            <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
-                            <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
-                            <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
-                        </div>
+                        <h1 id="my-profile-name-display" class="tm-profile-name">Name</h1>
+                        <p id="my-profile-username-display" class="tm-profile-username">@username</p>
                     </div>
-                    <div class="sheet-avatar-upload ig-profile-avatar" id="sheet-avatar-upload">
-                        <div class="avatar-circle" id="profile-avatar-preview"></div>
-                        <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
-                        <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
-                    </div>
+                    <div class="avatar-circle tm-profile-avatar ig-profile-avatar" id="my-profile-avatar-display"></div>
                 </div>
 
-                <div class="tm-profile-editable-row">
-                    <input type="text" id="profile-about" class="tm-profile-bio-input" maxlength="80" placeholder="Hey there! I'm using Haba" autocomplete="off">
-                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
-                </div>
-
-                <div class="tm-profile-editable-row">
-                    <input type="text" id="profile-website" class="tm-profile-link-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
-                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
-                </div>
+                <p id="my-profile-about-display" class="tm-profile-bio">—</p>
 
                 <div class="profile-community-pills" id="my-profile-community-pills" style="display:none;"></div>
+
+                <div class="tm-profile-meta-row">
+                    <a href="#" id="my-profile-website-display" class="tm-profile-link" target="_blank" rel="noopener noreferrer" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                        <span id="my-profile-website-display-text"></span>
+                    </a>
+                </div>
 
                 <div class="ig-profile-stats-grid">
                     <button type="button" class="ig-profile-stat" id="btn-my-profile-posts-stat" aria-label="Posts">
@@ -5459,6 +5455,58 @@
                     <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
                     <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile — a separate sheet stacked on top of the (read-only) profile view
+         above, Threads/Instagram-style, opened by tapping "Edit Profile" there. Holds
+         all the actually-editable fields: avatar, cover, name, bio, website. Save writes
+         through and hands back to the view sheet, which re-renders with the new values. -->
+    <div id="edit-profile-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+
+            <div class="tm-profile-header" style="padding: 14px 0 4px;">
+                <button type="button" id="btn-close-edit-profile" class="tm-profile-back-btn" aria-label="Cancel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+                <div class="wa-header-title">Edit profile</div>
+                <button type="button" id="btn-save-profile" class="wa-header-save-btn">Save</button>
+            </div>
+
+            <div class="tm-profile-cover-wrap">
+                <div class="wa-cover-photo-block sheet-cover-upload" id="sheet-cover-upload">
+                    <div class="cover-camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                    <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+                </div>
+                <input type="file" id="profile-cover-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                <div class="tm-profile-avatar-row">
+                    <div class="sheet-avatar-upload" id="sheet-avatar-upload">
+                        <div class="avatar-circle" id="profile-avatar-preview"></div>
+                        <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                        <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+                    </div>
+                </div>
+                <input type="file" id="profile-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+            </div>
+
+            <div class="tm-profile-content" style="margin-top: 0; padding-top: 60px; box-shadow: none;">
+                <div class="tm-profile-editable-row" style="margin-bottom: 4px;">
+                    <input type="text" id="profile-name" class="tm-profile-name-input" placeholder="Your display name" autocomplete="off">
+                    <span class="ig-profile-verified-badge" id="my-profile-verified-badge"></span>
+                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                </div>
+
+                <div class="tm-profile-editable-row">
+                    <input type="text" id="profile-about" class="tm-profile-bio-input" maxlength="80" placeholder="Hey there! I'm using Haba" autocomplete="off">
+                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                </div>
+
+                <div class="tm-profile-editable-row">
+                    <input type="text" id="profile-website" class="tm-profile-link-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
+                    <svg class="tm-profile-edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                 </div>
             </div>
         </div>
@@ -18810,6 +18858,7 @@
         document.getElementById('choose-business-remove-row').addEventListener('click', () => setTaggedBusiness(null));
 
         const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
+        const editProfileSheetOverlay = document.getElementById('edit-profile-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
         let pendingPhotoURL = null;
         let pendingCoverURL = null;
@@ -18874,29 +18923,40 @@
             pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const user = auth.currentUser;
             if (user) {
-                document.getElementById('profile-name').value = user.displayName || "";
-                pendingPhotoURL = user.photoURL || null;
-                const preview = document.getElementById('profile-avatar-preview');
-                preview.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
-                preview.textContent = "";
-
                 const myProfile = cachedUsers[user.uid] || {};
-                pendingCoverURL = myProfile.coverPhotoURL || null;
-                document.getElementById('sheet-cover-upload').style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
+
+                // Read-only display (the profile view itself is no longer editable in
+                // place — tapping "Edit Profile" below opens a separate sheet for that).
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(user.displayName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
+                document.getElementById('my-profile-username-display').textContent = myProfile.username ? '@' + myProfile.username : '@—';
+                const avatarDisplay = document.getElementById('my-profile-avatar-display');
+                avatarDisplay.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
+                const coverDisplay = document.getElementById('my-profile-cover-photo');
+                coverDisplay.style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
+                coverDisplay.classList.toggle('has-cover', !!myProfile.coverPhotoURL);
+                const aboutDisplay = document.getElementById('my-profile-about-display');
+                aboutDisplay.textContent = myProfile.about || '';
+                aboutDisplay.style.display = myProfile.about ? 'block' : 'none';
+                const websiteDisplay = document.getElementById('my-profile-website-display');
+                if (myProfile.website) {
+                    websiteDisplay.href = /^https?:\/\//i.test(myProfile.website) ? myProfile.website : 'https://' + myProfile.website;
+                    document.getElementById('my-profile-website-display-text').textContent = myProfile.website;
+                    websiteDisplay.style.display = 'inline-flex';
+                } else {
+                    websiteDisplay.style.display = 'none';
+                }
+
                 document.getElementById('display-username').textContent = myProfile.username ? '@' + myProfile.username : '@—';
                 document.getElementById('new-username-input').value = '';
                 document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
                 document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
                 document.getElementById('my-profile-posts-count').textContent = Object.values(cachedPosts).filter(post => post && post.uid === user.uid).length;
-                document.getElementById('my-profile-verified-badge').innerHTML = verifiedBadgeFor(user.uid, false);
                 renderProfileCommunityPills('my-profile-community-pills', user.uid);
                 const usernameLocked = myProfile.usernameChanged && !myProfile.isBusinessAccount;
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
                 document.getElementById('username-locked-note').style.display = usernameLocked ? 'block' : 'none';
                 document.getElementById('btn-set-username').textContent = myProfile.isBusinessAccount ? 'Update Username' : 'Set Username (one-time)';
 
-                document.getElementById('profile-about').value = myProfile.about || '';
-                document.getElementById('profile-website').value = myProfile.website || '';
                 resetPhoneLinkUI(user);
 
                 const businessToggle = document.getElementById('business-account-toggle');
@@ -18916,6 +18976,28 @@
                 initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list', 'my-profile-replies-list');
                 profileSheetOverlay.classList.add('active');
             }
+        }
+
+        // Populates and opens the separate Edit Profile sheet (stacked on top of the
+        // read-only view above) with the current values as a starting point.
+        function openEditProfileSheet() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const myProfile = cachedUsers[user.uid] || {};
+
+            document.getElementById('profile-name').value = user.displayName || "";
+            pendingPhotoURL = user.photoURL || null;
+            const preview = document.getElementById('profile-avatar-preview');
+            preview.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
+            preview.textContent = "";
+
+            pendingCoverURL = myProfile.coverPhotoURL || null;
+            document.getElementById('sheet-cover-upload').style.backgroundImage = myProfile.coverPhotoURL ? `url('${myProfile.coverPhotoURL}')` : 'none';
+            document.getElementById('my-profile-verified-badge').innerHTML = verifiedBadgeFor(user.uid, false);
+            document.getElementById('profile-about').value = myProfile.about || '';
+            document.getElementById('profile-website').value = myProfile.website || '';
+
+            editProfileSheetOverlay.classList.add('active');
         }
 
         // --- Trial Verified Badge: one-time, free 14-day activation of the same blue badge a
@@ -20971,7 +21053,26 @@
                     email: user.email || ""
                 });
                 updateAvatarUI(user);
-                profileSheetOverlay.classList.remove('active');
+                editProfileSheetOverlay.classList.remove('active');
+                // Refresh the read-only view sheet underneath with the values just saved,
+                // rather than re-fetching — cachedUsers may take a moment to catch up with
+                // the write above.
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
+                document.getElementById('my-profile-avatar-display').style.backgroundImage = `url('${finalPhoto}')`;
+                const coverDisplay = document.getElementById('my-profile-cover-photo');
+                coverDisplay.style.backgroundImage = finalCover ? `url('${finalCover}')` : 'none';
+                coverDisplay.classList.toggle('has-cover', !!finalCover);
+                const aboutDisplay = document.getElementById('my-profile-about-display');
+                aboutDisplay.textContent = newAbout;
+                aboutDisplay.style.display = newAbout ? 'block' : 'none';
+                const websiteDisplay = document.getElementById('my-profile-website-display');
+                if (newWebsite) {
+                    websiteDisplay.href = /^https?:\/\//i.test(newWebsite) ? newWebsite : 'https://' + newWebsite;
+                    document.getElementById('my-profile-website-display-text').textContent = newWebsite;
+                    websiteDisplay.style.display = 'inline-flex';
+                } else {
+                    websiteDisplay.style.display = 'none';
+                }
                 notify("Profile updated successfully");
             } catch (err) {
                 showCustomModal("Error Updating Profile", err.message);
@@ -21419,14 +21520,13 @@
             }
         }
 
-        // "Edit Profile" just surfaces the name field for editing — the underlying
-        // name/bio/website inputs (with their pencil-icon affordance) are always
-        // editable in place, same as before this redesign; this button is a more
-        // familiar, discoverable entry point into that same behavior.
+        // "Edit Profile" opens the dedicated Edit Profile sheet (stacked on top of this
+        // read-only view), Threads/Instagram-style, instead of editing in place.
         document.getElementById('btn-edit-profile').addEventListener('click', () => {
-            const nameInput = document.getElementById('profile-name');
-            nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            nameInput.focus();
+            openEditProfileSheet();
+        });
+        document.getElementById('btn-close-edit-profile').addEventListener('click', () => {
+            editProfileSheetOverlay.classList.remove('active');
         });
 
         // Tapping the Posts stat scrolls down to that user's posts, mirroring the

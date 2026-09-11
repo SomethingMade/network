@@ -8947,6 +8947,11 @@
             const likedByMe = !!(post && post.reactions && myUid && post.reactions[myUid]);
             const repostedByMe = !!(post && post.reposts && myUid && post.reposts[myUid]);
             const savedByMe = !!cachedSavedPosts[postId];
+            // Same verified-only gate as the plain video viewer's download icon (see
+            // #video-viewer-save wiring) — gated on the CURRENT viewer's own verified status,
+            // not the post author's, since this is "can I save this to my device", not a
+            // property of the post itself.
+            const canDownload = isVerifiedUid(myUid);
             return `
                 <div class="reel-item" data-post-id="${postId}">
                     <div class="reel-item-media">
@@ -8979,6 +8984,10 @@
                         <button type="button" class="reel-item-action-btn reel-share-btn" data-post-id="${postId}" title="Share">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
                         </button>
+                        ${canDownload ? `
+                        <button type="button" class="reel-item-action-btn reel-download-btn" data-post-id="${postId}" title="Download">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>` : ''}
                     </div>
                     <div class="reel-item-progress-track">
                         <div class="reel-item-progress-fill"></div>
@@ -9164,6 +9173,12 @@
             if (shareBtn) shareBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 openSharePostSheet(postId);
+            });
+            const downloadBtn = itemEl.querySelector('.reel-download-btn');
+            if (downloadBtn) downloadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const post = cachedPosts[postId];
+                if (post && post.videoUrl) downloadMediaFile(post.videoUrl, 'video');
             });
         }
 
@@ -15109,7 +15124,7 @@
 
         // Wires up a fully custom player (play/pause, seekable progress bar, mute, time) for a
         // single feed video, replacing native browser controls entirely.
-        function initFeedVideoPlayer(wrap) {
+        function initFeedVideoPlayer(wrap, opts) {
             const video = wrap.querySelector('.feed-post-video');
             const hasMusic = wrap.dataset.hasMusic === '1';
             const musicAudio = hasMusic ? wrap.querySelector('.feed-post-video-music-audio') : null;
@@ -15166,7 +15181,15 @@
                 thumb.style.left = (ratio * 100) + '%';
             }
 
-            video.addEventListener('click', togglePlay);
+            video.addEventListener('click', (e) => {
+                // Tapping the video itself now opens the full video view (like tapping a post
+                // image opens the image viewer), rather than just toggling play/pause inline —
+                // the dedicated center play/pause button below still does that. Callers that
+                // don't pass onVideoTap (DM/community previews, etc.) keep the old tap-to-toggle
+                // behavior.
+                if (opts && opts.onVideoTap) { e.stopPropagation(); opts.onVideoTap(); }
+                else togglePlay(e);
+            });
             centerBtn.addEventListener('click', togglePlay);
             playPauseBtn.addEventListener('click', togglePlay);
             video.addEventListener('play', updatePlayUI);
@@ -15994,15 +16017,7 @@
             }
 
             const videoWrap = card.querySelector('.feed-post-video-wrap');
-            if (videoWrap) initFeedVideoPlayer(videoWrap);
-            const expandBtn = card.querySelector('.feed-video-expand-btn');
-            // Same reasoning as the image click guard above: the preview card inside the full
-            // Post view already shows the video inline, so the full-screen expand/reel view
-            // isn't offered there — hide the button rather than just no-op its click, since a
-            // visible control that does nothing reads as broken.
-            if (expandBtn && opts.isPreview) expandBtn.style.display = 'none';
-            if (expandBtn && !opts.isPreview) expandBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
+            function openThisVideoFullView() {
                 const video = videoWrap.querySelector('.feed-post-video');
                 if (video && !video.paused) video.pause();
                 // Same elevation as the image viewer above — see the comment on the image click
@@ -16011,7 +16026,16 @@
                     document.getElementById('reel-viewer-overlay').classList.add('above-sheet');
                 }
                 openReelViewer(targetId, { fullscreen: true });
-            });
+            }
+            // Same reasoning as the image click guard above: the preview card inside the full
+            // Post view already shows the video inline, so the full-screen expand/reel view
+            // isn't offered there.
+            if (videoWrap) initFeedVideoPlayer(videoWrap, opts.isPreview ? undefined : { onVideoTap: openThisVideoFullView });
+            // Tapping the video itself now opens the full view (see onVideoTap above), so the
+            // separate expand button is redundant — kept in the markup (in case some other CSS
+            // depends on its presence) but hidden rather than removed outright.
+            const expandBtn = card.querySelector('.feed-video-expand-btn');
+            if (expandBtn) expandBtn.style.display = 'none';
             const popoutBtn = card.querySelector('.feed-video-popout-btn');
             if (popoutBtn) popoutBtn.addEventListener('click', (e) => {
                 e.stopPropagation();

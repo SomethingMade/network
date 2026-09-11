@@ -3956,12 +3956,12 @@
         .discover-suggest-card .discover-card:last-of-type { border-bottom: none; }
         .discover-suggest-card .profile-suggested-scroll { padding: 4px 14px 14px; }
 
-        /* News cards woven into the feed (see sprinkleNewsCards) — reuse the exact
-           .x-post-row/.x-media-grid child markup real posts use (so header, avatar sizing,
-           and image inset all match), but on their own top-level class rather than sharing
-           .feed-post-card — that class is targeted by delegated tap handlers (open profile,
-           open comments, etc.) that assume a real post's dataset (uid/postId), which a news
-           card doesn't have. The card-level box styling below is copied 1:1 from
+        /* News cards, rendered in the Search view's News tab (see renderExploreNews) — reuse
+           the exact .x-post-row/.x-media-grid child markup real posts use (so header, avatar
+           sizing, and image inset all match), but on their own top-level class rather than
+           sharing .feed-post-card — that class is targeted by delegated tap handlers (open
+           profile, open comments, etc.) that assume a real post's dataset (uid/postId), which a
+           news card doesn't have. The card-level box styling below is copied 1:1 from
            .feed-post-card so it's visually indistinguishable. */
         .feed-news-card { display: flex; flex-direction: column; background: var(--bg-surface); margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border-color); transition: background 0.12s ease; cursor: default; }
         .feed-news-card:hover { background: var(--bg-hover); }
@@ -7175,12 +7175,19 @@
                         <div class="explore-tabs-bar" id="explore-tabs-bar">
                             <button type="button" class="feed-subtab-btn active" data-explore-tab="trending">Trending</button>
                             <button type="button" class="feed-subtab-btn" data-explore-tab="people">People</button>
+                            <button type="button" class="feed-subtab-btn" data-explore-tab="news">News</button>
                         </div>
                         <div class="explore-panel active" id="explore-panel-trending">
                             <div id="explore-trending-list"></div>
                         </div>
                         <div class="explore-panel" id="explore-panel-people">
                             <div class="discover-grid" id="explore-people-grid"></div>
+                        </div>
+                        <!-- Headlines used to be sprinkled directly into the Home feed's own post
+                             list (see the old sprinkleNewsCards() comment above fetchNewsHeadlines);
+                             they now live only here, as their own tab, so Home stays pure posts. -->
+                        <div class="explore-panel" id="explore-panel-news">
+                            <div id="explore-news-list"></div>
                         </div>
 
                         <p class="discover-section-label" id="discover-stories-label">Status</p>
@@ -12430,35 +12437,9 @@
         // Weaves news headlines in between post cards, same rhythm as sprinkleSuggestedPeople
         // (see there) but on its own interval/offset so the two widget types don't always land
         // on the same post. Called after every reorderFeedCards() pass, which strips old ones first.
-        function sprinkleNewsCards() {
-            const list = document.getElementById('feed-posts-list');
-            if (!list) return;
-            list.querySelectorAll('.feed-news-card').forEach(el => el.remove());
-            if (!cachedNewsArticles.length) return;
-
-            const postCards = Array.from(list.children).filter(el => el.classList.contains('feed-post-card'));
-            if (!postCards.length) return;
-
-            let articleIndex = 0;
-            let sincePlaced = 0;
-            let nextGap = 6 + Math.floor(seededRandom01('news-gap-0') * 3); // 6-8 posts before the first headline
-
-            postCards.forEach((card, i) => {
-                sincePlaced++;
-                if (sincePlaced >= nextGap && articleIndex < cachedNewsArticles.length) {
-                    list.insertBefore(buildNewsCard(cachedNewsArticles[articleIndex]), card.nextSibling);
-                    articleIndex++;
-                    sincePlaced = 0;
-                    nextGap = 6 + Math.floor(seededRandom01('news-gap-' + i) * 3);
-                }
-            });
-
-            // A feed shorter than the gap (new account, quiet day) would otherwise never earn
-            // a headline at all — guarantee at least one by tacking it onto the end.
-            if (articleIndex === 0) {
-                list.insertBefore(buildNewsCard(cachedNewsArticles[0]), postCards[postCards.length - 1].nextSibling);
-            }
-        }
+        // News cards used to be interspersed directly into the Home feed's post list here
+        // (sprinkleNewsCards) — they now render only in the Search view's News tab, see
+        // renderExploreNews() near initExploreTabs.
 
         // --- DISCOVER TAB (browse other Haba users and follow them) ---
         // Lives where the old video-Moments "Status" tab used to be. Reuses the existing
@@ -12551,7 +12532,6 @@
                 if (exploreTabsBar) exploreTabsBar.style.display = '';
                 explorePanels.forEach(p => p.style.display = '');
                 sprinkleSuggestedPeople();
-                sprinkleNewsCards();
                 return;
             }
 
@@ -12635,6 +12615,22 @@
             }).join('');
         }
 
+        // Renders the shared news batch (see fetchNewsHeadlines — same sharedNewsCache/latest
+        // batch every user reads, not a per-device fetch) as its own tab in Search/Explore,
+        // rather than woven in between posts the way it used to be in the Home feed.
+        function renderExploreNews() {
+            const list = document.getElementById('explore-news-list');
+            if (!list) return;
+            fetchNewsHeadlines().then(() => {
+                list.innerHTML = '';
+                if (!cachedNewsArticles.length) {
+                    list.innerHTML = `<div class="explore-empty">No headlines right now — check back soon</div>`;
+                    return;
+                }
+                cachedNewsArticles.forEach(article => list.appendChild(buildNewsCard(article)));
+            });
+        }
+
         (function initExploreTabs() {
             const bar = document.getElementById('explore-tabs-bar');
             const trendingList = document.getElementById('explore-trending-list');
@@ -12647,7 +12643,9 @@
                 const target = btn.dataset.exploreTab;
                 document.getElementById('explore-panel-trending').classList.toggle('active', target === 'trending');
                 document.getElementById('explore-panel-people').classList.toggle('active', target === 'people');
+                document.getElementById('explore-panel-news').classList.toggle('active', target === 'news');
                 if (target === 'people') renderExplorePeople();
+                if (target === 'news') renderExploreNews();
             });
             if (trendingList) {
                 trendingList.addEventListener('click', (e) => {
@@ -13114,9 +13112,11 @@
         function reorderFeedCards() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return;
-            // Suggestion/news widgets aren't part of the ranked post set — pull them out before
-            // sorting/anchoring and re-sprinkle fresh ones afterward (see sprinkleSuggestedPeople,
-            // sprinkleNewsCards).
+            // Suggestion widgets aren't part of the ranked post set — pull them out before
+            // sorting/anchoring and re-sprinkle fresh ones afterward (see sprinkleSuggestedPeople).
+            // News cards used to live here too (see sprinkleNewsCards' old comment) but now only
+            // render in the Search view's News tab (renderExploreNews) — .feed-news-card is swept
+            // out here too in case any are left over from before that move.
             list.querySelectorAll('.discover-suggest-card, .feed-news-card').forEach(el => el.remove());
             const container = document.getElementById('discover-grid-scroll');
             const anchorCard = findFeedAnchorCard(list, container);
@@ -13151,7 +13151,6 @@
             }
 
             sprinkleSuggestedPeople();
-            sprinkleNewsCards();
         }
 
         function updateNewPostsPill() {
@@ -13353,7 +13352,9 @@
             feedListenersAttached = true;
             initFeedScrollListener();
 
-            fetchNewsHeadlines().then(() => sprinkleNewsCards());
+            // Prefetch the shared news batch so it's ready the moment someone opens the Search
+            // view's News tab (renderExploreNews) — no longer sprinkled into the feed itself.
+            fetchNewsHeadlines();
 
             onValue(ref(database, `saved_posts/${user.uid}`), (snap) => {
                 cachedSavedPosts = snap.exists() ? snap.val() : {};

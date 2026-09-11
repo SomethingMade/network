@@ -2,75 +2,428 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <title>Haba Code</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='45' fill='%23111111'/%3E%3Cpolygon points='20,80 170,30 80,110' fill='%23fff' fill-opacity='.75'/%3E%3Cpolygon points='120,180 170,30 80,110' fill='%23fff'/%3E%3Cpolygon points='20,80 80,110 80,140' fill='%23fff' fill-opacity='.55'/%3E%3C/svg%3E">
 <style>
-:root{--bg:#f5f5f5;--surface:#fff;--text:#111;--muted:#707070;--border:#dedede;--black:#111;--green:#16a34a;--red:#dc2626;--radius:16px}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
-button,select,textarea{font:inherit}.page{min-height:100vh;display:flex;flex-direction:column}.topbar{height:64px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 20px;position:sticky;top:0;z-index:10}.back{width:38px;height:38px;border:1px solid var(--border);border-radius:50%;background:var(--surface);cursor:pointer;display:grid;place-items:center}.back:hover{background:#f0f0f0}.brand{font-weight:800;font-size:18px}.brand small{font-weight:500;color:var(--muted);margin-left:5px}.spacer{flex:1}.api-status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}.dot{width:8px;height:8px;border-radius:50%;background:#aaa}.dot.ok{background:var(--green)}.dot.bad{background:var(--red)}
-.toolbar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}.toolbar select,.toolbar button{height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:0 12px;color:var(--text);cursor:pointer}.toolbar button.primary{background:var(--black);border-color:var(--black);color:#fff;font-weight:700}.toolbar button:disabled{opacity:.5;cursor:not-allowed}.toolbar label{font-size:12px;color:var(--muted);font-weight:600}.lang-wrap{display:flex;align-items:center;gap:7px}
-.workspace{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,420px);gap:14px;padding:14px;min-height:0}.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0}.panel-head{height:48px;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700}.panel-head span{margin-left:auto;color:var(--muted);font-weight:500}.editor-wrap{position:relative;flex:1;min-height:420px;background:#101010}.line-numbers{position:absolute;left:0;top:0;bottom:0;width:46px;padding:14px 8px;text-align:right;color:#666;background:#101010;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;user-select:none}.editor{position:absolute;inset:0 0 0 46px;width:calc(100% - 46px);height:100%;resize:none;border:0;outline:0;background:#101010;color:#f3f3f3;padding:14px 16px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:4;white-space:pre;overflow:auto}.editor::selection{background:#444}.side{display:grid;grid-template-rows:1fr 1.35fr;gap:14px;min-height:0}.stdin,.output{width:100%;height:100%;resize:none;border:0;outline:0;padding:14px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#fff;color:#111}.output{white-space:pre-wrap;overflow:auto}.output.error{color:var(--red)}.output.success{color:#166534}.empty{color:#888}.foot{font-size:11px;color:var(--muted);padding:8px 14px;border-top:1px solid var(--border)}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:30}.modal.open{display:flex}.modal-card{width:min(560px,100%);background:#fff;border-radius:18px;padding:20px;border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.2)}.modal-card h2{margin:0 0 8px;font-size:18px}.modal-card p{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5}.modal-card input{width:100%;height:42px;border:1px solid var(--border);border-radius:10px;padding:0 12px;outline:none}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.modal-actions button{height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:#fff;cursor:pointer}.modal-actions .primary{background:#111;color:#fff;border-color:#111}
-@media(max-width:850px){.workspace{grid-template-columns:1fr}.side{grid-template-rows:220px minmax(260px,1fr)}.editor-wrap{min-height:430px}.api-status{display:none}}
-@media(max-width:520px){.topbar{padding:0 12px}.toolbar{padding:10px}.workspace{padding:10px;gap:10px}.panel{border-radius:13px}.toolbar .api-settings{margin-left:auto}.brand small{display:none}}
+:root {
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --text: #1c1c1e;
+  --muted: #8e8e93;
+  --border: #e5e5ea;
+  --black: #111111;
+  --green: #34c759;
+  --red: #ff3b30;
+  --blue: #007aff;
+  --radius: 16px;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+}
+
+/* ===== TOP BAR ===== */
+.topbar {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.back {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg);
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.brand {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+}
+.brand small {
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 4px;
+  font-size: 13px;
+}
+.spacer { flex: 1; }
+.api-status {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c7c7cc;
+}
+.dot.ok { background: var(--green); }
+.dot.bad { background: var(--red); }
+
+/* ===== LANGUAGE + ACTIONS ===== */
+.controls {
+  background: var(--surface);
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.lang-select {
+  flex: 1;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 500;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238e8e93' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+/* ===== MAIN CONTENT ===== */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-head {
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.2px;
+}
+.card-head span {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* Code editor */
+.editor-card {
+  flex: 1;
+  min-height: 280px;
+}
+.editor-wrap {
+  position: relative;
+  flex: 1;
+  background: #1c1c1e;
+  min-height: 260px;
+}
+.line-numbers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 42px;
+  padding: 14px 6px;
+  text-align: right;
+  color: #636366;
+  background: #1c1c1e;
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  user-select: none;
+}
+.editor {
+  position: absolute;
+  inset: 0 0 0 42px;
+  width: calc(100% - 42px);
+  height: 100%;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: #1c1c1e;
+  color: #f2f2f7;
+  padding: 14px 14px 20px;
+  font: 13.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.editor::selection { background: #3a3a3c; }
+
+/* Input & Output */
+.io-card {
+  min-height: 140px;
+}
+.stdin, .output {
+  width: 100%;
+  height: 140px;
+  border: 0;
+  outline: 0;
+  padding: 14px 16px;
+  font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--surface);
+  color: var(--text);
+  resize: none;
+}
+.output {
+  white-space: pre-wrap;
+  overflow: auto;
+  height: 160px;
+}
+.output.error { color: var(--red); }
+.output.success { color: #248a3d; }
+.output.empty { color: var(--muted); }
+
+/* ===== BOTTOM BAR ===== */
+.bottombar {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px 16px calc(12px + var(--safe-bottom));
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.btn {
+  height: 48px;
+  border-radius: 14px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-secondary {
+  flex: 0 0 48px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 18px;
+}
+.btn-primary {
+  flex: 1;
+  background: var(--black);
+  color: white;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+.btn-primary:active { transform: scale(0.98); }
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  padding: 0;
+}
+.modal.open { display: flex; }
+.modal-card {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px calc(24px + var(--safe-bottom));
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.modal-card h2 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+.modal-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+.modal-card input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 15px;
+  outline: none;
+  margin-bottom: 16px;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+.modal-actions button {
+  flex: 1;
+  height: 48px;
+  border-radius: 14px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.modal-actions .cancel {
+  background: var(--bg);
+  color: var(--text);
+}
+.modal-actions .save {
+  background: var(--black);
+  color: white;
+}
+
+/* Small tweaks */
+@media (max-height: 700px) {
+  .editor-card { min-height: 220px; }
+  .editor-wrap { min-height: 200px; }
+  .stdin, .output { height: 110px; }
+  .output { height: 130px; }
+}
 </style>
 </head>
 <body>
 <div class="page">
-<header class="topbar">
-  <button class="back" id="backBtn" title="Back" aria-label="Back">←</button>
-  <div class="brand">Haba <small>Code Compiler</small></div>
-  <div class="spacer"></div>
-  <div class="api-status"><span class="dot" id="apiDot"></span><span id="apiStatusText">API not checked</span></div>
-</header>
 
-<div class="toolbar">
-  <div class="lang-wrap"><label for="language">Language</label><select id="language">
-    <option value="javascript">JavaScript</option><option value="python">Python</option><option value="java">Java</option><option value="cpp">C++</option><option value="c">C</option><option value="go">Go</option><option value="rust">Rust</option><option value="php">PHP</option><option value="ruby">Ruby</option>
-  </select></div>
-  <button class="primary" id="runBtn">▶ Run Code</button>
-  <button id="clearBtn">Clear</button>
-  <button id="resetBtn">Reset Example</button>
-  <div class="spacer"></div>
-  <button class="api-settings" id="apiBtn">API Settings</button>
-</div>
-
-<main class="workspace">
-  <section class="panel">
-    <div class="panel-head">Code <span id="fileName">main.js</span></div>
-    <div class="editor-wrap">
-      <div class="line-numbers" id="lineNumbers">1</div>
-      <textarea class="editor" id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <button class="back" id="backBtn" aria-label="Back">←</button>
+    <div class="brand">Haba <small>Code</small></div>
+    <div class="spacer"></div>
+    <div class="api-status">
+      <span class="dot" id="apiDot"></span>
+      <span id="apiStatusText">Ready</span>
     </div>
-    <div class="foot">Ctrl/Cmd + Enter to run</div>
-  </section>
+  </header>
 
-  <section class="side">
-    <div class="panel">
-      <div class="panel-head">Standard Input <span>stdin</span></div>
+  <!-- Language + Settings -->
+  <div class="controls">
+    <select class="lang-select" id="language">
+      <option value="javascript">JavaScript</option>
+      <option value="python">Python</option>
+      <option value="java">Java</option>
+      <option value="cpp">C++</option>
+      <option value="c">C</option>
+      <option value="go">Go</option>
+      <option value="rust">Rust</option>
+      <option value="php">PHP</option>
+      <option value="ruby">Ruby</option>
+    </select>
+    <button class="icon-btn" id="apiBtn" title="API Settings">⚙️</button>
+  </div>
+
+  <!-- Main scrollable content -->
+  <main class="main">
+
+    <!-- Code Editor -->
+    <section class="card editor-card">
+      <div class="card-head">Code <span id="fileName">main.js</span></div>
+      <div class="editor-wrap">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <textarea class="editor" id="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+      </div>
+    </section>
+
+    <!-- Stdin -->
+    <section class="card io-card">
+      <div class="card-head">Standard Input</div>
       <textarea class="stdin" id="stdin" placeholder="Input passed to your program..."></textarea>
-    </div>
-    <div class="panel">
-      <div class="panel-head">Output <span id="runTime"></span></div>
+    </section>
+
+    <!-- Output -->
+    <section class="card io-card">
+      <div class="card-head">Output <span id="runTime"></span></div>
       <pre class="output empty" id="output">Run your code to see the output.</pre>
-    </div>
-  </section>
-</main>
+    </section>
+
+  </main>
+
+  <!-- Bottom Action Bar -->
+  <div class="bottombar">
+    <button class="btn btn-secondary" id="clearBtn" title="Clear">⌫</button>
+    <button class="btn btn-secondary" id="resetBtn" title="Reset Example">↺</button>
+    <button class="btn btn-primary" id="runBtn">▶  Run Code</button>
+  </div>
+
 </div>
 
+<!-- API Modal (bottom sheet style) -->
 <div class="modal" id="apiModal">
   <div class="modal-card">
-    <h2>Compiler REST API</h2>
-    <p>Haba Code uses the open-source Judge0 CE REST API. The default host is <code>https://ce.judge0.com</code>. For a production Haba deployment, you can replace it with your own self-hosted Judge0 CE host.</p>
+    <h2>Compiler API</h2>
+    <p>Uses the open-source Judge0 CE API. Default is the public instance. You can point it to your own self-hosted host.</p>
     <input id="apiUrl" type="url" placeholder="https://ce.judge0.com">
-    <div class="modal-actions"><button id="cancelApi">Cancel</button><button class="primary" id="saveApi">Save</button></div>
+    <div class="modal-actions">
+      <button class="cancel" id="cancelApi">Cancel</button>
+      <button class="save" id="saveApi">Save</button>
+    </div>
   </div>
 </div>
 
 <script>
 const DEFAULT_API_URL = 'https://ce.judge0.com';
 const STORAGE_API = 'haba_compiler_api_url';
+
 const examples = {
   javascript: `console.log("Hello from Haba Code!");\n\nconst numbers = [1, 2, 3, 4, 5];\nconsole.log("Sum:", numbers.reduce((a, b) => a + b, 0));`,
   python: `print("Hello from Haba Code!")\n\nnumbers = [1, 2, 3, 4, 5]\nprint("Sum:", sum(numbers))`,
@@ -83,19 +436,16 @@ const examples = {
   ruby: `puts "Hello from Haba Code!"`
 };
 
-// Judge0 CE v1.13.1 active language IDs.
 const languageIds = {
-  javascript: 63,
-  python: 71,
-  java: 62,
-  cpp: 54,
-  c: 50,
-  go: 60,
-  rust: 73,
-  php: 68,
-  ruby: 72
+  javascript: 63, python: 71, java: 62, cpp: 54,
+  c: 50, go: 60, rust: 73, php: 68, ruby: 72
 };
-const fileNames = {javascript:'main.js',python:'main.py',java:'Main.java',cpp:'main.cpp',c:'main.c',go:'main.go',rust:'main.rs',php:'main.php',ruby:'main.rb'};
+const fileNames = {
+  javascript:'main.js', python:'main.py', java:'Main.java',
+  cpp:'main.cpp', c:'main.c', go:'main.go',
+  rust:'main.rs', php:'main.php', ruby:'main.rb'
+};
+
 const language = document.getElementById('language');
 const code = document.getElementById('code');
 const stdin = document.getElementById('stdin');
@@ -104,44 +454,81 @@ const lineNumbers = document.getElementById('lineNumbers');
 const runBtn = document.getElementById('runBtn');
 const apiDot = document.getElementById('apiDot');
 const apiStatusText = document.getElementById('apiStatusText');
+
 const apiUrl = () => (localStorage.getItem(STORAGE_API) || window.HABA_COMPILER_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
-function setExample(){ const lang=language.value; code.value=examples[lang]||''; document.getElementById('fileName').textContent=fileNames[lang]||'main.txt'; updateLines(); }
-function updateLines(){ const count=Math.max(1, code.value.split('\n').length); lineNumbers.textContent=Array.from({length:count},(_,i)=>i+1).join('\n'); }
-function setStatus(text, ok=null){ apiStatusText.textContent=text; apiDot.className='dot'+(ok===true?' ok':ok===false?' bad':''); }
-function setOutput(text, type=''){ output.textContent=text||'(no output)'; output.className='output'+(type?' '+type:''); }
+function setExample() {
+  const lang = language.value;
+  code.value = examples[lang] || '';
+  document.getElementById('fileName').textContent = fileNames[lang] || 'main.txt';
+  updateLines();
+}
+function updateLines() {
+  const count = Math.max(1, code.value.split('\n').length);
+  lineNumbers.textContent = Array.from({length: count}, (_, i) => i + 1).join('\n');
+}
+function setStatus(text, ok = null) {
+  apiStatusText.textContent = text;
+  apiDot.className = 'dot' + (ok === true ? ' ok' : ok === false ? ' bad' : '');
+}
+function setOutput(text, type = '') {
+  output.textContent = text || '(no output)';
+  output.className = 'output' + (type ? ' ' + type : '');
+}
 
-language.addEventListener('change',setExample);
-code.addEventListener('input',updateLines);
-code.addEventListener('scroll',()=>{lineNumbers.scrollTop=code.scrollTop});
-document.getElementById('clearBtn').addEventListener('click',()=>{code.value='';updateLines();code.focus()});
-document.getElementById('resetBtn').addEventListener('click',setExample);
-document.getElementById('backBtn').addEventListener('click',()=>{ if(history.length>1) history.back(); else location.href='index.html'; });
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();runCode()}});
+language.addEventListener('change', setExample);
+code.addEventListener('input', updateLines);
+code.addEventListener('scroll', () => { lineNumbers.scrollTop = code.scrollTop; });
 
-function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+document.getElementById('clearBtn').addEventListener('click', () => {
+  code.value = '';
+  updateLines();
+  code.focus();
+});
+document.getElementById('resetBtn').addEventListener('click', setExample);
+document.getElementById('backBtn').addEventListener('click', () => {
+  if (history.length > 1) history.back();
+  else location.href = 'index.html';
+});
 
-async function judge0Request(path, options={}){
-  const response=await fetch(apiUrl()+path, options);
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error||data.message||`Judge0 returned HTTP ${response.status}`);
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    runCode();
+  }
+});
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function judge0Request(path, options = {}) {
+  const response = await fetch(apiUrl() + path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || data.message || `Judge0 returned HTTP ${response.status}`);
   return data;
 }
 
-async function runCode(){
-  const source=code.value;
-  if(!source.trim()){setOutput('Write some code first.','error');return;}
-  const languageId=languageIds[language.value];
-  if(!languageId){setOutput('This language is not configured.','error');return;}
+async function runCode() {
+  const source = code.value;
+  if (!source.trim()) {
+    setOutput('Write some code first.', 'error');
+    return;
+  }
+  const languageId = languageIds[language.value];
+  if (!languageId) {
+    setOutput('This language is not configured.', 'error');
+    return;
+  }
 
-  runBtn.disabled=true; runBtn.textContent='Running…'; setOutput('Submitting to Judge0…');
-  const started=performance.now();
-  try{
-    // Use the documented asynchronous Judge0 flow: POST submission, then poll the token.
-    const submission=await judge0Request('/submissions/?base64_encoded=false&wait=false',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running…';
+  setOutput('Submitting to Judge0…');
+  const started = performance.now();
+
+  try {
+    const submission = await judge0Request('/submissions/?base64_encoded=false&wait=false', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         language_id: languageId,
         source_code: source,
         stdin: stdin.value,
@@ -150,46 +537,64 @@ async function runCode(){
       })
     });
 
-    if(!submission.token) throw new Error('Judge0 did not return a submission token.');
+    if (!submission.token) throw new Error('Judge0 did not return a submission token.');
     setOutput('Code submitted. Waiting for execution…');
 
-    let result=null;
-    for(let attempt=0; attempt<40; attempt++){
+    let result = null;
+    for (let attempt = 0; attempt < 40; attempt++) {
       await sleep(1000);
-      result=await judge0Request(`/submissions/${encodeURIComponent(submission.token)}?base64_encoded=false&fields=stdout,time,memory,stderr,compile_output,message,status,token,language_id`);
-      if(result.status && result.status.id > 2) break;
+      result = await judge0Request(`/submissions/${encodeURIComponent(submission.token)}?base64_encoded=false&fields=stdout,time,memory,stderr,compile_output,message,status,token,language_id`);
+      if (result.status && result.status.id > 2) break;
     }
 
-    if(!result || !result.status) throw new Error('No execution result was returned by Judge0.');
-    const parts=[];
-    if(result.compile_output) parts.push('[compiler output]\n'+result.compile_output.trimEnd());
-    if(result.stdout) parts.push(result.stdout.trimEnd());
-    if(result.stderr) parts.push('[stderr]\n'+result.stderr.trimEnd());
-    if(result.message) parts.push('[message]\n'+result.message);
-    if(!parts.length) parts.push('(Program finished with no output.)');
+    if (!result || !result.status) throw new Error('No execution result was returned by Judge0.');
 
-    const failed=result.status.id >= 4;
+    const parts = [];
+    if (result.compile_output) parts.push('[compiler output]\n' + result.compile_output.trimEnd());
+    if (result.stdout) parts.push(result.stdout.trimEnd());
+    if (result.stderr) parts.push('[stderr]\n' + result.stderr.trimEnd());
+    if (result.message) parts.push('[message]\n' + result.message);
+    if (!parts.length) parts.push('(Program finished with no output.)');
+
+    const failed = result.status.id >= 4;
     setOutput(parts.join('\n\n'), failed ? 'error' : 'success');
-    const metrics=[];
-    if(result.time) metrics.push(`${result.time}s`);
-    if(result.memory != null) metrics.push(`${result.memory} KB`);
-    metrics.push(`${Math.round(performance.now()-started)} ms`);
-    document.getElementById('runTime').textContent=metrics.join(' · ');
-    setStatus('Judge0 connected',true);
-  }catch(err){
-    setOutput(err.message||'Unable to run code.','error');
-    setStatus('Judge0 API error',false);
-  }finally{runBtn.disabled=false;runBtn.textContent='▶ Run Code';}
+
+    const metrics = [];
+    if (result.time) metrics.push(`${result.time}s`);
+    if (result.memory != null) metrics.push(`${result.memory} KB`);
+    metrics.push(`${Math.round(performance.now() - started)} ms`);
+    document.getElementById('runTime').textContent = metrics.join(' · ');
+    setStatus('Connected', true);
+  } catch (err) {
+    setOutput(err.message || 'Unable to run code.', 'error');
+    setStatus('API error', false);
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = '▶  Run Code';
+  }
 }
-runBtn.addEventListener('click',runCode);
 
-const modal=document.getElementById('apiModal');
-document.getElementById('apiBtn').addEventListener('click',()=>{document.getElementById('apiUrl').value=apiUrl();modal.classList.add('open')});
-document.getElementById('cancelApi').addEventListener('click',()=>modal.classList.remove('open'));
-document.getElementById('saveApi').addEventListener('click',()=>{const value=document.getElementById('apiUrl').value.trim();if(value)localStorage.setItem(STORAGE_API,value);else localStorage.removeItem(STORAGE_API);modal.classList.remove('open');setStatus('Judge0 API ready',null)});
-modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open')});
+runBtn.addEventListener('click', runCode);
 
-setExample(); setStatus('Judge0 API ready',null);
+const modal = document.getElementById('apiModal');
+document.getElementById('apiBtn').addEventListener('click', () => {
+  document.getElementById('apiUrl').value = apiUrl();
+  modal.classList.add('open');
+});
+document.getElementById('cancelApi').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('saveApi').addEventListener('click', () => {
+  const value = document.getElementById('apiUrl').value.trim();
+  if (value) localStorage.setItem(STORAGE_API, value);
+  else localStorage.removeItem(STORAGE_API);
+  modal.classList.remove('open');
+  setStatus('Ready', null);
+});
+modal.addEventListener('click', e => {
+  if (e.target === modal) modal.classList.remove('open');
+});
+
+setExample();
+setStatus('Ready', null);
 </script>
 </body>
 </html>

@@ -5495,6 +5495,25 @@
         <div class="bottom-sheet wa-profile-sheet">
             <div class="sheet-handle"></div>
 
+            <!-- Same floating sticky header pattern as #user-info-sticky-header, but for the
+                 read-only view of your OWN profile: Share (icon) + Edit Profile (pill) instead
+                 of Message + Follow. See initProfileStickyHeader(). -->
+            <div class="tm-profile-sticky-header" id="my-profile-sticky-header">
+                <button type="button" class="tm-profile-back-btn" id="btn-close-profile-sticky" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="tm-profile-sticky-id">
+                    <span class="tm-profile-sticky-name" id="my-profile-sticky-name">Name</span>
+                    <span class="tm-profile-sticky-count" id="my-profile-sticky-count">0 posts</span>
+                </div>
+                <div class="tm-profile-sticky-actions">
+                    <button type="button" class="tm-profile-sticky-msg-btn" id="btn-share-profile-sticky" aria-label="Share Profile">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                    </button>
+                    <button type="button" id="btn-edit-profile-sticky" class="btn-pill btn-primary tm-profile-sticky-follow-btn">Edit Profile</button>
+                </div>
+            </div>
+
             <div class="tm-profile-cover-wrap">
                 <div class="wa-cover-photo-block" id="my-profile-cover-photo">
                     <div class="tm-profile-header">
@@ -19087,7 +19106,11 @@
                 document.getElementById('new-username-input').value = '';
                 document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
                 document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
-                document.getElementById('my-profile-posts-count').textContent = Object.values(cachedPosts).filter(post => post && post.uid === user.uid).length;
+                const myPostsCount = Object.values(cachedPosts).filter(post => post && post.uid === user.uid).length;
+                document.getElementById('my-profile-posts-count').textContent = myPostsCount;
+                document.getElementById('my-profile-sticky-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+                document.getElementById('my-profile-sticky-count').textContent = `${myPostsCount} posts`;
+                initProfileStickyHeader(profileSheetOverlay, 'my-profile-sticky-header', '.ig-profile-actions-row');
                 renderProfileCommunityPills('my-profile-community-pills', user.uid);
                 const usernameLocked = myProfile.usernameChanged && !myProfile.isBusinessAccount;
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
@@ -20481,6 +20504,9 @@
             e.preventDefault();
             profileSheetOverlay.classList.remove('active');
         });
+        document.getElementById('btn-close-profile-sticky').addEventListener('click', (e) => {
+            document.getElementById('btn-close-profile').click();
+        });
 
         // --- Settings sheet (moved out of Profile: Content & Copyright through Sign Out) ---
         const settingsSheetOverlay = document.getElementById('settings-bottom-sheet-overlay');
@@ -21639,6 +21665,9 @@
         document.getElementById('btn-edit-profile').addEventListener('click', () => {
             openEditProfileSheet();
         });
+        document.getElementById('btn-edit-profile-sticky').addEventListener('click', () => {
+            document.getElementById('btn-edit-profile').click();
+        });
         document.getElementById('btn-close-edit-profile').addEventListener('click', () => {
             editProfileSheetOverlay.classList.remove('active');
         });
@@ -21656,6 +21685,9 @@
         document.getElementById('btn-share-profile').addEventListener('click', () => {
             renderShareProfileQr();
             shareProfileSheetOverlay.classList.add('active');
+        });
+        document.getElementById('btn-share-profile-sticky').addEventListener('click', () => {
+            document.getElementById('btn-share-profile').click();
         });
         document.getElementById('btn-close-share-profile').addEventListener('click', () => {
             shareProfileSheetOverlay.classList.remove('active');

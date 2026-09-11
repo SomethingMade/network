@@ -3099,6 +3099,31 @@
         .chat-view-menu-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
         .chat-view-menu-dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 190px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-elevated); padding: 6px; z-index: 40; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
         .chat-view-menu-dropdown.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+        /* --- Code Compiler (community owner-enabled feature, see btn-open-group-compiler) --- */
+        .code-compiler-overlay { position: fixed; inset: 0; z-index: 100065; display: none; flex-direction: column; background: var(--bg-base); }
+        .code-compiler-overlay.active { display: flex; }
+        .code-compiler-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); }
+        .code-compiler-title { flex: 1; min-width: 0; }
+        .code-compiler-title h4 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .code-compiler-title p { margin: 2px 0 0; font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .code-compiler-lang-select { flex-shrink: 0; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-pill); padding: 8px 12px; font-size: 13px; font-weight: 600; }
+        .code-compiler-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px; gap: 14px; overflow-y: auto; }
+        .code-compiler-editor-wrap { display: flex; flex: 1; min-height: 220px; background: #1E1E1E; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-soft); }
+        .code-compiler-gutter { flex-shrink: 0; width: 40px; padding: 14px 8px 14px 0; text-align: right; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; line-height: 1.55; color: #6E6E73; background: #1A1A1A; user-select: none; white-space: pre; overflow: hidden; }
+        .code-compiler-editor { flex: 1; resize: none; border: none; outline: none; background: transparent; color: #E9EDEF; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; line-height: 1.55; padding: 14px 14px 14px 8px; tab-size: 4; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+        .code-compiler-stdin-row { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+        .code-compiler-stdin-row label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        .code-compiler-stdin { resize: vertical; min-height: 48px; max-height: 120px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-input); color: var(--text-primary); font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; padding: 10px 12px; }
+        .code-compiler-output-wrap { flex-shrink: 0; display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 14px; overflow: hidden; }
+        .code-compiler-output-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-alt); font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+        .code-compiler-status-pill { font-size: 11px; font-weight: 700; text-transform: none; letter-spacing: 0; padding: 3px 10px; border-radius: var(--radius-pill); background: rgba(var(--primary-rgb),0.1); color: var(--primary-blue); }
+        .code-compiler-status-pill.success { background: rgba(52,199,89,0.12); color: var(--success-green); }
+        .code-compiler-status-pill.error { background: rgba(255,69,58,0.12); color: var(--danger-red); }
+        .code-compiler-output { margin: 0; padding: 14px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 13px; line-height: 1.5; color: var(--text-primary); background: var(--bg-surface); white-space: pre-wrap; word-break: break-word; min-height: 60px; max-height: 220px; overflow-y: auto; }
+        .code-compiler-footer { flex-shrink: 0; padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-color); background: var(--bg-surface); }
+        .code-compiler-run-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .code-compiler-run-btn.running { opacity: 0.7; pointer-events: none; }
         .chats-menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; background: none; border: none; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--text-primary); cursor: pointer; text-align: left; }
         .chats-menu-item:hover { background: var(--bg-hover); }
         .chats-menu-item svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-secondary); }
@@ -5492,6 +5517,20 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+            <div class="group-info-section" id="group-compiler-toggle-row" style="display:none; align-items:center; justify-content:space-between; gap:12px;">
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-size:14px; font-weight:600; color:var(--text-primary);">Code Compiler</span>
+                    <span style="font-size:12px; color:var(--text-secondary);">Let members write &amp; run code in this community</span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="group-compiler-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <button type="button" id="btn-open-group-compiler" class="btn-pill btn-outline" style="margin-bottom:12px; display:none; align-items:center; justify-content:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                Open Compiler
+            </button>
             <div class="group-info-section">
                 <div class="group-info-section-label" id="group-info-members-label">Members</div>
                 <div id="group-info-members-list"></div>
@@ -5500,6 +5539,54 @@
             <button type="button" id="btn-invite-to-group" class="btn-pill btn-outline" style="margin-bottom:12px; display:none;">Invite by ID</button>
             <button type="button" id="btn-leave-group" class="btn-pill" style="background:rgba(255,69,58,0.1); color:var(--danger-red);">Leave Group</button>
             <button type="button" id="btn-delete-community" class="btn-pill" style="background:var(--danger-red); color:#fff; margin-top:10px; display:none;">Delete Community</button>
+        </div>
+    </div>
+
+    <!-- Code Compiler: full-screen overlay opened from a community's Group Info sheet /
+         3-dot menu when the owner has enabled it. Editor + language picker + stdin + Run,
+         with a Judge0-backed execution result panel below. See runCompilerCode() /
+         initCodeCompilerEditor() in the script section. -->
+    <div class="code-compiler-overlay" id="code-compiler-overlay">
+        <div class="code-compiler-header">
+            <svg id="btn-close-compiler" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            <div class="code-compiler-title">
+                <h4>Code Compiler</h4>
+                <p id="code-compiler-community-name">Community</p>
+            </div>
+            <select id="code-compiler-language" class="code-compiler-lang-select">
+                <option value="java">Java</option>
+                <option value="python">Python 3</option>
+                <option value="javascript">JavaScript (Node)</option>
+                <option value="cpp">C++</option>
+                <option value="c">C</option>
+            </select>
+        </div>
+
+        <div class="code-compiler-body">
+            <div class="code-compiler-editor-wrap">
+                <div class="code-compiler-gutter" id="code-compiler-gutter">1</div>
+                <textarea id="code-compiler-editor" class="code-compiler-editor" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" placeholder="Write your code here..."></textarea>
+            </div>
+
+            <div class="code-compiler-stdin-row">
+                <label for="code-compiler-stdin">Input (stdin) — optional</label>
+                <textarea id="code-compiler-stdin" class="code-compiler-stdin" spellcheck="false" placeholder="Any input your program reads from stdin"></textarea>
+            </div>
+
+            <div class="code-compiler-output-wrap">
+                <div class="code-compiler-output-header">
+                    <span>Output</span>
+                    <span id="code-compiler-status-pill" class="code-compiler-status-pill" style="display:none;"></span>
+                </div>
+                <pre id="code-compiler-output" class="code-compiler-output">Run your code to see the output here.</pre>
+            </div>
+        </div>
+
+        <div class="code-compiler-footer">
+            <button type="button" id="btn-run-compiler" class="btn-pill btn-primary code-compiler-run-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span id="btn-run-compiler-label">Run</span>
+            </button>
         </div>
     </div>
 
@@ -6348,10 +6435,6 @@
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     <span>Settings</span>
-                </button>
-                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-devtools">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
-                    <span>Developer Tools</span>
                 </button>
                 <div class="sidebar-drawer-divider"></div>
                 <button type="button" class="sidebar-drawer-item sidebar-drawer-item-danger" id="sidebar-drawer-logout">
@@ -7462,6 +7545,10 @@
                     <button type="button" class="chats-menu-item" id="chat-view-menu-disappearing">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         <span id="chat-view-menu-disappearing-label">Disappearing messages</span>
+                    </button>
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-compiler" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        <span>Code Compiler</span>
                     </button>
                     <button type="button" class="chats-menu-item" id="chat-view-menu-music">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
@@ -10842,6 +10929,10 @@
                     ? `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`
                     : 'Disappearing messages';
 
+                const compilerItem = document.getElementById('chat-view-menu-compiler');
+                const activeGroup = isGroup && typeof cachedCommunities !== 'undefined' ? cachedCommunities[activeGroupId] : null;
+                compilerItem.style.display = (activeGroup && activeGroup.compilerEnabled) ? 'flex' : 'none';
+
                 dropdown.classList.toggle('open');
             });
             document.addEventListener('click', (e) => {
@@ -10885,9 +10976,186 @@
                 closeMenu();
                 openWallpaperSheet();
             });
+
+            document.getElementById('chat-view-menu-compiler').addEventListener('click', () => {
+                closeMenu();
+                const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
+                if (group && group.compilerEnabled) openCodeCompiler(group);
+            });
         })();
 
-        // --- Header three-dot menu on every tab (currently just "Check Updates", same pattern
+        // --- Code Compiler (community owner-enabled feature) ---
+        // Opened from a community's Group Info sheet ("Open Compiler") or its 3-dot menu, only
+        // when group.compilerEnabled is true. The editor is a plain <textarea> with a synced
+        // line-number gutter, Tab-to-indent, and light auto-closing of brackets/quotes (the
+        // "autocorrecting" behavior asked for) — not a full syntax-highlighting IDE. Execution
+        // is handled by Judge0 CE (see JUDGE0_API_HOST/JUDGE0_API_KEY above).
+        (function setupCodeCompiler() {
+            const overlay = document.getElementById('code-compiler-overlay');
+            const editor = document.getElementById('code-compiler-editor');
+            const gutter = document.getElementById('code-compiler-gutter');
+            const stdinBox = document.getElementById('code-compiler-stdin');
+            const langSelect = document.getElementById('code-compiler-language');
+            const outputBox = document.getElementById('code-compiler-output');
+            const statusPill = document.getElementById('code-compiler-status-pill');
+            const runBtn = document.getElementById('btn-run-compiler');
+            const runLabel = document.getElementById('btn-run-compiler-label');
+            const closeBtn = document.getElementById('btn-close-compiler');
+            if (!overlay || !editor) return;
+
+            const STARTER_SNIPPETS = {
+                java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, world!");\n    }\n}\n',
+                python: 'print("Hello, world!")\n',
+                javascript: 'console.log("Hello, world!");\n',
+                cpp: '#include <iostream>\n\nint main() {\n    std::cout << "Hello, world!" << std::endl;\n    return 0;\n}\n',
+                c: '#include <stdio.h>\n\nint main() {\n    printf("Hello, world!\\n");\n    return 0;\n}\n'
+            };
+            const AUTO_CLOSE_PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'" };
+
+            function syncGutter() {
+                const lineCount = editor.value.split('\n').length;
+                let lines = '';
+                for (let i = 1; i <= lineCount; i++) lines += i + '\n';
+                gutter.textContent = lines;
+                gutter.scrollTop = editor.scrollTop;
+            }
+
+            editor.addEventListener('input', syncGutter);
+            editor.addEventListener('scroll', () => { gutter.scrollTop = editor.scrollTop; });
+
+            // Tab inserts 4 spaces instead of moving focus; auto-close brackets/quotes as the
+            // person types, and let a typed closing character just skip over one already inserted
+            // rather than doubling it up.
+            editor.addEventListener('keydown', (e) => {
+                const start = editor.selectionStart, end = editor.selectionEnd;
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    editor.setRangeText('    ', start, end, 'end');
+                    syncGutter();
+                    return;
+                }
+                if (e.key === 'Enter') {
+                    // Keep the same leading indentation as the current line on the new line.
+                    const before = editor.value.slice(0, start);
+                    const lineStart = before.lastIndexOf('\n') + 1;
+                    const currentLine = before.slice(lineStart);
+                    const indentMatch = currentLine.match(/^[ \t]*/);
+                    const indent = indentMatch ? indentMatch[0] : '';
+                    if (indent) {
+                        e.preventDefault();
+                        editor.setRangeText('\n' + indent, start, end, 'end');
+                        syncGutter();
+                    }
+                    return;
+                }
+                const closeChar = AUTO_CLOSE_PAIRS[e.key];
+                if (closeChar && start === end) {
+                    e.preventDefault();
+                    editor.setRangeText(e.key + closeChar, start, end, 'end');
+                    editor.selectionStart = editor.selectionEnd = start + 1;
+                    syncGutter();
+                    return;
+                }
+                const nextChar = editor.value[start];
+                if (start === end && nextChar === e.key && Object.values(AUTO_CLOSE_PAIRS).includes(e.key)) {
+                    e.preventDefault();
+                    editor.selectionStart = editor.selectionEnd = start + 1;
+                }
+            });
+
+            langSelect.addEventListener('change', () => {
+                // Only swap in the starter snippet if the editor is empty or still holds a
+                // previous starter snippet — never clobber code the person actually wrote.
+                const stillDefault = !editor.value.trim() || Object.values(STARTER_SNIPPETS).includes(editor.value);
+                if (stillDefault) {
+                    editor.value = STARTER_SNIPPETS[langSelect.value] || '';
+                    syncGutter();
+                }
+            });
+
+            function setStatus(text, kind) {
+                statusPill.textContent = text;
+                statusPill.className = 'code-compiler-status-pill' + (kind ? ' ' + kind : '');
+                statusPill.style.display = text ? 'inline-flex' : 'none';
+            }
+
+            function b64encode(str) {
+                return btoa(unescape(encodeURIComponent(str || '')));
+            }
+            function b64decode(str) {
+                if (!str) return '';
+                try { return decodeURIComponent(escape(atob(str))); } catch (err) { return atob(str); }
+            }
+
+            async function runCompilerCode() {
+                const source = editor.value;
+                if (!source.trim()) { notify('Write some code first', 'error'); return; }
+                if (!JUDGE0_API_KEY || JUDGE0_API_KEY.includes('REPLACE_WITH_YOUR')) {
+                    outputBox.textContent = 'The compiler isn\'t configured yet — add a RapidAPI Judge0 CE key to JUDGE0_API_KEY in the code.';
+                    setStatus('Not configured', 'error');
+                    return;
+                }
+                const languageId = JUDGE0_LANGUAGE_IDS[langSelect.value];
+                runBtn.classList.add('running');
+                runLabel.textContent = 'Running…';
+                setStatus('Running…', '');
+                outputBox.textContent = '';
+                try {
+                    const res = await fetch(`https://${JUDGE0_API_HOST}/submissions?base64_encoded=true&wait=true&fields=stdout,stderr,compile_output,message,status`, {
+                        method: 'POST',
+                        headers: {
+                            'content-type': 'application/json',
+                            'X-RapidAPI-Host': JUDGE0_API_HOST,
+                            'X-RapidAPI-Key': JUDGE0_API_KEY
+                        },
+                        body: JSON.stringify({
+                            source_code: b64encode(source),
+                            language_id: languageId,
+                            stdin: b64encode(stdinBox.value)
+                        })
+                    });
+                    if (!res.ok) throw new Error('Request failed (' + res.status + ')');
+                    const result = await res.json();
+                    const statusDesc = result.status ? result.status.description : 'Unknown';
+                    const isOk = result.status && result.status.id === 3; // 3 = Accepted
+                    setStatus(statusDesc, isOk ? 'success' : 'error');
+
+                    const parts = [];
+                    const stdout = b64decode(result.stdout);
+                    const stderr = b64decode(result.stderr);
+                    const compileOutput = b64decode(result.compile_output);
+                    const message = b64decode(result.message);
+                    if (stdout) parts.push(stdout.replace(/\n$/, ''));
+                    if (compileOutput) parts.push('--- Compile output ---\n' + compileOutput.replace(/\n$/, ''));
+                    if (stderr) parts.push('--- stderr ---\n' + stderr.replace(/\n$/, ''));
+                    if (message && !stdout && !stderr && !compileOutput) parts.push(message);
+                    outputBox.textContent = parts.length ? parts.join('\n\n') : '(no output)';
+                } catch (err) {
+                    setStatus('Error', 'error');
+                    outputBox.textContent = 'Could not run this code: ' + (err && err.message ? err.message : 'network error');
+                } finally {
+                    runBtn.classList.remove('running');
+                    runLabel.textContent = 'Run';
+                }
+            }
+
+            runBtn.addEventListener('click', runCompilerCode);
+            closeBtn.addEventListener('click', () => overlay.classList.remove('active'));
+
+            // Exposed so Group Info / the 3-dot menu can open the compiler for a given community.
+            window.openCodeCompiler = function (group) {
+                document.getElementById('code-compiler-community-name').textContent = group && group.name ? group.name : 'Community';
+                if (!editor.value.trim()) {
+                    editor.value = STARTER_SNIPPETS[langSelect.value] || '';
+                }
+                syncGutter();
+                outputBox.textContent = 'Run your code to see the output here.';
+                setStatus('', '');
+                overlay.classList.add('active');
+            };
+        })();
+
+
         // as the chat view's three-dot menu below). Each tab has its own button/dropdown ids
         // since they all render at once in the DOM, so this is one reusable setup function
         // called once per tab instead of duplicating the listener logic five times. ---
@@ -12023,6 +12291,15 @@
         // everyone else once it does. Needs an RTDB rule allowing authenticated read/write on
         // sharedNewsCache — add one if the project's existing rules don't already cover it.
         const CURRENTS_API_KEY = 'AZZOie9hyFShgrAVkPXG9MNNgLtACTCgu_BwDtYIdKlaZulH';
+
+        // --- Code Compiler (community owner-enabled feature) ---
+        // Runs code client-side against Judge0 CE via RapidAPI. Sign up for a free RapidAPI
+        // account, subscribe to "Judge0 CE", and drop your key below — the free tier is plenty
+        // for a chat-app compiler feature. https://rapidapi.com/judge0-official/api/judge0-ce
+        const JUDGE0_API_HOST = 'judge0-ce.p.rapidapi.com';
+        const JUDGE0_API_KEY = 'REPLACE_WITH_YOUR_RAPIDAPI_KEY';
+        // Judge0 language IDs for the compiler's language dropdown.
+        const JUDGE0_LANGUAGE_IDS = { java: 62, python: 71, javascript: 63, cpp: 54, c: 50 };
         const NEWS_CACHE_STORAGE_KEY = 'haba_news_cache_v1';
         const NEWS_CACHE_MS = 24 * 60 * 60 * 1000; // 24h — governs how often the *shared* Firebase
         // copy is refreshed; localStorage below is just a per-device echo of that shared batch so
@@ -19457,10 +19734,6 @@
             closeSidebarDrawer();
             document.getElementById('btn-open-settings').click();
         });
-        document.getElementById('sidebar-drawer-devtools').addEventListener('click', () => {
-            closeSidebarDrawer();
-            window.location.href = 'compiler.html';
-        });
         document.getElementById('sidebar-drawer-logout').addEventListener('click', () => {
             closeSidebarDrawer();
             document.getElementById('btn-logout').click();
@@ -23599,6 +23872,14 @@
             document.getElementById('group-only-owner-post-row').style.display = group.isBusinessPage ? 'none' : 'flex';
             document.getElementById('group-only-owner-post-row').style.opacity = isOwner ? '1' : '0.6';
 
+            // Code Compiler: owner sees the enable/disable toggle; any member sees the "Open
+            // Compiler" button once it's on. See btn-open-group-compiler / openCodeCompiler().
+            const compilerToggleRow = document.getElementById('group-compiler-toggle-row');
+            const compilerToggle = document.getElementById('group-compiler-toggle');
+            compilerToggleRow.style.display = isOwner ? 'flex' : 'none';
+            compilerToggle.checked = !!group.compilerEnabled;
+            document.getElementById('btn-open-group-compiler').style.display = group.compilerEnabled ? 'flex' : 'none';
+
             const memberIds = group.members ? Object.keys(group.members) : [];
             document.getElementById('group-info-members-label').textContent = `Members (${memberIds.length})`;
             const membersList = document.getElementById('group-info-members-list');
@@ -23643,6 +23924,31 @@
                 e.target.checked = !value;
                 notify('Could not update this setting', 'error');
             }
+        });
+
+        document.getElementById('group-compiler-toggle').addEventListener('change', async (e) => {
+            const user = auth.currentUser;
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
+            if (!user || !group || !activeGroupId || group.ownerUid !== user.uid) {
+                e.target.checked = !!(group && group.compilerEnabled);
+                return;
+            }
+            const value = e.target.checked;
+            try {
+                await update(ref(database, `communities/${activeGroupId}`), { compilerEnabled: value });
+                document.getElementById('btn-open-group-compiler').style.display = value ? 'flex' : 'none';
+                notify(value ? 'Code Compiler is on for this community' : 'Code Compiler is off for this community');
+            } catch (err) {
+                e.target.checked = !value;
+                notify('Could not update this setting', 'error');
+            }
+        });
+
+        document.getElementById('btn-open-group-compiler').addEventListener('click', () => {
+            const group = activeGroupId ? cachedCommunities[activeGroupId] : null;
+            if (!group || !group.compilerEnabled) return;
+            groupInfoSheet.classList.remove('active');
+            openCodeCompiler(group);
         });
 
         document.getElementById('btn-convert-business-page').addEventListener('click', async () => {

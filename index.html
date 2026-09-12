@@ -2963,14 +2963,21 @@
            Sibling of #communities-feed-container inside the same flex column; only one of
            the two is ever visible at a time (toggled in the subtab click handler). Fills all
            remaining vertical space below the header/subtabs, same way #communities-feed-container
-           does, so the map canvas itself gets a true "full mapview" rather than a small embed. */
+           does, so the map canvas itself gets a true "full mapview" rather than a small embed.
+           When active, #tab-groups also gets .map-fullview, which hides .chat-header-area
+           entirely (header row + Home/Explore/Map subtabs + category chips) so the map owns
+           the whole screen — the map's own top bar below carries a back button and the profile
+           avatar that would otherwise have lived in that now-hidden header. */
+        #tab-groups.map-fullview .chat-header-area { display: none; }
         #communities-map-view { flex: 1; display: none; flex-direction: column; min-height: 0; position: relative; }
         #communities-map-view.active { display: flex; }
         .map-search-bar { padding: 10px 14px; display: flex; gap: 8px; align-items: center; background: var(--bg-base); position: relative; z-index: 2; }
+        #tab-groups.map-fullview .map-search-bar { padding-top: calc(10px + env(safe-area-inset-top)); }
         .map-search-bar .search-box { flex: 1; margin-bottom: 0; }
         .map-search-bar .search-box input { padding-right: 14px; }
-        #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #btn-map-use-location:active { transform: scale(0.94); }
+        #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
+        .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; }
         #communities-map-canvas { flex: 1; min-height: 0; background: var(--bg-alt); }
         .map-route-panel { position: absolute; left: 14px; right: 14px; bottom: calc(var(--nav-bar-total) + 14px + env(safe-area-inset-bottom)); z-index: 2; background: var(--bg-surface); border-radius: 18px; box-shadow: var(--shadow-elevated); padding: 14px 16px; display: none; }
         .map-route-panel.active { display: block; }
@@ -7406,6 +7413,9 @@
                     <div id="communities-feed-container"><div id="communities-explore-groups-list" style="display:none;"></div><div id="communities-feed-list"></div></div>
                     <div id="communities-map-view">
                         <div class="map-search-bar">
+                            <div id="btn-map-exit-fullview" title="Back">
+                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+                            </div>
                             <div class="search-box" style="margin-bottom:0;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 <input type="text" id="map-destination-search" placeholder="Search a destination..." autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
@@ -7413,6 +7423,7 @@
                             <div id="btn-map-use-location" title="Use my location">
                                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
                             </div>
+                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                         </div>
                         <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
                         <div id="communities-map-canvas"></div>
@@ -22820,6 +22831,7 @@
         function showCommunitiesMapSubtab() {
             document.getElementById('communities-feed-container').style.display = 'none';
             document.getElementById('community-category-chips').style.display = 'none';
+            document.getElementById('tab-groups').classList.add('map-fullview');
             const view = document.getElementById('communities-map-view');
             view.classList.add('active');
             initCommunitiesMap().catch(err => {
@@ -22832,6 +22844,7 @@
 
         function hideCommunitiesMapSubtab() {
             document.getElementById('communities-map-view').classList.remove('active');
+            document.getElementById('tab-groups').classList.remove('map-fullview');
             document.getElementById('community-category-chips').style.display = '';
             document.getElementById('communities-feed-container').style.display = '';
         }
@@ -22868,6 +22881,11 @@
                 document.getElementById('btn-map-use-location').addEventListener('click', () => {
                     triggerHaptic(10);
                     centerMapOnUserLocation(true);
+                });
+
+                document.getElementById('btn-map-exit-fullview').addEventListener('click', () => {
+                    triggerHaptic(10);
+                    document.querySelector('#communities-sub-tabs button[data-subtab="home"]').click();
                 });
 
                 document.getElementById('btn-map-start-navigation').addEventListener('click', () => {

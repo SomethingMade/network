@@ -10366,8 +10366,20 @@
             // never changes — so the back press appeared to do nothing at all.
             if (topHistoryEntryKind === 'hash') return;
             closingSheetViaBackButton = true;
-            const overlay = document.getElementById(sheetOpenStack[sheetOpenStack.length - 1]);
-            if (overlay) overlay.classList.remove('active');
+            const topSheetId = sheetOpenStack[sheetOpenStack.length - 1];
+            // post-comments-sheet-overlay carries real side effects beyond its own 'active'
+            // class — a live Firebase comments listener, reply/GIF composer state, and (when
+            // opened from the reel viewer's comment icon) the linked video-shrink layout — so
+            // the device back button needs to run its actual close function, not just the plain
+            // class toggle every other tracked sheet gets here, or those leak: the comments
+            // listener stays subscribed and the reel video is left stuck shrunk with nothing
+            // controlling it.
+            if (topSheetId === 'post-comments-sheet-overlay') {
+                closePostComments();
+            } else {
+                const overlay = document.getElementById(topSheetId);
+                if (overlay) overlay.classList.remove('active');
+            }
             // Flush synchronously (rather than waiting for the microtask) so the flag is still
             // true when syncSheetHistory reconciles this particular change.
             sheetSyncScheduled = false;

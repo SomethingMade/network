@@ -7466,7 +7466,7 @@
                             <!-- HOME: no destination chosen yet — pick a ride type, see fake nearby-driver count -->
                             <div id="haba-ride-home-panel">
                                 <div class="haba-ride-hero">
-                                    <div class="haba-ride-hero-icon" id="haba-ride-hero-icon">🚗</div>
+                                    <div class="haba-ride-hero-icon" id="haba-ride-hero-icon"></div>
                                     <div>
                                         <div class="haba-ride-hero-title" id="haba-ride-hero-title">Car</div>
                                         <div class="haba-ride-hero-sub"><span id="haba-ride-driver-count">--</span> drivers nearby · <span id="haba-ride-eta">--</span> min away</div>
@@ -7493,7 +7493,7 @@
                             <div id="haba-ride-confirm-panel" style="display:none;">
                                 <button type="button" class="haba-ride-back-to-options" id="btn-haba-ride-back-to-options">‹ Back</button>
                                 <div class="haba-ride-confirm-header">
-                                    <div class="haba-ride-confirm-icon" id="haba-ride-confirm-icon">🚗</div>
+                                    <div class="haba-ride-confirm-icon" id="haba-ride-confirm-icon"></div>
                                     <div>
                                         <div class="haba-ride-confirm-title" id="haba-ride-confirm-title">Car</div>
                                         <div class="haba-ride-confirm-sub" id="haba-ride-confirm-sub">Affordable, everyday rides</div>
@@ -22929,13 +22929,22 @@
             if (communitiesMapState) resetHabaRideFlow();
         }
 
+        // Simple generic (non-branded) line icons for the ride-type picker — deliberately
+        // plain silhouettes, not modeled on any real vehicle, so there's no trademark/likeness
+        // concern. Sized in em so they scale with each container's font-size automatically.
+        const HABA_RIDE_ICONS = {
+            car: `<svg width="1.5em" height="1.5em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3.2a1 1 0 0 1 .1-.4l1.6-3.6A2 2 0 0 1 7.5 7.5h9a2 2 0 0 1 1.8 1.3l1.6 3.6a1 1 0 0 1 .1.4V16"/><path d="M4 16h16v2a1 1 0 0 1-1 1h-1a2 2 0 1 1-4 0H10a2 2 0 1 1-4 0H5a1 1 0 0 1-1-1v-2z"/><path d="M6.2 11h11.6"/></svg>`,
+            bike: `<svg width="1.5em" height="1.5em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.3"/><circle cx="18.5" cy="17.5" r="3.3"/><path d="M5.5 17.5L10 8h4l1.5 3M5.5 17.5H10l4-6M12 8l2 4h4.5"/><circle cx="10" cy="8" r="0.9" fill="currentColor" stroke="none"/></svg>`,
+            scoot: `<svg width="1.5em" height="1.5em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="18.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="18.5" r="1.5" fill="currentColor" stroke="none"/><path d="M4.5 16.7H14L17 6"/><path d="M14 7.2h5"/></svg>`
+        };
+
         // Fake ride-type catalog for the Haba Ride flow — no real driver matching yet (see
         // requestHabaRide below), just believable-looking numbers computed from the real
         // route distance/duration Google gives us.
         const HABA_RIDE_TYPES = {
-            car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: '🚗', baseFare: 2.5, perKm: 1.10, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9] },
-            bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: '🚲', baseFare: 1.5, perKm: 0.65, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6] },
-            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: '🛴', baseFare: 1.0, perKm: 0.55, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5] }
+            car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: HABA_RIDE_ICONS.car,   baseFare: 2.5, perKm: 1.10, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9] },
+            bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: HABA_RIDE_ICONS.bike,  baseFare: 1.5, perKm: 0.65, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6] },
+            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: HABA_RIDE_ICONS.scoot, baseFare: 1.0, perKm: 0.55, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5] }
         };
         let habaRideRoute = null; // { distanceKm, durationMin, destLabel, destLatLng } once a destination is picked
         let habaRideArrivalByType = {}; // cached per-type "driver" arrival minutes so Options/Confirm agree
@@ -22980,7 +22989,7 @@
 
         function updateHabaRideHomeStats(typeId) {
             const t = HABA_RIDE_TYPES[typeId];
-            document.getElementById('haba-ride-hero-icon').textContent = t.icon;
+            document.getElementById('haba-ride-hero-icon').innerHTML = t.icon;
             document.getElementById('haba-ride-hero-title').textContent = t.label;
             document.getElementById('haba-ride-driver-count').textContent = communitiesMapState.fakeDriverCount || randInt(12, 34);
             const [lo, hi] = t.homeEta;
@@ -23037,7 +23046,7 @@
             const t = HABA_RIDE_TYPES[typeId];
             const price = habaRidePrice(typeId, habaRideRoute.distanceKm);
             const tripMin = Math.max(1, Math.round(habaRideRoute.durationMin * t.durationFactor));
-            document.getElementById('haba-ride-confirm-icon').textContent = t.icon;
+            document.getElementById('haba-ride-confirm-icon').innerHTML = t.icon;
             document.getElementById('haba-ride-confirm-title').textContent = t.label;
             document.getElementById('haba-ride-confirm-sub').textContent = t.sub;
             document.getElementById('haba-ride-confirm-eta').textContent = `${tripMin} min`;

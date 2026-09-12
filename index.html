@@ -2979,12 +2979,46 @@
         #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
         .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; }
         #communities-map-canvas { flex: 1; min-height: 0; background: var(--bg-alt); }
-        .map-route-panel { position: absolute; left: 14px; right: 14px; bottom: calc(var(--nav-bar-total) + 14px + env(safe-area-inset-bottom)); z-index: 2; background: var(--bg-surface); border-radius: 18px; box-shadow: var(--shadow-elevated); padding: 14px 16px; display: none; }
-        .map-route-panel.active { display: block; }
-        .map-route-panel .map-route-dest { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .map-route-panel .map-route-meta { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 10px; }
-        .map-route-panel .btn-pill { padding: 12px 20px; font-size: 14.5px; }
         #map-permission-hint { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 10px 14px 0; }
+
+        /* ── HABA RIDE bottom sheet (Uber-style) — three panels toggled by JS, only one
+           visible at a time: home (ride type + nearby count), options (destination chosen,
+           pick a ride type with price/eta), confirm (review + request). UI-only for now —
+           no real driver matching, see requestHabaRide(). */
+        .haba-ride-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg-surface); border-radius: 22px 22px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,0.12); padding: 16px 18px calc(16px + var(--nav-bar-total) + env(safe-area-inset-bottom)); }
+        .haba-ride-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .haba-ride-hero-icon { width: 56px; height: 56px; border-radius: 16px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0; }
+        .haba-ride-hero-title { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+        .haba-ride-hero-sub { font-size: 13.5px; color: var(--text-secondary); margin-top: 2px; }
+        .haba-ride-type-picker { margin-bottom: 0; }
+        .haba-ride-dest-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px 14px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
+        .haba-ride-dest-row svg { flex-shrink: 0; color: var(--text-secondary); }
+        .haba-ride-dest-row span { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .haba-ride-edit-dest { flex-shrink: 0; background: none; border: none; color: var(--primary-blue); font-weight: 700; font-size: 13.5px; cursor: pointer; padding: 4px; }
+        .haba-ride-options-list { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto; }
+        .haba-ride-option-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1.5px solid var(--border-color); cursor: pointer; transition: 0.15s; background: var(--bg-base); }
+        .haba-ride-option-card:active { transform: scale(0.98); }
+        .haba-ride-option-card .haba-ride-option-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+        .haba-ride-option-info { flex: 1; min-width: 0; }
+        .haba-ride-option-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+        .haba-ride-option-meta { font-size: 12.5px; color: var(--text-secondary); margin-top: 1px; }
+        .haba-ride-option-price { font-size: 15px; font-weight: 800; color: var(--text-primary); flex-shrink: 0; }
+        .haba-ride-back-to-options { background: none; border: none; color: var(--primary-blue); font-weight: 700; font-size: 14px; cursor: pointer; padding: 0 0 12px; }
+        .haba-ride-confirm-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .haba-ride-confirm-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0; }
+        .haba-ride-confirm-title { font-size: 17px; font-weight: 800; color: var(--text-primary); }
+        .haba-ride-confirm-sub { font-size: 13px; color: var(--text-secondary); margin-top: 1px; }
+        .haba-ride-confirm-stats { display: flex; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
+        .haba-ride-stat-value { font-size: 16px; font-weight: 800; color: var(--text-primary); text-align: center; }
+        .haba-ride-stat-label { font-size: 11.5px; color: var(--text-secondary); text-align: center; margin-top: 2px; }
+        .haba-ride-confirm-trip { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+        .haba-ride-trip-row { display: flex; align-items: flex-start; gap: 10px; }
+        .haba-ride-trip-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+        .haba-ride-trip-dot.pickup { background: var(--text-primary); }
+        .haba-ride-trip-dot.dropoff { background: transparent; border: 2px solid var(--text-primary); }
+        .haba-ride-trip-label { font-size: 12px; color: var(--text-secondary); }
+        .haba-ride-trip-value { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        #btn-haba-ride-request:disabled { opacity: 0.6; }
 
         /* Scrollable vertical feed container — same scroll behavior as the Home feed's
            .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
@@ -7418,7 +7452,7 @@
                             </div>
                             <div class="search-box" style="margin-bottom:0;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                <input type="text" id="map-destination-search" placeholder="Search a destination..." autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                                <input type="text" id="map-destination-search" placeholder="Where to?" autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
                             </div>
                             <div id="btn-map-use-location" title="Use my location">
                                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
@@ -7427,10 +7461,55 @@
                         </div>
                         <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
                         <div id="communities-map-canvas"></div>
-                        <div class="map-route-panel" id="map-route-panel">
-                            <div class="map-route-dest" id="map-route-dest"></div>
-                            <div class="map-route-meta" id="map-route-meta"></div>
-                            <button type="button" class="btn-pill btn-primary" id="btn-map-start-navigation">Start Navigation</button>
+
+                        <div class="haba-ride-sheet" id="haba-ride-sheet">
+                            <!-- HOME: no destination chosen yet — pick a ride type, see fake nearby-driver count -->
+                            <div id="haba-ride-home-panel">
+                                <div class="haba-ride-hero">
+                                    <div class="haba-ride-hero-icon" id="haba-ride-hero-icon">🚗</div>
+                                    <div>
+                                        <div class="haba-ride-hero-title" id="haba-ride-hero-title">Car</div>
+                                        <div class="haba-ride-hero-sub"><span id="haba-ride-driver-count">--</span> drivers nearby · <span id="haba-ride-eta">--</span> min away</div>
+                                    </div>
+                                </div>
+                                <div class="segmented-control haba-ride-type-picker" id="haba-ride-type-picker">
+                                    <button type="button" class="active" data-ride-type="car">Car</button>
+                                    <button type="button" data-ride-type="bike">Bike</button>
+                                    <button type="button" data-ride-type="scoot">Scoot</button>
+                                </div>
+                            </div>
+
+                            <!-- OPTIONS: destination chosen, route drawn — choose which ride type to book -->
+                            <div id="haba-ride-options-panel" style="display:none;">
+                                <div class="haba-ride-dest-row">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.5 7.3 11.7a1 1 0 0 0 1.4 0C13 21.5 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>
+                                    <span id="haba-ride-dest-label">Destination</span>
+                                    <button type="button" class="haba-ride-edit-dest" id="btn-haba-ride-edit-dest">Edit</button>
+                                </div>
+                                <div class="haba-ride-options-list" id="haba-ride-options-list"></div>
+                            </div>
+
+                            <!-- CONFIRM: a ride type was tapped in Options — review and (fake) request it -->
+                            <div id="haba-ride-confirm-panel" style="display:none;">
+                                <button type="button" class="haba-ride-back-to-options" id="btn-haba-ride-back-to-options">‹ Back</button>
+                                <div class="haba-ride-confirm-header">
+                                    <div class="haba-ride-confirm-icon" id="haba-ride-confirm-icon">🚗</div>
+                                    <div>
+                                        <div class="haba-ride-confirm-title" id="haba-ride-confirm-title">Car</div>
+                                        <div class="haba-ride-confirm-sub" id="haba-ride-confirm-sub">Affordable, everyday rides</div>
+                                    </div>
+                                </div>
+                                <div class="haba-ride-confirm-stats">
+                                    <div><div class="haba-ride-stat-value" id="haba-ride-confirm-eta">-- min</div><div class="haba-ride-stat-label">Trip time</div></div>
+                                    <div><div class="haba-ride-stat-value" id="haba-ride-confirm-price">$--</div><div class="haba-ride-stat-label">Estimated fare</div></div>
+                                    <div><div class="haba-ride-stat-value" id="haba-ride-confirm-arrival">-- min</div><div class="haba-ride-stat-label">Driver arrival</div></div>
+                                </div>
+                                <div class="haba-ride-confirm-trip">
+                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot pickup"></span><div><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value">Your location</div></div></div>
+                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot dropoff"></span><div><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-confirm-dest">--</div></div></div>
+                                </div>
+                                <button type="button" class="btn-pill btn-primary" id="btn-haba-ride-request">Request Haba Car</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -22847,6 +22926,139 @@
             document.getElementById('tab-groups').classList.remove('map-fullview');
             document.getElementById('community-category-chips').style.display = '';
             document.getElementById('communities-feed-container').style.display = '';
+            if (communitiesMapState) resetHabaRideFlow();
+        }
+
+        // Fake ride-type catalog for the Haba Ride flow — no real driver matching yet (see
+        // requestHabaRide below), just believable-looking numbers computed from the real
+        // route distance/duration Google gives us.
+        const HABA_RIDE_TYPES = {
+            car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: '🚗', baseFare: 2.5, perKm: 1.10, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9] },
+            bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: '🚲', baseFare: 1.5, perKm: 0.65, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6] },
+            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: '🛴', baseFare: 1.0, perKm: 0.55, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5] }
+        };
+        let habaRideRoute = null; // { distanceKm, durationMin, destLabel, destLatLng } once a destination is picked
+        let habaRideArrivalByType = {}; // cached per-type "driver" arrival minutes so Options/Confirm agree
+        let habaSelectedRideTypeId = null;
+        const habaFakeDriverMarkers = [];
+
+        function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function habaRidePrice(typeId, distanceKm) {
+            const t = HABA_RIDE_TYPES[typeId];
+            const price = t.baseFare + t.perKm * Math.max(distanceKm, 1);
+            return Math.round(price * 2) / 2; // round to nearest 50 cents, feels more like a real fare
+        }
+
+        function habaRideArrivalMin(typeId) {
+            if (!habaRideArrivalByType[typeId]) {
+                const [lo, hi] = HABA_RIDE_TYPES[typeId].arrivalMin;
+                habaRideArrivalByType[typeId] = randInt(lo, hi);
+            }
+            return habaRideArrivalByType[typeId];
+        }
+
+        // Scatters a handful of car-emoji markers near the person so the home screen doesn't
+        // feel empty — purely decorative, not real driver positions.
+        function spawnFakeNearbyDrivers(center, count) {
+            const map = communitiesMapState.map;
+            habaFakeDriverMarkers.forEach(m => m.setMap(null));
+            habaFakeDriverMarkers.length = 0;
+            const shown = Math.min(count, 8);
+            for (let i = 0; i < shown; i++) {
+                const dLat = (Math.random() - 0.5) * 0.01;
+                const dLng = (Math.random() - 0.5) * 0.01;
+                const marker = new google.maps.Marker({
+                    position: { lat: center.lat + dLat, lng: center.lng + dLng },
+                    map,
+                    label: { text: '🚗', fontSize: '16px' },
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0, strokeOpacity: 0 }
+                });
+                habaFakeDriverMarkers.push(marker);
+            }
+        }
+
+        function updateHabaRideHomeStats(typeId) {
+            const t = HABA_RIDE_TYPES[typeId];
+            document.getElementById('haba-ride-hero-icon').textContent = t.icon;
+            document.getElementById('haba-ride-hero-title').textContent = t.label;
+            document.getElementById('haba-ride-driver-count').textContent = communitiesMapState.fakeDriverCount || randInt(12, 34);
+            const [lo, hi] = t.homeEta;
+            document.getElementById('haba-ride-eta').textContent = randInt(lo, hi);
+        }
+
+        function showHabaRideStep(step) {
+            document.getElementById('haba-ride-home-panel').style.display = step === 'home' ? '' : 'none';
+            document.getElementById('haba-ride-options-panel').style.display = step === 'options' ? '' : 'none';
+            document.getElementById('haba-ride-confirm-panel').style.display = step === 'confirm' ? '' : 'none';
+        }
+
+        // Clears the chosen destination/route and drops the sheet back to the home screen —
+        // used by "Edit" on the destination row and after a (fake) ride request completes.
+        function resetHabaRideFlow() {
+            habaRideRoute = null;
+            habaRideArrivalByType = {};
+            habaSelectedRideTypeId = null;
+            document.getElementById('map-destination-search').value = '';
+            if (communitiesMapState) {
+                communitiesMapState.directionsRenderer.setDirections({ routes: [] });
+                communitiesMapState.routed = false;
+            }
+            showHabaRideStep('home');
+            updateHabaRideHomeStats(document.querySelector('#haba-ride-type-picker button.active')?.dataset.rideType || 'car');
+        }
+
+        function renderHabaRideOptionsList() {
+            const list = document.getElementById('haba-ride-options-list');
+            list.innerHTML = Object.keys(HABA_RIDE_TYPES).map(typeId => {
+                const t = HABA_RIDE_TYPES[typeId];
+                const price = habaRidePrice(typeId, habaRideRoute.distanceKm);
+                const tripMin = Math.max(1, Math.round(habaRideRoute.durationMin * t.durationFactor));
+                const arrival = habaRideArrivalMin(typeId);
+                return `<div class="haba-ride-option-card" data-ride-type="${typeId}">
+                    <div class="haba-ride-option-icon">${t.icon}</div>
+                    <div class="haba-ride-option-info">
+                        <div class="haba-ride-option-name">${t.label}</div>
+                        <div class="haba-ride-option-meta">${tripMin} min trip · ${arrival} min away</div>
+                    </div>
+                    <div class="haba-ride-option-price">$${price.toFixed(2)}</div>
+                </div>`;
+            }).join('');
+            list.querySelectorAll('.haba-ride-option-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    triggerHaptic(10);
+                    showHabaRideConfirm(card.dataset.rideType);
+                });
+            });
+        }
+
+        function showHabaRideConfirm(typeId) {
+            habaSelectedRideTypeId = typeId;
+            const t = HABA_RIDE_TYPES[typeId];
+            const price = habaRidePrice(typeId, habaRideRoute.distanceKm);
+            const tripMin = Math.max(1, Math.round(habaRideRoute.durationMin * t.durationFactor));
+            document.getElementById('haba-ride-confirm-icon').textContent = t.icon;
+            document.getElementById('haba-ride-confirm-title').textContent = t.label;
+            document.getElementById('haba-ride-confirm-sub').textContent = t.sub;
+            document.getElementById('haba-ride-confirm-eta').textContent = `${tripMin} min`;
+            document.getElementById('haba-ride-confirm-price').textContent = `$${price.toFixed(2)}`;
+            document.getElementById('haba-ride-confirm-arrival').textContent = `${habaRideArrivalMin(typeId)} min`;
+            document.getElementById('haba-ride-confirm-dest').textContent = habaRideRoute.destLabel;
+            document.getElementById('btn-haba-ride-request').textContent = `Request Haba ${t.label}`;
+            showHabaRideStep('confirm');
+        }
+
+        // No real driver matching yet — just gives the tap a satisfying loading state, then a
+        // heads-up that this is a demo, then resets back to the home screen.
+        function requestHabaRide() {
+            const btn = document.getElementById('btn-haba-ride-request');
+            btn.disabled = true;
+            btn.textContent = 'Requesting…';
+            setTimeout(() => {
+                notify("This is a demo — real driver matching isn't wired up yet.", 'info');
+                btn.disabled = false;
+                resetHabaRideFlow();
+            }, 1400);
         }
 
         async function initCommunitiesMap() {
@@ -22865,7 +23077,7 @@
                 const directionsService = new google.maps.DirectionsService();
                 const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false });
 
-                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, directionsService, directionsRenderer };
+                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, directionsService, directionsRenderer, fakeDriverCount: randInt(12, 34) };
 
                 const input = document.getElementById('map-destination-search');
                 const autocomplete = new google.maps.places.Autocomplete(input, { fields: ['geometry', 'name', 'formatted_address'] });
@@ -22888,13 +23100,28 @@
                     document.querySelector('#communities-sub-tabs button[data-subtab="home"]').click();
                 });
 
-                document.getElementById('btn-map-start-navigation').addEventListener('click', () => {
-                    if (!communitiesMapState.lastDestination) return;
-                    const { lat, lng } = communitiesMapState.lastDestination;
-                    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-                    window.open(url, '_blank');
+                document.getElementById('haba-ride-type-picker').addEventListener('click', (e) => {
+                    const btn = e.target.closest('button[data-ride-type]');
+                    if (!btn) return;
+                    triggerHaptic(8);
+                    document.querySelectorAll('#haba-ride-type-picker button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateHabaRideHomeStats(btn.dataset.rideType);
                 });
 
+                document.getElementById('btn-haba-ride-edit-dest').addEventListener('click', () => {
+                    resetHabaRideFlow();
+                    document.getElementById('map-destination-search').focus();
+                });
+
+                document.getElementById('btn-haba-ride-back-to-options').addEventListener('click', () => {
+                    triggerHaptic(8);
+                    showHabaRideStep('options');
+                });
+
+                document.getElementById('btn-haba-ride-request').addEventListener('click', requestHabaRide);
+
+                updateHabaRideHomeStats('car');
                 centerMapOnUserLocation(false);
             }
         }
@@ -22918,6 +23145,7 @@
                             title: 'Your location',
                             icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#111111', fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 }
                         });
+                        spawnFakeNearbyDrivers(latLng, communitiesMapState.fakeDriverCount);
                     } else {
                         communitiesMapState.userMarker.setPosition(latLng);
                     }
@@ -22937,19 +23165,12 @@
             const state = communitiesMapState;
             if (!state) return;
             const origin = state.userLatLng;
-            const panel = document.getElementById('map-route-panel');
 
             if (!origin) {
-                // No location fix yet — just drop a pin and center on the destination instead
-                // of routing blind; the person can still tap "Start Navigation" to hand off
-                // to the Google Maps app, which will resolve their location itself.
-                state.map.setCenter(destLatLng);
-                state.map.setZoom(14);
-                new google.maps.Marker({ position: destLatLng, map: state.map, title: destLabel });
-                state.lastDestination = { lat: destLatLng.lat(), lng: destLatLng.lng() };
-                document.getElementById('map-route-dest').textContent = destLabel;
-                document.getElementById('map-route-meta').textContent = 'Enable location for turn-by-turn directions';
-                panel.classList.add('active');
+                // Booking a ride needs a fare calculated from real distance, which needs a
+                // location fix — ask for it instead of guessing at a route.
+                notify('Turn on location access to book a Haba ride.', 'error');
+                centerMapOnUserLocation(false);
                 return;
             }
 
@@ -22957,17 +23178,22 @@
                 { origin, destination: destLatLng, travelMode: google.maps.TravelMode.DRIVING },
                 (result, status) => {
                     if (status !== 'OK') {
-                        document.getElementById('map-route-meta').textContent = 'Couldn\'t find a route there.';
-                        panel.classList.add('active');
+                        notify("Couldn't find a route there.", 'error');
                         return;
                     }
                     state.directionsRenderer.setDirections(result);
                     state.routed = true;
                     const leg = result.routes[0].legs[0];
-                    state.lastDestination = { lat: destLatLng.lat(), lng: destLatLng.lng() };
-                    document.getElementById('map-route-dest').textContent = destLabel;
-                    document.getElementById('map-route-meta').textContent = `${leg.distance.text} · ${leg.duration.text}`;
-                    panel.classList.add('active');
+                    habaRideRoute = {
+                        distanceKm: leg.distance.value / 1000,
+                        durationMin: leg.duration.value / 60,
+                        destLabel,
+                        destLatLng
+                    };
+                    habaRideArrivalByType = {};
+                    document.getElementById('haba-ride-dest-label').textContent = destLabel;
+                    renderHabaRideOptionsList();
+                    showHabaRideStep('options');
                 }
             );
         }

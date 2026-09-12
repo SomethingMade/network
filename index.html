@@ -3833,6 +3833,14 @@
            view's OWN elevated tier: it can itself be opened from within that same elevated viewer
            (or a profile sheet), which needs the exact same bump. */
         #post-comments-sheet-overlay.above-viewer { z-index: 100013; }
+        /* Paired with #reel-viewer-overlay.comments-shrink above — once the reel has collapsed to
+           its top strip, this sheet stops behaving like a floating dimmed drawer (no backdrop) and
+           instead simply occupies the screen below that strip, full height, so the two together
+           read as one "video + comments" page rather than a sheet stacked on top of a video. The
+           preview card's own video is hidden since the shrunk reel above is already showing it. */
+        #post-comments-sheet-overlay.reel-comments-mode { top: 34vh; background: transparent; backdrop-filter: none; }
+        #post-comments-sheet-overlay.reel-comments-mode .bottom-sheet { max-height: 100% !important; height: 100% !important; }
+        #post-comments-sheet-overlay.reel-comments-mode #post-comments-post-preview .feed-post-video-wrap { display: none; }
         /* Sheets opened FROM WITHIN the post view — its "..." menu, a comment's "..." menu, the
            repost button (Repost/Quote choice) — need to clear the post view's OWN highest
            possible tier (100013 just above), not just its default 100010. Reusing 100013 for
@@ -3866,6 +3874,19 @@
            (#user-info-sheet-overlay / #profile-bottom-sheet-overlay, both z-index 100010). See the
            tier comment above #image-viewer-overlay.active.above-sheet for the full picture. */
         #reel-viewer-overlay.active.above-sheet { z-index: 100012; }
+        /* X-style "shrink" mode: tapping the comment icon on a reel doesn't dim the full-screen
+           video behind a floating sheet like every other comments entry point — instead the reel
+           viewer itself collapses down to a video strip pinned to the top of the screen, and
+           #post-comments-sheet-overlay (see its own .reel-comments-mode rule) takes over the
+           remaining space below it, both visible at once. Toggled alongside that sheet class in
+           openPostComments/closePostComments/closeReelViewer. Caption, action icons and the
+           bottom-gradient/progress-bar are hidden since there's no room for them at this size and
+           their info (like/comment/repost counts) is already one tap away in the sheet below. */
+        #reel-viewer-overlay.active.comments-shrink { height: 34vh; bottom: auto; }
+        #reel-viewer-overlay.comments-shrink .reel-item-info,
+        #reel-viewer-overlay.comments-shrink .reel-item-actions,
+        #reel-viewer-overlay.comments-shrink .reel-item-progress-track,
+        #reel-viewer-overlay.comments-shrink .reel-item::after { display: none; }
         /* .reel-viewer-topbar / .reel-viewer-close / .reel-viewer-header are no longer used —
            the header chrome was removed in favor of the bottom progress line (see
            .reel-item-progress-track) — leaving the rules here rather than deleting them,
@@ -9228,7 +9249,7 @@
                 if (svgEl) svgEl.setAttribute('fill', likeBtn.classList.contains('liked') ? 'currentColor' : 'none');
             });
             const commentBtn = itemEl.querySelector('.reel-comment-btn');
-            if (commentBtn) commentBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(postId); });
+            if (commentBtn) commentBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(postId, { fromReel: true }); });
             const repostBtn = itemEl.querySelector('.reel-repost-btn');
             if (repostBtn) repostBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -9299,7 +9320,12 @@
             track.innerHTML = '';
             reelPostIds = [];
             reelActiveIndex = -1;
-            document.getElementById('reel-viewer-overlay').classList.remove('active', 'above-sheet', 'reel-viewer-fullscreen');
+            document.getElementById('reel-viewer-overlay').classList.remove('active', 'above-sheet', 'reel-viewer-fullscreen', 'comments-shrink');
+            // The comments sheet's shrink layout (.reel-comments-mode) is only meaningful while
+            // this reel viewer is actually sitting above it as a video strip — if the viewer is
+            // closing (e.g. hardware back), closing the sheet along with it avoids leaving a
+            // "comments" page open with no video and nothing behind it.
+            if (activeCommentsFromReel) closePostComments();
         }
 
         // Keeps a reel item's like count/heart state, comment count, repost state/count, and
@@ -12194,6 +12220,10 @@
         // Tracks whether the currently-open post-comments sheet is showing the full X-style
         // Post detail view (true) or the small Comments-only drawer (false) — see openPostComments.
         let activeCommentsIsFullView = false;
+        // Set when comments were opened from the reel viewer's comment icon (see bindReelItem) —
+        // drives the shrink-video "mini player" layout (.comments-shrink / .reel-comments-mode)
+        // instead of the normal dimmed-sheet-over-full-video look. See openPostComments.
+        let activeCommentsFromReel = false;
         let postCommentsUnsub = null;
         let activeReplyToComment = null; // { id, name } or null
         let oldestLoadedPostTimestamp = Infinity;
@@ -16853,6 +16883,7 @@
         }
         function openPostComments(postId, opts = {}) {
             const fullView = !!opts.fullView;
+            const fromReel = !!opts.fromReel;
             const overlay = document.getElementById('post-comments-sheet-overlay');
             // Guard against downgrading an already-open full Post view. The preview post card
             // rendered INSIDE the full view (see previewEl.appendChild below) is built with the
@@ -16870,6 +16901,9 @@
             }
             activeCommentsPostId = postId;
             activeCommentsIsFullView = fullView;
+            activeCommentsFromReel = fromReel;
+            document.getElementById('reel-viewer-overlay').classList.toggle('comments-shrink', fromReel);
+            overlay.classList.toggle('reel-comments-mode', fromReel);
             const sheetBox = overlay.querySelector('.bottom-sheet');
             syncSheetAboveViewer(overlay);
             overlay.classList.add('active');
@@ -16900,10 +16934,15 @@
             const spacer = document.getElementById('comments-sheet-spacer');
             const handle = document.getElementById('comments-sheet-handle');
             const previewEl = document.getElementById('post-comments-post-preview');
+            // fromReel keeps the small-drawer chrome (rounded corners, drag handle, no back
+            // button) since it's sitting below a still-visible video strip rather than covering
+            // the whole screen like a real Post page — but still wants the post preview shown
+            // above the comment list, same as fullView, since there's no post card already
+            // visible elsewhere on screen the way there is for a plain feed comment tap.
             if (titleEl) titleEl.textContent = fullView ? 'Post' : 'Comments';
-            if (backBtn) backBtn.style.display = fullView ? 'flex' : 'none';
-            if (spacer) spacer.style.display = fullView ? 'none' : 'block';
-            if (handle) handle.style.display = fullView ? 'none' : 'block';
+            if (backBtn) backBtn.style.display = (fullView && !fromReel) ? 'flex' : 'none';
+            if (spacer) spacer.style.display = (fullView && !fromReel) ? 'none' : 'block';
+            if (handle) handle.style.display = (fullView && !fromReel) ? 'none' : 'block';
             if (sheetBox) {
                 // Fixed 100vh here doesn't account for the overlay's own `bottom: var(--keyboard-
                 // inset)` shrinking (see .bottom-sheet-overlay CSS) once the keyboard opens — the
@@ -16911,13 +16950,13 @@
                 // original height, so it overflows past the TOP of the screen, i.e. the post at
                 // the top effectively vanishes off-screen. height:100% instead tracks whatever
                 // height the (already keyboard-aware) parent overlay actually has.
-                sheetBox.style.maxHeight = fullView ? '100%' : '85vh';
-                sheetBox.style.height = fullView ? '100%' : '';
-                sheetBox.style.borderRadius = fullView ? '0' : '';
+                sheetBox.style.maxHeight = (fullView || fromReel) ? '100%' : '85vh';
+                sheetBox.style.height = (fullView || fromReel) ? '100%' : '';
+                sheetBox.style.borderRadius = (fullView && !fromReel) ? '0' : '';
             }
             if (previewEl) {
                 previewEl.innerHTML = '';
-                if (fullView && post) {
+                if ((fullView || fromReel) && post) {
                     previewEl.appendChild(buildFeedPostCard(postId, post, { isPreview: true }));
                     previewEl.style.display = '';
                     // Picks up playback where the feed card's own video left off (see the tap
@@ -16955,11 +16994,13 @@
         }
 
         function closePostComments() {
-            document.getElementById('post-comments-sheet-overlay').classList.remove('active', 'above-viewer');
+            document.getElementById('post-comments-sheet-overlay').classList.remove('active', 'above-viewer', 'reel-comments-mode');
+            document.getElementById('reel-viewer-overlay').classList.remove('comments-shrink');
             document.getElementById('post-comment-input').blur(); // don't leave the keyboard's owner focused for whichever post opens next
             if (postCommentsUnsub) { postCommentsUnsub(); postCommentsUnsub = null; }
             activeCommentsPostId = null;
             activeCommentsIsFullView = false;
+            activeCommentsFromReel = false;
             setReplyToComment(null);
             clearCommentGif();
         }

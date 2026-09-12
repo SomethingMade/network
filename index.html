@@ -1115,33 +1115,12 @@
         .tm-profile-icon-btn:active { transform: scale(0.92); }
         .tm-profile-icon-btn svg { width: 20px; height: 20px; }
 
-        /* When the header sits on top of the cover photo (see .wa-cover-photo-block
-           .tm-profile-header below), its buttons need their own scrim so they stay
-           legible over an arbitrary photo instead of relying on the page background. */
-        .wa-cover-photo-block .tm-profile-header { position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: 12px 30px 0 30px; }
-        .wa-cover-photo-block .tm-profile-back-btn,
-        .wa-cover-photo-block .tm-profile-icon-btn { background: rgba(17,17,17,0.35); color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
-        .wa-cover-photo-block .tm-profile-back-btn:hover,
-        .wa-cover-photo-block .tm-profile-icon-btn:hover { background: rgba(17,17,17,0.5); }
 
-        /* ── Content sits in a "floating card" that overlaps the bottom of the cover
-           photo, rounded-top and elevated with its own shadow so the profile reads as
-           a distinct panel rather than text just resuming below a banner. Pulling it up
-           with a negative margin (rather than sizing the cover shorter) keeps the cover
-           photo itself full-bleed while still letting the card ride up over it; the
-           avatar's higher z-index keeps it floating above the card's rounded corner. */
-        .tm-profile-content { position: relative; z-index: 2; margin-top: -26px; padding: 24px 20px 32px; flex: 1; background: var(--bg-surface); border-radius: 26px 26px 0 0; box-shadow: 0 -12px 28px rgba(17,17,17,0.05); }
+        /* ── Content sits in a "floating card" that overlaps the bottom of the plain
+           header, rounded-top and elevated with its own shadow so the profile reads as
+           a distinct panel rather than text just resuming below a bar. */
+        .tm-profile-content { position: relative; z-index: 2; margin-top: -6px; padding: 24px 20px 32px; flex: 1; background: var(--bg-surface); border-radius: 26px 26px 0 0; box-shadow: 0 -12px 28px rgba(17,17,17,0.05); }
 
-        /* Avatar sits inside a relative-positioned wrapper that also holds the cover
-           photo (.tm-profile-cover-wrap below), and is absolutely positioned so it
-           overlaps the bottom-left edge of the cover, X-style, with a squircle
-           (rounded-square) shape instead of a circle to read as visually distinct.
-           Using position:absolute (rather than a negative margin pulling it up in
-           normal flow) keeps it out of the bottom sheet's own scrollable flow — a
-           negative margin there gets clipped by the sheet's overflow-y:auto instead
-           of rendering the overlap. A soft gradient ring rendered behind the avatar
-           (::before) gives it a bit of lift where it crosses the card's rounded edge. */
-        .tm-profile-cover-wrap { position: relative; }
 
         /* Floating sticky mini-header for profile sheets (see #user-info-sticky-header markup):
            sits as the first child of the scrollable .bottom-sheet, sticks to its top, but stays
@@ -1178,9 +1157,7 @@
         .tm-profile-avatar-row { position: absolute; left: 20px; bottom: -46px; z-index: 3; }
         .tm-profile-avatar-row::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: var(--gradient-brand); opacity: 0.9; z-index: -1; }
 
-        /* Insights/Settings sit inline with Save on the header's right side (all three
-           already inherit the frosted scrim look from the ".wa-cover-photo-block
-           .tm-profile-icon-btn" rule above, since they now live inside the header). */
+        /* Insights/Settings sit inline with Save on the header's right side. */
         .tm-profile-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .tm-profile-id { min-width: 0; }
         .tm-profile-name { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.2; margin: 0 0 4px; letter-spacing: -0.4px; word-break: break-word; display: flex; align-items: center; gap: 6px; }
@@ -2327,43 +2304,6 @@
 
         .wa-avatar-block { display: flex; justify-content: center; margin-bottom: 22px; }
 
-        /* Cover photo banner shown above the avatar on profile sheets. Falls back to the
-           brand gradient when the user has no coverPhotoURL set, so this stays visible
-           (not display:none) on every profile — own and others' — instead of only
-           rendering once a photo happens to be set. */
-        .wa-cover-photo-block { position: relative; height: 172px; margin: 0 -20px; background: var(--gradient-brand); background-size: cover; background-position: center; overflow: hidden; }
-        /* Subtle sheen so the banner reads as intentional even as a flat gradient
-           fallback, and adds a touch of depth once a real cover photo is set too. */
-        .wa-cover-photo-block::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 15% 0%, rgba(255,255,255,0.14), transparent 55%), linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(0,0,0,0.16) 100%); pointer-events: none; }
-
-        /* Threads has no cover photo at all — a plain top bar over the page background.
-           On a read-only profile VIEW (#user-info-cover-photo for someone else,
-           #my-profile-cover-photo for your own) we match that by default: short bar,
-           no gradient placeholder, dark icons that sit directly on the page. The
-           .has-cover modifier (toggled in JS only when that person actually set a
-           coverPhotoURL) restores the full-height photo banner with its frosted,
-           white-on-photo icon treatment — "even better" than Threads for the people
-           who do want a banner, without forcing a gradient placeholder on everyone
-           else. (The Edit Profile sheet no longer has a cover photo at all — see
-           .edit-profile-body below — so these rules only apply to the read-only
-           profile view sheets.) */
-        #user-info-cover-photo, #my-profile-cover-photo { height: 64px; background: var(--bg-surface); }
-        /* The card's -26px pull-up (see .tm-profile-content above) is tuned for the full
-           172px banner; with the plain 64px no-cover bar it would climb high enough to
-           clip the back button, so ease it off in that state only. */
-        .tm-profile-cover-wrap:has(#user-info-cover-photo:not(.has-cover)) + .tm-profile-content,
-        .tm-profile-cover-wrap:has(#my-profile-cover-photo:not(.has-cover)) + .tm-profile-content { margin-top: -6px; }
-        #user-info-cover-photo::after, #my-profile-cover-photo::after { display: none; }
-        #user-info-cover-photo .tm-profile-back-btn, #my-profile-cover-photo .tm-profile-back-btn,
-        #user-info-cover-photo .tm-profile-icon-btn, #my-profile-cover-photo .tm-profile-icon-btn { background: transparent; color: var(--text-primary); backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
-        #user-info-cover-photo .tm-profile-back-btn:hover, #my-profile-cover-photo .tm-profile-back-btn:hover,
-        #user-info-cover-photo .tm-profile-icon-btn:hover, #my-profile-cover-photo .tm-profile-icon-btn:hover { background: var(--bg-hover); }
-        #user-info-cover-photo.has-cover, #my-profile-cover-photo.has-cover { height: 172px; background-color: transparent; }
-        #user-info-cover-photo.has-cover::after, #my-profile-cover-photo.has-cover::after { display: block; }
-        #user-info-cover-photo.has-cover .tm-profile-back-btn, #my-profile-cover-photo.has-cover .tm-profile-back-btn,
-        #user-info-cover-photo.has-cover .tm-profile-icon-btn, #my-profile-cover-photo.has-cover .tm-profile-icon-btn { background: rgba(17,17,17,0.35); color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
-        #user-info-cover-photo.has-cover .tm-profile-back-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-back-btn:hover,
-        #user-info-cover-photo.has-cover .tm-profile-icon-btn:hover, #my-profile-cover-photo.has-cover .tm-profile-icon-btn:hover { background: rgba(17,17,17,0.5); }
         .cover-camera-badge { position: absolute; bottom: 38px; right: 14px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; background: rgba(17,17,17,0.4); box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; border: none; color: #fff; backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%); }
         .cover-camera-badge svg { width: 15px; height: 15px; }
         /* Pulls the avatar up so it overlaps the bottom edge of the cover photo, banner-style */
@@ -4238,7 +4178,6 @@
             .sheet-avatar-upload { width: 80px; height: 80px; }
             .sheet-avatar-upload .avatar-circle, .wa-avatar-block .avatar-circle { width: 80px; height: 80px; }
             .sheet-avatar-upload .camera-badge { width: 28px; height: 28px; }
-            .wa-cover-photo-block { height: 146px; margin: 0 -18px; }
             .wa-avatar-block-overlap { margin-top: -40px; }
             .ig-profile-avatar, .ig-profile-avatar .avatar-circle, .ig-profile-avatar.avatar-circle { width: 62px; height: 62px; }
             .chat-view-avatar { width: 36px; height: 36px; }
@@ -4350,14 +4289,13 @@
             .gc-grid { grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 14px 8px; }
             .gc-tile-avatar-wrap, .gc-tile-avatar { width: 50px; height: 50px; }
 
-            /* Extra-small phones: shrink the profile cover/avatar further so the
-               squircle doesn't crowd the name/username on narrow screens. */
+            /* Extra-small phones: shrink the profile avatar further so the squircle
+               doesn't crowd the name/username on narrow screens. */
             .bottom-sheet { padding: 10px 14px 20px; }
             .wa-profile-sheet { padding-left: 14px; padding-right: 14px; }
-            .wa-cover-photo-block { height: 126px; margin: 0 -14px; }
             .ig-profile-avatar, .ig-profile-avatar .avatar-circle, .ig-profile-avatar.avatar-circle { width: 58px; height: 58px; }
             .ig-profile-stat-num, .ig-profile-stat-label { font-size: 14px; }
-            .tm-profile-content { margin-top: -20px; padding-top: 20px; border-radius: 22px 22px 0 0; }
+            .tm-profile-content { padding-top: 20px; border-radius: 22px 22px 0 0; }
             .tm-profile-name { font-size: 20px; }
             .cover-camera-badge { bottom: 32px; width: 30px; height: 30px; }
         }
@@ -5618,21 +5556,17 @@
                 </div>
             </div>
 
-            <div class="tm-profile-cover-wrap">
-                <div class="wa-cover-photo-block" id="my-profile-cover-photo">
-                    <div class="tm-profile-header">
-                        <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                        </button>
-                        <div class="tm-profile-header-actions">
-                            <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                            </button>
-                            <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                            </button>
-                        </div>
-                    </div>
+            <div class="tm-profile-header">
+                <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="tm-profile-header-actions">
+                    <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    </button>
+                    <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
                 </div>
             </div>
 
@@ -5809,15 +5743,10 @@
                 </div>
             </div>
 
-            <div class="tm-profile-cover-wrap">
-                <div class="wa-cover-photo-block" id="user-info-cover-photo">
-                    <div class="tm-profile-header">
-                        <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                        </button>
-                    </div>
-                </div>
-
+            <div class="tm-profile-header">
+                <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
             </div>
 
             <div class="tm-profile-content">

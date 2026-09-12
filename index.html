@@ -2959,6 +2959,26 @@
         .community-category-chip.active { background: var(--text-primary); color: var(--bg-surface); border-color: var(--text-primary); }
         .community-joined-badge { flex-shrink: 0; padding: 6px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; color: var(--text-secondary); background: var(--bg-alt); border: 1px solid var(--border-color); }
 
+        /* ── COMMUNITIES "MAP" SUBTAB — full-bleed navigation map ──
+           Sibling of #communities-feed-container inside the same flex column; only one of
+           the two is ever visible at a time (toggled in the subtab click handler). Fills all
+           remaining vertical space below the header/subtabs, same way #communities-feed-container
+           does, so the map canvas itself gets a true "full mapview" rather than a small embed. */
+        #communities-map-view { flex: 1; display: none; flex-direction: column; min-height: 0; position: relative; }
+        #communities-map-view.active { display: flex; }
+        .map-search-bar { padding: 10px 14px; display: flex; gap: 8px; align-items: center; background: var(--bg-base); position: relative; z-index: 2; }
+        .map-search-bar .search-box { flex: 1; margin-bottom: 0; }
+        .map-search-bar .search-box input { padding-right: 14px; }
+        #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #btn-map-use-location:active { transform: scale(0.94); }
+        #communities-map-canvas { flex: 1; min-height: 0; background: var(--bg-alt); }
+        .map-route-panel { position: absolute; left: 14px; right: 14px; bottom: calc(var(--nav-bar-total) + 14px + env(safe-area-inset-bottom)); z-index: 2; background: var(--bg-surface); border-radius: 18px; box-shadow: var(--shadow-elevated); padding: 14px 16px; display: none; }
+        .map-route-panel.active { display: block; }
+        .map-route-panel .map-route-dest { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .map-route-panel .map-route-meta { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 10px; }
+        .map-route-panel .btn-pill { padding: 12px 20px; font-size: 14.5px; }
+        #map-permission-hint { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 10px 14px 0; }
+
         /* Scrollable vertical feed container — same scroll behavior as the Home feed's
            .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
            single vertical column and scroll independently of the fixed header/tabs above them. */
@@ -7378,11 +7398,30 @@
                         <div class="segmented-control" id="communities-sub-tabs">
                             <button type="button" class="active" data-subtab="home">Home</button>
                             <button type="button" data-subtab="explore">Explore</button>
+                            <button type="button" data-subtab="map">Map</button>
                         </div>
                         <div class="community-category-chips" id="community-category-chips"></div>
                     </div>
                     <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
                     <div id="communities-feed-container"><div id="communities-explore-groups-list" style="display:none;"></div><div id="communities-feed-list"></div></div>
+                    <div id="communities-map-view">
+                        <div class="map-search-bar">
+                            <div class="search-box" style="margin-bottom:0;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <input type="text" id="map-destination-search" placeholder="Search a destination..." autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                            </div>
+                            <div id="btn-map-use-location" title="Use my location">
+                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+                            </div>
+                        </div>
+                        <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
+                        <div id="communities-map-canvas"></div>
+                        <div class="map-route-panel" id="map-route-panel">
+                            <div class="map-route-dest" id="map-route-dest"></div>
+                            <div class="map-route-meta" id="map-route-meta"></div>
+                            <button type="button" class="btn-pill btn-primary" id="btn-map-start-navigation">Start Navigation</button>
+                        </div>
+                    </div>
                 </div>
 
 
@@ -22721,8 +22760,196 @@
             document.querySelectorAll('#communities-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeCommunitySubtab = btn.dataset.subtab;
-            loadCommunityFeed();
+            if (activeCommunitySubtab === 'map') {
+                showCommunitiesMapSubtab();
+            } else {
+                hideCommunitiesMapSubtab();
+                loadCommunityFeed();
+            }
         });
+
+        // ── COMMUNITIES "MAP" SUBTAB ──────────────────────────────────────────────
+        // Full-screen Google Map with a destination search box (Places Autocomplete) and
+        // turn-by-turn directions from the person's current location. Independent of the
+        // Home/Explore post feed entirely — switching to Map just hides the feed container
+        // and shows this one; switching away tears down nothing (map instance persists so
+        // re-opening Map doesn't reload the script or lose the last route).
+        //
+        // Requires a Google Maps JavaScript API key with the Maps JavaScript API, Places
+        // API, and Directions API enabled, and billing turned on for the Google Cloud
+        // project. Same pattern as generateAgoraToken: the key never sits in this file —
+        // a Cloud Function (see functions/index.js: getGoogleMapsApiKey) holds it as a
+        // Secret Manager secret and hands it back to signed-in clients on request.
+        let googleMapsLoadPromise = null;
+        let communitiesMapState = null; // { map, marker (user location), autocomplete, directionsService, directionsRenderer, userLatLng }
+        let cachedGoogleMapsApiKey = null;
+        const getGoogleMapsApiKeyCallable = httpsCallable(functionsClient, 'getGoogleMapsApiKey');
+
+        async function fetchGoogleMapsApiKey() {
+            if (cachedGoogleMapsApiKey) return cachedGoogleMapsApiKey;
+            const result = await getGoogleMapsApiKeyCallable();
+            const key = (result.data && result.data.apiKey) || '';
+            if (key) cachedGoogleMapsApiKey = key;
+            return key;
+        }
+
+        function loadGoogleMapsScript() {
+            if (googleMapsLoadPromise) return googleMapsLoadPromise;
+            googleMapsLoadPromise = (async () => {
+                if (window.google && window.google.maps) return;
+                const apiKey = await fetchGoogleMapsApiKey();
+                if (!apiKey) {
+                    throw new Error('getGoogleMapsApiKey returned no key — check the GOOGLE_MAPS_API_KEY secret is set and the function is deployed');
+                }
+                await new Promise((resolve, reject) => {
+                    window.__onGoogleMapsLoaded = () => resolve();
+                    const script = document.createElement('script');
+                    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=__onGoogleMapsLoaded`;
+                    script.async = true;
+                    script.defer = true;
+                    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+                    document.head.appendChild(script);
+                });
+            })();
+            return googleMapsLoadPromise;
+        }
+
+        function showCommunitiesMapSubtab() {
+            document.getElementById('communities-feed-container').style.display = 'none';
+            document.getElementById('community-category-chips').style.display = 'none';
+            const view = document.getElementById('communities-map-view');
+            view.classList.add('active');
+            initCommunitiesMap().catch(err => {
+                console.error('[communities-map] failed to load Google Maps', err);
+                googleMapsLoadPromise = null; // let the next visit to this tab retry, e.g. after the key is set in Remote Config
+                document.getElementById('communities-map-canvas').innerHTML =
+                    '<div class="empty-state" style="padding:60px 24px;"><p class="empty-msg">Map couldn\'t load. Check that getGoogleMapsApiKey is deployed with its secret set.</p></div>';
+            });
+        }
+
+        function hideCommunitiesMapSubtab() {
+            document.getElementById('communities-map-view').classList.remove('active');
+            document.getElementById('community-category-chips').style.display = '';
+            document.getElementById('communities-feed-container').style.display = '';
+        }
+
+        async function initCommunitiesMap() {
+            await loadGoogleMapsScript();
+
+            const defaultCenter = { lat: 40.7128, lng: -74.0060 }; // used until/unless location is granted
+
+            if (!communitiesMapState) {
+                const map = new google.maps.Map(document.getElementById('communities-map-canvas'), {
+                    center: defaultCenter,
+                    zoom: 13,
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                    gestureHandling: 'greedy'
+                });
+                const directionsService = new google.maps.DirectionsService();
+                const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false });
+
+                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, directionsService, directionsRenderer };
+
+                const input = document.getElementById('map-destination-search');
+                const autocomplete = new google.maps.places.Autocomplete(input, { fields: ['geometry', 'name', 'formatted_address'] });
+                autocomplete.bindTo('bounds', map);
+                communitiesMapState.autocomplete = autocomplete;
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+                    if (!place.geometry || !place.geometry.location) return;
+                    triggerHaptic(10);
+                    routeToDestination(place.geometry.location, place.name || place.formatted_address || 'Destination');
+                });
+
+                document.getElementById('btn-map-use-location').addEventListener('click', () => {
+                    triggerHaptic(10);
+                    centerMapOnUserLocation(true);
+                });
+
+                document.getElementById('btn-map-start-navigation').addEventListener('click', () => {
+                    if (!communitiesMapState.lastDestination) return;
+                    const { lat, lng } = communitiesMapState.lastDestination;
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+                    window.open(url, '_blank');
+                });
+
+                centerMapOnUserLocation(false);
+            }
+        }
+
+        function centerMapOnUserLocation(recenterOnly) {
+            const hint = document.getElementById('map-permission-hint');
+            if (!navigator.geolocation) {
+                hint.style.display = 'block';
+                hint.textContent = 'Location isn\'t available on this device.';
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    hint.style.display = 'none';
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    communitiesMapState.userLatLng = latLng;
+                    if (!communitiesMapState.userMarker) {
+                        communitiesMapState.userMarker = new google.maps.Marker({
+                            position: latLng,
+                            map: communitiesMapState.map,
+                            title: 'Your location',
+                            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#111111', fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 }
+                        });
+                    } else {
+                        communitiesMapState.userMarker.setPosition(latLng);
+                    }
+                    if (recenterOnly || !communitiesMapState.routed) {
+                        communitiesMapState.map.setCenter(latLng);
+                    }
+                },
+                () => {
+                    hint.style.display = 'block';
+                    hint.textContent = 'Turn on location access to navigate from where you are.';
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        function routeToDestination(destLatLng, destLabel) {
+            const state = communitiesMapState;
+            if (!state) return;
+            const origin = state.userLatLng;
+            const panel = document.getElementById('map-route-panel');
+
+            if (!origin) {
+                // No location fix yet — just drop a pin and center on the destination instead
+                // of routing blind; the person can still tap "Start Navigation" to hand off
+                // to the Google Maps app, which will resolve their location itself.
+                state.map.setCenter(destLatLng);
+                state.map.setZoom(14);
+                new google.maps.Marker({ position: destLatLng, map: state.map, title: destLabel });
+                state.lastDestination = { lat: destLatLng.lat(), lng: destLatLng.lng() };
+                document.getElementById('map-route-dest').textContent = destLabel;
+                document.getElementById('map-route-meta').textContent = 'Enable location for turn-by-turn directions';
+                panel.classList.add('active');
+                return;
+            }
+
+            state.directionsService.route(
+                { origin, destination: destLatLng, travelMode: google.maps.TravelMode.DRIVING },
+                (result, status) => {
+                    if (status !== 'OK') {
+                        document.getElementById('map-route-meta').textContent = 'Couldn\'t find a route there.';
+                        panel.classList.add('active');
+                        return;
+                    }
+                    state.directionsRenderer.setDirections(result);
+                    state.routed = true;
+                    const leg = result.routes[0].legs[0];
+                    state.lastDestination = { lat: destLatLng.lat(), lng: destLatLng.lng() };
+                    document.getElementById('map-route-dest').textContent = destLabel;
+                    document.getElementById('map-route-meta').textContent = `${leg.distance.text} · ${leg.duration.text}`;
+                    panel.classList.add('active');
+                }
+            );
+        }
 
         // Home = every public community's posts, visible to everyone regardless of membership
         // (this is the actual Communities feed people read). Explore is a discovery strip of

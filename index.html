@@ -3002,6 +3002,7 @@
         .haba-ride-dest-row span { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .haba-ride-edit-dest { flex-shrink: 0; background: none; border: none; color: var(--primary-blue); font-weight: 700; font-size: 13.5px; cursor: pointer; padding: 4px; }
         .haba-ride-options-list { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto; }
+        .haba-ride-surge-note { display: flex; align-items: center; gap: 6px; background: rgba(255,149,0,0.12); color: #b8630a; font-size: 12.5px; font-weight: 600; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px; }
         .haba-ride-option-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1.5px solid var(--border-color); cursor: pointer; transition: 0.15s; background: var(--bg-base); }
         .haba-ride-option-card:active { transform: scale(0.98); }
         .haba-ride-option-card .haba-ride-option-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
@@ -7498,6 +7499,7 @@
                                     <span id="haba-ride-dest-label">Destination</span>
                                     <button type="button" class="haba-ride-edit-dest" id="btn-haba-ride-edit-dest">Edit</button>
                                 </div>
+                                <div class="haba-ride-surge-note" id="haba-ride-surge-note" style="display:none;">⚡ Prices are higher due to increased demand right now</div>
                                 <div class="haba-ride-options-list" id="haba-ride-options-list"></div>
                             </div>
 
@@ -22950,13 +22952,14 @@
             scoot: `<img src="https://i.postimg.cc/sxy0JYKs/file-0000000040c48211b12bd2b713d978d4.png" alt="Scoot" style="width:1.7em;height:1.7em;object-fit:contain;">`
         };
 
-        // Fake ride-type catalog for the Haba Ride flow — no real driver matching yet (see
-        // requestHabaRide below), just believable-looking numbers computed from the real
-        // route distance/duration Google gives us.
+        // Ride-type catalog for the Haba Ride flow — fares are computed for real from the
+        // actual route distance/duration Google gives us (see habaRidePrice below), same as
+        // Uber: a base fare + a per-km rate, multiplied up during peak hours. Only the
+        // driver-matching (count/arrival/ETA) is still simulated since there's no live fleet.
         const HABA_RIDE_TYPES = {
-            car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: HABA_RIDE_ICONS.car,   baseFare: 2.5, perKm: 1.10, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9] },
-            bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: HABA_RIDE_ICONS.bike,  baseFare: 1.5, perKm: 0.65, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6] },
-            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: HABA_RIDE_ICONS.scoot, baseFare: 1.0, perKm: 0.55, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5] }
+            car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: HABA_RIDE_ICONS.car,   baseFare: 15, perKm: 7.00, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9] },
+            bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: HABA_RIDE_ICONS.bike,  baseFare: 10, perKm: 4.50, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6] },
+            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: HABA_RIDE_ICONS.scoot, baseFare: 8,  perKm: 3.50, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5] }
         };
         let habaRideRoute = null; // { distanceKm, durationMin, destLabel, destLatLng } once a destination is picked
         let habaRideArrivalByType = {}; // cached per-type "driver" arrival minutes so Options/Confirm agree
@@ -22965,9 +22968,24 @@
 
         function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
+        // Uber-style peak-hour surge: weekday morning (07:00-09:00) and evening (16:00-19:00)
+        // commute windows get a demand multiplier on top of the base + per-km fare. Based on
+        // the device's real local clock, not simulated.
+        function habaRideSurgeMultiplier(date = new Date()) {
+            const day = date.getDay(); // 0 = Sun, 6 = Sat
+            const hour = date.getHours();
+            const isWeekday = day >= 1 && day <= 5;
+            const isMorningPeak = isWeekday && hour >= 7 && hour < 9;
+            const isEveningPeak = isWeekday && hour >= 16 && hour < 19;
+            const isWeekendNightPeak = (day === 5 || day === 6) && (hour >= 22 || hour < 1);
+            if (isMorningPeak || isEveningPeak) return 1.4;
+            if (isWeekendNightPeak) return 1.25;
+            return 1;
+        }
+
         function habaRidePrice(typeId, distanceKm) {
             const t = HABA_RIDE_TYPES[typeId];
-            const price = t.baseFare + t.perKm * Math.max(distanceKm, 1);
+            const price = (t.baseFare + t.perKm * Math.max(distanceKm, 1)) * habaRideSurgeMultiplier();
             return Math.round(price * 2) / 2; // round to nearest 50 cents, feels more like a real fare
         }
 
@@ -23013,7 +23031,7 @@
             if (habaRideRoute) {
                 priceEl.textContent = `R${habaRidePrice(typeId, habaRideRoute.distanceKm).toFixed(2)}`;
             } else {
-                priceEl.textContent = `From R${t.baseFare.toFixed(2)}`;
+                priceEl.textContent = `From R${(t.baseFare * habaRideSurgeMultiplier()).toFixed(2)}`;
             }
         }
 
@@ -23040,6 +23058,7 @@
 
         function renderHabaRideOptionsList() {
             const list = document.getElementById('haba-ride-options-list');
+            document.getElementById('haba-ride-surge-note').style.display = habaRideSurgeMultiplier() > 1 ? 'flex' : 'none';
             list.innerHTML = Object.keys(HABA_RIDE_TYPES).map(typeId => {
                 const t = HABA_RIDE_TYPES[typeId];
                 const price = habaRidePrice(typeId, habaRideRoute.distanceKm);

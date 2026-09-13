@@ -2998,6 +2998,14 @@
         .haba-ride-hero-sub { font-size: 13.5px; color: var(--text-secondary); margin-top: 2px; }
         .haba-ride-hero-price { font-size: 16px; font-weight: 800; color: var(--text-primary); flex-shrink: 0; white-space: nowrap; }
         .haba-ride-type-picker { margin-bottom: 0; }
+        .haba-womandrive-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; margin-top: 12px; cursor: pointer; background: linear-gradient(135deg, #E5148C, #C2126F); transition: transform 0.15s; }
+        .haba-womandrive-card:active { transform: scale(0.98); }
+        .haba-womandrive-card.active { box-shadow: 0 0 0 2.5px #E5148C, 0 0 0 5px rgba(229,20,140,0.18); }
+        .haba-womandrive-icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,0.22); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .haba-womandrive-text { flex: 1; min-width: 0; }
+        .haba-womandrive-title { font-size: 14.5px; font-weight: 800; color: #ffffff; }
+        .haba-womandrive-sub { font-size: 11.5px; color: rgba(255,255,255,0.88); margin-top: 2px; line-height: 1.3; }
+        .haba-womandrive-price { font-size: 14px; font-weight: 800; color: #ffffff; flex-shrink: 0; white-space: nowrap; }
         .haba-ride-dest-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px 14px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
         .haba-ride-dest-row svg { flex-shrink: 0; color: var(--text-secondary); }
         .haba-ride-dest-row span { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -7493,6 +7501,16 @@
                                     <button type="button" class="active" data-ride-type="car">Car</button>
                                     <button type="button" data-ride-type="bike">Bike</button>
                                     <button type="button" data-ride-type="scoot">Scoot</button>
+                                </div>
+                                <div class="haba-womandrive-card" id="haba-womandrive-card" role="button" tabindex="0" title="Women-only rides">
+                                    <div class="haba-womandrive-icon">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"/><path d="M12 14v7M8.5 18h7"/></svg>
+                                    </div>
+                                    <div class="haba-womandrive-text">
+                                        <div class="haba-womandrive-title">Woman Drive Woman</div>
+                                        <div class="haba-womandrive-sub">Women-only rides — women drivers for women passengers</div>
+                                    </div>
+                                    <div class="haba-womandrive-price" id="haba-womandrive-price">--</div>
                                 </div>
                             </div>
 
@@ -22954,26 +22972,34 @@
         const HABA_RIDE_ICONS = {
             car: `<img src="https://i.postimg.cc/vmgWq66R/file-000000004d648208990a7d21d5041430.png" alt="Car" style="width:1.7em;height:1.7em;object-fit:contain;">`,
             bike: `<img src="https://i.postimg.cc/yNGHnbSd/file-00000000f17482118d09ee7d425c2b15.png" alt="Bike" style="width:1.7em;height:1.7em;object-fit:contain;">`,
-            scoot: `<img src="https://i.postimg.cc/sxy0JYKs/file-0000000040c48211b12bd2b713d978d4.png" alt="Scoot" style="width:1.7em;height:1.7em;object-fit:contain;">`
+            scoot: `<img src="https://i.postimg.cc/sxy0JYKs/file-0000000040c48211b12bd2b713d978d4.png" alt="Scoot" style="width:1.7em;height:1.7em;object-fit:contain;">`,
+            womandrive: `<svg width="1.7em" height="1.7em" viewBox="0 0 24 24" fill="none" stroke="#E5148C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5"/><path d="M12 14v7M8.5 18h7"/></svg>`
         };
+        const HABA_WOMANDRIVE_MARKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#E5148C"/><circle cx="16" cy="12" r="6" fill="none" stroke="#ffffff" stroke-width="2"/><path d="M16 18v7M12.5 22h7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/></svg>`;
         const HABA_RIDE_MARKER_ICON_URLS = {
             car: 'https://i.postimg.cc/vmgWq66R/file-000000004d648208990a7d21d5041430.png',
             bike: 'https://i.postimg.cc/yNGHnbSd/file-00000000f17482118d09ee7d425c2b15.png',
-            scoot: 'https://i.postimg.cc/sxy0JYKs/file-0000000040c48211b12bd2b713d978d4.png'
+            scoot: 'https://i.postimg.cc/sxy0JYKs/file-0000000040c48211b12bd2b713d978d4.png',
+            womandrive: 'data:image/svg+xml,' + encodeURIComponent(HABA_WOMANDRIVE_MARKER_SVG)
         };
 
         // Ride-type catalog for the Haba Ride flow — fares are computed for real from the
         // actual route distance/duration Google gives us (see habaRidePrice below), same as
         // Uber: a base fare + a per-km rate, multiplied up during peak hours. Only the
         // driver-matching (count/arrival/ETA) is still simulated since there's no live fleet.
+        // 'womandrive' (Woman Drive Woman) is a women-only variant of the Car service — its own
+        // promo card on the home panel, but it shares the same options/confirm/request pipeline
+        // as Car/Bike/Scoot since the logic is identical (driver of vehicleType 'womandrive').
         const HABA_RIDE_TYPES = {
             car:   { label: 'Car',   sub: 'Affordable, everyday rides', icon: HABA_RIDE_ICONS.car,   baseFare: 15, perKm: 7.00, arrivalMin: [4, 8],  durationFactor: 1,    homeEta: [4, 9], seats: 4 },
             bike:  { label: 'Bike',  sub: 'Quick trips through traffic', icon: HABA_RIDE_ICONS.bike,  baseFare: 10, perKm: 4.50, arrivalMin: [2, 5],  durationFactor: 0.85, homeEta: [2, 6], seats: 1 },
-            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: HABA_RIDE_ICONS.scoot, baseFare: 8,  perKm: 3.50, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5], seats: 1 }
+            scoot: { label: 'Scoot', sub: 'Short hops, lowest cost',     icon: HABA_RIDE_ICONS.scoot, baseFare: 8,  perKm: 3.50, arrivalMin: [2, 4],  durationFactor: 0.8,  homeEta: [2, 5], seats: 1 },
+            womandrive: { label: 'Woman Drive Woman', sub: 'Women-only rides — women drivers for women passengers', icon: HABA_RIDE_ICONS.womandrive, baseFare: 15, perKm: 7.00, arrivalMin: [4, 8], durationFactor: 1, homeEta: [4, 9], seats: 4, womenOnly: true }
         };
         let habaRideRoute = null; // { distanceKm, durationMin, destLabel, destLatLng } once a destination is picked
         let habaRideArrivalByType = {}; // cached per-type "driver" arrival minutes so Options/Confirm agree
         let habaSelectedRideTypeId = null;
+        let habaHomeSelectedType = 'car'; // which type the home panel hero/picker is currently showing (car/bike/scoot/womandrive)
         const habaDriverMarkers = [];
 
         function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -23029,7 +23055,7 @@
         // start writing to this path, this legitimately comes back empty and the UI says so.
         const HABA_DRIVER_SEARCH_RADIUS_KM = 15;
         async function fetchNearbyDrivers(center) {
-            const grouped = { car: [], bike: [], scoot: [] };
+            const grouped = { car: [], bike: [], scoot: [], womandrive: [] };
             try {
                 const snap = await get(ref(database, 'drivers'));
                 if (snap.exists()) {
@@ -23077,14 +23103,21 @@
             communitiesMapState.nearbyDrivers = grouped;
             habaRideArrivalByType = {}; // stale cached ETAs no longer valid once availability changes
             renderNearbyDriverMarkers(grouped);
-            const activeType = document.querySelector('#haba-ride-type-picker button.active')?.dataset.rideType || 'car';
+            const activeType = habaHomeSelectedType;
             updateHabaRideHomeStats(activeType);
+        }
+
+        function habaHeroTitleFor(typeId) {
+            if (typeId === 'car') return 'Haba Ride';
+            if (typeId === 'womandrive') return 'Woman Drive Woman';
+            return 'Haba Bike';
         }
 
         function updateHabaRideHomeStats(typeId) {
             const t = HABA_RIDE_TYPES[typeId];
             document.getElementById('haba-ride-hero-icon').innerHTML = t.icon + habaSeatBadgeHtml(typeId);
-            document.getElementById('haba-ride-hero-title').textContent = typeId === 'car' ? 'Haba Ride' : 'Haba Bike';
+            document.getElementById('haba-ride-hero-title').textContent = habaHeroTitleFor(typeId);
+            document.getElementById('haba-womandrive-card').classList.toggle('active', typeId === 'womandrive');
             const drivers = communitiesMapState.nearbyDrivers ? (communitiesMapState.nearbyDrivers[typeId] || []) : null;
             const subEl = document.getElementById('haba-ride-hero-sub');
             if (drivers === null) {
@@ -23101,6 +23134,10 @@
             } else {
                 priceEl.textContent = `From R${(t.baseFare * habaRideSurgeMultiplier()).toFixed(2)}`;
             }
+            const womandriveT = HABA_RIDE_TYPES.womandrive;
+            document.getElementById('haba-womandrive-price').textContent = habaRideRoute
+                ? `R${habaRidePrice('womandrive', habaRideRoute.distanceKm).toFixed(2)}`
+                : `From R${(womandriveT.baseFare * habaRideSurgeMultiplier()).toFixed(2)}`;
         }
 
         function showHabaRideStep(step) {
@@ -23121,7 +23158,7 @@
                 communitiesMapState.routed = false;
             }
             showHabaRideStep('home');
-            updateHabaRideHomeStats(document.querySelector('#haba-ride-type-picker button.active')?.dataset.rideType || 'car');
+            updateHabaRideHomeStats(habaHomeSelectedType);
         }
 
         function renderHabaRideOptionsList() {
@@ -23171,7 +23208,7 @@
             document.getElementById('haba-ride-confirm-arrival').textContent = arrival === null ? 'N/A' : `${arrival} min`;
             document.getElementById('haba-ride-confirm-seats').textContent = t.seats;
             document.getElementById('haba-ride-confirm-dest').textContent = habaRideRoute.destLabel;
-            document.getElementById('btn-haba-ride-request').textContent = `Request Haba ${t.label}`;
+            document.getElementById('btn-haba-ride-request').textContent = typeId === 'womandrive' ? 'Request Woman Drive Woman' : `Request Haba ${t.label}`;
             showHabaRideStep('confirm');
         }
 
@@ -23238,7 +23275,23 @@
                     triggerHaptic(8);
                     document.querySelectorAll('#haba-ride-type-picker button').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    updateHabaRideHomeStats(btn.dataset.rideType);
+                    habaHomeSelectedType = btn.dataset.rideType;
+                    updateHabaRideHomeStats(habaHomeSelectedType);
+                });
+
+                document.getElementById('haba-womandrive-card').addEventListener('click', () => {
+                    triggerHaptic(10);
+                    document.querySelectorAll('#haba-ride-type-picker button').forEach(b => b.classList.remove('active'));
+                    habaHomeSelectedType = 'womandrive';
+                    updateHabaRideHomeStats('womandrive');
+                    document.getElementById('map-destination-search').focus();
+                });
+
+                document.getElementById('haba-womandrive-card').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        document.getElementById('haba-womandrive-card').click();
+                    }
                 });
 
                 document.getElementById('haba-ride-hero').addEventListener('click', () => {

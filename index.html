@@ -2990,7 +2990,8 @@
            pick a ride type with price/eta), confirm (review + request). UI-only for now —
            no real driver matching, see requestHabaRide(). */
         .haba-ride-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg-surface); border-radius: 22px 22px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,0.12); padding: 16px 18px calc(16px + var(--nav-bar-total) + env(safe-area-inset-bottom)); }
-        .haba-ride-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .haba-ride-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; cursor: pointer; border-radius: 16px; padding: 6px; margin-left: -6px; margin-right: -6px; transition: background 0.15s; }
+        .haba-ride-hero:active { background: var(--bg-alt); transform: scale(0.99); }
         .haba-ride-hero-icon { width: 56px; height: 56px; border-radius: 16px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0; }
         .haba-ride-hero-text { flex: 1; min-width: 0; }
         .haba-ride-hero-title { font-size: 18px; font-weight: 800; color: var(--text-primary); }
@@ -7477,7 +7478,7 @@
                         <div class="haba-ride-sheet" id="haba-ride-sheet">
                             <!-- HOME: no destination chosen yet — pick a ride type, see fake nearby-driver count -->
                             <div id="haba-ride-home-panel">
-                                <div class="haba-ride-hero">
+                                <div class="haba-ride-hero" id="haba-ride-hero" role="button" tabindex="0" title="Tap to enter a destination">
                                     <div class="haba-ride-hero-icon" id="haba-ride-hero-icon"></div>
                                     <div class="haba-ride-hero-text">
                                         <div class="haba-ride-hero-title" id="haba-ride-hero-title">Haba Ride</div>
@@ -23156,6 +23157,18 @@
                     document.querySelectorAll('#haba-ride-type-picker button').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     updateHabaRideHomeStats(btn.dataset.rideType);
+                });
+
+                document.getElementById('haba-ride-hero').addEventListener('click', () => {
+                    triggerHaptic(10);
+                    document.getElementById('map-destination-search').focus();
+                });
+
+                document.getElementById('haba-ride-hero').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        document.getElementById('haba-ride-hero').click();
+                    }
                 });
 
                 document.getElementById('btn-haba-ride-edit-dest').addEventListener('click', () => {

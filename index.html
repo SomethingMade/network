@@ -2977,6 +2977,11 @@
         #tab-groups.map-fullview .map-search-bar { padding-top: calc(10px + env(safe-area-inset-top)); }
         .map-search-bar .search-box { flex: 1; margin-bottom: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         .map-search-bar .search-box input { padding-right: 14px; }
+        .map-search-inputs { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .map-search-inputs .search-box { flex: 0 0 auto; }
+        .haba-search-dot { position: absolute; left: 14px; top: 11px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+        .haba-search-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%; }
+        .haba-search-dot.pickup::before { background: var(--text-primary); }
         #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
         .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
@@ -7472,9 +7477,15 @@
                                 <div id="btn-map-exit-fullview" title="Back">
                                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
                                 </div>
-                                <div class="search-box" style="margin-bottom:0;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                    <input type="text" id="map-destination-search" placeholder="Where to?" autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                                <div class="map-search-inputs">
+                                    <div class="search-box haba-pickup-search-box" style="margin-bottom:0;">
+                                        <span class="haba-search-dot pickup"></span>
+                                        <input type="text" id="map-pickup-search" placeholder="Pickup location" autocomplete="off" name="haba-map-pickup" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                                    </div>
+                                    <div class="search-box" style="margin-bottom:0;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                        <input type="text" id="map-destination-search" placeholder="Where to?" autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                                    </div>
                                 </div>
                                 <div class="map-location-btn-wrap">
                                     <div id="btn-map-use-location" title="Use my location">
@@ -7543,7 +7554,7 @@
                                     <div><div class="haba-ride-stat-value" id="haba-ride-confirm-seats">--</div><div class="haba-ride-stat-label">Seats</div></div>
                                 </div>
                                 <div class="haba-ride-confirm-trip">
-                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot pickup"></span><div><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value">Your location</div></div></div>
+                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot pickup"></span><div><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-confirm-pickup-value">Your location</div></div></div>
                                     <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot dropoff"></span><div><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-confirm-dest">--</div></div></div>
                                 </div>
                                 <button type="button" class="btn-pill btn-primary" id="btn-haba-ride-request">Request Haba Car</button>
@@ -23253,7 +23264,47 @@
                 const directionsService = new google.maps.DirectionsService();
                 const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false });
 
-                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, directionsService, directionsRenderer, nearbyDrivers: null };
+                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, pickupAutocomplete: null, pickupLatLng: null, pickupLabel: null, pickupMarker: null, directionsService, directionsRenderer, nearbyDrivers: null };
+
+                const pickupInput = document.getElementById('map-pickup-search');
+                const pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, { fields: ['geometry', 'name', 'formatted_address'] });
+                pickupAutocomplete.bindTo('bounds', map);
+                communitiesMapState.pickupAutocomplete = pickupAutocomplete;
+                pickupAutocomplete.addListener('place_changed', () => {
+                    const place = pickupAutocomplete.getPlace();
+                    if (!place.geometry || !place.geometry.location) return;
+                    triggerHaptic(10);
+                    const latLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+                    communitiesMapState.pickupLatLng = latLng;
+                    communitiesMapState.pickupLabel = place.name || place.formatted_address || 'Pickup location';
+                    if (communitiesMapState.pickupMarker) {
+                        communitiesMapState.pickupMarker.setPosition(latLng);
+                    } else {
+                        communitiesMapState.pickupMarker = new google.maps.Marker({
+                            position: latLng,
+                            map,
+                            title: 'Pickup location',
+                            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#111111', fillOpacity: 1, strokeColor: '#FFFFFF', strokeWeight: 2 }
+                        });
+                    }
+                    // If a destination/route is already showing, re-route from the newly chosen
+                    // pickup point instead of the device's GPS location.
+                    if (habaRideRoute) {
+                        routeToDestination(habaRideRoute.destLatLng, habaRideRoute.destLabel);
+                    }
+                });
+                // Clearing the field by hand drops back to using the device's real GPS fix as
+                // the pickup point, same as before this field existed.
+                pickupInput.addEventListener('input', () => {
+                    if (pickupInput.value.trim() === '') {
+                        communitiesMapState.pickupLatLng = null;
+                        communitiesMapState.pickupLabel = null;
+                        if (communitiesMapState.pickupMarker) {
+                            communitiesMapState.pickupMarker.setMap(null);
+                            communitiesMapState.pickupMarker = null;
+                        }
+                    }
+                });
 
                 const input = document.getElementById('map-destination-search');
                 const autocomplete = new google.maps.places.Autocomplete(input, { fields: ['geometry', 'name', 'formatted_address'] });
@@ -23368,12 +23419,13 @@
         function routeToDestination(destLatLng, destLabel) {
             const state = communitiesMapState;
             if (!state) return;
-            const origin = state.userLatLng;
+            const origin = state.pickupLatLng || state.userLatLng;
 
             if (!origin) {
                 // Booking a ride needs a fare calculated from real distance, which needs a
-                // location fix — ask for it instead of guessing at a route.
-                notify('Turn on location access to book a Haba ride.', 'error');
+                // pickup point — ask for GPS access (or a typed pickup location) instead of
+                // guessing at a route.
+                notify('Turn on location access or set a pickup location to book a Haba ride.', 'error');
                 centerMapOnUserLocation(false);
                 return;
             }
@@ -23396,6 +23448,7 @@
                     };
                     habaRideArrivalByType = {};
                     document.getElementById('haba-ride-dest-label').textContent = destLabel;
+                    document.getElementById('haba-ride-confirm-pickup-value').textContent = state.pickupLabel || 'Your location';
                     renderHabaRideOptionsList();
                     showHabaRideStep('options');
                 }

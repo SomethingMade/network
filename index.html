@@ -4071,14 +4071,15 @@
 
 
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
-        @media (max-width: 1024px) {
-            .app-grid { grid-template-columns: 88px 1fr; }
-            .workspace-pane { display: none; }
-            .chat-view-overlay { left: 88px; border-left: none; }
-            /* Without a workspace pane, the list column would otherwise stretch edge to
-               edge on a tablet; cap it to a comfortable reading width and center it so
-               it doesn't feel like a single overstretched list. */
-            .chat-pane { max-width: 480px; width: 100%; justify-self: center; border-right: none; }
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* X-style tablet: nav rail + list + open conversation stay side-by-side,
+               same as desktop — just with a narrower list column so the conversation
+               pane still has room to breathe. Everything else (workspace-pane's idle
+               placeholder, chat-pane's border, chat-view-overlay's border-left) is left
+               at its normal desktop default now instead of being turned off, since the
+               conversation no longer needs to cover the list to be usable. */
+            .app-grid { grid-template-columns: 88px 300px 1fr; }
+            .chat-view-overlay { left: 388px; } /* 88px nav + 300px list */
         }
         /* ── WIDE-SCREEN TUNING (tablets landscape and up): keep message content from
            ballooning edge-to-edge as the viewport widens ── */
@@ -4092,13 +4093,72 @@
            this kicks in as soon as the 3-pane layout itself does (1025px, matching the
            .chat-view-back breakpoint above) instead of waiting for ultra-wide monitors. */
         @media (min-width: 1025px) {
+            /* X-style: the app is flush with the page (no floating card/shadow, no
+               contrasting backdrop) — just centered and capped so the columns don't
+               stretch edge-to-edge on ultra-wide monitors. translateZ(0) is still needed
+               here: it gives .chat-view-overlay's position:fixed a containing block that
+               matches this centered box instead of the raw viewport. */
             #app-shell {
                 max-width: 1400px;
                 margin: 0 auto;
                 transform: translateZ(0);
-                box-shadow: 0 0 0 1px var(--border-color), var(--shadow-elevated);
             }
-            body:not(.glass-theme) { background-color: var(--bg-alt); }
+        }
+        /* ── X-STYLE EXPANDED NAV (roomy desktop): once there's enough width to spare
+           beyond the 3-pane minimum, expand the icon-only rail into a labeled sidebar —
+           icon + text side-by-side on every row, like X's left nav — instead of icons
+           alone. Kicks in well above the 1025px 3-pane breakpoint so the list/thread
+           columns always get their room first. */
+        @media (min-width: 1280px) {
+            .app-grid { grid-template-columns: 240px 380px 1fr; }
+            .side-nav { align-items: stretch; padding: 24px 12px; gap: 4px; }
+            .nav-item {
+                flex-direction: row;
+                justify-content: flex-start;
+                width: 100%;
+                gap: 16px;
+                padding: 12px 16px;
+                border-radius: 999px;
+                font-size: 15.5px;
+            }
+            .nav-item:hover { background: var(--bg-hover); }
+            .nav-item.active { font-weight: 700; }
+            /* Reveal every item's label, not just the active tab's (the base rule two
+               lines up in the shared styles is .nav-item.active span — two classes, which
+               beats this plain .nav-item span on specificity regardless of source order,
+               so the active label stays visible via that rule and this only affects to
+               the rest). */
+            .nav-item span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; }
+            .nav-badge { right: auto; left: 30px; }
+            .nav-badge.nav-badge-count { right: auto; left: 24px; }
+            /* The active row's own bold label + filled icon carry the state now, X-style;
+               the underline (built for a narrow icon-only rail) would otherwise stretch
+               under the full label row, which reads as a leftover tab-bar affordance. */
+            .nav-indicator { display: none; }
+        }
+        /* ── HOME FEED GOES WIDE-AND-CENTERED, X-STYLE (tablet & up) ──
+           On the Home tab, give chat-pane the whole row instead of sharing it with
+           workspace-pane's idle "select a chat" placeholder (irrelevant here — Home
+           isn't a conversation), then center the actual feed content inside that
+           space to one comfortable reading column, like X's timeline, rather than
+           stretching it edge-to-edge. The header keeps its full-width bar/border but
+           calc()-pads its content to line up with that same centered column. */
+        @media (min-width: 769px) {
+            body.feed-open .app-grid { grid-template-columns: 88px 1fr; }
+            body.feed-open .workspace-pane { display: none; }
+            body.feed-open .chat-pane { max-width: none; border-right: none; }
+            body.feed-open #tab-status .chat-header-area {
+                padding-left: max(16px, calc((100% - 640px) / 2));
+                padding-right: max(16px, calc((100% - 640px) / 2));
+            }
+            body.feed-open #tab-status .discover-grid-scroll {
+                max-width: 640px;
+                width: 100%;
+                margin: 0 auto;
+            }
+        }
+        @media (min-width: 1280px) {
+            body.feed-open .app-grid { grid-template-columns: 240px 1fr; }
         }
         @media (max-width: 768px) {
             .app-grid { grid-template-columns: 1fr; }
@@ -10429,6 +10489,11 @@
                 const sideNavEl = document.querySelector('.side-nav');
                 if (sideNavEl) sideNavEl.classList.remove('nav-scroll-hidden'); // always start visible on tab entry
                 document.body.classList.toggle('communities-open', hash === 'tab-groups');
+                // Home's timeline was built to live in the chat-list column, but that leaves
+                // it squeezed to list-width next to an idle, unrelated "select a chat" pane
+                // on tablet/desktop. Widen chat-pane to the full row while Home is active —
+                // see the body.feed-open CSS — instead of sharing space with that pane.
+                document.body.classList.toggle('feed-open', hash === 'tab-status');
 
                 if (hash === 'tab-status') {
                     renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');

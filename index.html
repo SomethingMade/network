@@ -23174,6 +23174,7 @@
             if (communitiesMapState) {
                 communitiesMapState.directionsRenderer.setDirections({ routes: [] });
                 communitiesMapState.routed = false;
+                clearAnimatedRoute();
             }
             showHabaRideStep('home');
             updateHabaRideHomeStats(habaHomeSelectedType);
@@ -23262,9 +23263,9 @@
                     gestureHandling: 'greedy'
                 });
                 const directionsService = new google.maps.DirectionsService();
-                const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false });
+                const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false, suppressPolyline: true });
 
-                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, pickupAutocomplete: null, pickupLatLng: null, pickupLabel: null, pickupMarker: null, directionsService, directionsRenderer, nearbyDrivers: null };
+                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, pickupAutocomplete: null, pickupLatLng: null, pickupLabel: null, pickupMarker: null, directionsService, directionsRenderer, nearbyDrivers: null, routeBasePolyline: null, routeShimmerPolyline: null, routeAnimationInterval: null };
 
                 const pickupInput = document.getElementById('map-pickup-search');
                 const pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, { fields: ['geometry', 'name', 'formatted_address'] });
@@ -23416,6 +23417,60 @@
             );
         }
 
+        // Draws the pickup→destination route as a solid black line with a looping,
+        // shimmering dash traveling along it (continuous marching-ants effect, not tied to
+        // the default DirectionsRenderer polyline which we suppress in favor of this).
+        function clearAnimatedRoute() {
+            const state = communitiesMapState;
+            if (!state) return;
+            if (state.routeAnimationInterval) {
+                clearInterval(state.routeAnimationInterval);
+                state.routeAnimationInterval = null;
+            }
+            if (state.routeBasePolyline) {
+                state.routeBasePolyline.setMap(null);
+                state.routeBasePolyline = null;
+            }
+            if (state.routeShimmerPolyline) {
+                state.routeShimmerPolyline.setMap(null);
+                state.routeShimmerPolyline = null;
+            }
+        }
+
+        function drawAnimatedRoute(path) {
+            const state = communitiesMapState;
+            clearAnimatedRoute();
+
+            state.routeBasePolyline = new google.maps.Polyline({
+                path,
+                map: state.map,
+                strokeColor: '#000000',
+                strokeOpacity: 1,
+                strokeWeight: 5,
+                zIndex: 1
+            });
+
+            state.routeShimmerPolyline = new google.maps.Polyline({
+                path,
+                map: state.map,
+                strokeOpacity: 0,
+                zIndex: 2,
+                icons: [{
+                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3, scale: 4 },
+                    offset: '0%',
+                    repeat: '40px'
+                }]
+            });
+
+            let offset = 0;
+            state.routeAnimationInterval = setInterval(() => {
+                offset = (offset + 1) % 100;
+                const icons = state.routeShimmerPolyline.get('icons');
+                icons[0].offset = offset + '%';
+                state.routeShimmerPolyline.set('icons', icons);
+            }, 30);
+        }
+
         function routeToDestination(destLatLng, destLabel) {
             const state = communitiesMapState;
             if (!state) return;
@@ -23438,6 +23493,7 @@
                         return;
                     }
                     state.directionsRenderer.setDirections(result);
+                    drawAnimatedRoute(result.routes[0].overview_path);
                     state.routed = true;
                     const leg = result.routes[0].legs[0];
                     habaRideRoute = {

@@ -4071,46 +4071,12 @@
 
 
         @media (min-width: 1025px) { .chat-view-back { display: none; } }
-        @media (min-width: 769px) and (max-width: 1024px) {
-            /* X-style tablet: nav rail + list + open conversation stay side-by-side,
-               same as desktop — just with a narrower list column so the conversation
-               pane still has room to breathe. Everything else (workspace-pane's idle
-               placeholder, chat-pane's border, chat-view-overlay's border-left) is left
-               at its normal desktop default now instead of being turned off, since the
-               conversation no longer needs to cover the list to be usable. */
-            .app-grid { grid-template-columns: 88px 300px 1fr; }
-            .chat-view-overlay { left: 388px; } /* 88px nav + 300px list */
-        }
-        /* ── WIDE-SCREEN TUNING (tablets landscape and up): keep message content from
-           ballooning edge-to-edge as the viewport widens ── */
-        @media (min-width: 900px) {
-            .chat-view-messages { padding: 24px clamp(24px, 9vw, 170px); }
-            .msg-bubble { max-width: min(68%, 560px); }
-        }
-        /* ── DESKTOP: float the whole 3-pane app as a centered, capped-width column
-           group — X's Messages tab keeps its list + conversation columns narrow and
-           centered in the viewport rather than letting them stretch edge-to-edge, so
-           this kicks in as soon as the 3-pane layout itself does (1025px, matching the
-           .chat-view-back breakpoint above) instead of waiting for ultra-wide monitors. */
-        @media (min-width: 1025px) {
-            /* X-style: the app is flush with the page (no floating card/shadow, no
-               contrasting backdrop) — just centered and capped so the columns don't
-               stretch edge-to-edge on ultra-wide monitors. translateZ(0) is still needed
-               here: it gives .chat-view-overlay's position:fixed a containing block that
-               matches this centered box instead of the raw viewport. */
-            #app-shell {
-                max-width: 1400px;
-                margin: 0 auto;
-                transform: translateZ(0);
-            }
-        }
-        /* ── X-STYLE EXPANDED NAV (roomy desktop): once there's enough width to spare
-           beyond the 3-pane minimum, expand the icon-only rail into a labeled sidebar —
-           icon + text side-by-side on every row, like X's left nav — instead of icons
-           alone. Kicks in well above the 1025px 3-pane breakpoint so the list/thread
-           columns always get their room first. */
-        @media (min-width: 1280px) {
-            .app-grid { grid-template-columns: 240px 380px 1fr; }
+        /* ── X-STYLE EXPANDED NAV (tablet & desktop): icon + label side-by-side on
+           every row, like X's left nav — instead of an icon-only rail. Only the exact
+           column widths differ per tier (tablet is tighter); the row layout, visible
+           labels, hover pill, and active-state treatment are shared here. Phones keep
+           the icon-only bottom bar untouched (see the max-width:768px block). */
+        @media (min-width: 769px) {
             .side-nav { align-items: stretch; padding: 24px 12px; gap: 4px; }
             .nav-item {
                 flex-direction: row;
@@ -4136,6 +4102,44 @@
                under the full label row, which reads as a leftover tab-bar affordance. */
             .nav-indicator { display: none; }
         }
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* X-style tablet: nav rail + list + open conversation stay side-by-side,
+               same as desktop. The nav column is narrower here than on desktop (just
+               enough for icon + label at a slightly smaller size) and the list column
+               narrows a little too, so the conversation pane still has room to breathe.
+               Everything else (workspace-pane's idle placeholder, chat-pane's border,
+               chat-view-overlay's border-left) is left at its normal desktop default now
+               instead of being turned off, since the conversation no longer needs to
+               cover the list to be usable. */
+            .app-grid { grid-template-columns: 190px 260px 1fr; }
+            .nav-item { gap: 12px; padding: 10px 14px; font-size: 14.5px; }
+            .chat-view-overlay { left: 450px; } /* 190px nav + 260px list */
+        }
+        /* ── WIDE-SCREEN TUNING (tablets landscape and up): keep message content from
+           ballooning edge-to-edge as the viewport widens ── */
+        @media (min-width: 900px) {
+            .chat-view-messages { padding: 24px clamp(24px, 9vw, 170px); }
+            .msg-bubble { max-width: min(68%, 560px); }
+        }
+        /* ── DESKTOP: float the whole 3-pane app as a centered, capped-width column
+           group — X's Messages tab keeps its list + conversation columns narrow and
+           centered in the viewport rather than letting them stretch edge-to-edge, so
+           this kicks in as soon as the 3-pane layout itself does (1025px, matching the
+           .chat-view-back breakpoint above) instead of waiting for ultra-wide monitors. */
+        @media (min-width: 1025px) {
+            /* X-style: the app is flush with the page (no floating card/shadow, no
+               contrasting backdrop) — just centered and capped so the columns don't
+               stretch edge-to-edge on ultra-wide monitors. translateZ(0) is still needed
+               here: it gives .chat-view-overlay's position:fixed a containing block that
+               matches this centered box instead of the raw viewport. */
+            #app-shell {
+                max-width: 1400px;
+                margin: 0 auto;
+                transform: translateZ(0);
+            }
+            .app-grid { grid-template-columns: 240px 380px 1fr; }
+            .chat-view-overlay { left: 620px; } /* 240px nav + 380px list */
+        }
         /* ── HOME FEED GOES WIDE-AND-CENTERED, X-STYLE (tablet & up) ──
            On the Home tab, give chat-pane the whole row instead of sharing it with
            workspace-pane's idle "select a chat" placeholder (irrelevant here — Home
@@ -4144,7 +4148,6 @@
            stretching it edge-to-edge. The header keeps its full-width bar/border but
            calc()-pads its content to line up with that same centered column. */
         @media (min-width: 769px) {
-            body.feed-open .app-grid { grid-template-columns: 88px 1fr; }
             body.feed-open .workspace-pane { display: none; }
             body.feed-open .chat-pane { max-width: none; border-right: none; }
             body.feed-open #tab-status .chat-header-area {
@@ -4157,10 +4160,14 @@
                 margin: 0 auto;
             }
         }
-        @media (min-width: 1280px) {
+        @media (min-width: 769px) and (max-width: 1024px) {
+            body.feed-open .app-grid { grid-template-columns: 190px 1fr; }
+        }
+        @media (min-width: 1025px) {
             body.feed-open .app-grid { grid-template-columns: 240px 1fr; }
         }
         @media (max-width: 768px) {
+
             .app-grid { grid-template-columns: 1fr; }
             /* The tablet fix above only hides this pane in the 769–1024px band now (so
                it can stay visible for side-by-side tablet); phones need it hidden too,

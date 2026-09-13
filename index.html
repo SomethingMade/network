@@ -2969,17 +2969,19 @@
            the whole screen — the map's own top bar below carries a back button and the profile
            avatar that would otherwise have lived in that now-hidden header. */
         #tab-groups.map-fullview .chat-header-area { display: none; }
-        #communities-map-view { flex: 1; display: none; flex-direction: column; min-height: 0; position: relative; }
+        #communities-map-view { flex: 1; display: none; flex-direction: column; min-height: 0; position: relative; overflow: hidden; }
         #communities-map-view.active { display: flex; }
-        .map-search-bar { padding: 10px 14px; display: flex; gap: 8px; align-items: center; background: var(--bg-base); position: relative; z-index: 2; }
+        .map-top-overlay { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; flex-direction: column; pointer-events: none; }
+        .map-top-overlay > * { pointer-events: auto; }
+        .map-search-bar { padding: 10px 14px; display: flex; gap: 8px; align-items: center; background: transparent; position: relative; z-index: 2; }
         #tab-groups.map-fullview .map-search-bar { padding-top: calc(10px + env(safe-area-inset-top)); }
-        .map-search-bar .search-box { flex: 1; margin-bottom: 0; }
+        .map-search-bar .search-box { flex: 1; margin-bottom: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         .map-search-bar .search-box input { padding-right: 14px; }
-        #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
-        .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; }
-        #communities-map-canvas { flex: 1; min-height: 0; background: var(--bg-alt); }
-        #map-permission-hint { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 10px 14px 0; }
+        .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
+        #communities-map-canvas { position: absolute; inset: 0; z-index: 1; background: var(--bg-alt); }
+        #map-permission-hint { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 6px 14px 0; }
 
         /* ── HABA RIDE bottom sheet (Uber-style) — three panels toggled by JS, only one
            visible at a time: home (ride type + nearby count), options (destination chosen,
@@ -7448,21 +7450,23 @@
                     <div class="chat-request-banner" id="group-invites-container" style="display:none;"></div>
                     <div id="communities-feed-container"><div id="communities-explore-groups-list" style="display:none;"></div><div id="communities-feed-list"></div></div>
                     <div id="communities-map-view">
-                        <div class="map-search-bar">
-                            <div id="btn-map-exit-fullview" title="Back">
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
-                            </div>
-                            <div class="search-box" style="margin-bottom:0;">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                <input type="text" id="map-destination-search" placeholder="Where to?" autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
-                            </div>
-                            <div id="btn-map-use-location" title="Use my location">
-                                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
-                            </div>
-                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-                        </div>
-                        <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
                         <div id="communities-map-canvas"></div>
+                        <div class="map-top-overlay">
+                            <div class="map-search-bar">
+                                <div id="btn-map-exit-fullview" title="Back">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+                                </div>
+                                <div class="search-box" style="margin-bottom:0;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="text" id="map-destination-search" placeholder="Where to?" autocomplete="off" name="haba-map-destination" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                                </div>
+                                <div id="btn-map-use-location" title="Use my location">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+                                </div>
+                                <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            </div>
+                            <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
+                        </div>
 
                         <div class="haba-ride-sheet" id="haba-ride-sheet">
                             <!-- HOME: no destination chosen yet — pick a ride type, see fake nearby-driver count -->
@@ -7470,7 +7474,7 @@
                                 <div class="haba-ride-hero">
                                     <div class="haba-ride-hero-icon" id="haba-ride-hero-icon"></div>
                                     <div class="haba-ride-hero-text">
-                                        <div class="haba-ride-hero-title" id="haba-ride-hero-title">Car</div>
+                                        <div class="haba-ride-hero-title" id="haba-ride-hero-title">Haba Ride</div>
                                         <div class="haba-ride-hero-sub"><span id="haba-ride-driver-count">--</span> drivers nearby · <span id="haba-ride-eta">--</span> min away</div>
                                     </div>
                                     <div class="haba-ride-hero-price" id="haba-ride-hero-price">--</div>
@@ -22996,7 +23000,7 @@
         function updateHabaRideHomeStats(typeId) {
             const t = HABA_RIDE_TYPES[typeId];
             document.getElementById('haba-ride-hero-icon').innerHTML = t.icon;
-            document.getElementById('haba-ride-hero-title').textContent = t.label;
+            document.getElementById('haba-ride-hero-title').textContent = 'Haba Ride';
             document.getElementById('haba-ride-driver-count').textContent = communitiesMapState.fakeDriverCount || randInt(12, 34);
             const [lo, hi] = t.homeEta;
             document.getElementById('haba-ride-eta').textContent = randInt(lo, hi);

@@ -3904,6 +3904,9 @@
         .image-viewer-post-action-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
         .image-viewer-post-action-btn.liked { color: var(--danger-red); }
         .image-viewer-post-action-btn.reposted { color: var(--success-green); }
+        .image-viewer-post-action-btn.saved { color: var(--primary-blue); }
+        .image-viewer-view-stat { cursor: default; }
+        .image-viewer-view-stat:hover { background: none; }
 
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
@@ -8306,6 +8309,13 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <span id="image-viewer-repost-count">0</span>
             </button>
+            <div class="image-viewer-post-action-btn image-viewer-view-stat" title="Views">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                <span id="image-viewer-view-count">0</span>
+            </div>
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-save-btn" title="Save">
+                <svg id="image-viewer-save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            </button>
         </div>
     </div>
 
@@ -9045,12 +9055,18 @@
             overlay.classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
+        let currentViewerHideSave = false;
         function updateImageViewerPostBarVisibility() {
             document.getElementById('image-viewer-post-actions').style.display = currentViewerPostId ? 'flex' : 'none';
             document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
             if (currentViewerPostId) {
-                document.getElementById('image-viewer-save').style.display = 'none';
+                // Post images now get the same verified-gated download as the video/reel
+                // viewers (see video-viewer-save / reel-download-btn) instead of being
+                // hidden outright — hideSave (view-once etc.) still wins either way.
+                const myUid = auth.currentUser && auth.currentUser.uid;
+                document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || !isVerifiedUid(myUid)) ? 'none' : '';
                 syncImageViewerPostBar();
+                trackImageViewerPostImpression();
             }
         }
         // Reflects cachedPosts[currentViewerPostId] (likeCount/commentCount/repostCount and
@@ -9064,6 +9080,7 @@
             const myUid = user ? user.uid : null;
             const likedByMe = !!(post.reactions && myUid && post.reactions[myUid]);
             const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
+            const savedByMe = !!cachedSavedPosts[currentViewerPostId];
 
             const likeBtn = document.getElementById('image-viewer-like-btn');
             likeBtn.classList.toggle('liked', likedByMe);
@@ -9072,6 +9089,27 @@
             document.getElementById('image-viewer-comment-count').textContent = post.commentCount || 0;
             document.getElementById('image-viewer-repost-btn').classList.toggle('reposted', repostedByMe);
             document.getElementById('image-viewer-repost-count').textContent = formatFeedCount(post.repostCount || 0);
+            document.getElementById('image-viewer-view-count').textContent = formatFeedCount(post.impressionCount || 0);
+            const saveBtn = document.getElementById('image-viewer-save-btn');
+            saveBtn.classList.toggle('saved', savedByMe);
+            document.getElementById('image-viewer-save-icon').setAttribute('fill', savedByMe ? 'currentColor' : 'none');
+        }
+        // Same 1s-dwell-then-count-once approach as getFeedImpressionObserver, just without an
+        // IntersectionObserver — the image viewer is already fully on-screen the moment it opens,
+        // so a plain timer does the same job. Shares impressedPostIds with the feed/reel so a
+        // post already counted elsewhere this session doesn't get double-counted here.
+        function trackImageViewerPostImpression() {
+            const postId = currentViewerPostId;
+            if (!postId) return;
+            const user = auth.currentUser;
+            if (!user || impressedPostIds.has(postId)) return;
+            const post = cachedPosts[postId];
+            if (post && post.uid === user.uid) return; // don't count your own post
+            setTimeout(() => {
+                if (currentViewerPostId !== postId || impressedPostIds.has(postId)) return;
+                impressedPostIds.add(postId);
+                registerPostImpression(postId, user.uid);
+            }, 1000);
         }
         document.getElementById('image-viewer-like-btn').addEventListener('click', () => {
             if (currentViewerPostId) { triggerHaptic(15); toggleLikePost(currentViewerPostId); }
@@ -9082,6 +9120,9 @@
         document.getElementById('image-viewer-repost-btn').addEventListener('click', (e) => {
             if (!currentViewerPostId) return;
             onRepostButtonTap(currentViewerPostId, e.currentTarget);
+        });
+        document.getElementById('image-viewer-save-btn').addEventListener('click', () => {
+            if (currentViewerPostId) { triggerHaptic(15); toggleSavePost(currentViewerPostId); } // saved_posts listener flips .saved back onto this button once it lands, same as reel-save-btn
         });
         document.getElementById('image-viewer-post-menu-btn').addEventListener('click', () => {
             if (!currentViewerPostId) return;
@@ -9108,6 +9149,7 @@
         }
         function renderImageViewerFrame(url, hideSave) {
             currentViewerImageUrl = url;
+            currentViewerHideSave = !!hideSave;
             const imgEl = document.getElementById('image-viewer-img');
             imgEl.src = url;
             imgEl.draggable = !hideSave;
@@ -14047,6 +14089,12 @@
                     const svgEl = btn.querySelector('svg');
                     if (svgEl) svgEl.setAttribute('fill', saved ? 'currentColor' : 'none');
                 });
+                if (currentViewerPostId) {
+                    const imgSaveBtn = document.getElementById('image-viewer-save-btn');
+                    const saved = !!cachedSavedPosts[currentViewerPostId];
+                    imgSaveBtn.classList.toggle('saved', saved);
+                    document.getElementById('image-viewer-save-icon').setAttribute('fill', saved ? 'currentColor' : 'none');
+                }
                 const savedList = document.getElementById('my-profile-saved-list');
                 if (savedList && savedList.style.display !== 'none') buildProfileSavedList(savedList);
             });

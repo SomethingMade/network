@@ -3133,9 +3133,21 @@
         .chat-view-hidden-controls { display: none; }
         .chats-menu-item.viewonce-active { color: var(--primary-blue); }
         .chats-menu-item.viewonce-active svg { color: var(--primary-blue); }
-        .chat-view-menu-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
-        .chat-view-menu-dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 190px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-elevated); padding: 6px; z-index: 40; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
+        /* z-index:1000 (not the old 5) so this wrap — and the dropdown menu inside it — clears
+           every piece of fixed page chrome it can open above: the bottom nav bar (z-index:100),
+           the nav-compose-btn FAB (z-index:101), and the chat-view-overlay conversation screen
+           (z-index:500). isolation:isolate means the dropdown's own z-index:200 below only ever
+           ranks it against its own siblings inside this wrap, not against the rest of the page —
+           it's the wrap's z-index that decides how the whole thing stacks against everything
+           else, so that's what has to clear those fixed elements, not the dropdown itself. */
+        .chat-view-menu-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; isolation: isolate; z-index: 1000; }
+        .chat-view-menu-dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 190px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-elevated); padding: 6px; z-index: 200; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
         .chat-view-menu-dropdown.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        /* Belt-and-suspenders: while any of these header dropdowns is open, the scrollable
+           list sitting underneath it is fully disabled for pointer interaction (see
+           setupHeaderMenu's listSelector param), so a tap meant for a dropdown row can never
+           be intercepted by a chat/contact/call card underneath it. */
+        .header-menu-list-locked { pointer-events: none; }
 
         /* --- Code Compiler (community owner-enabled feature, see btn-open-group-compiler) --- */
         .code-compiler-overlay { position: fixed; inset: 0; z-index: 100065; display: none; flex-direction: column; background: var(--bg-base); }
@@ -10996,7 +11008,7 @@
             // Delegated so both the Chats-tab communities icon and the Feed-tab communities
             // icon (added next to the settings button) share this one handler.
             document.querySelectorAll('.js-goto-communities').forEach(btn => {
-                btn.addEventListener('click', () => goToTab('tab-groups'));
+                btn.addEventListener('click', () => { clearAllHeaderMenuLocks(); goToTab('tab-groups'); });
             });
 
             const chips = document.querySelectorAll('#wa-filter-row .wa-chip[data-filter]');
@@ -11036,6 +11048,7 @@
         // opened next (a sheet, another tab, and so on).
         document.getElementById('header-menu-dropdown-chats').addEventListener('click', () => {
             document.getElementById('header-menu-dropdown-chats').classList.remove('open');
+            clearAllHeaderMenuLocks();
         });
 
         // --- ARCHIVED CHATS ---
@@ -11616,18 +11629,31 @@
             clearAllCachesAndReload();
         }
         document.getElementById('setting-refresh-app').addEventListener('click', confirmAndRefreshApp);
-        function setupHeaderMenu(btnId, dropdownId, refreshId, editProfileId) {
+        // Only one header dropdown is ever open at a time, so any path that closes one
+        // (including navigating away via Communities/Jobs before setupHeaderMenu's own
+        // closeMenu runs) can safely clear every list-lock in one sweep rather than needing
+        // to know which specific list it corresponds to.
+        function clearAllHeaderMenuLocks() {
+            document.querySelectorAll('.header-menu-list-locked').forEach(el => el.classList.remove('header-menu-list-locked'));
+        }
+        function setupHeaderMenu(btnId, dropdownId, refreshId, editProfileId, listSelector) {
             const menuBtn = document.getElementById(btnId);
             const dropdown = document.getElementById(dropdownId);
             const refreshBtn = document.getElementById(refreshId);
             const editProfileBtn = editProfileId ? document.getElementById(editProfileId) : null;
+            const listEl = listSelector ? document.querySelector(listSelector) : null;
             if (!menuBtn || !dropdown || !refreshBtn) return;
 
-            const closeMenu = () => dropdown.classList.remove('open');
+            // While the dropdown is open, the list underneath it is locked out of pointer
+            // interaction entirely (see .header-menu-list-locked) — this is on top of, not a
+            // replacement for, the z-index fix on .chat-view-menu-dropdown, so a tap on a
+            // dropdown row can never land on a chat/contact/call card behind it instead.
+            const openMenu = () => { dropdown.classList.add('open'); if (listEl) listEl.classList.add('header-menu-list-locked'); };
+            const closeMenu = () => { dropdown.classList.remove('open'); if (listEl) listEl.classList.remove('header-menu-list-locked'); };
 
             menuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                dropdown.classList.toggle('open');
+                if (dropdown.classList.contains('open')) closeMenu(); else openMenu();
             });
             document.addEventListener('click', (e) => {
                 if (dropdown.classList.contains('open') && !dropdown.contains(e.target) && e.target !== menuBtn) {
@@ -11647,11 +11673,11 @@
                 });
             }
         }
-        setupHeaderMenu('btn-header-menu', 'home-header-menu-dropdown', 'home-header-menu-refresh', 'home-header-menu-edit-profile');
-        setupHeaderMenu('btn-header-menu-chats', 'header-menu-dropdown-chats', 'header-menu-refresh-chats', 'header-menu-edit-profile-chats');
-        setupHeaderMenu('btn-header-menu-groups', 'header-menu-dropdown-groups', 'header-menu-refresh-groups', 'header-menu-edit-profile-groups');
-        setupHeaderMenu('btn-header-menu-calls', 'header-menu-dropdown-calls', 'header-menu-refresh-calls', 'header-menu-edit-profile-calls');
-        setupHeaderMenu('btn-header-menu-contacts', 'header-menu-dropdown-contacts', 'header-menu-refresh-contacts', 'header-menu-edit-profile-contacts');
+        setupHeaderMenu('btn-header-menu', 'home-header-menu-dropdown', 'home-header-menu-refresh', 'home-header-menu-edit-profile', '#discover-grid-scroll');
+        setupHeaderMenu('btn-header-menu-chats', 'header-menu-dropdown-chats', 'header-menu-refresh-chats', 'header-menu-edit-profile-chats', '#chat-list-container');
+        setupHeaderMenu('btn-header-menu-groups', 'header-menu-dropdown-groups', 'header-menu-refresh-groups', 'header-menu-edit-profile-groups', '#communities-feed-container');
+        setupHeaderMenu('btn-header-menu-calls', 'header-menu-dropdown-calls', 'header-menu-refresh-calls', 'header-menu-edit-profile-calls', '#calls-list-container');
+        setupHeaderMenu('btn-header-menu-contacts', 'header-menu-dropdown-contacts', 'header-menu-refresh-contacts', 'header-menu-edit-profile-contacts', '#contacts-list-container');
 
         // --- Invite a Friend ---
         document.getElementById('setting-invite-friend').addEventListener('click', async () => {
@@ -19719,6 +19745,7 @@
             btn.addEventListener('click', () => {
                 const dropdown = btn.closest('.chat-view-menu-dropdown');
                 if (dropdown) dropdown.classList.remove('open');
+                clearAllHeaderMenuLocks();
                 openJobsSheet();
             });
         });

@@ -7242,6 +7242,35 @@
                     <button type="button" id="btn-set-name-continue" class="btn-pill btn-primary" style="margin-top: 20px;" disabled>Continue</button>
                 </div>
 
+                <!-- ── PROFILE STEP (first-time signup only — see promptSetProfileDetails()) ──
+                     Lets the person add a profile picture and claim an @username right during
+                     signup. Both are optional: skipping leaves the default avatar in place and
+                     falls back to the auto-generated username from ensureUsername(), same as
+                     before this step existed. Reuses the same avatar-upload widget markup and
+                     username validation rules as the Edit Profile / Settings screens so the
+                     behavior stays consistent across the app. -->
+                <div id="auth-step-profile" style="display:none;">
+                    <h2>Add a photo &amp; username</h2>
+                    <p>Optional — you can always do this later in Settings</p>
+
+                    <div class="edit-profile-avatar-block" style="margin-bottom: 20px;">
+                        <div class="sheet-avatar-upload" id="signup-avatar-upload">
+                            <div class="avatar-circle" id="signup-avatar-preview"></div>
+                            <div class="camera-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div>
+                            <div class="sheet-upload-spinner"><div class="spinner-sm"></div></div>
+                        </div>
+                        <input type="file" id="signup-photo-input" accept="image/jpeg, image/png, image/webp" style="display:none;">
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="signup-username-input" class="pill-input" placeholder="Choose your @username" style="text-align:center; font-family:monospace; font-weight:600;" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="20">
+                    </div>
+                    <p id="signup-username-hint" style="text-align:center; margin-top:6px; font-size:12.5px; color:var(--text-secondary);">3–20 characters: letters, numbers, underscores. Leave blank to get one assigned.</p>
+
+                    <button type="button" id="btn-set-profile-continue" class="btn-pill btn-primary" style="margin-top: 20px;">Continue</button>
+                    <p class="toggle-auth" style="margin-top:8px;"><span id="btn-skip-profile-step">Skip for now</span></p>
+                </div>
+
                 <!-- ── ACCOUNT TYPE STEP (first-time signup only — see promptAccountType()) ── -->
                 <div id="auth-step-account-type" style="display:none;">
                     <h2>How will you use Haba?</h2>
@@ -19094,6 +19123,7 @@
         const stepEmail = document.getElementById('auth-step-email');
         const stepAccountType = document.getElementById('auth-step-account-type');
         const stepName = document.getElementById('auth-step-name');
+        const stepProfile = document.getElementById('auth-step-profile');
         const authCardBrand = document.querySelector('.auth-card-brand');
 
         function showAuthStep(step) {
@@ -19103,6 +19133,7 @@
             stepEmail.style.display = step === 'email' ? 'block' : 'none';
             if (stepAccountType) stepAccountType.style.display = step === 'account-type' ? 'block' : 'none';
             if (stepName) stepName.style.display = step === 'name' ? 'block' : 'none';
+            if (stepProfile) stepProfile.style.display = step === 'profile' ? 'block' : 'none';
             const formSide = document.getElementById('auth-form-side');
             if (formSide) formSide.classList.toggle('auth-landing-active', step === 'landing');
             // The landing step carries its own logo/wordmark, so hide the generic mobile
@@ -19168,6 +19199,121 @@
             setNameResolve = null;
             resolveFn(name);
         });
+
+        // First-time-signup-only profile-picture + username step — shown right after
+        // promptSetName() and before promptAccountType(). Both fields are optional: tapping
+        // "Skip for now" (or hitting Continue with a blank username field) resolves with
+        // username: null, and the caller leaves photo/username assignment to the existing
+        // defaults (DEFAULT_AVATAR_URL, ensureUsername()'s auto-generated handle). The avatar
+        // uploads immediately on selection (same pattern as #profile-photo-input in Edit
+        // Profile) since cred.user already exists by this point in the signup flow; the
+        // username is validated against the same 3–20 char alphanumeric/underscore rule and
+        // uniqueness-checked against `usernames/` the same way #btn-set-username does.
+        let setProfileResolve = null;
+        let pendingSignupPhotoURL = null;
+        function promptSetProfileDetails() {
+            pendingSignupPhotoURL = null;
+            const preview = document.getElementById('signup-avatar-preview');
+            preview.style.backgroundImage = '';
+            const input = document.getElementById('signup-username-input');
+            input.value = '';
+            const btn = document.getElementById('btn-set-profile-continue');
+            btn.disabled = false;
+            btn.textContent = 'Continue';
+            showAuthStep('profile');
+            return new Promise(resolve => { setProfileResolve = resolve; });
+        }
+        document.getElementById('signup-avatar-upload').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('signup-photo-input').click();
+        });
+        document.getElementById('signup-photo-input').addEventListener('change', async (e) => {
+            e.preventDefault();
+            const file = e.target.files[0];
+            if (!file) return;
+            const user = auth.currentUser;
+            if (!user) return;
+            const wrapper = document.getElementById('signup-avatar-upload');
+            wrapper.classList.add('uploading');
+            try {
+                const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                const url = await uploadToFirebaseStorage(file, `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
+                pendingSignupPhotoURL = url;
+                const preview = document.getElementById('signup-avatar-preview');
+                preview.style.backgroundImage = `url('${url}')`;
+                preview.textContent = "";
+            } catch (err) {
+                showCustomModal("Upload Failed", "We couldn't upload that image. You can add one later in Settings.");
+            } finally {
+                wrapper.classList.remove('uploading');
+                e.target.value = "";
+            }
+        });
+        document.getElementById('btn-set-profile-continue').addEventListener('click', async () => {
+            if (!setProfileResolve) return;
+            const user = auth.currentUser;
+            const raw = document.getElementById('signup-username-input').value.trim();
+            const cleaned = raw.replace(/^@/, '');
+
+            if (cleaned) {
+                if (!/^[a-zA-Z0-9_]{3,20}$/.test(cleaned)) {
+                    return showCustomModal("Invalid Username", "Usernames must be 3–20 characters using letters, numbers, or underscores only.");
+                }
+                const btn = document.getElementById('btn-set-profile-continue');
+                btn.disabled = true;
+                btn.textContent = 'Checking...';
+                try {
+                    const lower = cleaned.toLowerCase();
+                    const takenSnap = await get(ref(database, `usernames/${lower}`));
+                    if (takenSnap.exists() && (!user || takenSnap.val() !== user.uid)) {
+                        showCustomModal("Username Taken", "That username is already in use. Please choose another.");
+                        return;
+                    }
+                } catch (err) {
+                    showCustomModal("Error", "Could not verify that username. Please try again.");
+                    return;
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Continue';
+                }
+            }
+
+            const resolveFn = setProfileResolve;
+            setProfileResolve = null;
+            resolveFn({ photoURL: pendingSignupPhotoURL, username: cleaned || null });
+        });
+        document.getElementById('btn-skip-profile-step').addEventListener('click', () => {
+            if (!setProfileResolve) return;
+            const resolveFn = setProfileResolve;
+            setProfileResolve = null;
+            resolveFn({ photoURL: pendingSignupPhotoURL, username: null });
+        });
+
+        // Persists whatever was chosen (or skipped) in promptSetProfileDetails(). The photo
+        // was already uploaded and saved to Firebase Auth's photoURL at selection time, so this
+        // just needs to sync it into the Realtime Database profile too. The username write
+        // mirrors #btn-set-username's logic (claim the `usernames/` index entry, mark
+        // usernameChanged so the one-time-set rule is respected later in Settings) and, by
+        // writing `users/{uid}/username` up front, makes ensureUsername() at login skip its
+        // own auto-generated fallback since it only assigns one when that field is empty.
+        async function applySignupProfileChoice(user, choice) {
+            if (!choice) return;
+            if (choice.photoURL) {
+                try { await updateProfile(user, { photoURL: choice.photoURL }); } catch (err) { console.error('Failed to sync signup photo to auth profile', err); }
+                try { await update(ref(database, `users/${user.uid}`), { photoURL: choice.photoURL }); }
+                catch (err) { console.error('Failed to save signup profile photo', err); }
+            }
+            if (choice.username) {
+                try {
+                    const lower = choice.username.toLowerCase();
+                    const updates = {};
+                    updates[`users/${user.uid}/username`] = choice.username;
+                    updates[`users/${user.uid}/usernameChanged`] = true;
+                    updates[`usernames/${lower}`] = user.uid;
+                    await update(ref(database), updates);
+                } catch (err) { console.error('Failed to save signup username', err); }
+            }
+        }
 
         // Landing screen ("See what's happening" — X/Twitter-style splash before any input
         // fields) — both buttons lead into the same phone-first flow, which already handles
@@ -19436,6 +19582,8 @@
                 if (addInfo && addInfo.isNewUser) {
                     const chosenName = await promptSetName();
                     try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
+                    const profileChoice = await promptSetProfileDetails();
+                    await applySignupProfileChoice(cred.user, profileChoice);
                     const chosenType = await promptAccountType();
                     if (chosenType === 'business') {
                         try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
@@ -19505,6 +19653,8 @@
                     hideLoading();
                     const chosenName = await promptSetName();
                     try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
+                    const profileChoice = await promptSetProfileDetails();
+                    await applySignupProfileChoice(cred.user, profileChoice);
                     const chosenType = await promptAccountType();
                     if (chosenType === 'business') {
                         try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }

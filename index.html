@@ -3165,6 +3165,8 @@
         .chat-view-hidden-controls { display: none; }
         .chats-menu-item.viewonce-active { color: var(--primary-blue); }
         .chats-menu-item.viewonce-active svg { color: var(--primary-blue); }
+        .wa-list-row.viewonce-active .wa-row-title { color: var(--primary-blue); }
+        .wa-list-row.viewonce-active .wa-row-icon { color: var(--primary-blue); }
         /* z-index:150 clears the bottom nav bar (z-index:100) and the nav-compose-btn FAB
            (z-index:101) so the dropdown doesn't render underneath them, but stays below
            chat-view-overlay (z-index:500) — the full-screen open-conversation panel — so that
@@ -6135,6 +6137,54 @@
                         <span class="wa-row-meta" id="contact-card-disappearing-value">Off</span>
                         <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- "More options" sheet, opened from the Contact Info card's "More" button. Mirrors the
+         same items as the chat header's three-dot dropdown (#chat-view-menu-dropdown) but as
+         a proper bottom sheet instead of a small anchored dropdown — see
+         computeChatViewMenuState()/openContactCardMoreSheet() for how the two entry points
+         share their visibility/label logic so they never drift apart. -->
+    <div id="contact-card-more-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+            <div class="wa-sheet-header">
+                <button type="button" id="btn-close-contact-card-more" class="wa-header-icon-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="wa-header-title">More options</div>
+                <div style="width:38px; flex-shrink:0;"></div>
+            </div>
+            <div class="wa-section contact-card-list">
+                <div class="wa-list-row wa-row-clickable" id="contact-more-info">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title" id="contact-more-info-label">View contact</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-viewonce">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">1</text></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title" id="contact-more-viewonce-label">Send as view once</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-disappearing">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title" id="contact-more-disappearing-label">Disappearing messages</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-compiler" style="display:none;">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Code Compiler</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-music">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Share music</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-wallpaper">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Wallpaper</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-ride">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L18.5 11"></path><rect x="3" y="11" width="18" height="6" rx="2"></rect><circle cx="7.5" cy="17.5" r="1.5"></circle><circle cx="16.5" cy="17.5" r="1.5"></circle></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Request ride</span></div>
                 </div>
             </div>
         </div>
@@ -11415,6 +11465,36 @@
             window.location.reload();
         }
 
+        // Shared by both "more options" entry points for a DM/group chat — the header's
+        // three-dot dropdown (#chat-view-menu-dropdown) and the Contact Info card's "More"
+        // bottom sheet (#contact-card-more-sheet-overlay, see openContactCardMoreSheet below)
+        // — so their item visibility/labels can never drift apart from one another.
+        function computeChatViewMenuState() {
+            const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
+            const isAIChat = typeof activeChatUid !== 'undefined' && activeChatUid === AI_UID;
+            const infoSourceBtn = isGroup ? document.getElementById('btn-group-info') : document.getElementById('btn-user-info');
+            const viewOnceBtn = document.getElementById('btn-view-once-toggle');
+            const isArmed = !!(viewOnceBtn && viewOnceBtn.classList.contains('active'));
+            const activeGroup = isGroup && typeof cachedCommunities !== 'undefined' ? cachedCommunities[activeGroupId] : null;
+            return {
+                isGroup,
+                infoLabel: isGroup ? 'Group info' : 'View contact',
+                showInfo: !!(infoSourceBtn && infoSourceBtn.style.display !== 'none'),
+                showViewOnce: !!(viewOnceBtn && viewOnceBtn.style.display !== 'none'),
+                isArmed,
+                viewOnceLabel: isArmed ? 'View once is on' : 'Send as view once',
+                // Disappearing messages and "Request ride" are personal actions tied to a 1:1
+                // DM's own context, not something that makes sense inside a group thread or
+                // the AI chat.
+                showDisappearing: !isGroup && !isAIChat,
+                disappearingLabel: activeChatDisappearingSeconds > 0
+                    ? `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`
+                    : 'Disappearing messages',
+                showCompiler: !!(activeGroup && activeGroup.compilerEnabled),
+                showRide: !isGroup && !isAIChat
+            };
+        }
+
         // --- DM/group chat header three-dot menu ---
         (function setupChatViewMenu() {
             const menuBtn = document.getElementById('btn-chat-view-menu');
@@ -11425,33 +11505,21 @@
 
             menuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
-                document.getElementById('chat-view-menu-info-label').textContent = isGroup ? 'Group info' : 'View contact';
-                const infoSourceBtn = isGroup ? document.getElementById('btn-group-info') : document.getElementById('btn-user-info');
-                document.getElementById('chat-view-menu-info').style.display = (infoSourceBtn && infoSourceBtn.style.display !== 'none') ? 'flex' : 'none';
+                const state = computeChatViewMenuState();
 
-                const viewOnceBtn = document.getElementById('btn-view-once-toggle');
+                document.getElementById('chat-view-menu-info-label').textContent = state.infoLabel;
+                document.getElementById('chat-view-menu-info').style.display = state.showInfo ? 'flex' : 'none';
+
                 const viewOnceItem = document.getElementById('chat-view-menu-viewonce');
-                viewOnceItem.style.display = (viewOnceBtn && viewOnceBtn.style.display !== 'none') ? 'flex' : 'none';
-                const isArmed = viewOnceBtn && viewOnceBtn.classList.contains('active');
-                viewOnceItem.classList.toggle('viewonce-active', !!isArmed);
-                document.getElementById('chat-view-menu-viewonce-label').textContent = isArmed ? 'View once is on' : 'Send as view once';
+                viewOnceItem.style.display = state.showViewOnce ? 'flex' : 'none';
+                viewOnceItem.classList.toggle('viewonce-active', state.isArmed);
+                document.getElementById('chat-view-menu-viewonce-label').textContent = state.viewOnceLabel;
 
-                const isAIChat = typeof activeChatUid !== 'undefined' && activeChatUid === AI_UID;
-                const disappearingItem = document.getElementById('chat-view-menu-disappearing');
-                disappearingItem.style.display = (!isGroup && !isAIChat) ? 'flex' : 'none';
-                document.getElementById('chat-view-menu-disappearing-label').textContent = activeChatDisappearingSeconds > 0
-                    ? `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`
-                    : 'Disappearing messages';
+                document.getElementById('chat-view-menu-disappearing').style.display = state.showDisappearing ? 'flex' : 'none';
+                document.getElementById('chat-view-menu-disappearing-label').textContent = state.disappearingLabel;
 
-                const compilerItem = document.getElementById('chat-view-menu-compiler');
-                const activeGroup = isGroup && typeof cachedCommunities !== 'undefined' ? cachedCommunities[activeGroupId] : null;
-                compilerItem.style.display = (activeGroup && activeGroup.compilerEnabled) ? 'flex' : 'none';
-
-                // Requesting a ride is a personal action tied to the DM's own location context,
-                // not something that makes sense inside a group thread or the AI chat — same
-                // scope as the disappearing-messages item above.
-                document.getElementById('chat-view-menu-ride').style.display = (!isGroup && !isAIChat) ? 'flex' : 'none';
+                document.getElementById('chat-view-menu-compiler').style.display = state.showCompiler ? 'flex' : 'none';
+                document.getElementById('chat-view-menu-ride').style.display = state.showRide ? 'flex' : 'none';
 
                 dropdown.classList.toggle('open');
             });
@@ -25650,11 +25718,88 @@
             if (contactCardUid) openUserProfileSheet(contactCardUid);
         });
         document.getElementById('btn-contact-card-more').addEventListener('click', () => {
-            // Closes down to the underlying chat header first, then opens its existing "..."
-            // menu (View contact / Disappearing messages / Wallpaper / etc.) — reuses that
-            // menu rather than duplicating its items here.
             contactCardSheet.classList.remove('active');
-            document.getElementById('btn-chat-view-menu').click();
+            openContactCardMoreSheet();
+        });
+
+        // "More options" bottom sheet — opened from the Contact Info card's "More" button.
+        // Shows the same items as the chat header's three-dot dropdown (chat-view-menu-dropdown)
+        // but as a proper sheet rather than a small anchored dropdown, which reads better once
+        // it's already being opened from inside another sheet. computeChatViewMenuState() (see
+        // setupChatViewMenu above) keeps the two entry points' item visibility/labels in sync.
+        const contactCardMoreSheet = document.getElementById('contact-card-more-sheet-overlay');
+
+        function openContactCardMoreSheet() {
+            const state = computeChatViewMenuState();
+
+            document.getElementById('contact-more-info-label').textContent = state.infoLabel;
+            document.getElementById('contact-more-info').style.display = state.showInfo ? 'flex' : 'none';
+
+            const viewOnceRow = document.getElementById('contact-more-viewonce');
+            viewOnceRow.style.display = state.showViewOnce ? 'flex' : 'none';
+            viewOnceRow.classList.toggle('viewonce-active', state.isArmed);
+            document.getElementById('contact-more-viewonce-label').textContent = state.viewOnceLabel;
+
+            document.getElementById('contact-more-disappearing').style.display = state.showDisappearing ? 'flex' : 'none';
+            document.getElementById('contact-more-disappearing-label').textContent = state.disappearingLabel;
+
+            document.getElementById('contact-more-compiler').style.display = state.showCompiler ? 'flex' : 'none';
+            document.getElementById('contact-more-ride').style.display = state.showRide ? 'flex' : 'none';
+
+            contactCardMoreSheet.classList.add('active');
+        }
+
+        document.getElementById('btn-close-contact-card-more').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+        });
+        contactCardMoreSheet.addEventListener('click', (e) => {
+            if (e.target === contactCardMoreSheet) contactCardMoreSheet.classList.remove('active');
+        });
+
+        document.getElementById('contact-more-info').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
+            if (isGroup) {
+                document.getElementById('btn-group-info').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            } else if (typeof activeChatUid !== 'undefined' && activeChatUid) {
+                openUserProfileSheet(activeChatUid);
+            }
+        });
+        document.getElementById('contact-more-viewonce').addEventListener('click', () => {
+            // Doesn't close the sheet — this is a toggle the person may want to flip and then
+            // keep picking other options from, same as the header dropdown's equivalent item.
+            toggleViewOnceArmed();
+            const isArmed = document.getElementById('btn-view-once-toggle').classList.contains('active');
+            const row = document.getElementById('contact-more-viewonce');
+            row.classList.toggle('viewonce-active', isArmed);
+            document.getElementById('contact-more-viewonce-label').textContent = isArmed ? 'View once is on' : 'Send as view once';
+        });
+        document.getElementById('contact-more-disappearing').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            openDisappearingSheet();
+        });
+        document.getElementById('contact-more-compiler').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
+            const group = isGroup ? cachedCommunities[activeGroupId] : null;
+            if (group && group.compilerEnabled) openCodeCompiler(group);
+        });
+        document.getElementById('contact-more-music').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            openMusicPicker('Share a song', (music) => {
+                if (!music) return;
+                sendMusicMessage(music);
+            });
+        });
+        document.getElementById('contact-more-wallpaper').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            openWallpaperSheet();
+        });
+        document.getElementById('contact-more-ride').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            goToTab('tab-groups');
+            const mapSubtabBtn = document.querySelector('#communities-sub-tabs button[data-subtab="map"]');
+            if (mapSubtabBtn && !mapSubtabBtn.classList.contains('active')) mapSubtabBtn.click();
         });
         document.getElementById('btn-contact-card-disappearing').addEventListener('click', () => {
             contactCardSheet.classList.remove('active');

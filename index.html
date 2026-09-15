@@ -10650,12 +10650,18 @@
             let hash = window.location.hash.replace('#', '') || 'tab-status';
 
             // Re-derive which system now owns the top-of-history entry now that the hash has
-            // settled. If we've landed on a hash-overlay hash, that overlay's own entry is on
-            // top. Otherwise, if a bottom sheet is still open (sheetOpenStack tracked further
-            // down), it must be sitting on top instead — e.g. going back from an image viewer
-            // that was opened on top of the full Post view lands back on the Post view's own
-            // hash-unchanged entry, not on "nothing". See topHistoryEntryKind's declaration.
-            topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(hash) ? 'hash' : (sheetOpenStack.length ? 'sheet' : null);
+            // settled. A still-open bottom sheet (sheetOpenStack tracked further down) always
+            // wins here, even if the hash underneath it happens to itself be a
+            // HASH_OVERLAY_NAMES value — e.g. Contact Info's "Media, Links, Docs" sheet is
+            // opened from inside a DM (hash stays '#chat', which IS in HASH_OVERLAY_NAMES) and
+            // its own pushed history entry sits on top of chat's. Checking hash first here used
+            // to get that backwards: closing a photo viewer opened from that sheet landed back
+            // on hash '#chat', which matched HASH_OVERLAY_NAMES and wrongly marked the hash
+            // system as owning the top entry again — so the very next back press (meant to
+            // close the still-open sheet) was skipped by the guard below instead of closing it.
+            // Same priority order syncSheetHistory already uses — see its comment for the
+            // original "Post view" case this ordering was built for.
+            topHistoryEntryKind = sheetOpenStack.length ? 'sheet' : (HASH_OVERLAY_NAMES.includes(hash) ? 'hash' : null);
 
             const chatActive = document.getElementById('chat-view-overlay').classList.contains('active');
             const storyActive = document.getElementById('story-viewer-overlay').classList.contains('active');

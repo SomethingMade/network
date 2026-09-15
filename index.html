@@ -1793,6 +1793,17 @@
         .profile-media-grid-item .profile-media-play-badge { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item .profile-media-pin-badge { position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item:active { opacity: 0.85; }
+        /* Encrypted DM media cell, still being fetched + decrypted client-side (see
+           btn-contact-card-media above). Pulses gently so an empty cell doesn't read as
+           broken while it waits on decryptMediaUrlForPeer. */
+        .profile-media-grid-item.media-decrypting { animation: mediaGridPulse 1.4s ease-in-out infinite; }
+        @keyframes mediaGridPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+        .profile-media-grid-item.media-decrypt-failed { display: flex; align-items: center; justify-content: center; }
+        .profile-media-grid-item.media-decrypt-failed::after {
+            content: '🔒';
+            font-size: 20px;
+            opacity: 0.6;
+        }
         .profile-media-empty { grid-column: 1 / -1; text-align: center; font-size: 13.5px; color: var(--text-secondary); padding: 22px 0; }
         /* ── PROFILE SUBTABS (Posts / Media switcher above the section) ── */
         /* Same flat tab row as .feed-subtabs (bottom-border indicator under the active
@@ -12799,41 +12810,6 @@
             let tail = videoUrl.slice(idx + marker.length);
             tail = tail.replace(/\.\w+(\?.*)?$/, '.jpg$1');
             return `${head}so_${offsetSeconds},f_jpg,q_auto/${tail}`;
-        }
-
-        // Fallback for when cloudinaryVideoThumbnail() can't produce a server-rendered thumbnail
-        // (e.g. the URL doesn't match the expected '/video/upload/' shape). Rather than leaving a
-        // bare <video> with no poster — which browsers render as a big native "no frame decoded
-        // yet" placeholder — this seeks the video itself, grabs a real frame onto a canvas, and
-        // swaps it in for a proper static thumbnail once ready. Silently gives up (leaving the
-        // <video> in place, still playable on click) if the source can't be captured, e.g. a
-        // cross-origin video without CORS headers tainting the canvas.
-        function attachVideoFrameCapture(container) {
-            container.querySelectorAll('video[data-capture="1"]').forEach(video => {
-                const captureFrame = () => {
-                    const duration = isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-                    const target = duration ? Math.min(duration * 0.3, 2) : 0.1;
-                    if (Math.abs(video.currentTime - target) > 0.05) {
-                        try { video.currentTime = target; } catch (err) { /* not seekable yet */ }
-                        return;
-                    }
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = video.videoWidth || 240;
-                        canvas.height = video.videoHeight || 240;
-                        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const img = document.createElement('img');
-                        img.src = canvas.toDataURL('image/jpeg', 0.7);
-                        img.alt = '';
-                        img.loading = 'lazy';
-                        video.replaceWith(img);
-                    } catch (err) {
-                        // Tainted canvas or decode failure — leave the <video> as-is.
-                    }
-                };
-                video.addEventListener('loadedmetadata', captureFrame, { once: true });
-                video.addEventListener('seeked', captureFrame);
-            });
         }
 
         // --- FEED: POSTS + COMMENTS ---
@@ -25858,6 +25834,7 @@
         document.getElementById('btn-contact-card-media').addEventListener('click', () => {
             const grid = document.getElementById('contact-card-media-grid');
             const emptyMsg = document.getElementById('contact-card-media-empty');
+            const otherUid = contactCardUid;
             const items = Object.values(cachedThreadMessages)
                 .filter(msg => msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video') && !msg.deleted && !(msg.viewOnce && !msg.viewOnceViewed))
                 .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -25866,22 +25843,70 @@
                 emptyMsg.style.display = 'block';
             } else {
                 emptyMsg.style.display = 'none';
+                // Regular (non-view-once) DM photos/videos are end-to-end encrypted — msg.mediaURL
+                // points at ciphertext in Firebase Storage, which can't be dropped straight into an
+                // <img>/<video> src (that's what was rendering as a broken/placeholder thumbnail
+                // here before). Each cell starts blank and is filled in once decryptMediaUrlForPeer
+                // resolves a local, directly-playable blob URL — same approach the chat bubbles
+                // use for encrypted media. Unencrypted items (legacy messages, or view-once media
+                // which uploads via Cloudinary) already have a directly-usable mediaURL.
                 grid.innerHTML = items.map((msg, idx) => {
                     const isVideo = msg.mediaType === 'video';
-                    const thumb = isVideo ? (cloudinaryVideoThumbnail(msg.mediaURL, 1) || '') : msg.mediaURL;
                     const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
-                    const mediaTag = (isVideo && !thumb)
-                        ? `<video src="${msg.mediaURL}" crossorigin="anonymous" muted playsinline preload="metadata" data-capture="1"></video>`
-                        : `<img src="${thumb}" alt="" loading="lazy">`;
-                    return `<div class="profile-media-grid-item" data-idx="${idx}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
+                    return `<div class="profile-media-grid-item media-decrypting" data-idx="${idx}" data-is-video="${isVideo ? '1' : '0'}">${playBadge}</div>`;
                 }).join('');
-                attachVideoFrameCapture(grid);
+
+                const resolveUrl = (msg, bypassCache) => msg.mediaEncrypted
+                    ? decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType, bypassCache)
+                    : Promise.resolve(msg.mediaURL);
+
                 grid.querySelectorAll('.profile-media-grid-item').forEach(cell => {
+                    const msg = items[Number(cell.dataset.idx)];
+                    if (!msg) return;
+                    const isVideo = cell.dataset.isVideo === '1';
+
+                    const showReady = (localUrl) => {
+                        cell.classList.remove('media-decrypting', 'media-decrypt-failed');
+                        cell.dataset.resolvedUrl = localUrl;
+                        const oldMedia = cell.querySelector('img, video');
+                        if (oldMedia) oldMedia.remove();
+                        if (isVideo) {
+                            const vid = document.createElement('video');
+                            vid.muted = true;
+                            vid.playsInline = true;
+                            vid.preload = 'metadata';
+                            vid.src = localUrl;
+                            cell.prepend(vid);
+                            primeVideoPosterFrame(vid);
+                        } else {
+                            const img = document.createElement('img');
+                            img.src = localUrl;
+                            img.alt = '';
+                            img.loading = 'lazy';
+                            cell.prepend(img);
+                        }
+                    };
+
+                    const attemptResolve = (bypassCache) => {
+                        cell.classList.remove('media-decrypt-failed');
+                        cell.classList.add('media-decrypting');
+                        resolveUrl(msg, bypassCache).then(localUrl => {
+                            if (!localUrl) {
+                                cell.classList.remove('media-decrypting');
+                                cell.classList.add('media-decrypt-failed');
+                                return;
+                            }
+                            showReady(localUrl);
+                        });
+                    };
+                    attemptResolve(false);
+
                     cell.addEventListener('click', () => {
-                        const msg = items[Number(cell.dataset.idx)];
-                        if (!msg) return;
-                        if (cell.dataset.isVideo === '1') openVideoViewer(msg.mediaURL);
-                        else openImageViewer(msg.mediaURL);
+                        if (cell.classList.contains('media-decrypt-failed')) { attemptResolve(true); return; }
+                        const url = cell.dataset.resolvedUrl;
+                        if (!url) return; // still decrypting
+                        if (isVideo) openVideoViewer(url);
+                        else openImageViewer(url);
                     });
                 });
             }

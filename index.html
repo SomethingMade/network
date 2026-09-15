@@ -12801,6 +12801,41 @@
             return `${head}so_${offsetSeconds},f_jpg,q_auto/${tail}`;
         }
 
+        // Fallback for when cloudinaryVideoThumbnail() can't produce a server-rendered thumbnail
+        // (e.g. the URL doesn't match the expected '/video/upload/' shape). Rather than leaving a
+        // bare <video> with no poster — which browsers render as a big native "no frame decoded
+        // yet" placeholder — this seeks the video itself, grabs a real frame onto a canvas, and
+        // swaps it in for a proper static thumbnail once ready. Silently gives up (leaving the
+        // <video> in place, still playable on click) if the source can't be captured, e.g. a
+        // cross-origin video without CORS headers tainting the canvas.
+        function attachVideoFrameCapture(container) {
+            container.querySelectorAll('video[data-capture="1"]').forEach(video => {
+                const captureFrame = () => {
+                    const duration = isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+                    const target = duration ? Math.min(duration * 0.3, 2) : 0.1;
+                    if (Math.abs(video.currentTime - target) > 0.05) {
+                        try { video.currentTime = target; } catch (err) { /* not seekable yet */ }
+                        return;
+                    }
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth || 240;
+                        canvas.height = video.videoHeight || 240;
+                        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const img = document.createElement('img');
+                        img.src = canvas.toDataURL('image/jpeg', 0.7);
+                        img.alt = '';
+                        img.loading = 'lazy';
+                        video.replaceWith(img);
+                    } catch (err) {
+                        // Tainted canvas or decode failure — leave the <video> as-is.
+                    }
+                };
+                video.addEventListener('loadedmetadata', captureFrame, { once: true });
+                video.addEventListener('seeked', captureFrame);
+            });
+        }
+
         // --- FEED: POSTS + COMMENTS ---
         let feedListenersAttached = false;
         let cachedPosts = {};
@@ -25836,10 +25871,11 @@
                     const thumb = isVideo ? (cloudinaryVideoThumbnail(msg.mediaURL, 1) || '') : msg.mediaURL;
                     const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
                     const mediaTag = (isVideo && !thumb)
-                        ? `<video src="${msg.mediaURL}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=Math.min(this.duration*0.3,2)"></video>`
+                        ? `<video src="${msg.mediaURL}" crossorigin="anonymous" muted playsinline preload="metadata" data-capture="1"></video>`
                         : `<img src="${thumb}" alt="" loading="lazy">`;
                     return `<div class="profile-media-grid-item" data-idx="${idx}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
                 }).join('');
+                attachVideoFrameCapture(grid);
                 grid.querySelectorAll('.profile-media-grid-item').forEach(cell => {
                     cell.addEventListener('click', () => {
                         const msg = items[Number(cell.dataset.idx)];

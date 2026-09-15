@@ -1518,9 +1518,9 @@
         .post-composer-overlay .feed-composer-actions { border-top: 1px solid var(--border-color); margin-top: 14px; padding-top: 14px; justify-content: flex-start; }
         .post-composer-overlay .feed-composer-attach-row { gap: 14px; }
         .post-composer-overlay .feed-composer-attach { gap: 0; width: 38px; height: 38px; justify-content: center; border-radius: 50%; flex-shrink: 0; position: relative; }
-        .post-composer-overlay .feed-composer-attach:not(.feed-composer-tag-btn):hover,
-        .post-composer-overlay .feed-composer-attach:not(.feed-composer-tag-btn):active { background: var(--bg-alt); }
-        .post-composer-overlay .feed-composer-tag-btn { padding: 0; }
+        .post-composer-overlay .feed-composer-attach:not(.feed-composer-tag-btn):not(.feed-composer-location-btn):hover,
+        .post-composer-overlay .feed-composer-attach:not(.feed-composer-tag-btn):not(.feed-composer-location-btn):active { background: var(--bg-alt); }
+        .post-composer-overlay .feed-composer-tag-btn, .post-composer-overlay .feed-composer-location-btn { padding: 0; }
         .post-composer-overlay .feed-composer-attach span:not(.feed-composer-music-clear) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
         .post-composer-overlay .feed-composer-music-btn.has-music { background: rgba(var(--primary-rgb), 0.12); }
         .post-composer-overlay .feed-composer-music-clear { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--text-secondary); color: var(--bg-surface); display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
@@ -1753,6 +1753,9 @@
         .x-post-headline-main .time { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .x-post-headline-main .time::before { content: '·'; margin-right: 4px; color: var(--text-secondary); }
         .x-post-username { font-size: 13px; color: var(--text-secondary); margin-top: -1px; }
+        .feed-post-location { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; cursor: pointer; }
+        .feed-post-location svg { flex-shrink: 0; }
+        .feed-post-location span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-post-menu-btn { margin-left: auto; flex-shrink: 0; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 50%; display: flex; align-items: center; transition: background 0.12s ease, color 0.12s ease; }
         .feed-post-menu-btn:hover { background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); }
         .feed-post-edited-tag { font-size: 11px; color: var(--text-secondary); }
@@ -1937,6 +1940,17 @@
         .feed-composer-tags-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 4px 50px; }
         .feed-composer-tag-chip { display: flex; align-items: center; gap: 5px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); font-size: 12px; font-weight: 600; padding: 5px 8px 5px 10px; border-radius: 50px; }
         .feed-composer-tag-chip-remove { cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.75; }
+        /* Location attach button (post composer) — same idle/active pill treatment as
+           .feed-composer-tag-btn just above; the picker itself is #location-picker-sheet-overlay,
+           built on Haba Ride's existing Google Places loader (see loadGoogleMapsScript). */
+        .feed-composer-location-btn { border: 1.5px solid var(--border-color); border-radius: var(--radius-pill); padding: 6px 14px; background: var(--bg-alt); }
+        .feed-composer-location-btn.has-location { color: var(--primary-blue); background: rgba(var(--primary-rgb), 0.1); border-color: rgba(var(--primary-rgb), 0.3); }
+        .feed-composer-location-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 4px 50px; }
+        .feed-composer-location-chip { display: flex; align-items: center; gap: 5px; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); font-size: 12px; font-weight: 600; padding: 5px 8px 5px 10px; border-radius: 50px; max-width: 220px; }
+        .feed-composer-location-chip span:not(.feed-composer-location-chip-remove) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .feed-composer-location-chip-remove { cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.75; flex-shrink: 0; }
+        #location-picker-use-current { border-bottom: 1px solid var(--border-color); margin-bottom: 4px; }
+        #location-picker-current-icon { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); flex-shrink: 0; }
         .tag-people-item { display: flex; align-items: center; gap: 10px; padding: 10px 4px; cursor: pointer; border-radius: 12px; }
         .tag-people-item:hover { background: var(--bg-hover); }
         .tag-people-item .avatar { width: 40px; height: 40px; flex-shrink: 0; }
@@ -4915,6 +4929,7 @@
                     <input type="url" id="feed-composer-ad-url" class="feed-composer-ad-url-input" placeholder="Destination link, e.g. https://yourbusiness.com" autocomplete="off">
                 </div>
                 <div class="feed-composer-tags-row" id="feed-composer-tags-row" style="display:none;"></div>
+                <div class="feed-composer-location-row" id="feed-composer-location-row" style="display:none;"></div>
                 <div class="feed-composer-preview" id="feed-composer-preview" style="display:none;">
                     <div class="feed-composer-preview-main" id="feed-composer-preview-main">
                         <img id="feed-composer-preview-image" src="" alt="" style="display:none;">
@@ -4953,6 +4968,10 @@
                         <button type="button" class="feed-composer-attach feed-composer-poll-btn" id="feed-composer-poll-btn" title="Poll">
                             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
                             <span>Poll</span>
+                        </button>
+                        <button type="button" class="feed-composer-attach feed-composer-location-btn" id="feed-composer-location-btn" title="Location">
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            <span id="feed-composer-location-btn-text">Location</span>
                         </button>
                         <button type="button" class="feed-composer-attach feed-composer-music-btn" id="feed-composer-music-btn" style="display:none;" title="Music">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
@@ -5684,6 +5703,29 @@
             <div style="padding: 12px 20px 24px;">
                 <button type="button" id="btn-done-tagging" class="btn-pill" style="background: var(--gradient-brand); color:#fff;">Done</button>
             </div>
+        </div>
+    </div>
+
+    <div id="location-picker-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Add Location</h3>
+                <svg id="btn-close-location-picker-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="padding: 12px 20px 4px;">
+                <div class="input-group">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="location-picker-search-input" class="pill-input" placeholder="Search for a place" autocomplete="off" name="haba-location-search" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other">
+                </div>
+            </div>
+            <div class="tag-people-item" id="location-picker-use-current" role="button" tabindex="0" style="margin: 4px 16px 0; padding: 10px 4px;">
+                <div id="location-picker-current-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line></svg></div>
+                <div class="tag-people-item-body">
+                    <div class="tag-people-item-name" id="location-picker-current-label">Use current location</div>
+                </div>
+            </div>
+            <div id="location-picker-results" style="flex:1; overflow-y:auto; padding: 4px 20px 4px;"></div>
+            <div id="location-picker-empty" class="notif-empty-state" style="display:none;">No places found.</div>
         </div>
     </div>
 
@@ -12831,6 +12873,7 @@
         let feedComposerPollActive = false; // true while the poll builder panel is open; poll is mutually exclusive with media
         let feedComposerVisibility = 'everyone'; // 'everyone' | 'followers' — who can see this post once published
         let feedComposerIsAd = false; // true while "Publish as an Ad" is toggled on (business accounts only)
+        let composerLocation = null; // { name, address, lat, lng } picked via the Location bottom sheet, or null
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
         function canViewPost(post) {
@@ -14632,7 +14675,7 @@
                     submitBtn.disabled = true;
                     return;
                 }
-                const hasContent = (input.value && input.value.trim().length > 0) || feedComposerImages.length > 0 || !!feedComposerVideo;
+                const hasContent = (input.value && input.value.trim().length > 0) || feedComposerImages.length > 0 || !!feedComposerVideo || !!composerLocation;
                 submitBtn.disabled = !hasContent;
             }
 
@@ -15081,7 +15124,7 @@
                     if (!question || options.length < 2) return;
                     pollData = { question, options };
                 }
-                if (!text && !feedComposerImages.length && !feedComposerVideo && !pollData) return;
+                if (!text && !feedComposerImages.length && !feedComposerVideo && !pollData && !composerLocation) return;
                 const u = auth.currentUser;
                 if (!u) return;
                 const myProfile = cachedUsers[u.uid] || { name: u.displayName || 'You', photoURL: u.photoURL || '' };
@@ -15104,12 +15147,15 @@
                 const pendingIsAd = isAdSubmit;
                 const pendingAdCta = adCtaSelect.value;
                 const pendingAdUrl = normalizeAdUrl(adUrlInput.value.trim());
+                const pendingLocation = composerLocation;
 
                 // Close the composer and reset it right away — posting happens in the
                 // background behind a thin top-of-screen progress bar (see
                 // showGlobalUploadProgress) instead of blocking the modal open.
                 composerTaggedUids = new Set();
                 updateComposerTagsUI();
+                composerLocation = null;
+                updateComposerLocationUI();
                 feedComposerVisibility = 'everyone';
                 updateComposerAudienceUI();
                 feedComposerIsAd = false;
@@ -15176,6 +15222,7 @@
                         isAd: pendingIsAd || null,
                         adCta: pendingIsAd ? pendingAdCta : null,
                         adUrl: pendingIsAd ? pendingAdUrl : null,
+                        location: pendingLocation ? { name: pendingLocation.name, address: pendingLocation.address || '', lat: pendingLocation.lat, lng: pendingLocation.lng } : null,
                         timestamp: serverTimestamp(),
                         likeCount: 0,
                         commentCount: 0
@@ -16846,6 +16893,7 @@
                             ${menuBtnHtml}
                         </div>
                         <div class="x-post-username"><span class="x-post-username-text"></span></div>
+                        ${post.location ? `<div class="feed-post-location" data-lat="${post.location.lat}" data-lng="${post.location.lng}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span></span></div>` : ''}
                     </div>
                 </div>
                 <div class="feed-post-body">
@@ -16900,6 +16948,14 @@
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
                 musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+            }
+            const locationEl = card.querySelector('.feed-post-location');
+            if (locationEl && post.location) {
+                locationEl.querySelector('span').textContent = post.location.name;
+                locationEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${post.location.lat},${post.location.lng}`, '_blank', 'noopener');
+                });
             }
 
             if (post.poll) {
@@ -18259,6 +18315,164 @@
 
         function closeTagPeopleSheet() {
             document.getElementById('tag-people-sheet-overlay').classList.remove('active');
+        }
+
+        // --- LOCATION PICKER BOTTOM SHEET (post composer) ---
+        // Lets someone attach a real-world place to a feed post — either searched by name
+        // (Google Places Autocomplete predictions, resolved to full geometry via a Places
+        // Details lookup) or grabbed from the device's current GPS position (reverse-geocoded
+        // to a readable address). Reuses the exact same Google Maps script loader/API-key
+        // fetch already built for Haba Ride (loadGoogleMapsScript/fetchGoogleMapsApiKey) so the
+        // Maps JS SDK — and its 'places' library — is only ever loaded once, whichever feature
+        // triggers it first. Renders predictions as plain rows (reusing .tag-people-item)
+        // instead of Google's native pac-container dropdown, since that widget's own floating
+        // positioning doesn't play well anchored inside a bottom sheet.
+        let locationPickerAutocompleteService = null;
+        let locationPickerPlacesService = null;
+        let locationPickerGeocoder = null;
+        let locationPickerSearchDebounce = null;
+
+        function updateComposerLocationUI() {
+            const btn = document.getElementById('feed-composer-location-btn');
+            const btnText = document.getElementById('feed-composer-location-btn-text');
+            const row = document.getElementById('feed-composer-location-row');
+            if (btn) btn.classList.toggle('has-location', !!composerLocation);
+            if (btnText) btnText.textContent = composerLocation ? composerLocation.name : 'Location';
+            if (row) {
+                if (!composerLocation) {
+                    row.style.display = 'none';
+                    row.innerHTML = '';
+                } else {
+                    row.style.display = 'flex';
+                    row.innerHTML = '';
+                    const chip = document.createElement('div');
+                    chip.className = 'feed-composer-location-chip';
+                    chip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span></span><span class="feed-composer-location-chip-remove">&times;</span>`;
+                    chip.querySelector('span:not(.feed-composer-location-chip-remove)').textContent = composerLocation.name;
+                    chip.querySelector('.feed-composer-location-chip-remove').addEventListener('click', () => {
+                        composerLocation = null;
+                        updateComposerLocationUI();
+                    });
+                    row.appendChild(chip);
+                }
+            }
+            // Picking (or clearing) a location can flip whether the Post button should be
+            // enabled — e.g. a location with no caption/media is still postable. refreshSubmitState
+            // itself lives in a separate closure, so nudge it the same way mention-autocomplete
+            // does: dispatch a synthetic 'input' event on the composer textarea, which is already
+            // wired to call refreshSubmitState()/updateCharCount() on every keystroke.
+            const composerInput = document.getElementById('feed-composer-input');
+            if (composerInput) composerInput.dispatchEvent(new Event('input'));
+        }
+
+        async function ensureLocationPickerHelpers() {
+            await loadGoogleMapsScript();
+            if (!locationPickerAutocompleteService) locationPickerAutocompleteService = new google.maps.places.AutocompleteService();
+            if (!locationPickerPlacesService) {
+                // PlacesService requires a map or DOM node to bind to even for text-only lookups
+                // (no map is ever shown) — a detached div is the documented way to satisfy that.
+                locationPickerPlacesService = new google.maps.places.PlacesService(document.createElement('div'));
+            }
+            if (!locationPickerGeocoder) locationPickerGeocoder = new google.maps.Geocoder();
+        }
+
+        function renderLocationPickerResults(predictions) {
+            const list = document.getElementById('location-picker-results');
+            const emptyEl = document.getElementById('location-picker-empty');
+            list.innerHTML = '';
+            emptyEl.style.display = predictions.length === 0 ? 'block' : 'none';
+            predictions.forEach((pred) => {
+                const item = document.createElement('div');
+                item.className = 'tag-people-item';
+                item.innerHTML = `
+                    <div class="tag-people-item-body">
+                        <div class="tag-people-item-name"></div>
+                        <div class="tag-people-item-username"></div>
+                    </div>`;
+                const structured = pred.structured_formatting;
+                item.querySelector('.tag-people-item-name').textContent = (structured && structured.main_text) || pred.description;
+                item.querySelector('.tag-people-item-username').textContent = (structured && structured.secondary_text) || '';
+                item.addEventListener('click', () => selectLocationPrediction(pred));
+                list.appendChild(item);
+            });
+        }
+
+        function selectLocationPrediction(pred) {
+            locationPickerPlacesService.getDetails({ placeId: pred.place_id, fields: ['geometry', 'name', 'formatted_address'] }, (place, status) => {
+                if (status !== google.maps.places.PlacesServiceStatus.OK || !place || !place.geometry) {
+                    notify('Could not load that place', 'error');
+                    return;
+                }
+                const structured = pred.structured_formatting;
+                composerLocation = {
+                    name: place.name || (structured && structured.main_text) || pred.description,
+                    address: place.formatted_address || pred.description,
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng()
+                };
+                updateComposerLocationUI();
+                closeLocationPickerSheet();
+            });
+        }
+
+        function searchLocationPicker(query) {
+            if (!query) { renderLocationPickerResults([]); return; }
+            if (!locationPickerAutocompleteService) return;
+            locationPickerAutocompleteService.getPlacePredictions({ input: query }, (predictions, status) => {
+                if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+                    renderLocationPickerResults([]);
+                    return;
+                }
+                renderLocationPickerResults(predictions);
+            });
+        }
+
+        function useCurrentLocationForPost() {
+            const label = document.getElementById('location-picker-current-label');
+            if (!navigator.geolocation) {
+                notify("Location isn't available on this device", 'error');
+                return;
+            }
+            label.textContent = 'Finding your location…';
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    locationPickerGeocoder.geocode({ location: latLng }, (results, status) => {
+                        label.textContent = 'Use current location';
+                        if (status === 'OK' && results && results[0]) {
+                            composerLocation = {
+                                name: (results[0].formatted_address || 'Current location').split(',')[0],
+                                address: results[0].formatted_address || '',
+                                lat: latLng.lat,
+                                lng: latLng.lng
+                            };
+                        } else {
+                            composerLocation = { name: 'Current location', address: '', lat: latLng.lat, lng: latLng.lng };
+                        }
+                        updateComposerLocationUI();
+                        closeLocationPickerSheet();
+                    });
+                },
+                () => {
+                    label.textContent = 'Use current location';
+                    notify('Turn on location access to use this', 'error');
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        function openLocationPickerSheet() {
+            document.getElementById('location-picker-search-input').value = '';
+            renderLocationPickerResults([]);
+            document.getElementById('location-picker-sheet-overlay').classList.add('active');
+            ensureLocationPickerHelpers().catch((err) => {
+                console.error('[location-picker] failed to load Google Maps', err);
+                notify('Could not load location search', 'error');
+            });
+        }
+
+        function closeLocationPickerSheet() {
+            document.getElementById('location-picker-sheet-overlay').classList.remove('active');
         }
 
         // --- TAGGED BUSINESS (Settings > Business > Tagged Business) ---
@@ -20172,6 +20386,21 @@
         });
         document.getElementById('tag-people-search-input').addEventListener('input', (e) => {
             renderTagPeopleList(e.target.value);
+        });
+
+        document.getElementById('feed-composer-location-btn').addEventListener('click', openLocationPickerSheet);
+        document.getElementById('btn-close-location-picker-sheet').addEventListener('click', closeLocationPickerSheet);
+        document.getElementById('location-picker-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'location-picker-sheet-overlay') closeLocationPickerSheet();
+        });
+        document.getElementById('location-picker-use-current').addEventListener('click', useCurrentLocationForPost);
+        document.getElementById('location-picker-use-current').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); useCurrentLocationForPost(); }
+        });
+        document.getElementById('location-picker-search-input').addEventListener('input', (e) => {
+            clearTimeout(locationPickerSearchDebounce);
+            const q = e.target.value.trim();
+            locationPickerSearchDebounce = setTimeout(() => searchLocationPicker(q), 350);
         });
 
         document.getElementById('open-tagged-business-row').addEventListener('click', openChooseBusinessSheet);

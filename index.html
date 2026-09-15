@@ -6878,8 +6878,9 @@
         </div>
     </div>
 
-    <!-- BUY COINS SHEET: Paystack Inline checkout per bundle, same client-side pattern as the
-         Verified Badge purchase (see PAYSTACK_PUBLIC_KEY / btn-buy-verified-badge). -->
+    <!-- BUY COINS SHEET: Paystack Inline checkout per bundle (see PAYSTACK_PUBLIC_KEY). The
+         Verified Badge used to follow this same client-side pattern but purchasing it has
+         since been removed — see refreshVerifiedBadgePurchaseUI further down. -->
     <div id="buy-coins-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet">
             <div class="sheet-handle"></div>
@@ -6939,7 +6940,7 @@
 
     <!-- Dedicated "Get Verified" page — reached from the Verified Badge row in Settings.
          Reuses the same trial/purchase element IDs and click handlers as before (see
-         refreshTrialBadgeUI / refreshVerifiedBadgePurchaseUI / btn-buy-verified-badge below),
+         refreshTrialBadgeUI / refreshVerifiedBadgePurchaseUI below),
          just moved from a compact settings row into a full standalone page. -->
     <div id="verified-badge-page-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet vb-promo-sheet" style="max-height: 94vh; display:flex; flex-direction:column; padding:0;">
@@ -6996,18 +6997,20 @@
                         <span class="vb-promo-plan-badge">14 DAYS FREE</span>
                     </div>
                     <p class="vb-promo-plan-sub" id="trial-badge-status">Try the full Verified Badge free for 14 days</p>
+                    <div class="wa-earnings-progress-track" id="trial-badge-progress-track" style="display:none; margin-top:10px;">
+                        <div class="wa-earnings-progress-fill" id="trial-badge-progress-fill"></div>
+                    </div>
                     <button type="button" id="btn-trial-badge" class="vb-promo-cta">Start Trial</button>
                 </div>
 
-                <div class="vb-promo-plan-card" id="buy-verified-badge-row">
-                    <div class="vb-promo-plan-head">
-                        <span class="vb-promo-plan-name">Buy Verified <span class="group-badge-pill gold-business" id="paid-verified-pill" style="display:none; margin-left:6px; background:rgba(10,132,255,0.18); color:#0A84FF;">Verified</span></span>
-                    </div>
-                    <p class="vb-promo-plan-sub" id="buy-verified-badge-status">A permanent blue badge on your personal account — R2.99 once-off</p>
-                    <button type="button" id="btn-buy-verified-badge" class="vb-promo-cta vb-promo-cta-primary">Buy · R2.99</button>
-                </div>
+                <!-- Buy Verified card removed — purchases are no longer offered from this sheet.
+                     "paid-verified-pill" is kept (hidden, id preserved) purely so
+                     refreshVerifiedBadgePurchaseUI's DOM lookups still resolve for accounts that
+                     already have paidVerifiedAt/streakVerifiedAt from before this change; their
+                     badge itself is unaffected since that's driven by verifiedBadgeFor elsewhere. -->
+                <span id="paid-verified-pill" style="display:none;"></span>
 
-                <p class="vb-promo-terms">Payments are processed securely by Paystack. The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
+                <p class="vb-promo-terms">The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
             </div>
         </div>
     </div>
@@ -8621,11 +8624,11 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <!-- Paystack Inline JS (client-side checkout popup) — used to sell the paid Verified
-         Badge for personal accounts. Client-only integration: on a successful popup callback
-         the app writes paidVerifiedAt to Firebase directly, with no server-side check that a
-         charge actually went through (see the NOTE on PAYSTACK_PUBLIC_KEY / buyVerifiedBadge
-         below for the tradeoff). -->
+    <!-- Paystack Inline JS (client-side checkout popup) — used by the Buy Coins sheet. It used
+         to also power a paid Verified Badge purchase for personal accounts, but that purchase
+         flow has since been removed (see refreshVerifiedBadgePurchaseUI). Client-only
+         integration: on a successful popup callback the app writes the coin balance to Firebase
+         directly, with no server-side check that a charge actually went through. -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <!-- Agora Web SDK (RTC) — powers the Live feature: single host broadcasting to viewers,
          with the host able to pull viewers up on-stage as co-hosts mid-broadcast. -->
@@ -15585,14 +15588,32 @@
 
         // --- Dedicated "Get Verified" page (see verified-badge-page-overlay) ---
         const verifiedBadgePageOverlay = document.getElementById('verified-badge-page-overlay');
+        // Trial status/progress is time-based (days left, % elapsed), so it can go stale just
+        // sitting on screen — refreshTrialBadgeUI only re-runs when the profile listener fires.
+        // This interval keeps it accurate for as long as the sheet stays open, independent of
+        // any profile write; refreshTrialBadgeUI itself is defined further below, but function
+        // declarations are hoisted so it's safe to reference here.
+        let verifiedBadgePageTickInterval = null;
         document.getElementById('open-verified-badge-page-row').addEventListener('click', () => {
             verifiedBadgePageOverlay.classList.add('active');
+            const user = auth.currentUser;
+            const myProfile = (user && cachedUsers[user.uid]) || {};
+            refreshTrialBadgeUI(myProfile);
+            clearInterval(verifiedBadgePageTickInterval);
+            verifiedBadgePageTickInterval = setInterval(() => {
+                const u = auth.currentUser;
+                refreshTrialBadgeUI((u && cachedUsers[u.uid]) || {});
+            }, 60 * 1000);
         });
         document.getElementById('btn-close-verified-badge-page').addEventListener('click', () => {
             verifiedBadgePageOverlay.classList.remove('active');
+            clearInterval(verifiedBadgePageTickInterval);
         });
         verifiedBadgePageOverlay.addEventListener('click', (e) => {
-            if (e.target === verifiedBadgePageOverlay) verifiedBadgePageOverlay.classList.remove('active');
+            if (e.target === verifiedBadgePageOverlay) {
+                verifiedBadgePageOverlay.classList.remove('active');
+                clearInterval(verifiedBadgePageTickInterval);
+            }
         });
 
         // --- Haba Verification — business-account identity check (Didit, via Latch's
@@ -20331,22 +20352,36 @@
         function refreshTrialBadgeUI(myProfile) {
             const statusEl = document.getElementById('trial-badge-status');
             const btn = document.getElementById('btn-trial-badge');
-            const activatedAt = myProfile.trialBadgeActivatedAt || null;
+            const track = document.getElementById('trial-badge-progress-track');
+            const fill = document.getElementById('trial-badge-progress-fill');
+
+            // trialBadgeActivatedAt is written with serverTimestamp(); on the writer's own
+            // client this can briefly resolve to a placeholder object before the server value
+            // lands, rather than a number. Guard against that (and against any other non-number)
+            // so we never show a bogus countdown or a stuck/garbled progress bar.
+            const activatedAt = typeof myProfile.trialBadgeActivatedAt === 'number' ? myProfile.trialBadgeActivatedAt : null;
+
             if (!activatedAt) {
                 statusEl.textContent = 'Try the full Verified Badge free for 14 days';
                 btn.textContent = 'Start Trial';
                 btn.disabled = false;
                 btn.style.display = 'inline-flex';
+                track.style.display = 'none';
                 return;
             }
-            const msLeft = TRIAL_BADGE_DURATION_MS - (Date.now() - activatedAt);
+
+            const elapsedMs = Math.max(0, Date.now() - activatedAt);
+            const msLeft = TRIAL_BADGE_DURATION_MS - elapsedMs;
+            const pct = Math.min(100, Math.max(0, (elapsedMs / TRIAL_BADGE_DURATION_MS) * 100));
+            track.style.display = 'block';
+            fill.style.width = pct + '%';
+            btn.style.display = 'none';
+
             if (msLeft > 0) {
                 const daysLeft = Math.max(1, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
                 statusEl.textContent = `Active — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
-                btn.style.display = 'none';
             } else {
                 statusEl.textContent = 'Your free trial has ended';
-                btn.style.display = 'none';
             }
         }
 
@@ -20372,33 +20407,21 @@
             }
         });
 
-        // --- Paid Verified Badge (see PAYSTACK_PUBLIC_KEY / verifiedBadgeFor for background) ---
-        // Business accounts already have a badge (gold, free), so the purchase row is only
-        // relevant — and only shown — for personal accounts that haven't already bought it.
+        // --- Permanent Verified Badge status (see verifiedBadgeFor for background) ---
+        // Purchasing is no longer offered from this sheet — there's no buy button anymore —
+        // but accounts that already earned a permanent badge (old purchase, or a
+        // STREAK_PERMANENT_VERIFY_THRESHOLD-day streak) still get a status line and the pill
+        // confirming it, since that badge itself is untouched by removing the purchase flow.
         function refreshVerifiedBadgePurchaseUI(myProfile) {
-            const row = document.getElementById('buy-verified-badge-row');
-            const statusEl = document.getElementById('buy-verified-badge-status');
             const pill = document.getElementById('paid-verified-pill');
-            const btn = document.getElementById('btn-buy-verified-badge');
-            if (myProfile.isBusinessAccount) {
-                row.style.display = 'none';
-                return;
-            }
-            row.style.display = 'block';
             if (myProfile.streakVerifiedAt) {
-                statusEl.textContent = `You earned a permanent blue Verified Badge with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak — free, no purchase needed`;
+                pill.textContent = `Earned free with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak`;
                 pill.style.display = 'inline-block';
-                btn.style.display = 'none';
             } else if (myProfile.paidVerifiedAt) {
-                statusEl.textContent = "You've bought the permanent blue Verified Badge";
+                pill.textContent = 'Verified';
                 pill.style.display = 'inline-block';
-                btn.style.display = 'none';
             } else {
-                statusEl.textContent = `A permanent blue badge on your personal account — R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)} once-off`;
                 pill.style.display = 'none';
-                btn.style.display = 'inline-flex';
-                btn.disabled = false;
-                btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
             }
         }
 
@@ -20428,66 +20451,10 @@
             }
         }
 
-        document.getElementById('btn-buy-verified-badge').addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-            const myProfile = cachedUsers[user.uid] || {};
-            if (myProfile.paidVerifiedAt || myProfile.isBusinessAccount || myProfile.streakVerifiedAt) return;
-
-            if (!PAYSTACK_PUBLIC_KEY || PAYSTACK_PUBLIC_KEY.includes('REPLACE_WITH_YOUR')) {
-                showCustomModal('Payments Not Set Up', "The app owner hasn't connected a payment provider yet, so badge purchases aren't available right now.");
-                return;
-            }
-            if (typeof PaystackPop === 'undefined') {
-                notify('Payment system failed to load. Check your connection and try again.', 'error');
-                return;
-            }
-
-            const btn = document.getElementById('btn-buy-verified-badge');
-            btn.disabled = true;
-            btn.textContent = 'Opening…';
-
-            const paystackHandler = PaystackPop.setup({
-                key: PAYSTACK_PUBLIC_KEY,
-                email: user.email || `${user.uid}@haba.app`,
-                amount: VERIFIED_BADGE_PRICE_CENTS,
-                currency: 'ZAR',
-                metadata: {
-                    uid: user.uid,
-                    product: 'verified_badge',
-                    custom_fields: [
-                        { display_name: 'Product', variable_name: 'product', value: 'Haba Verified Badge' }
-                    ]
-                },
-                callback: (response) => {
-                    (async () => {
-                        // Client-only flow: trusting Paystack's callback directly and writing
-                        // paidVerifiedAt ourselves (see the NOTE on PAYSTACK_PUBLIC_KEY above for
-                        // why this is weaker than server-side verification).
-                        btn.textContent = 'Finishing up…';
-                        try {
-                            await update(ref(database, `users/${user.uid}`), {
-                                paidVerifiedAt: serverTimestamp(),
-                                paidVerifiedRef: response.reference
-                            });
-                            notify("You're verified! Your blue badge is live.");
-                            createSystemNotification(user.uid, { type: 'verified', text: "You're verified! Your blue badge is live." });
-                            refreshVerifiedBadgePurchaseUI({ ...myProfile, paidVerifiedAt: Date.now() });
-                            refreshVerifiedBadgeSettingsRow({ ...myProfile, paidVerifiedAt: Date.now() });
-                        } catch (err) {
-                            notify(err.message || 'Payment went through, but we could not update your badge. Contact support.', 'error');
-                            btn.disabled = false;
-                            btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
-                        }
-                    })();
-                },
-                onClose: () => {
-                    btn.disabled = false;
-                    btn.textContent = `Buy · R${VERIFIED_BADGE_PRICE_ZAR.toFixed(2)}`;
-                }
-            });
-            paystackHandler.openIframe();
-        });
+        // Buy-verified-badge click handler removed along with the button — purchasing a
+        // Verified Badge via Paystack is no longer offered from this sheet. paidVerifiedAt is
+        // still read (see refreshVerifiedBadgePurchaseUI/refreshVerifiedBadgeSettingsRow above)
+        // so anyone who bought the badge before this change keeps their status shown correctly.
 
         // Header avatars ([data-profile-trigger], all tab headers) now open the sidebar
         // drawer — a quick nav menu — instead of jumping straight into the Profile sheet.

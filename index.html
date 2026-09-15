@@ -832,6 +832,11 @@
            not just its own default (100002) — it's placed after profile-bottom-sheet-overlay
            in the DOM, so equal z-index still paints it above when both are open. */
         #user-info-sheet-overlay { z-index: 100010; }
+        #contact-card-sheet-overlay { z-index: 100010; }
+        /* Media grid opens from a row inside the contact card sheet, so it needs to clear
+           that sheet's own z-index too — same "opened from inside another sheet" pattern used
+           throughout the app (e.g. #choose-business-sheet-overlay above Settings). */
+        #contact-card-media-sheet-overlay { z-index: 100011; }
         /* Followers/Following list is opened from inside either the profile sheet or the
            user-info sheet, so it needs the same top tier as those — placed after both in
            the DOM, so equal z-index still paints it above whichever is open underneath. */
@@ -1064,7 +1069,7 @@
            opacity fade running underneath a transform slide at the same time reads as
            a flicker, not a clean single motion. */
         @media (max-width: 767px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #insights-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay, #contact-card-sheet-overlay, #contact-card-media-sheet-overlay {
                 opacity: 1;
                 visibility: visible;
                 pointer-events: none;
@@ -1075,10 +1080,10 @@
                 justify-content: flex-start;
                 transition: none;
             }
-            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #edit-profile-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active, #notifications-sheet-overlay.active, #jobs-sheet-overlay.active, #market-sheet-overlay.active {
+            #user-info-sheet-overlay.active, #profile-bottom-sheet-overlay.active, #edit-profile-sheet-overlay.active, #settings-bottom-sheet-overlay.active, #insights-bottom-sheet-overlay.active, #notifications-sheet-overlay.active, #jobs-sheet-overlay.active, #market-sheet-overlay.active, #contact-card-sheet-overlay.active, #contact-card-media-sheet-overlay.active {
                 pointer-events: auto;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #insights-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet, #contact-card-sheet-overlay .bottom-sheet, #contact-card-media-sheet-overlay .bottom-sheet {
                 width: 100%;
                 max-width: 100%;
                 height: 100%;
@@ -1094,10 +1099,10 @@
                 flex-direction: column;
                 overflow-y: auto;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #insights-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet, #contact-card-sheet-overlay.active .bottom-sheet, #contact-card-media-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #insights-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle, #contact-card-sheet-overlay .sheet-handle, #contact-card-media-sheet-overlay .sheet-handle {
                 display: none;
             }
             #notifications-sheet-overlay .notif-sheet-header, #notifications-sheet-overlay #notif-header-selection, #jobs-sheet-overlay .notif-sheet-header, #market-sheet-overlay .notif-sheet-header {
@@ -1167,6 +1172,33 @@
         .tm-profile-avatar.avatar-circle { width: 92px; height: 92px; flex-shrink: 0; border-radius: 50%; background-color: var(--border-color); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--primary-blue); font-weight: 700; border: 4px solid var(--bg-surface); box-shadow: var(--shadow-elevated); cursor: pointer; transition: transform 0.2s var(--ease-smooth); }
 
         .tm-profile-bio { font-size: 15px; line-height: 1.55; color: var(--text-primary); margin: 0 0 14px; white-space: pre-wrap; }
+
+        /* ── QUICK "CONTACT INFO" CARD (tap chat header/avatar in a DM) ──
+           WhatsApp/Telegram-style summary: centered avatar/name/username, a row of round
+           icon-button quick actions, then a short settings-style list (reusing .wa-list-row).
+           Lighter and chat-scoped, unlike user-info-sheet-overlay's deeper Instagram-style
+           profile (posts grid, Follow/Message) — "Profile" below opens that sheet instead of
+           duplicating it here. Shares .bottom-sheet.wa-profile-sheet's full-page-on-phone /
+           docked-panel-on-desktop mechanics with every other simple settings-style sheet. */
+        .contact-card-content { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 4px 4px 8px; }
+        .contact-card-avatar { margin-bottom: 14px; }
+        .contact-card-name { font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 2px; display: flex; align-items: center; gap: 6px; word-break: break-word; }
+        .contact-card-username { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin: 0 0 22px; }
+        .contact-card-actions { display: flex; align-items: flex-start; justify-content: center; gap: 22px; width: 100%; margin-bottom: 26px; }
+        .contact-card-action-btn { display: flex; flex-direction: column; align-items: center; gap: 7px; background: none; border: none; cursor: pointer; color: var(--text-primary); flex-shrink: 0; }
+        .contact-card-action-icon { width: 52px; height: 52px; border-radius: 50%; background: var(--bg-input); display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, transform 0.15s ease; }
+        .contact-card-action-icon svg { width: 22px; height: 22px; }
+        .contact-card-action-btn:hover .contact-card-action-icon { background: var(--bg-hover); }
+        .contact-card-action-btn:active .contact-card-action-icon { transform: scale(0.94); }
+        .contact-card-action-label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+        .contact-card-list { width: 100%; text-align: left; }
+        /* Trailing status text (e.g. "Off" / "24 hours") before a row's chevron — the app's
+           existing .wa-list-row pattern had no variant for this, just icon+title+chevron. */
+        .wa-row-meta { font-size: 13.5px; color: var(--text-secondary); flex-shrink: 0; margin-right: 2px; }
+
+        /* Media grid page opened from the "Media, Links, Docs" row above. */
+        .contact-card-media-sheet .profile-media-grid { margin-top: 4px; }
+
 
         /* Website link reads as a small pill/chip (icon + host) rather than plain
            underlined text — pulls it in line with the stat chips below it instead of
@@ -1327,14 +1359,14 @@
            dropped so the chat stays visible and usable underneath; clicking outside the
            panel still closes it via the existing generic overlay click handler. */
         @media (min-width: 768px) {
-            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay {
+            #user-info-sheet-overlay, #profile-bottom-sheet-overlay, #edit-profile-sheet-overlay, #settings-bottom-sheet-overlay, #notifications-sheet-overlay, #jobs-sheet-overlay, #market-sheet-overlay, #contact-card-sheet-overlay, #contact-card-media-sheet-overlay {
                 align-items: stretch;
                 justify-content: flex-end;
                 background: rgba(0, 0, 0, 0.08);
                 backdrop-filter: none;
                 -webkit-backdrop-filter: none;
             }
-            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet {
+            #user-info-sheet-overlay .bottom-sheet, #profile-bottom-sheet-overlay .bottom-sheet, #edit-profile-sheet-overlay .bottom-sheet, #settings-bottom-sheet-overlay .bottom-sheet, #notifications-sheet-overlay .bottom-sheet, #jobs-sheet-overlay .bottom-sheet, #market-sheet-overlay .bottom-sheet, #contact-card-sheet-overlay .bottom-sheet, #contact-card-media-sheet-overlay .bottom-sheet {
                 width: 400px;
                 max-width: 400px;
                 height: 100%;
@@ -1352,10 +1384,10 @@
                 display: flex;
                 flex-direction: column;
             }
-            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet {
+            #user-info-sheet-overlay.active .bottom-sheet, #profile-bottom-sheet-overlay.active .bottom-sheet, #edit-profile-sheet-overlay.active .bottom-sheet, #settings-bottom-sheet-overlay.active .bottom-sheet, #notifications-sheet-overlay.active .bottom-sheet, #jobs-sheet-overlay.active .bottom-sheet, #market-sheet-overlay.active .bottom-sheet, #contact-card-sheet-overlay.active .bottom-sheet, #contact-card-media-sheet-overlay.active .bottom-sheet {
                 transform: translateX(0);
             }
-            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle {
+            #user-info-sheet-overlay .sheet-handle, #profile-bottom-sheet-overlay .sheet-handle, #edit-profile-sheet-overlay .sheet-handle, #settings-bottom-sheet-overlay .sheet-handle, #notifications-sheet-overlay .sheet-handle, #jobs-sheet-overlay .sheet-handle, #market-sheet-overlay .sheet-handle, #contact-card-sheet-overlay .sheet-handle, #contact-card-media-sheet-overlay .sheet-handle {
                 display: none;
             }
         }
@@ -6047,6 +6079,84 @@
                     <div class="profile-media-grid" id="user-info-media-grid" style="display:none;"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Quick "Contact Info" card — WhatsApp/Telegram-style summary opened by tapping the chat
+         header (avatar or name/status) in a 1:1 DM: Call/Video/Profile/More quick actions plus
+         Media,Links,Docs and Disappearing messages rows. Distinct from user-info-sheet-overlay
+         above (the deeper Instagram-style profile with Follow/Message + posts grid) — the
+         "Profile" action below opens that sheet; this one is the lighter, chat-scoped summary
+         that sits in front of it. Uses the plain generic bottom-sheet open/close pattern (no
+         hash routing of its own), same as Settings/Edit Profile/etc., so it's automatically
+         picked up by the generic back-button-tracked overlay list. -->
+    <div id="contact-card-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet">
+            <div class="sheet-handle"></div>
+            <div class="wa-sheet-header">
+                <button type="button" id="btn-close-contact-card" class="wa-header-icon-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div style="width:38px; flex-shrink:0;"></div>
+            </div>
+            <div class="contact-card-content">
+                <div class="avatar-circle tm-profile-avatar contact-card-avatar" id="contact-card-avatar"></div>
+                <h1 id="contact-card-name" class="contact-card-name">Name</h1>
+                <p id="contact-card-username" class="contact-card-username">@username</p>
+
+                <div class="contact-card-actions">
+                    <button type="button" class="contact-card-action-btn" id="btn-contact-card-call">
+                        <span class="contact-card-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></span>
+                        <span class="contact-card-action-label">Call</span>
+                    </button>
+                    <button type="button" class="contact-card-action-btn" id="btn-contact-card-video">
+                        <span class="contact-card-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></span>
+                        <span class="contact-card-action-label">Video</span>
+                    </button>
+                    <button type="button" class="contact-card-action-btn" id="btn-contact-card-profile">
+                        <span class="contact-card-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"></circle><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path></svg></span>
+                        <span class="contact-card-action-label">Profile</span>
+                    </button>
+                    <button type="button" class="contact-card-action-btn" id="btn-contact-card-more">
+                        <span class="contact-card-action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="4" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="20" cy="12" r="1.5"></circle></svg></span>
+                        <span class="contact-card-action-label">More</span>
+                    </button>
+                </div>
+
+                <div class="wa-section contact-card-list">
+                    <div class="wa-list-row wa-row-clickable" id="btn-contact-card-media">
+                        <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div>
+                        <div class="wa-row-body"><span class="wa-row-title">Media, Links, Docs</span></div>
+                        <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </div>
+                    <div class="wa-list-row wa-row-clickable" id="btn-contact-card-disappearing">
+                        <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                        <div class="wa-row-body"><span class="wa-row-title">Disappearing messages</span></div>
+                        <span class="wa-row-meta" id="contact-card-disappearing-value">Off</span>
+                        <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media grid for the "Media, Links, Docs" row above. Shows images/videos from the
+         currently loaded portion of this DM thread (cachedThreadMessages) — Haba doesn't have
+         a separate document/file message type yet and pulling the FULL thread history (rather
+         than just what's already loaded) would need its own Firebase query, so this is scoped
+         to media from what's already in view, same data the chat itself is rendering from. -->
+    <div id="contact-card-media-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet wa-profile-sheet contact-card-media-sheet">
+            <div class="sheet-handle"></div>
+            <div class="wa-sheet-header">
+                <button type="button" id="btn-close-contact-card-media" class="wa-header-icon-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="wa-header-title">Media, Links, Docs</div>
+                <div style="width:38px; flex-shrink:0;"></div>
+            </div>
+            <div class="profile-media-grid" id="contact-card-media-grid"></div>
+            <p class="empty-msg" id="contact-card-media-empty" style="display:none;">No media in this chat yet.</p>
         </div>
     </div>
 
@@ -25498,6 +25608,101 @@
             userInfoSheet.classList.remove('active');
         }
 
+        // Quick "Contact Info" card — the lighter, chat-scoped summary opened by tapping the
+        // chat header (avatar or name/status) in an open DM. See the HTML comment above
+        // #contact-card-sheet-overlay for how this differs from openUserProfileSheet above.
+        const contactCardSheet = document.getElementById('contact-card-sheet-overlay');
+        let contactCardUid = null;
+
+        function openContactCard(uid) {
+            if (!uid || uid === AI_UID) return;
+            pauseAllAppMedia();
+            const profile = cachedUsers[uid] || {};
+            contactCardUid = uid;
+            const avatarEl = document.getElementById('contact-card-avatar');
+            avatarEl.style.backgroundImage = `url('${profile.photoURL || DEFAULT_AVATAR_URL}')`;
+            avatarEl.style.backgroundColor = '';
+            avatarEl.textContent = '';
+            document.getElementById('contact-card-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
+            document.getElementById('contact-card-username').textContent = profile.username ? '@' + profile.username : '@—';
+            document.getElementById('contact-card-disappearing-value').textContent = activeChatDisappearingSeconds > 0
+                ? disappearingLabelFor(activeChatDisappearingSeconds)
+                : 'Off';
+            contactCardSheet.classList.add('active');
+        }
+
+        document.getElementById('btn-close-contact-card').addEventListener('click', () => {
+            contactCardSheet.classList.remove('active');
+        });
+        contactCardSheet.addEventListener('click', (e) => {
+            if (e.target === contactCardSheet) contactCardSheet.classList.remove('active');
+        });
+        document.getElementById('btn-contact-card-call').addEventListener('click', () => {
+            contactCardSheet.classList.remove('active');
+            document.getElementById('btn-call-voice').click();
+        });
+        document.getElementById('btn-contact-card-video').addEventListener('click', () => {
+            contactCardSheet.classList.remove('active');
+            document.getElementById('btn-call-video').click();
+        });
+        document.getElementById('btn-contact-card-profile').addEventListener('click', () => {
+            contactCardSheet.classList.remove('active');
+            if (contactCardUid) openUserProfileSheet(contactCardUid);
+        });
+        document.getElementById('btn-contact-card-more').addEventListener('click', () => {
+            // Closes down to the underlying chat header first, then opens its existing "..."
+            // menu (View contact / Disappearing messages / Wallpaper / etc.) — reuses that
+            // menu rather than duplicating its items here.
+            contactCardSheet.classList.remove('active');
+            document.getElementById('btn-chat-view-menu').click();
+        });
+        document.getElementById('btn-contact-card-disappearing').addEventListener('click', () => {
+            contactCardSheet.classList.remove('active');
+            openDisappearingSheet();
+        });
+
+        // "Media, Links, Docs" — images/videos from the currently loaded portion of this DM
+        // thread (cachedThreadMessages). See the HTML comment above
+        // #contact-card-media-sheet-overlay for why this is media-only, and why it's scoped to
+        // what's already loaded rather than the full thread history.
+        document.getElementById('btn-contact-card-media').addEventListener('click', () => {
+            const grid = document.getElementById('contact-card-media-grid');
+            const emptyMsg = document.getElementById('contact-card-media-empty');
+            const items = Object.values(cachedThreadMessages)
+                .filter(msg => msg.mediaURL && (msg.mediaType === 'image' || msg.mediaType === 'video') && !msg.deleted && !(msg.viewOnce && !msg.viewOnceViewed))
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            if (!items.length) {
+                grid.innerHTML = '';
+                emptyMsg.style.display = 'block';
+            } else {
+                emptyMsg.style.display = 'none';
+                grid.innerHTML = items.map((msg, idx) => {
+                    const isVideo = msg.mediaType === 'video';
+                    const thumb = isVideo ? (cloudinaryVideoThumbnail(msg.mediaURL, 1) || '') : msg.mediaURL;
+                    const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
+                    const mediaTag = (isVideo && !thumb)
+                        ? `<video src="${msg.mediaURL}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=Math.min(this.duration*0.3,2)"></video>`
+                        : `<img src="${thumb}" alt="" loading="lazy">`;
+                    return `<div class="profile-media-grid-item" data-idx="${idx}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${playBadge}</div>`;
+                }).join('');
+                grid.querySelectorAll('.profile-media-grid-item').forEach(cell => {
+                    cell.addEventListener('click', () => {
+                        const msg = items[Number(cell.dataset.idx)];
+                        if (!msg) return;
+                        if (cell.dataset.isVideo === '1') openVideoViewer(msg.mediaURL);
+                        else openImageViewer(msg.mediaURL);
+                    });
+                });
+            }
+            document.getElementById('contact-card-media-sheet-overlay').classList.add('active');
+        });
+        document.getElementById('btn-close-contact-card-media').addEventListener('click', () => {
+            document.getElementById('contact-card-media-sheet-overlay').classList.remove('active');
+        });
+        document.getElementById('contact-card-media-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) e.currentTarget.classList.remove('active');
+        });
+
         // "Followed by A, B, and N others" — X-style social proof for someone else's profile:
         // among the people I follow (cachedContacts), which ones also follow this profile.
         // followers/{uid} isn't kept in a live cache for arbitrary uids (only my own, at
@@ -25839,12 +26044,12 @@
         document.getElementById('chat-view-avatar').addEventListener('click', () => {
             if (activeGroupId) { document.getElementById('btn-group-info').click(); }
             else if (activeChatUid === AI_UID) { openImageViewer(AI_AVATAR_VIEWER_SRC, true); }
-            else if (activeChatUid) { openUserProfileSheet(activeChatUid); }
+            else if (activeChatUid) { openContactCard(activeChatUid); }
         });
         document.getElementById('chat-view-avatar').style.cursor = 'pointer';
         document.querySelector('.chat-view-info').addEventListener('click', () => {
             if (activeGroupId) { document.getElementById('btn-group-info').click(); }
-            else if (activeChatUid) { openUserProfileSheet(activeChatUid); }
+            else if (activeChatUid) { openContactCard(activeChatUid); }
         });
         document.querySelector('.chat-view-info').style.cursor = 'pointer';
         userInfoSheet.addEventListener('click', (e) => {

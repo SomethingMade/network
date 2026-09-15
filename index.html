@@ -25905,8 +25905,17 @@
                         if (cell.classList.contains('media-decrypt-failed')) { attemptResolve(true); return; }
                         const url = cell.dataset.resolvedUrl;
                         if (!url) return; // still decrypting
-                        if (isVideo) openVideoViewer(url);
-                        else openImageViewer(url);
+                        // This grid lives inside #contact-card-media-sheet-overlay (z-index
+                        // 100011); without this the viewer (100008 by default) would open
+                        // visually underneath it — see the tier comment above
+                        // #image-viewer-overlay.active.above-sheet.
+                        if (isVideo) {
+                            document.getElementById('video-viewer-overlay').classList.add('above-sheet');
+                            openVideoViewer(url);
+                        } else {
+                            document.getElementById('image-viewer-overlay').classList.add('above-sheet');
+                            openImageViewer(url);
+                        }
                     });
                 });
             }

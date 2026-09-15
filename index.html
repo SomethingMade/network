@@ -833,6 +833,10 @@
            in the DOM, so equal z-index still paints it above when both are open. */
         #user-info-sheet-overlay { z-index: 100010; }
         #contact-card-sheet-overlay { z-index: 100010; }
+        /* "More options" sheet opens from inside the contact card sheet, so it needs to clear
+           that sheet's own z-index too — same "opened from inside another sheet" pattern as
+           contact-card-media-sheet-overlay just below. */
+        #contact-card-more-sheet-overlay { z-index: 100011; }
         /* Media grid opens from a row inside the contact card sheet, so it needs to clear
            that sheet's own z-index too — same "opened from inside another sheet" pattern used
            throughout the app (e.g. #choose-business-sheet-overlay above Settings). */
@@ -25706,12 +25710,16 @@
             if (e.target === contactCardSheet) contactCardSheet.classList.remove('active');
         });
         document.getElementById('btn-contact-card-call').addEventListener('click', () => {
+            if (!contactCardUid) return;
+            const profile = cachedUsers[contactCardUid] || {};
             contactCardSheet.classList.remove('active');
-            document.getElementById('btn-call-voice').click();
+            startCall(contactCardUid, profile.name || 'Contact', profile.photoURL || '', false);
         });
         document.getElementById('btn-contact-card-video').addEventListener('click', () => {
+            if (!contactCardUid) return;
+            const profile = cachedUsers[contactCardUid] || {};
             contactCardSheet.classList.remove('active');
-            document.getElementById('btn-call-video').click();
+            startCall(contactCardUid, profile.name || 'Contact', profile.photoURL || '', true);
         });
         document.getElementById('btn-contact-card-profile').addEventListener('click', () => {
             contactCardSheet.classList.remove('active');

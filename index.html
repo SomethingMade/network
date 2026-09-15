@@ -23070,7 +23070,9 @@
         // actually slides up to fill the space, instead of leaving a gap. ---
         (function initHeaderScrollHide() {
             const pairs = [
-                ['tab-chats', 'chat-list-container'],
+                // tab-chats intentionally excluded — its header (avatar/title, filter pill, and
+                // the search bar) stays pinned at the top while the chat list scrolls, rather
+                // than sliding away like the other tabs below.
                 ['tab-status', 'discover-grid-scroll'],
                 ['tab-groups', 'communities-feed-container'],
                 ['tab-calls', 'calls-list-container'],
@@ -25909,11 +25911,23 @@
                         // 100011); without this the viewer (100008 by default) would open
                         // visually underneath it — see the tier comment above
                         // #image-viewer-overlay.active.above-sheet.
+                        //
+                        // topHistoryEntryKind is set here too, not left to the async 'hashchange'
+                        // listener alone: openImageViewer/openVideoViewer set location.hash, but
+                        // the resulting 'hashchange' event (which is what normally flips
+                        // topHistoryEntryKind to 'hash') fires on a later task, not synchronously.
+                        // A back press landing inside that gap would still read the stale 'sheet'
+                        // value, so the generic sheet popstate listener (see its guard comment)
+                        // would wrongly pop this media sheet in addition to the hash listener
+                        // correctly closing the viewer — one back press undoing two levels
+                        // instead of just closing the viewer on top.
                         if (isVideo) {
                             document.getElementById('video-viewer-overlay').classList.add('above-sheet');
+                            topHistoryEntryKind = 'hash';
                             openVideoViewer(url);
                         } else {
                             document.getElementById('image-viewer-overlay').classList.add('above-sheet');
+                            topHistoryEntryKind = 'hash';
                             openImageViewer(url);
                         }
                     });

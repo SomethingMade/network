@@ -22078,17 +22078,30 @@
             settingsSheetOverlay.querySelectorAll('.settings-x-row-hidden').forEach(row => row.classList.remove('settings-x-row-hidden'));
             refreshAppLockSettingsUI();
             if (auth.currentUser) resetPhoneLinkUI(auth.currentUser);
+            // The generic sheet tracker (see "GENERIC BACK-BUTTON SUPPORT" above) normally
+            // reconciles class changes into a pushed history entry a microtask later. That's
+            // fine for sheets opened well before anyone could react, but Settings is commonly
+            // the very first thing tapped after load — leaving a brief window where a fast
+            // device back press lands before the entry is pushed and falls straight through
+            // to the app's boot entry (exiting the app instead of just closing Settings).
+            // Reconcile immediately and synchronously here so that window never exists; the
+            // scheduled microtask still runs afterward but finds nothing left to do.
+            syncSheetHistory();
         }
         document.getElementById('btn-open-settings').addEventListener('click', openSettingsSheet);
         const homeHeaderSettingsBtn = document.getElementById('home-header-settings-btn');
         if (homeHeaderSettingsBtn) {
             homeHeaderSettingsBtn.addEventListener('click', openSettingsSheet);
         }
-        document.getElementById('btn-close-settings').addEventListener('click', () => {
+        function closeSettingsSheet() {
             settingsSheetOverlay.classList.remove('active');
-        });
+            // Same reasoning as the open path above: reconcile synchronously so the pushed
+            // entry is consumed (via history.back()) right away instead of a microtask later.
+            syncSheetHistory();
+        }
+        document.getElementById('btn-close-settings').addEventListener('click', closeSettingsSheet);
         settingsSheetOverlay.addEventListener('click', (e) => {
-            if (e.target === settingsSheetOverlay) settingsSheetOverlay.classList.remove('active');
+            if (e.target === settingsSheetOverlay) closeSettingsSheet();
         });
 
         // Tapping the Home header title (avatar + "Home" text) scrolls the feed back to the

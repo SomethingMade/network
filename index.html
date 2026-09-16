@@ -11134,15 +11134,24 @@
             // controlling it.
             if (topSheetId === 'post-comments-sheet-overlay') {
                 closePostComments();
-            } else if (topSheetId === 'settings-bottom-sheet-overlay' && document.querySelector('#settings-bottom-sheet-overlay .settings-x-panel.active')?.dataset.settingsPanel !== 'main') {
-                // Settings is showing one of its X-style sub-panels (Your account, Privacy
-                // and safety, etc). A device back press here should do exactly what tapping
-                // the in-sheet back arrow does — drop to the root category list — not close
-                // Settings outright. The browser has already consumed this entry, so push a
-                // replacement one right back so the sheet stays on the stack and a *second*
-                // back press is what's needed to actually close it.
+            } else if (topSheetId === 'settings-bottom-sheet-overlay' && history.state?.sheetNav?.includes('settings-bottom-sheet-overlay')) {
+                // Settings sub-panels (Your account, Privacy and safety, etc.) push their own
+                // history entry when opened (see the data-open-settings-panel handler below),
+                // the same pattern used for hash overlays and live overlays elsewhere in this
+                // file. So popping back to an entry that still has the settings sheet in its
+                // sheetNav means this back press only closed a sub-panel, not the sheet itself
+                // — the sheet is still open underneath. Just swap the panel back to the root
+                // category list, exactly like the in-app back arrow (which now triggers this
+                // same history.back() rather than repainting directly — see that handler).
+                // Leave sheetOpenStack and the overlay's own 'active' class untouched so a
+                // *second* back press is what's needed to actually close Settings.
+                //
+                // This replaces an earlier approach that let the browser consume the sub-panel
+                // press and then pushed a replacement entry back on to "re-arm" the sheet —
+                // that reconstruction could drift out of sync with the real history stack
+                // (e.g. if a second back press arrived before the replacement entry landed)
+                // and fall through to a full app reload instead of a clean close.
                 showSettingsPanel('main');
-                history.pushState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
                 sheetSyncScheduled = false;
                 closingSheetViaBackButton = false;
                 return;
@@ -22044,10 +22053,23 @@
             if (settingsXScrollHost) settingsXScrollHost.scrollTop = 0;
         }
         settingsSheetOverlay.querySelectorAll('[data-open-settings-panel]').forEach(row => {
-            row.addEventListener('click', () => showSettingsPanel(row.dataset.openSettingsPanel));
+            row.addEventListener('click', () => {
+                // Give the sub-panel its own real history entry (mirroring hash overlays and
+                // live overlays elsewhere in this file) instead of just repainting — that lets
+                // the device back button pop straight back out via the ordinary popstate flow
+                // below (see its settings-bottom-sheet-overlay branch), rather than needing to
+                // reconstruct history state after the fact.
+                const panel = row.dataset.openSettingsPanel;
+                showSettingsPanel(panel);
+                history.pushState({ sheetNav: sheetOpenStack.slice(), settingsPanel: panel }, '', location.href);
+            });
         });
         settingsSheetOverlay.querySelectorAll('[data-back-to-main]').forEach(btn => {
-            btn.addEventListener('click', () => showSettingsPanel('main'));
+            // Consume the sub-panel's history entry via the same history.back() the device
+            // back button triggers, so both land on the exact same popstate handling below —
+            // the in-app arrow and the device back button can't drift apart in behavior since
+            // they now run the same code path.
+            btn.addEventListener('click', () => history.back());
         });
 
         const settingsXSearchInput = document.getElementById('settings-x-search-input');
@@ -22094,10 +22116,23 @@
             homeHeaderSettingsBtn.addEventListener('click', openSettingsSheet);
         }
         function closeSettingsSheet() {
+            // A sub-panel (Your account, Privacy and safety, etc.) pushes its own history
+            // entry on top of the sheet's own when opened (see the data-open-settings-panel
+            // handler above). Closing Settings directly from there — via the backdrop tap,
+            // since the X button only shows on the root panel — needs to consume both, or
+            // the sub-panel's entry is left behind for a later back press to land on.
+            const onSubPanel = document.querySelector('#settings-bottom-sheet-overlay .settings-x-panel.active')?.dataset.settingsPanel !== 'main';
             settingsSheetOverlay.classList.remove('active');
-            // Same reasoning as the open path above: reconcile synchronously so the pushed
-            // entry is consumed (via history.back()) right away instead of a microtask later.
-            syncSheetHistory();
+            if (onSubPanel) {
+                sheetOpenStack.length = 0;
+                topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(lastKnownHash) ? 'hash' : null;
+                suppressNextPopstateClose = true;
+                history.go(-2);
+            } else {
+                // Same reasoning as the open path above: reconcile synchronously so the pushed
+                // entry is consumed (via history.back()) right away instead of a microtask later.
+                syncSheetHistory();
+            }
         }
         document.getElementById('btn-close-settings').addEventListener('click', closeSettingsSheet);
         settingsSheetOverlay.addEventListener('click', (e) => {

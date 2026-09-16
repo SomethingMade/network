@@ -3183,6 +3183,9 @@
 
         /* Right Pane: Empty State */
         .workspace-pane { position: relative; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; padding: 40px; }
+        /* ── X-STYLE RIGHT SIDEBAR (desktop Home feed only) ── hidden everywhere else;
+           see the desktop feed-open media query below for the visible/column-adding rules. */
+        .right-sidebar { display: none; }
         .workspace-empty { text-align: center; max-width: 380px; }
         .workspace-empty-icon { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, rgba(var(--primary-rgb),0.1) 0%, rgba(var(--accent-rgb),0.1) 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 28px; color: var(--primary-blue); }
         .workspace-empty h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 400; letter-spacing: 0.5px; color: var(--text-primary); margin-bottom: 10px; }
@@ -4277,6 +4280,46 @@
         }
         @media (min-width: 1025px) {
             body.feed-open .app-grid { grid-template-columns: 240px 1fr; }
+        }
+        /* ── X-STYLE RIGHT SIDEBAR: only ever appears alongside the Home feed, and only
+           once there's room for a real 3-column layout (matches the .app-shell desktop
+           tier above) — search box + Trending + Who to follow, like X's right rail.
+           Left out of the tablet 769–1024px tier on purpose: that width is already
+           tight for nav + centered feed alone (see the tablet app-grid override above),
+           a fourth column would squeeze the feed itself. */
+        @media (min-width: 1025px) {
+            body.feed-open .app-grid { grid-template-columns: 240px 1fr 320px; }
+            body.feed-open .right-sidebar {
+                display: block;
+                height: 100%;
+                overflow-y: auto;
+                border-left: 1px solid var(--border-color);
+                padding: 20px 20px 40px;
+            }
+            .right-sidebar-inner { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0; }
+            .right-sidebar-search {
+                display: flex; align-items: center; gap: 10px; width: 100%;
+                background: var(--bg-input); border: none; border-radius: 999px;
+                padding: 12px 16px; color: var(--text-secondary); font-size: 14.5px;
+                font-family: inherit; cursor: pointer; transition: background 0.15s ease;
+            }
+            .right-sidebar-search:hover { background: var(--bg-hover); }
+            .right-sidebar-search svg { width: 18px; height: 18px; flex-shrink: 0; }
+            .right-sidebar-card { background: var(--bg-alt); border-radius: 16px; padding: 12px 16px 8px; }
+            .right-sidebar-card h3 { font-size: 18px; font-weight: 800; margin: 4px 0 8px; color: var(--text-primary); }
+            .right-sidebar-trend-item, .right-sidebar-person {
+                display: flex; align-items: center; gap: 10px; padding: 8px; margin: 0 -8px;
+                border-radius: 10px; cursor: pointer; transition: background 0.15s ease;
+            }
+            .right-sidebar-trend-item:hover, .right-sidebar-person:hover { background: var(--bg-hover); }
+            .right-sidebar-trend-tag { font-size: 14.5px; font-weight: 700; color: var(--text-primary); }
+            .right-sidebar-trend-count { font-size: 12.5px; color: var(--text-secondary); }
+            .right-sidebar-person-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-input); flex-shrink: 0; }
+            .right-sidebar-person-info { min-width: 0; flex: 1; }
+            .right-sidebar-person-info h4 { font-size: 14px; font-weight: 700; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+            .right-sidebar-person-info span { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+            .right-sidebar-card .discover-card-add-btn { padding: 6px 14px; font-size: 12.5px; }
+            .right-sidebar-empty { font-size: 13.5px; color: var(--text-secondary); padding: 8px 0 12px; }
         }
         @media (max-width: 768px) {
 
@@ -8048,6 +8091,26 @@
                     <p>Select a chat from the list to start messaging, or follow someone to begin a new conversation.</p>
                 </div>
             </main>
+
+            <!-- X-style right rail: only ever shown next to the desktop Home feed
+                 (see .right-sidebar CSS) — search shortcut + Trending + Who to follow,
+                 built from the same real app data as the Explore tabs / suggested people. -->
+            <aside class="right-sidebar" id="right-sidebar">
+                <div class="right-sidebar-inner">
+                    <button type="button" class="right-sidebar-search" id="right-sidebar-search-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.8"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="1.8"/></svg>
+                        <span>Search Haba</span>
+                    </button>
+                    <div class="right-sidebar-card">
+                        <h3>Trending</h3>
+                        <div id="right-sidebar-trending"></div>
+                    </div>
+                    <div class="right-sidebar-card">
+                        <h3>Who to follow</h3>
+                        <div id="right-sidebar-people"></div>
+                    </div>
+                </div>
+            </aside>
         </div>
     </div>
 
@@ -13599,8 +13662,111 @@
                 const searchEl = document.getElementById('search-discover');
                 renderDiscoverGrid(searchEl ? searchEl.value : '');
                 renderExploreTrending();
+                renderRightSidebar();
             }
         }
+
+        // --- X-style right sidebar (desktop Home feed only) ---
+        // Compact version of the same Trending/Who-to-follow data used by the Explore
+        // tabs inside the search overlay — kept as its own lightweight render function
+        // (rather than reusing renderExploreTrending/renderExplorePeople directly) since
+        // this lives permanently on-screen next to the feed instead of inside an overlay,
+        // so its markup is a smaller "widget" style rather than the full-size grid/list.
+        function renderRightSidebar() {
+            const trendingEl = document.getElementById('right-sidebar-trending');
+            if (trendingEl) {
+                const counts = {}; // hashtag -> number of posts using it
+                Object.keys(cachedPosts || {}).forEach(postId => {
+                    const post = cachedPosts[postId];
+                    if (!post) return;
+                    extractHashtags(post.text).forEach(tag => {
+                        counts[tag] = (counts[tag] || 0) + 1;
+                    });
+                });
+                const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 5);
+                trendingEl.innerHTML = tags.length ? tags.map(tag => `
+                    <div class="right-sidebar-trend-item" data-action="trend" data-tag="${escapeHtmlForSearch(tag)}">
+                        <div>
+                            <div class="right-sidebar-trend-tag">#${escapeHtmlForSearch(tag)}</div>
+                            <div class="right-sidebar-trend-count">${counts[tag]} post${counts[tag] === 1 ? '' : 's'}</div>
+                        </div>
+                    </div>
+                `).join('') : `<div class="right-sidebar-empty">No trends yet — post with a #hashtag to start one</div>`;
+            }
+
+            const peopleEl = document.getElementById('right-sidebar-people');
+            if (peopleEl) {
+                const uids = shuffleWithSeed(getSuggestableUsers(), 'right-sidebar-people').slice(0, 4);
+                peopleEl.innerHTML = uids.length ? uids.map(uid => {
+                    const profile = cachedUsers[uid] || {};
+                    const name = profile.name || 'Haba User';
+                    return `
+                        <div class="right-sidebar-person" data-uid="${uid}">
+                            ${feedAvatarHtml(profile, 'right-sidebar-person-avatar')}
+                            <div class="right-sidebar-person-info">
+                                <h4>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                                <span>${profile.username ? '@' + escapeHtmlForPost(profile.username) : 'On Haba'}</span>
+                            </div>
+                            <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
+                        </div>
+                    `;
+                }).join('') : `<div class="right-sidebar-empty">No one new to suggest right now</div>`;
+            }
+        }
+
+        (function initRightSidebar() {
+            const searchBtn = document.getElementById('right-sidebar-search-btn');
+            if (searchBtn) {
+                searchBtn.addEventListener('click', () => {
+                    const homeSearchBtn = document.getElementById('home-search-icon-btn');
+                    if (homeSearchBtn) homeSearchBtn.click();
+                });
+            }
+
+            const trendingEl = document.getElementById('right-sidebar-trending');
+            if (trendingEl) {
+                trendingEl.addEventListener('click', (e) => {
+                    const item = e.target.closest('[data-action="trend"]');
+                    if (!item) return;
+                    const tag = '#' + item.dataset.tag;
+                    const homeSearchBtn = document.getElementById('home-search-icon-btn');
+                    if (homeSearchBtn) homeSearchBtn.click();
+                    const input = document.getElementById('search-discover');
+                    if (!input) return;
+                    input.value = tag;
+                    input.focus();
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    addDiscoverSearchHistory(tag);
+                });
+            }
+
+            const peopleEl = document.getElementById('right-sidebar-people');
+            if (peopleEl) {
+                peopleEl.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('.discover-card-add-btn');
+                    if (!btn) {
+                        const row = e.target.closest('.right-sidebar-person');
+                        if (row && row.dataset.uid) openUserProfileSheet(row.dataset.uid);
+                        return;
+                    }
+                    if (btn.disabled) return;
+                    const uid = btn.dataset.uid;
+                    const user = auth.currentUser;
+                    if (!user || !uid) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Following...';
+                    try {
+                        await followUser(uid);
+                        btn.textContent = 'Following';
+                        btn.classList.add('added');
+                        notify('You followed this person');
+                    } catch (err) {
+                        btn.disabled = false;
+                        btn.textContent = 'Follow';
+                    }
+                });
+            }
+        })();
 
         // --- Explore tabs (Trending / People) ---
         // X-style Explore, built entirely from real app data: trending hashtags are counted

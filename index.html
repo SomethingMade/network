@@ -26657,6 +26657,11 @@
             if (typeof unsubscribeReadReceipt === 'function') unsubscribeReadReceipt();
             unsubscribeReadReceipt = null;
 
+            // Paint instantly from whatever this group's on-device cache has, while the live
+            // listener below is still in flight — see hydrateThreadFromDiskCache for the guard
+            // against clobbering fresher data that lands first.
+            hydrateThreadFromDiskCache(groupId, () => activeGroupId === groupId, renderGroupThread);
+
             const groupMemberCountLabel = group.members ? `${Object.keys(group.members).length} members` : '';
             let currentGroupIsTyping = false;
 
@@ -26728,6 +26733,7 @@
                     // miss before retiring the pill.
                     if (fetchedCount === 0) noMoreOlderMessages = true;
                     renderGroupThread();
+                    writeCachedThreadMessagesToDisk(groupId, cachedThreadMessages);
                 } catch (e) {
                     console.warn('loadOlderGroupMessages failed:', e);
                     removeChatLoadingSkeletons(messagesEl, skeletonNodes);
@@ -26900,6 +26906,7 @@
             // loadOlderGroupMessages above instead of ever loading the whole thread at once.
             const groupMessagesQuery = query(ref(database, `group_threads/${groupId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
             unsubscribeGroupMessages = onValue(groupMessagesQuery, (snap) => {
+                liveThreadSnapshotReceived = true;
                 const liveItems = snap.exists() ? Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })) : [];
                 liveItems.forEach(msg => { cachedThreadMessages[msg.key] = msg; });
                 if (liveItems.length) {
@@ -26911,6 +26918,9 @@
                 // to offer instead of waiting on a round-trip fetch to discover that.
                 if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
                 renderGroupThread();
+                // Mirror the refreshed window to disk (fire-and-forget) so the next time this
+                // group is opened — even after a full reload — it can paint from here instantly.
+                writeCachedThreadMessagesToDisk(groupId, cachedThreadMessages);
             });
 
             window.location.hash = 'chat';
@@ -29570,6 +29580,7 @@
         let noMoreOlderMessages = false;
         let chatMessagesScrollHandler = null; // scroll listener bound to the open thread's messages pane, toggles the pill below
         let chatMessagesPillClickHandler = null;
+        let liveThreadSnapshotReceived = false; // true once the live listener has fired at least once for the currently open thread — see the offline message cache below
 
         // Resets all of the pagination bookkeeping above — call this every time a chat or group
         // thread is (re)opened, before wiring up its listeners.
@@ -29578,6 +29589,7 @@
             oldestLoadedMessageTimestamp = Infinity;
             isLoadingMoreMessages = false;
             noMoreOlderMessages = false;
+            liveThreadSnapshotReceived = false;
             const messagesEl = document.getElementById('chat-view-messages');
             const pill = document.getElementById('load-older-msgs-pill');
             if (messagesEl && chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
@@ -29585,6 +29597,71 @@
             chatMessagesScrollHandler = null;
             chatMessagesPillClickHandler = null;
             if (pill) { pill.classList.remove('visible', 'is-loading'); setLoadOlderPillLabel(false); }
+        }
+
+        // --- OFFLINE MESSAGE CACHE (IndexedDB) ---
+        // Mirrors cachedThreadMessages to disk, keyed by thread/group id, so reopening a chat —
+        // even after a full page reload — paints the last-known messages immediately from the
+        // on-device copy instead of sitting on loading skeletons for a Firebase round trip every
+        // single time. The live listener in openChatView/openGroupChatView still attaches right
+        // alongside the hydration below and reconciles the moment fresh data lands. Follows the
+        // same lightweight IndexedDB pattern as openAuthCacheDB/openE2EDb elsewhere in this file.
+        const MSG_CACHE_DB = 'habaMessagesCache';
+        const MSG_CACHE_STORE = 'threads';
+
+        function openMessagesCacheDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(MSG_CACHE_DB, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(MSG_CACHE_STORE);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // threadKey is a DM threadId or a group's groupId — both live in the same store, just
+        // under different keys, since neither id format can collide with the other.
+        async function readCachedThreadMessagesFromDisk(threadKey) {
+            try {
+                const db = await openMessagesCacheDB();
+                return await new Promise((resolve, reject) => {
+                    const req = db.transaction(MSG_CACHE_STORE, 'readonly').objectStore(MSG_CACHE_STORE).get(threadKey);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => reject(req.error);
+                });
+            } catch (err) {
+                console.error('readCachedThreadMessagesFromDisk failed', err);
+                return null;
+            }
+        }
+
+        async function writeCachedThreadMessagesToDisk(threadKey, messagesByKey) {
+            try {
+                const db = await openMessagesCacheDB();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(MSG_CACHE_STORE, 'readwrite');
+                    tx.objectStore(MSG_CACHE_STORE).put({ messages: messagesByKey, updatedAt: Date.now() }, threadKey);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+            } catch (err) {
+                console.error('writeCachedThreadMessagesToDisk failed', err);
+            }
+        }
+
+        // Paints a thread instantly from its on-device cache (if any) while the live Firebase
+        // listener is still in flight. Guarded so it never clobbers fresher data: if the live
+        // listener has already fired for this thread by the time the disk read resolves — or the
+        // person has since navigated to a different thread — the disk copy is skipped entirely.
+        function hydrateThreadFromDiskCache(threadKey, isStillCurrentThread, renderFn) {
+            readCachedThreadMessagesFromDisk(threadKey).then((cached) => {
+                if (!cached || !cached.messages) return;
+                if (!isStillCurrentThread() || liveThreadSnapshotReceived) return;
+                cachedThreadMessages = { ...cached.messages };
+                const timestamps = Object.values(cachedThreadMessages).map(m => m.createdAt).filter(t => Number.isFinite(t));
+                if (timestamps.length) oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, Math.min(...timestamps));
+                isActiveThreadInitialLoad = false;
+                renderFn();
+            });
         }
 
         function setLoadOlderPillLabel(isLoading) {
@@ -32410,6 +32487,11 @@
             const threadId = threadIdFor(user.uid, otherUid);
             const isAIThread = otherUid === AI_UID;
 
+            // Paint instantly from whatever this thread's on-device cache has, while the live
+            // listener below is still in flight — see hydrateThreadFromDiskCache for the guard
+            // against clobbering fresher data that lands first.
+            hydrateThreadFromDiskCache(threadId, () => activeChatUid === otherUid, renderDmThread);
+
             // Mark this thread as read by me, right now
             if (!isAIThread && isReadReceiptsEnabled()) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
 
@@ -32504,6 +32586,7 @@
                     // miss before retiring the pill.
                     if (fetchedCount === 0) noMoreOlderMessages = true;
                     renderDmThread();
+                    writeCachedThreadMessagesToDisk(threadId, cachedThreadMessages);
                 } catch (e) {
                     // Pagination hitting the start of the thread (or a transient read issue)
                     // isn't something the user needs to see — just stop trying, and log for
@@ -32869,6 +32952,7 @@
             // of ever loading the whole thread at once.
             const dmMessagesQuery = query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
             unsubscribeChatMessages = onValue(dmMessagesQuery, async (snap) => {
+                liveThreadSnapshotReceived = true;
                 const liveItems = snap.exists() ? Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })) : [];
 
                 if (!isAIThread) {
@@ -32894,6 +32978,9 @@
                 if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
 
                 renderDmThread();
+                // Mirror the refreshed window to disk (fire-and-forget) so the next time this
+                // thread is opened — even after a full reload — it can paint from here instantly.
+                writeCachedThreadMessagesToDisk(threadId, cachedThreadMessages);
             });
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');

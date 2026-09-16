@@ -29652,6 +29652,10 @@
         // listener is still in flight. Guarded so it never clobbers fresher data: if the live
         // listener has already fired for this thread by the time the disk read resolves — or the
         // person has since navigated to a different thread — the disk copy is skipped entirely.
+        // Deliberately leaves isActiveThreadInitialLoad untouched here — renderFn() reads it to
+        // decide between an instant vs. smooth scrollToBottom, and this may be the very render
+        // that first flips it to false, so this thread opens already sitting at the last message
+        // (like WhatsApp) instead of visibly smooth-scrolling down to it.
         function hydrateThreadFromDiskCache(threadKey, isStillCurrentThread, renderFn) {
             readCachedThreadMessagesFromDisk(threadKey).then((cached) => {
                 if (!cached || !cached.messages) return;
@@ -29659,7 +29663,6 @@
                 cachedThreadMessages = { ...cached.messages };
                 const timestamps = Object.values(cachedThreadMessages).map(m => m.createdAt).filter(t => Number.isFinite(t));
                 if (timestamps.length) oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, Math.min(...timestamps));
-                isActiveThreadInitialLoad = false;
                 renderFn();
             });
         }

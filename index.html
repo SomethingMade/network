@@ -11134,6 +11134,18 @@
             // controlling it.
             if (topSheetId === 'post-comments-sheet-overlay') {
                 closePostComments();
+            } else if (topSheetId === 'settings-bottom-sheet-overlay' && document.querySelector('#settings-bottom-sheet-overlay .settings-x-panel.active')?.dataset.settingsPanel !== 'main') {
+                // Settings is showing one of its X-style sub-panels (Your account, Privacy
+                // and safety, etc). A device back press here should do exactly what tapping
+                // the in-sheet back arrow does — drop to the root category list — not close
+                // Settings outright. The browser has already consumed this entry, so push a
+                // replacement one right back so the sheet stays on the stack and a *second*
+                // back press is what's needed to actually close it.
+                showSettingsPanel('main');
+                history.pushState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
+                sheetSyncScheduled = false;
+                closingSheetViaBackButton = false;
+                return;
             } else {
                 const overlay = document.getElementById(topSheetId);
                 if (overlay) overlay.classList.remove('active');

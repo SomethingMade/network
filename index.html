@@ -2359,6 +2359,26 @@
         .wa-earnings-tier-badge { font-size: 11.5px; font-weight: 700; background: rgba(255,255,255,0.22); padding: 4px 10px; border-radius: 20px; flex-shrink: 0; }
         .wa-earnings-sub { font-size: 12.5px; font-weight: 600; opacity: 0.9; margin-top: 4px; }
         .wa-earnings-next-tier { font-size: 11.5px; opacity: 0.85; margin-top: 8px; }
+        /* "Withdraw" CTA on the unlocked earnings card, plus the small status line beneath it
+           reflecting whether a payout request is pending review (see renderInsightsEarnings /
+           updateWithdrawStatusLine). Banking details + the request itself are collected in the
+           two bottom sheets further down (#banking-details-sheet-overlay,
+           #withdrawal-request-sheet-overlay). */
+        .wa-earnings-withdraw-btn { width: 100%; margin-top: 14px; padding: 11px 0; border-radius: 50px; border: none; background: #fff; color: var(--primary-blue); font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+        .wa-earnings-withdraw-btn:disabled { opacity: 0.6; cursor: default; }
+        .wa-earnings-withdraw-status { font-size: 11.5px; opacity: 0.85; margin-top: 8px; text-align: center; }
+        .wa-banking-summary-row { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--bg-alt); margin-bottom: 16px; }
+        .wa-banking-summary-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-input); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .wa-banking-summary-icon svg { width: 17px; height: 17px; }
+        .wa-banking-summary-body { flex: 1; min-width: 0; }
+        .wa-banking-summary-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+        .wa-banking-summary-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .wa-banking-summary-edit { font-size: 12.5px; font-weight: 700; color: var(--comment-blue); background: none; border: none; font-family: inherit; cursor: pointer; flex-shrink: 0; }
+        .wa-withdraw-balance-row { text-align: center; padding: 6px 0 18px; }
+        .wa-withdraw-balance-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
+        .wa-withdraw-balance-value { font-size: 30px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.4px; margin-top: 2px; }
+        .wa-field-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin: 14px 2px 6px; }
+        .wa-field-label:first-child { margin-top: 0; }
         .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); gap: 12px; }
         .setting-item:last-child { border-bottom: none; }
         .setting-item span { font-size: 15px; font-weight: 500; color: var(--text-primary); }
@@ -6932,6 +6952,8 @@
                         </div>
                         <div class="wa-earnings-sub" id="insights-earnings-rate-label">R0.00 per 1,000 views</div>
                         <div class="wa-earnings-next-tier" id="insights-earnings-next-tier"></div>
+                        <button type="button" class="wa-earnings-withdraw-btn" id="btn-open-withdraw">Withdraw</button>
+                        <div class="wa-earnings-withdraw-status" id="insights-earnings-withdraw-status" style="display:none;"></div>
                     </div>
                 </div>
 
@@ -6954,6 +6976,68 @@
                 </div>
 
                 <p class="wa-insights-note">These numbers are based on activity on this account and update automatically.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── WITHDRAW EARNINGS ──
+         Two-step flow off the earnings card above (see #btn-open-withdraw): banking details
+         must be saved to users/$uid/bankingDetails before a withdrawal can be requested. A
+         request itself is just a record under withdrawal_requests/$id for manual review — same
+         "display-only earnings, no real payout flow yet" spirit as the rest of this feature
+         (see the EARNINGS_TIERS comment), so this never moves money on its own. -->
+    <div id="banking-details-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Banking Details</h3>
+                <svg id="btn-close-banking-details-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 6px 20px 4px;">
+                <p style="font-size:13px; color:var(--text-secondary); line-height:1.45; margin:2px 2px 16px;">We need these details to pay out your earnings. They're required once before your first withdrawal request.</p>
+                <div class="wa-field-label">Account holder name</div>
+                <input type="text" id="banking-holder-name" class="pill-input" placeholder="Full name on the account" maxlength="80" autocomplete="off">
+                <div class="wa-field-label">Bank name</div>
+                <input type="text" id="banking-bank-name" class="pill-input" placeholder="e.g. Standard Bank" maxlength="60" autocomplete="off">
+                <div class="wa-field-label">Account number</div>
+                <input type="text" id="banking-account-number" inputmode="numeric" class="pill-input" placeholder="Account number" maxlength="20" autocomplete="off">
+                <div class="wa-field-label">Branch code</div>
+                <input type="text" id="banking-branch-code" inputmode="numeric" class="pill-input" placeholder="Branch code" maxlength="10" autocomplete="off">
+                <div class="wa-field-label">Account type</div>
+                <select id="banking-account-type" class="pill-select">
+                    <option value="Savings">Savings</option>
+                    <option value="Cheque/Current">Cheque / Current</option>
+                </select>
+            </div>
+            <div style="padding: 4px 20px 24px;">
+                <button type="button" id="btn-submit-banking-details" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Save Banking Details</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="withdrawal-request-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Request Withdrawal</h3>
+                <svg id="btn-close-withdrawal-request-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 6px 20px 4px;">
+                <div class="wa-withdraw-balance-row">
+                    <div class="wa-withdraw-balance-label">Available balance</div>
+                    <div class="wa-withdraw-balance-value" id="withdraw-available-balance">R0.00</div>
+                </div>
+                <div class="wa-banking-summary-row">
+                    <div class="wa-banking-summary-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="wa-banking-summary-body">
+                        <div class="wa-banking-summary-title" id="withdraw-banking-bank-name">—</div>
+                        <div class="wa-banking-summary-sub" id="withdraw-banking-account-masked">—</div>
+                    </div>
+                    <button type="button" class="wa-banking-summary-edit" id="btn-edit-banking-details">Edit</button>
+                </div>
+                <div class="wa-field-label">Amount to withdraw (R)</div>
+                <input type="text" id="withdraw-amount" inputmode="decimal" class="pill-input" placeholder="0.00" autocomplete="off">
+            </div>
+            <div style="padding: 4px 20px 24px;">
+                <button type="button" id="btn-submit-withdrawal-request" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Request Withdrawal</button>
             </div>
         </div>
     </div>
@@ -22650,6 +22734,7 @@
             if (!tier) {
                 lockedEl.style.display = 'flex';
                 unlockedEl.style.display = 'none';
+                currentEarningsAmount = 0;
                 const goal = EARNINGS_TIERS[0].minFollowers;
                 const pct = Math.min(100, Math.round((followerCount / goal) * 100));
                 document.getElementById('insights-earnings-progress-fill').style.width = pct + '%';
@@ -22659,6 +22744,7 @@
             lockedEl.style.display = 'none';
             unlockedEl.style.display = 'block';
             const amount = (totalImpressions / 1000) * tier.rate;
+            currentEarningsAmount = amount;
             document.getElementById('insights-earnings-amount').textContent = 'R' + amount.toFixed(2);
             document.getElementById('insights-earnings-tier-badge').textContent = tier.label;
             document.getElementById('insights-earnings-rate-label').textContent = `R${tier.rate.toFixed(2)} per 1,000 views`;
@@ -22670,7 +22756,164 @@
             } else {
                 nextTierEl.textContent = "You've reached the highest earnings tier";
             }
+            renderWithdrawButtonState();
         }
+
+        // --- Withdraw earnings: banking details (users/$uid/bankingDetails) are required
+        // before a withdrawal request can go out; the request itself is a record under
+        // withdrawal_requests/$id for manual review, mirrored onto
+        // users/$uid/pendingWithdrawal so the UI can show/gate a single request at a time.
+        // See the comment above EARNINGS_TIERS — no money actually moves here.
+        let currentEarningsAmount = 0;
+        let withdrawContinueAfterBanking = false;
+
+        function maskAccountNumber(num) {
+            const digits = String(num || '');
+            return digits.length > 4 ? '••••' + digits.slice(-4) : digits;
+        }
+
+        function renderWithdrawButtonState() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            const withdrawBtn = document.getElementById('btn-open-withdraw');
+            const statusEl = document.getElementById('insights-earnings-withdraw-status');
+            if (!withdrawBtn || !statusEl) return;
+            if (myProfile.pendingWithdrawal) {
+                withdrawBtn.disabled = true;
+                withdrawBtn.textContent = 'Withdrawal pending';
+                statusEl.style.display = 'block';
+                statusEl.textContent = `R${(myProfile.pendingWithdrawal.amount || 0).toFixed(2)} requested — under review`;
+            } else {
+                withdrawBtn.disabled = false;
+                withdrawBtn.textContent = 'Withdraw';
+                statusEl.style.display = 'none';
+            }
+        }
+
+        function openBankingDetailsSheet(continueToWithdraw) {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            const bd = myProfile.bankingDetails || {};
+            document.getElementById('banking-holder-name').value = bd.holderName || '';
+            document.getElementById('banking-bank-name').value = bd.bankName || '';
+            document.getElementById('banking-account-number').value = bd.accountNumber || '';
+            document.getElementById('banking-branch-code').value = bd.branchCode || '';
+            document.getElementById('banking-account-type').value = bd.accountType || 'Savings';
+            withdrawContinueAfterBanking = !!continueToWithdraw;
+            document.getElementById('withdrawal-request-sheet-overlay').classList.remove('active');
+            document.getElementById('banking-details-sheet-overlay').classList.add('active');
+        }
+        function closeBankingDetailsSheet() {
+            document.getElementById('banking-details-sheet-overlay').classList.remove('active');
+        }
+        async function submitBankingDetails() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const holderName = document.getElementById('banking-holder-name').value.trim();
+            const bankName = document.getElementById('banking-bank-name').value.trim();
+            const accountNumber = document.getElementById('banking-account-number').value.trim();
+            const branchCode = document.getElementById('banking-branch-code').value.trim();
+            const accountType = document.getElementById('banking-account-type').value;
+            if (!holderName || !bankName || !accountNumber || !branchCode) { notify('Fill in all banking details', 'error'); return; }
+            if (!/^\d{4,20}$/.test(accountNumber)) { notify('Enter a valid account number', 'error'); return; }
+            if (!/^\d{3,10}$/.test(branchCode)) { notify('Enter a valid branch code', 'error'); return; }
+            try {
+                await update(ref(database, `users/${user.uid}`), {
+                    bankingDetails: {
+                        holderName: holderName.slice(0, 80),
+                        bankName: bankName.slice(0, 60),
+                        accountNumber: accountNumber.slice(0, 20),
+                        branchCode: branchCode.slice(0, 10),
+                        accountType,
+                        updatedAt: serverTimestamp()
+                    }
+                });
+                closeBankingDetailsSheet();
+                notify('Banking details saved');
+                if (withdrawContinueAfterBanking) {
+                    withdrawContinueAfterBanking = false;
+                    openWithdrawalRequestSheet();
+                }
+            } catch (err) {
+                console.error('submitBankingDetails failed', err);
+                notify("Couldn't save banking details", 'error');
+            }
+        }
+
+        function openWithdrawSheet() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            if (myProfile.pendingWithdrawal) { notify('You already have a withdrawal request pending review', 'error'); return; }
+            if (currentEarningsAmount <= 0) { notify('Nothing to withdraw yet', 'error'); return; }
+            if (!myProfile.bankingDetails) {
+                notify('Add your banking details to request a withdrawal', 'error');
+                openBankingDetailsSheet(true);
+                return;
+            }
+            openWithdrawalRequestSheet();
+        }
+
+        function openWithdrawalRequestSheet() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            const bd = myProfile.bankingDetails || {};
+            document.getElementById('withdraw-available-balance').textContent = 'R' + currentEarningsAmount.toFixed(2);
+            document.getElementById('withdraw-banking-bank-name').textContent = bd.bankName || '—';
+            document.getElementById('withdraw-banking-account-masked').textContent = bd.accountNumber ? `${bd.accountType || 'Account'} • ${maskAccountNumber(bd.accountNumber)}` : '—';
+            document.getElementById('withdraw-amount').value = currentEarningsAmount > 0 ? currentEarningsAmount.toFixed(2) : '';
+            document.getElementById('banking-details-sheet-overlay').classList.remove('active');
+            document.getElementById('withdrawal-request-sheet-overlay').classList.add('active');
+        }
+        function closeWithdrawalRequestSheet() {
+            document.getElementById('withdrawal-request-sheet-overlay').classList.remove('active');
+        }
+        async function submitWithdrawalRequest() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            if (!user) return;
+            if (!myProfile.bankingDetails) { notify('Add your banking details first', 'error'); return; }
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            if (!amount || amount <= 0) { notify('Enter a valid amount', 'error'); return; }
+            if (amount > currentEarningsAmount) { notify("Amount can't exceed your available balance", 'error'); return; }
+            try {
+                const bd = myProfile.bankingDetails;
+                const roundedAmount = Math.round(amount * 100) / 100;
+                const newRequestRef = push(ref(database, 'withdrawal_requests'));
+                await set(newRequestRef, {
+                    uid: user.uid,
+                    amount: roundedAmount,
+                    bankName: bd.bankName,
+                    accountHolder: bd.holderName,
+                    accountNumberLast4: maskAccountNumber(bd.accountNumber),
+                    accountType: bd.accountType,
+                    status: 'pending',
+                    requestedAt: serverTimestamp()
+                });
+                await update(ref(database, `users/${user.uid}`), {
+                    pendingWithdrawal: { id: newRequestRef.key, amount: roundedAmount, requestedAt: serverTimestamp() }
+                });
+                closeWithdrawalRequestSheet();
+                notify("Withdrawal requested — we'll review it shortly");
+            } catch (err) {
+                console.error('submitWithdrawalRequest failed', err);
+                notify("Couldn't submit withdrawal request", 'error');
+            }
+        }
+
+        document.getElementById('btn-open-withdraw')?.addEventListener('click', openWithdrawSheet);
+        document.getElementById('btn-close-banking-details-sheet')?.addEventListener('click', closeBankingDetailsSheet);
+        document.getElementById('banking-details-sheet-overlay')?.addEventListener('click', (e) => {
+            if (e.target.id === 'banking-details-sheet-overlay') closeBankingDetailsSheet();
+        });
+        document.getElementById('btn-submit-banking-details')?.addEventListener('click', submitBankingDetails);
+        document.getElementById('btn-close-withdrawal-request-sheet')?.addEventListener('click', closeWithdrawalRequestSheet);
+        document.getElementById('withdrawal-request-sheet-overlay')?.addEventListener('click', (e) => {
+            if (e.target.id === 'withdrawal-request-sheet-overlay') closeWithdrawalRequestSheet();
+        });
+        document.getElementById('btn-edit-banking-details')?.addEventListener('click', () => openBankingDetailsSheet(true));
+        document.getElementById('btn-submit-withdrawal-request')?.addEventListener('click', submitWithdrawalRequest);
+
+
 
         function renderAccountInsights() {
             const user = auth.currentUser;

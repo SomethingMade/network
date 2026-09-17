@@ -792,6 +792,19 @@
         .streak-day-dot.checked { background: var(--gradient-brand); color: #fff; }
         .streak-day-dot.today { box-shadow: 0 0 0 2px var(--primary-blue); }
         .streak-modal-longest { font-size: 12.5px; color: var(--text-secondary); margin-top: -14px; margin-bottom: 20px; }
+        /* Shown on every pre-verified check-in below the threshold — a running "X days to go"
+           nudge so the free badge feels close and worth coming back for, not just a distant
+           milestone buried in a list. */
+        .streak-progress-hint { font-size: 12.5px; font-weight: 700; color: #0A84FF; margin: -8px 0 14px; }
+        /* The celebration state itself, shown once on the exact day the permanent badge is
+           earned (and, in a quieter form, as a standing reminder on any later visit) — visually
+           distinct from a plain milestone line so the moment actually feels like a reward. */
+        .streak-verified-banner { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(10,132,255,0.14), rgba(10,132,255,0.05)); border: 1px solid rgba(10,132,255,0.35); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; text-align: left; }
+        .streak-verified-banner-icon-lg { width: 30px; height: 30px; flex-shrink: 0; }
+        .streak-verified-banner-text { display: flex; flex-direction: column; gap: 1px; }
+        .streak-verified-banner-text strong { font-size: 14px; color: var(--text-primary); }
+        .streak-verified-banner-text span { font-size: 12.5px; color: var(--text-secondary); }
+        .streak-modal-flame.streak-flame-verified { color: #0A84FF; }
 
         /* ── BOTTOM SHEET (Profile & Context Menus) ── */
         .bottom-sheet-overlay { position: fixed; inset: 0; bottom: var(--keyboard-inset, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s, bottom 0.15s ease; display: flex; align-items: flex-end; justify-content: center; }
@@ -5130,8 +5143,17 @@
             <h3 id="streak-modal-count">0-day streak</h3>
             <div class="streak-week-row" id="streak-week-row"></div>
             <p id="streak-modal-sub">Check in daily to keep your streak alive.</p>
+            <p class="streak-progress-hint" id="streak-progress-hint" style="display:none;"></p>
+            <div class="streak-verified-banner" id="streak-verified-banner" style="display:none;">
+                <span id="streak-verified-banner-icon"></span>
+                <div class="streak-verified-banner-text">
+                    <strong id="streak-verified-banner-title">You're Verified!</strong>
+                    <span id="streak-verified-banner-sub">Your free badge is permanent — it's yours to keep.</span>
+                </div>
+            </div>
             <p class="streak-modal-longest" id="streak-modal-longest"></p>
             <div class="modal-actions">
+                <button type="button" id="btn-view-streak-badge" class="btn-pill btn-outline" style="display:none;">View my badge</button>
                 <button type="button" id="btn-close-streak-modal" class="btn-pill btn-primary">Nice!</button>
             </div>
         </div>
@@ -9349,11 +9371,61 @@
                 ? `Longest streak: ${currentStreakData.longest} days`
                 : (currentStreakData.longest > 1 ? "That's your longest streak yet!" : '');
             renderStreakWeekRow();
+
+            const flameEl = document.getElementById('streak-modal-flame');
+            const hintEl = document.getElementById('streak-progress-hint');
+            const bannerEl = document.getElementById('streak-verified-banner');
+            const viewBadgeBtn = document.getElementById('btn-view-streak-badge');
+            const user = auth.currentUser;
+            const alreadyVerifiedByStreak = !!(user && cachedUsers[user.uid] && cachedUsers[user.uid].streakVerifiedAt);
+            const justEarnedPermanentVerify = justCheckedIn && currentStreakData.count === STREAK_PERMANENT_VERIFY_THRESHOLD;
+
+            flameEl.classList.toggle('streak-flame-verified', justEarnedPermanentVerify);
+            hintEl.style.display = 'none';
+            bannerEl.style.display = 'none';
+            viewBadgeBtn.style.display = 'none';
+
+            if (justEarnedPermanentVerify) {
+                // The exact day the streak crosses the threshold — this is the moment to make a
+                // fuss of, since it's the one time this fires for the account (a strict
+                // one-time-ever grant, see grantStreakPermanentVerified above).
+                document.getElementById('streak-modal-count').textContent = "You're Verified!";
+                document.getElementById('streak-verified-banner-icon').innerHTML = VERIFIED_BADGE_SVG;
+                document.getElementById('streak-verified-banner-icon').className = 'streak-verified-banner-icon-lg';
+                document.getElementById('streak-verified-banner-title').textContent = `${STREAK_PERMANENT_VERIFY_THRESHOLD} days in a row`;
+                document.getElementById('streak-verified-banner-sub').textContent = "Your free Verified Badge is permanent — it's yours to keep, streak or no streak.";
+                bannerEl.style.display = 'flex';
+                viewBadgeBtn.style.display = 'inline-flex';
+            } else if (alreadyVerifiedByStreak) {
+                // A later visit, after the badge is already earned — a quieter standing
+                // reminder rather than repeating the big celebration every time.
+                document.getElementById('streak-verified-banner-icon').innerHTML = VERIFIED_BADGE_SVG;
+                document.getElementById('streak-verified-banner-icon').className = 'streak-verified-banner-icon-lg';
+                document.getElementById('streak-verified-banner-title').textContent = "You have a permanent Verified Badge";
+                document.getElementById('streak-verified-banner-sub').textContent = "Earned it with your streak — it's yours for good.";
+                bannerEl.style.display = 'flex';
+            } else if (currentStreakData.count > 0) {
+                // Below the threshold and never earned it by streak — nudge with how close the
+                // free badge actually is, so it reads as a near-term reward worth returning for
+                // rather than a milestone buried in a long list.
+                const daysToGo = STREAK_PERMANENT_VERIFY_THRESHOLD - currentStreakData.count;
+                if (daysToGo > 0) {
+                    hintEl.textContent = daysToGo === 1
+                        ? "1 more day to a free Verified Badge! ✅"
+                        : `${daysToGo} more days to a free Verified Badge! ✅`;
+                    hintEl.style.display = 'block';
+                }
+            }
+
             overlay.classList.add('active');
         }
         document.getElementById('streak-badge-btn').addEventListener('click', () => showStreakModal(false));
         document.getElementById('btn-close-streak-modal').addEventListener('click', () => {
             document.getElementById('streak-modal-overlay').classList.remove('active');
+        });
+        document.getElementById('btn-view-streak-badge').addEventListener('click', () => {
+            document.getElementById('streak-modal-overlay').classList.remove('active');
+            openProfileSheet({ preventDefault: () => {} });
         });
         // TRIAL_BADGE_DURATION_MS itself lives further down with the rest of the badge code (see
         // verifiedBadgeFor), but as a top-level const it's already defined by the time any of
@@ -26096,9 +26168,16 @@
         // View another user's profile (avatar, name, username, about)
         const userInfoSheet = document.getElementById('user-info-sheet-overlay');
         let userInfoSheetUid = null;
+        // Every profile viewed while this sheet is already open (tapping a row in a Followers/
+        // Following list, a mention, an avatar in someone's posts, etc.) reuses the same
+        // '#user-info' hash — so unlike every other hash overlay, navigating from one profile to
+        // another doesn't produce a real 'hashchange' the generic system could react to. This
+        // stack (and the dedicated popstate listener below, by openUserProfileSheet) tracks that
+        // chain explicitly so the device back button steps back one profile at a time instead of
+        // a single back press collapsing the whole chain at once.
+        let userInfoUidStack = [];
 
-        function openUserProfileSheet(uid) {
-            if (!uid || uid === AI_UID) return;
+        function renderUserProfileSheetContent(uid) {
             pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const profile = cachedUsers[uid] || {};
             userInfoSheetUid = uid;
@@ -26153,12 +26232,51 @@
             if (userInfoSubtabsEl) userInfoSubtabsEl.dataset.uid = uid;
             initProfileSubtabs('user-info-subtabs', 'user-info-posts-list', 'user-info-media-grid', null, 'user-info-replies-list');
             userInfoSheet.classList.add('active');
-            if (window.location.hash !== '#user-info') window.location.hash = 'user-info';
         }
+
+        function openUserProfileSheet(uid) {
+            if (!uid || uid === AI_UID) return;
+            const wasAlreadyOpen = window.location.hash === '#user-info';
+            const sameUidAlreadyShowing = wasAlreadyOpen && userInfoSheetUid === uid;
+            renderUserProfileSheetContent(uid);
+            if (!wasAlreadyOpen) {
+                // First profile in a fresh chain — normal hash push, same as every other hash
+                // overlay. Tag this base entry with its uid too (via an immediate replaceState)
+                // so the popstate listener below can always read history.state.userInfoUid,
+                // rather than needing a special case for "the bottom of the chain".
+                userInfoUidStack = [uid];
+                window.location.hash = 'user-info';
+                history.replaceState({ userInfoUid: uid }, '', location.href);
+            } else if (!sameUidAlreadyShowing) {
+                // Already viewing a different profile — give this one its own real history
+                // entry (state-only; the hash stays '#user-info' throughout the whole chain,
+                // so this never fires 'hashchange' — only the dedicated popstate listener
+                // below sees it) instead of silently overwriting the entry underneath.
+                userInfoUidStack.push(uid);
+                history.pushState({ userInfoUid: uid }, '', location.href);
+            }
+        }
+
+        // Steps back exactly one profile in a chain (see userInfoUidStack above) per device back
+        // press. Bails out whenever the hash has actually changed — that's a real navigation
+        // away from Profile entirely, and handleHashChange (via the separate 'hashchange' event)
+        // already owns closing the sheet for that case.
+        window.addEventListener('popstate', () => {
+            if (suppressNextPopstateClose) return; // a programmatic close (e.g. a sheet opened on top) is consuming this pop, not a real back step through the chain
+            if (!userInfoSheet.classList.contains('active')) return;
+            if (window.location.hash !== '#user-info') return;
+            const landedUid = history.state?.userInfoUid;
+            if (!landedUid || landedUid === userInfoSheetUid) return;
+            const idx = userInfoUidStack.lastIndexOf(landedUid);
+            userInfoUidStack = idx === -1 ? [landedUid] : userInfoUidStack.slice(0, idx + 1);
+            renderUserProfileSheetContent(landedUid);
+        });
 
         function closeUserInfoSheet() {
             userInfoSheet.classList.remove('active');
+            userInfoUidStack = [];
         }
+
 
         // Quick "Contact Info" card — the lighter, chat-scoped summary opened by tapping the
         // chat header (avatar or name/status) in an open DM. See the HTML comment above

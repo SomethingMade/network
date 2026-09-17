@@ -877,6 +877,8 @@
         #withdrawal-request-sheet-overlay { z-index: 100011; }
         /* Payout History is opened from inside Settings (z-index 100010) too. */
         #payout-history-sheet-overlay { z-index: 100011; }
+        /* Auto Welcome Message editor — also opened from inside Settings. */
+        #business-welcome-sheet-overlay { z-index: 100011; }
         /* Tagged Business (choose-business-sheet-overlay) is opened from inside Settings too,
            but it's defined earlier in the DOM than settings-bottom-sheet-overlay, so matching
            z-index (100010) would still paint it underneath — needs to outrank Settings' own
@@ -4751,6 +4753,15 @@
         .dm-e2e-banner-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; line-height: 1.35; text-align: center; box-shadow: var(--shadow-bubble); border: 1px solid var(--border-color); }
         .dm-e2e-banner-pill svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.85; }
         body.glass-theme .dm-e2e-banner-pill { background: var(--bg-surface) !important; backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); }
+        /* "This is a Business Account" banner — same pinned-at-top treatment as the E2E notice
+           above (buildBusinessAccountBanner), shown only in DMs with a business account. Also
+           doubles as the chat-header chip (.chat-header-business-chip) next to the contact's
+           name, and updateActiveChatStatus prefixes the status line the same way. */
+        .dm-business-banner-row { display: flex; justify-content: center; align-self: center; margin: 0 0 8px; max-width: 100%; }
+        .dm-business-banner-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: var(--radius-pill); background: rgba(212, 160, 23, 0.12); color: #B8860B; font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; border: 1px solid rgba(212, 160, 23, 0.25); }
+        .dm-business-banner-pill svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .chat-header-business-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; padding: 2px 8px 2px 6px; border-radius: 50px; background: rgba(212, 160, 23, 0.14); color: #B8860B; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; margin-left: 6px; }
+        .chat-header-business-chip svg { width: 10px; height: 10px; }
         .group-call-banner.active { display: flex; }
         .group-call-banner-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--success-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
         .group-call-banner-icon svg { width: 16px; height: 16px; }
@@ -6572,6 +6583,14 @@
                     </div>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
+                <div class="wa-list-row" id="open-business-welcome-row" style="cursor:pointer; display:none;">
+                    <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Auto Welcome Message</span>
+                        <span class="wa-row-sub" id="business-welcome-row-sub">Off</span>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
             </div>
 
             <div class="wa-section">
@@ -7091,6 +7110,36 @@
                 </div>
                 <div id="payout-history-list"></div>
                 <div id="payout-history-empty" class="notif-empty-state" style="display:none;">No payout requests yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Welcome Message editor (Settings ▸ Business ▸ Auto Welcome Message, business
+         accounts only — see open-business-welcome-row / refreshBusinessWelcomeSettingsRow).
+         Saves users/$uid/businessAutoReply = { enabled, message }, read by
+         maybeSendBusinessWelcome when a customer's first DM to this business goes out. -->
+    <div id="business-welcome-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Auto Welcome Message</h3>
+                <svg id="btn-close-business-welcome-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 6px 20px 4px;">
+                <div class="wa-list-row" style="padding: 10px 0;">
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Send automatically</span>
+                        <span class="wa-row-sub">Greet new contacts the moment they message you</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="business-welcome-enabled-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="wa-field-label">Message</div>
+                <textarea id="business-welcome-message-input" class="pill-input" rows="4" maxlength="500" placeholder="Thanks for reaching out! We'll get back to you as soon as we can." style="resize: vertical; min-height: 88px; border-radius: 18px; padding: 12px 16px;"></textarea>
+            </div>
+            <div style="padding: 4px 20px 24px;">
+                <button type="button" id="btn-save-business-welcome" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Save</button>
             </div>
         </div>
     </div>
@@ -10737,6 +10786,18 @@
             row.innerHTML = `<div class="dm-e2e-banner-pill">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                 <span>Messages are end-to-end encrypted. No one outside this chat can read them.</span>
+            </div>`;
+            return row;
+        }
+
+        // Pinned "this is a Business Account" note, shown the same way as buildE2EBanner above,
+        // only in DMs where the other participant has isBusinessAccount set.
+        function buildBusinessAccountBanner() {
+            const row = document.createElement('div');
+            row.className = 'dm-business-banner-row';
+            row.innerHTML = `<div class="dm-business-banner-pill">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                <span>This is a Business Account</span>
             </div>`;
             return row;
         }
@@ -18959,6 +19020,22 @@
             subEl.textContent = business ? `Tagged: ${business.name || 'Business'}` : "Show a business's badge next to your name on your posts";
         }
 
+        // Shows/hides the "Auto Welcome Message" settings row for business accounts only, and
+        // keeps its subtitle ("Off" / "On" / a preview of the message) in sync with
+        // users/$uid/businessAutoReply. See maybeSendBusinessWelcome for where it's read.
+        function refreshBusinessWelcomeSettingsRow(myProfile) {
+            const row = document.getElementById('open-business-welcome-row');
+            const subEl = document.getElementById('business-welcome-row-sub');
+            if (!row || !subEl) return;
+            row.style.display = myProfile.isBusinessAccount ? 'flex' : 'none';
+            const autoReply = myProfile.businessAutoReply;
+            if (autoReply && autoReply.enabled) {
+                subEl.textContent = autoReply.message ? `On · "${autoReply.message.slice(0, 40)}${autoReply.message.length > 40 ? '…' : ''}"` : 'On';
+            } else {
+                subEl.textContent = 'Off';
+            }
+        }
+
         // Writes an in-app notification for `toUid` (skips self-notifications). The Realtime DB
         // write under notifications/{uid}/{id} is what a Cloud Function trigger would watch to
         // send an actual FCM push, mirroring how message pushes already work.
@@ -20814,6 +20891,39 @@
         document.getElementById('choose-business-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'choose-business-sheet-overlay') closeChooseBusinessSheet();
         });
+
+        // --- Auto Welcome Message editor (Settings ▸ Business) ---
+        function openBusinessWelcomeSheet() {
+            const user = auth.currentUser;
+            const myProfile = user ? (cachedUsers[user.uid] || {}) : {};
+            const autoReply = myProfile.businessAutoReply || {};
+            document.getElementById('business-welcome-enabled-toggle').checked = !!autoReply.enabled;
+            document.getElementById('business-welcome-message-input').value = autoReply.message || '';
+            document.getElementById('business-welcome-sheet-overlay').classList.add('active');
+        }
+        function closeBusinessWelcomeSheet() {
+            document.getElementById('business-welcome-sheet-overlay').classList.remove('active');
+        }
+        async function saveBusinessWelcomeMessage() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const enabled = document.getElementById('business-welcome-enabled-toggle').checked;
+            const message = document.getElementById('business-welcome-message-input').value.trim().slice(0, 500);
+            try {
+                await update(ref(database, `users/${user.uid}`), { businessAutoReply: { enabled, message } });
+                closeBusinessWelcomeSheet();
+                notify('Auto welcome message saved');
+            } catch (err) {
+                console.error('saveBusinessWelcomeMessage failed', err);
+                notify("Couldn't save your welcome message", 'error');
+            }
+        }
+        document.getElementById('open-business-welcome-row')?.addEventListener('click', openBusinessWelcomeSheet);
+        document.getElementById('btn-close-business-welcome-sheet')?.addEventListener('click', closeBusinessWelcomeSheet);
+        document.getElementById('business-welcome-sheet-overlay')?.addEventListener('click', (e) => {
+            if (e.target.id === 'business-welcome-sheet-overlay') closeBusinessWelcomeSheet();
+        });
+        document.getElementById('btn-save-business-welcome')?.addEventListener('click', saveBusinessWelcomeMessage);
         document.getElementById('choose-business-search-input').addEventListener('input', (e) => {
             renderChooseBusinessList(e.target.value);
         });
@@ -20931,6 +21041,7 @@
                 businessToggle.checked = !!myProfile.isBusinessAccount;
                 document.getElementById('business-account-pill').style.display = myProfile.isBusinessAccount ? 'inline-block' : 'none';
                 refreshTaggedBusinessSettingsRow(myProfile);
+                refreshBusinessWelcomeSettingsRow(myProfile);
 
                 refreshTrialBadgeUI(myProfile);
                 refreshVerifiedBadgePurchaseUI(myProfile);
@@ -22007,6 +22118,7 @@
                 document.getElementById('btn-set-username').textContent = isBusiness ? 'Update Username' : 'Set Username (one-time)';
                 refreshVerifiedBadgePurchaseUI({ ...myProfile, isBusinessAccount: isBusiness });
                 refreshVerifiedBadgeSettingsRow({ ...myProfile, isBusinessAccount: isBusiness });
+                refreshBusinessWelcomeSettingsRow({ ...myProfile, isBusinessAccount: isBusiness });
             } catch (err) {
                 e.target.checked = !isBusiness;
                 document.getElementById('business-account-pill').style.display = !isBusiness ? 'inline-block' : 'none';
@@ -32525,14 +32637,15 @@
             }
 
             const otherProfile = cachedUsers[activeChatUid] || {};
-            
+            const businessPrefix = otherProfile.isBusinessAccount ? 'Business Account · ' : '';
+
             if (otherProfile.status === 'online') {
-                statusEl.textContent = 'Online';
+                statusEl.textContent = businessPrefix + 'Online';
                 statusEl.style.color = 'var(--success-green)';
             } else {
                 statusEl.style.color = 'var(--text-secondary)';
-                if (otherProfile.lastSeen) statusEl.textContent = `Last seen ${formatTime(otherProfile.lastSeen)}`;
-                else statusEl.textContent = 'Offline';
+                if (otherProfile.lastSeen) statusEl.textContent = businessPrefix + `Last seen ${formatTime(otherProfile.lastSeen)}`;
+                else statusEl.textContent = businessPrefix ? businessPrefix.replace(' · ', '') : 'Offline';
             }
 
             if (otherProfile.about) {
@@ -33220,7 +33333,9 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
             cancelReplyMode(); cancelEditMode();
             
-            document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}`;
+            const otherProfileForHeader = cachedUsers[otherUid] || {};
+            const businessChip = (!isAIChat && otherProfileForHeader.isBusinessAccount) ? `<span class="chat-header-business-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>Business</span>` : '';
+            document.getElementById('chat-view-name').innerHTML = `<span>${otherName || 'Contact'}</span>${verifiedBadgeFor(otherUid, isAIChat)}${businessChip}`;
             updateActiveChatStatus();
             applyChatWallpaperToDOM(currentWallpaperValue());
             applyChatBubbleColorToDOM(currentBubbleColorValue());
@@ -33419,6 +33534,7 @@
                 const prevScrollHeight = messagesEl.scrollHeight;
                 messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
                 if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
+                if (!isAIThread && (cachedUsers[otherUid] || {}).isBusinessAccount) messagesEl.appendChild(buildBusinessAccountBanner());
                 const allItems = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
                 if (!isAIThread) scheduleDisappearingSweep(allItems);
                 const now = Date.now();
@@ -33980,8 +34096,49 @@
             clearTimeout(typingTimeout);
             set(ref(database, `dm_threads/${threadId}/typing/${user.uid}`), false);
 
-            try { await update(ref(database), updates); } 
+            try {
+                await update(ref(database), updates);
+                maybeSendBusinessWelcome(threadId, activeChatUid, user.uid);
+            }
             catch (err) { showCustomModal('Message Failed', 'Your message could not be sent.'); }
+        }
+
+        // Auto-reply for Business Accounts: fires after a customer's message goes out, and only
+        // actually sends once per thread (the dm_threads/$id/meta/welcomeSent flag makes this
+        // idempotent even if called again, e.g. on a retried send). There's no server-side actor
+        // here to "be" the business, so — same as every other write in this client-only app —
+        // the customer's own client writes the reply on the business's behalf, encrypted the
+        // normal encryptForPeer way (the shared key is symmetric, so this decrypts fine for the
+        // business too) and attributed via senderUid so it renders as their message.
+        const DEFAULT_BUSINESS_WELCOME_MESSAGE = "Thanks for reaching out! We'll get back to you as soon as we can.";
+        async function maybeSendBusinessWelcome(threadId, businessUid, customerUid) {
+            try {
+                const bizProfile = cachedUsers[businessUid];
+                if (!bizProfile || !bizProfile.isBusinessAccount) return;
+                const autoReply = bizProfile.businessAutoReply;
+                if (!autoReply || !autoReply.enabled) return;
+
+                const welcomeFlagRef = ref(database, `dm_threads/${threadId}/meta/welcomeSent`);
+                const flagSnap = await get(welcomeFlagRef);
+                if (flagSnap.exists()) return; // already greeted this thread
+                await set(welcomeFlagRef, true);
+
+                const messageText = (autoReply.message || '').trim() || DEFAULT_BUSINESS_WELCOME_MESSAGE;
+                const encryptedText = await encryptForPeer(businessUid, messageText);
+                const newMsgKey = push(ref(database, `dm_threads/${threadId}/messages`)).key;
+                const msgPayload = { text: encryptedText, senderUid: businessUid, createdAt: Date.now(), isAutoReply: true };
+
+                const updates = {};
+                updates[`dm_threads/${threadId}/messages/${newMsgKey}`] = msgPayload;
+                updates[`user_chats/${businessUid}/${customerUid}`] = { text: encryptedText, timestamp: msgPayload.createdAt, unreadCount: 0, senderUid: businessUid };
+                updates[`user_chats/${customerUid}/${businessUid}/text`] = encryptedText;
+                updates[`user_chats/${customerUid}/${businessUid}/timestamp`] = msgPayload.createdAt;
+                updates[`user_chats/${customerUid}/${businessUid}/unreadCount`] = increment(1);
+                updates[`user_chats/${customerUid}/${businessUid}/senderUid`] = businessUid;
+                await update(ref(database), updates);
+            } catch (err) {
+                console.error('maybeSendBusinessWelcome failed', err);
+            }
         }
 
         // --- HABA AI MESSAGING ---

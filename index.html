@@ -1783,6 +1783,14 @@
         .feed-post-location span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .feed-post-menu-btn { margin-left: auto; flex-shrink: 0; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 50%; display: flex; align-items: center; transition: background 0.12s ease, color 0.12s ease; }
         .feed-post-menu-btn:hover { background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); }
+        /* Inline "Follow" pill next to a post's three-dot menu, shown only when the viewer
+           doesn't already follow that post's author (see buildFeedPostCard / the
+           .feed-post-follow-pill click handler in initFeedPostCard). Replaces the old
+           sprinkled "who to follow" widgets (see sprinkleSuggestedPeople) as the feed's
+           follow-someone affordance. */
+        .feed-post-follow-pill { flex-shrink: 0; margin-left: auto; padding: 3px 13px; border-radius: 50px; border: 1.4px solid var(--primary-blue); background: transparent; color: var(--primary-blue); font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease; }
+        .feed-post-follow-pill:hover { background: var(--primary-blue); color: #fff; }
+        .feed-post-follow-pill.is-busy { opacity: 0.6; pointer-events: none; }
         .feed-post-edited-tag { font-size: 11px; color: var(--text-secondary); }
         .feed-post-edit-box { margin-top: 10px; }
         .feed-post-edit-box textarea { width: 100%; resize: none; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-alt); color: var(--text-primary); font-family: inherit; font-size: 14.5px; padding: 10px 12px; outline: none; min-height: 60px; }
@@ -14461,34 +14469,12 @@
         function sprinkleSuggestedPeople() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return;
+            // "People you may know" cards no longer weave into the Feed — clean up anything a
+            // stale render left behind and stop there. Suggested-follow surfaces now live in
+            // Explore ▸ People (renderExplorePeople) and the Profile "Suggested Friends" row
+            // instead. Kept as a no-op (rather than deleting every call site) so reorderFeedCards
+            // / the feed-subtab switch / renderDiscoverGrid can keep calling it safely.
             list.querySelectorAll('.discover-suggest-card').forEach(el => el.remove());
-
-            // Following only shows posts from people already followed — "people you may know"
-            // suggestion cards don't belong there, so skip weaving them in on that subtab.
-            if (feedActiveSubtab === 'following') return;
-
-            const pool = shuffleWithSeed(getSuggestableUsers(), 'discover-sprinkle-' + discoverShuffleSeed);
-            if (!pool.length) return;
-
-            const postCards = Array.from(list.children).filter(el => el.classList.contains('feed-post-card'));
-            if (!postCards.length) return;
-
-            let poolIndex = 0;
-            let sincePlaced = 0;
-            let nextGap = 4 + Math.floor(seededRandom01('gap-0') * 4); // 4-7 posts before the first widget
-
-            postCards.forEach((card, i) => {
-                sincePlaced++;
-                if (sincePlaced >= nextGap && poolIndex < pool.length) {
-                    const batch = pool.slice(poolIndex, poolIndex + 8);
-                    if (batch.length) {
-                        list.insertBefore(buildSuggestionCard(batch), card.nextSibling);
-                        poolIndex += batch.length;
-                    }
-                    sincePlaced = 0;
-                    nextGap = 4 + Math.floor(seededRandom01('gap-' + i) * 4);
-                }
-            });
         }
 
         // Follow buttons on the "People you may know" widgets woven into the feed (see
@@ -17336,6 +17322,8 @@
                 <button type="button" class="feed-post-menu-btn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                 </button>`;
+            const followPillHtml = (!isOwn && myUid && post.uid && !cachedContacts[post.uid]) ? `
+                <button type="button" class="feed-post-follow-pill" data-uid="${post.uid}">Follow</button>` : '';
 
             card.innerHTML = `
                 <div class="feed-thread-connector feed-thread-connector-down"></div>
@@ -17355,6 +17343,7 @@
                                 <button type="button" class="feed-post-why-ad-inline" style="display:none;">Why?</button>
                                 <span class="time" ${post.isAd ? 'style="display:none;"' : ''}><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span>${post.editedAt ? ' · <span class="feed-post-edited-tag">edited</span>' : ''}</span>
                             </div>
+                            ${followPillHtml}
                             ${menuBtnHtml}
                         </div>
                         <div class="x-post-username">
@@ -17554,6 +17543,25 @@
 
             const menuBtn = card.querySelector('.feed-post-menu-btn');
             if (menuBtn) menuBtn.addEventListener('click', (e) => { e.stopPropagation(); openPostOptions(postId, wrapperPost, card); });
+
+            // "Follow" pill next to the three-dot menu (see followPillHtml above) — tapping it
+            // follows the post's author right from the feed and removes the pill from every
+            // post of theirs currently on screen, not just this card.
+            const followPillBtn = card.querySelector('.feed-post-follow-pill');
+            if (followPillBtn) followPillBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (followPillBtn.classList.contains('is-busy')) return;
+                const targetUid = followPillBtn.dataset.uid;
+                followPillBtn.classList.add('is-busy');
+                try {
+                    await followUser(targetUid);
+                    document.querySelectorAll(`.feed-post-follow-pill[data-uid="${CSS.escape(targetUid)}"]`).forEach(btn => btn.remove());
+                } catch (err) {
+                    console.error('Follow from feed failed', err);
+                    followPillBtn.classList.remove('is-busy');
+                    notify("Couldn't follow this user", 'error');
+                }
+            });
 
             const whyAdInline = card.querySelector('.feed-post-why-ad-inline');
             if (whyAdInline) whyAdInline.addEventListener('click', (e) => {

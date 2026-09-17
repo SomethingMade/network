@@ -8147,7 +8147,7 @@
                 <div id="tab-contacts" class="tab-content">
                     <div class="chat-header-area">
                         <div class="chat-header-top"><div class="chat-header-title-row"><div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div><h1>Following</h1></div><div class="chat-header-icons">
-                                <div class="search-icon-btn js-search-open" data-search-list="contacts-list-container" title="Search">
+                                <div class="search-icon-btn js-search-open" id="contacts-search-icon-btn" data-search-list="contacts-list-container" title="Search">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                 </div>
                                 <div class="chat-view-menu-wrap">
@@ -10652,7 +10652,11 @@
         const chatSearchInput = document.getElementById('search-chats');
         const contactSearchInput = document.getElementById('search-contacts');
         chatSearchInput.addEventListener('input', () => filterListItems(chatSearchInput, 'chat-list-container'));
-        contactSearchInput.addEventListener('input', () => filterListItems(contactSearchInput, 'contacts-list-container'));
+        // The Following/Followers/Phone/Blocked sub-tabs share this one search bar (it's
+        // physically relocated into it, see initFullscreenSearch below) — filter whichever
+        // list is actually showing, kept in sync by the contacts-sub-tabs click handler,
+        // rather than always filtering the Following list regardless of the active sub-tab.
+        contactSearchInput.addEventListener('input', () => filterListItems(contactSearchInput, getActiveContactsListId()));
 
         // Header search icon → opens the same full-screen search overlay used everywhere,
         // reusing that tab's existing search bar + result list (moved into the overlay, then
@@ -28956,6 +28960,15 @@
             return true;
         }
 
+        // Maps the active button in #contacts-sub-tabs to the list container it shows —
+        // shared by the search input filter above and the sub-tab switch handler below,
+        // so both always agree on which list "search" currently means.
+        const CONTACTS_SUBTAB_LIST_IDS = { all: 'contacts-list-container', followers: 'followers-list-container', device: 'device-contacts-list-container', blocked: 'blocked-list-container' };
+        function getActiveContactsListId() {
+            const activeBtn = document.querySelector('#contacts-sub-tabs button.active');
+            return CONTACTS_SUBTAB_LIST_IDS[activeBtn?.dataset.subtab] || 'contacts-list-container';
+        }
+
         document.getElementById('contacts-sub-tabs').addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-subtab]');
             if (!btn) return;
@@ -28967,6 +28980,14 @@
             document.getElementById('followers-list-container').style.display = subtab === 'followers' ? 'block' : 'none';
             document.getElementById('device-contacts-list-container').style.display = subtab === 'device' ? 'block' : 'none';
             document.getElementById('blocked-list-container').style.display = subtab === 'blocked' ? 'block' : 'none';
+            // Point the search icon at the list that's now showing (openFullscreenSearch reads
+            // this at click time), and clear any leftover query from the previous sub-tab so
+            // switching tabs doesn't land on a list that's still filtered from before.
+            document.getElementById('contacts-search-icon-btn').dataset.searchList = CONTACTS_SUBTAB_LIST_IDS[subtab] || 'contacts-list-container';
+            if (contactSearchInput.value) {
+                contactSearchInput.value = '';
+                filterListItems(contactSearchInput, getActiveContactsListId());
+            }
         });
 
         // --- DEVICE CONTACTS SYNC (Contact Picker API) ---

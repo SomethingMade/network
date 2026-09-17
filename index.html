@@ -6918,11 +6918,11 @@
                         </div>
                         <div class="wa-earnings-lock-body">
                             <div class="wa-earnings-lock-title">Earnings locked</div>
-                            <div class="wa-earnings-lock-sub">Reach 100 followers to start earning from your post views</div>
+                            <div class="wa-earnings-lock-sub" id="insights-earnings-lock-sub">Get more than 10 followers to start earning from your post views</div>
                             <div class="wa-earnings-progress-track">
                                 <div class="wa-earnings-progress-fill" id="insights-earnings-progress-fill"></div>
                             </div>
-                            <div class="wa-earnings-progress-label" id="insights-earnings-progress-label">0/100 followers</div>
+                            <div class="wa-earnings-progress-label" id="insights-earnings-progress-label">0/10 followers</div>
                         </div>
                     </div>
                     <div id="insights-earnings-unlocked" class="wa-earnings-card unlocked" style="display:none;">
@@ -22627,11 +22627,11 @@
             return days ? Date.now() - days * 24 * 60 * 60 * 1000 : 0;
         }
 
-        // Follower-gated earnings: locked below 100 followers, then a tiered rate per
+        // Follower-gated earnings: locked at 10 followers or fewer, then a tiered rate per
         // 1,000 post impressions once unlocked (higher follower counts unlock better
         // rates). Purely a display of estimated earnings for now — no payout flow yet.
         const EARNINGS_TIERS = [
-            { minFollowers: 100, rate: 5, label: 'Tier 1' },
+            { minFollowers: 11, rate: 5, label: 'Tier 1' },
             { minFollowers: 1000, rate: 10, label: 'Tier 2' },
             { minFollowers: 10000, rate: 15, label: 'Tier 3' },
             { minFollowers: 50000, rate: 25, label: 'Tier 4' }
@@ -22650,9 +22650,10 @@
             if (!tier) {
                 lockedEl.style.display = 'flex';
                 unlockedEl.style.display = 'none';
-                const pct = Math.min(100, Math.round((followerCount / 100) * 100));
+                const goal = EARNINGS_TIERS[0].minFollowers;
+                const pct = Math.min(100, Math.round((followerCount / goal) * 100));
                 document.getElementById('insights-earnings-progress-fill').style.width = pct + '%';
-                document.getElementById('insights-earnings-progress-label').textContent = `${followerCount}/100 followers`;
+                document.getElementById('insights-earnings-progress-label').textContent = `${followerCount}/${goal} followers`;
                 return;
             }
             lockedEl.style.display = 'none';

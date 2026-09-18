@@ -19431,13 +19431,21 @@
                 const user = auth.currentUser;
                 if (user) update(ref(database, `notifications/${user.uid}/${notifId}`), { read: true });
             }
-            closeNotificationsSheet();
             if (notif.postId) {
+                // Deliberately NOT closing the notifications sheet first — opening the post view
+                // on top of it (both are .bottom-sheet-overlay, so the generic sheet-stack
+                // back-button system above tracks them automatically) means the device back
+                // button pops the post view and lands back on Notifications, right where the
+                // person left it, instead of dropping straight to the feed underneath.
                 openNotificationPostView(notif.postId);
             } else if (notif.type === 'job_application' && notif.jobId) {
+                closeNotificationsSheet();
                 openJobApplicantsSheet(notif.jobId);
             } else if (notif.type === 'follow' && notif.fromUid) {
+                closeNotificationsSheet();
                 openUserProfileSheet(notif.fromUid);
+            } else {
+                closeNotificationsSheet();
             }
         }
 

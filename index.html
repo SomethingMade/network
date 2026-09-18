@@ -5302,6 +5302,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                     <span>Share Post</span>
                 </button>
+                <button class="msg-option-btn with-icon" id="btn-post-download">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Download</span>
+                </button>
             </div>
             <div class="options-sheet-group">
                 <button class="msg-option-btn with-icon danger" id="btn-post-report">
@@ -9811,14 +9815,19 @@
             document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
             document.getElementById('image-viewer-author-bar-wrap').style.display = currentViewerPostId ? 'block' : 'none';
             if (currentViewerPostId) {
-                // Post images now get the same verified-gated download as the video/reel
-                // viewers (see video-viewer-save / reel-download-btn) instead of being
-                // hidden outright — hideSave (view-once etc.) still wins either way.
-                const myUid = auth.currentUser && auth.currentUser.uid;
-                document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || !isVerifiedUid(myUid)) ? 'none' : '';
+                // Post images: download now lives inside the three-dot menu (see
+                // btn-post-download / openPostOptions) instead of this floating icon, so keep
+                // it hidden here — openPostOptions applies its own verified gating.
+                document.getElementById('image-viewer-save').style.display = 'none';
                 syncImageViewerPostBar();
                 syncImageViewerAuthorBar();
                 trackImageViewerPostImpression();
+            } else {
+                // Not a post (chat photo, avatar, etc.) — there's no three-dot menu shown here
+                // at all in that case, so this floating icon is still the only way to download;
+                // keep its original verified/hideSave gating.
+                const myUid = auth.currentUser && auth.currentUser.uid;
+                document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || !isVerifiedUid(myUid)) ? 'none' : '';
             }
         }
         // Fills the avatar/name/username/Follow row above the image (see
@@ -10167,7 +10176,6 @@
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </div>
                     <div class="reel-item-info">
-                        <div class="reel-item-author">${feedAvatarHtml(author)}<span></span></div>
                         ${caption ? `<div class="reel-item-caption"></div>` : ''}
                         <div class="reel-item-view-stat">Views <span>${formatFeedCount((post && post.impressionCount) || 0)}</span></div>
                         ${post && post.music ? `<div class="reel-item-music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg><span></span></div>` : ''}
@@ -10207,8 +10215,6 @@
             const post = cachedPosts[postId];
             const uid = post && post.uid;
             const author = (post && cachedUsers[uid]) || {};
-            const nameEl = itemEl.querySelector('.reel-item-author span');
-            if (nameEl) nameEl.innerHTML = escapeHtmlForPost(author.name || (post && post.name) || 'User') + verifiedBadgeFor(uid, uid === AI_UID);
             const captionEl = itemEl.querySelector('.reel-item-caption');
             if (captionEl) captionEl.innerHTML = (post && post.text) ? linkifyHashtags(post.text) : '';
             const musicEl = itemEl.querySelector('.reel-item-music span');
@@ -16049,6 +16055,18 @@
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) openReportPostSheet(activePostOptions.postId, activePostOptions.post);
             });
+            document.getElementById('btn-post-download').addEventListener('click', () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
+                if (!activePostOptions) return;
+                const { postId, post } = activePostOptions;
+                // If this was opened from the image viewer on this exact post, download whichever
+                // image is currently on screen (gallery position included) rather than always the
+                // post's first image.
+                const url = (currentViewerPostId === postId && currentViewerImageUrl)
+                    ? currentViewerImageUrl
+                    : (post.imageUrl || (post.imageUrls && post.imageUrls[0]));
+                if (url) downloadMediaFile(url, 'image');
+            });
             document.getElementById('btn-post-delete').addEventListener('click', async () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
@@ -16123,6 +16141,12 @@
                 pinBtn.querySelector('span').textContent = isPinned ? 'Unpin from Profile' : 'Pin to Profile';
             }
             document.getElementById('btn-post-share').style.display = 'block';
+            // Download moved here from the image viewer's old floating icon (see
+            // updateImageViewerPostBarVisibility) — images only (videos already have their own
+            // download icon in the Reel viewer's action rail, .reel-download-btn), gated on the
+            // CURRENT viewer's own verified status same as that icon was.
+            const hasImage = !!(post.imageUrl || (post.imageUrls && post.imageUrls.length));
+            document.getElementById('btn-post-download').style.display = (hasImage && isVerifiedUid(user && user.uid)) ? 'block' : 'none';
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-post-delete').querySelector('span').textContent = isRepost ? 'Undo Repost' : 'Delete Post';

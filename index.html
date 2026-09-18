@@ -4209,6 +4209,31 @@
         .reel-item-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; color: #fff; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
         .reel-item-play-hint.visible { opacity: 1; }
         .reel-item-play-hint svg { width: 26px; height: 26px; }
+        /* New top header per reel item (back + three-dot menu, then the author's avatar/name/
+           username/Follow pill) — mirrors #image-viewer-overlay's author bar below
+           (.media-viewer-author-bar) so a post's video view and image view read the same way.
+           Lives inside each .reel-item (not a shared fixed bar) since every swiped-to item has
+           a different author — see buildReelItemHtml / fillReelItemText / bindReelItem. */
+        .reel-item-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.25) 70%, transparent); padding-top: env(safe-area-inset-top, 0px); }
+        .reel-item-topbar-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 6px 2px; }
+        .reel-item-back-btn, .reel-item-menu-btn { background: none; border: none; color: #fff; padding: 8px; cursor: pointer; display: flex; align-items: center; }
+        .reel-item-back-btn svg, .reel-item-menu-btn svg { width: 22px; height: 22px; }
+        /* Shared "avatar · name+badge / @username · Follow" row — used both inside
+           .reel-item-topbar above and inside #image-viewer-author-bar-wrap for the image
+           viewer. Follow pill only renders (see fillReelItemText / updateImageViewerPostBarVisibility)
+           when the viewer doesn't already follow that post's author, same rule as the feed's
+           inline Follow pill (.feed-post-follow-pill). */
+        .media-viewer-author-bar { display: flex; align-items: center; gap: 10px; padding: 6px 16px 12px; }
+        .media-viewer-author-avatar { width: 34px; height: 34px; }
+        .media-viewer-author-info { flex: 1; min-width: 0; }
+        .media-viewer-author-name { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .media-viewer-author-username { font-size: 12.5px; color: rgba(255,255,255,0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .media-viewer-follow-pill { flex-shrink: 0; padding: 6px 16px; border-radius: 50px; border: 1.5px solid #fff; background: transparent; color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background 0.15s ease, opacity 0.15s ease; }
+        .media-viewer-follow-pill:active { background: rgba(255,255,255,0.18); }
+        .media-viewer-follow-pill.is-busy { opacity: 0.6; pointer-events: none; }
+        /* Positions the same author-bar row (used bare inside .reel-item-topbar above) as its
+           own dark strip under the image viewer's existing floating close/menu icons. */
+        .media-viewer-author-bar-wrap { position: absolute; top: 56px; left: 0; right: 0; background: rgba(0,0,0,0.55); z-index: 1; }
         .reel-item-info { position: absolute; left: 14px; right: 14px; bottom: 64px; color: #fff; z-index: 2; }
         .reel-item-author { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; margin-bottom: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-author .avatar { width: 30px; height: 30px; font-size: 13px; }
@@ -8950,6 +8975,16 @@
         <button type="button" class="image-viewer-post-menu-btn" id="image-viewer-post-menu-btn" title="More" style="display:none;">
             <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
         </button>
+        <div class="media-viewer-author-bar-wrap" id="image-viewer-author-bar-wrap" style="display:none;">
+            <div class="media-viewer-author-bar">
+                <div class="avatar media-viewer-author-avatar" id="image-viewer-author-avatar"></div>
+                <div class="media-viewer-author-info">
+                    <div class="media-viewer-author-name"><span id="image-viewer-author-name"></span><span id="image-viewer-author-badge"></span></div>
+                    <div class="media-viewer-author-username" id="image-viewer-author-username"></div>
+                </div>
+                <button type="button" class="media-viewer-follow-pill" id="image-viewer-follow-pill" style="display:none;">Follow</button>
+            </div>
+        </div>
         <div class="image-viewer-media" id="image-viewer-media">
             <img id="image-viewer-img" src="" alt="Full image">
             <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="image-viewer-prev" aria-label="Previous image">
@@ -9774,6 +9809,7 @@
         function updateImageViewerPostBarVisibility() {
             document.getElementById('image-viewer-post-actions').style.display = currentViewerPostId ? 'flex' : 'none';
             document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
+            document.getElementById('image-viewer-author-bar-wrap').style.display = currentViewerPostId ? 'block' : 'none';
             if (currentViewerPostId) {
                 // Post images now get the same verified-gated download as the video/reel
                 // viewers (see video-viewer-save / reel-download-btn) instead of being
@@ -9781,9 +9817,45 @@
                 const myUid = auth.currentUser && auth.currentUser.uid;
                 document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || !isVerifiedUid(myUid)) ? 'none' : '';
                 syncImageViewerPostBar();
+                syncImageViewerAuthorBar();
                 trackImageViewerPostImpression();
             }
         }
+        // Fills the avatar/name/username/Follow row above the image (see
+        // #image-viewer-author-bar-wrap) from cachedPosts/cachedUsers, and hides the Follow pill
+        // once already following — same follow/unfollow call as the feed's inline pill
+        // (.feed-post-follow-pill in buildFeedPostCard).
+        function syncImageViewerAuthorBar() {
+            if (!currentViewerPostId) return;
+            const post = cachedPosts[currentViewerPostId];
+            if (!post || !post.uid) return;
+            const author = cachedUsers[post.uid] || {};
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            document.getElementById('image-viewer-author-avatar').style.backgroundImage = `url('${author.photoURL || post.photoURL || DEFAULT_AVATAR_URL}')`;
+            document.getElementById('image-viewer-author-name').textContent = author.name || post.name || 'User';
+            document.getElementById('image-viewer-author-badge').innerHTML = verifiedBadgeFor(post.uid, false);
+            document.getElementById('image-viewer-author-username').textContent = author.username ? '@' + author.username : '';
+            const followBtn = document.getElementById('image-viewer-follow-pill');
+            followBtn.dataset.uid = post.uid;
+            followBtn.style.display = (myUid && post.uid !== myUid && !cachedContacts[post.uid]) ? 'inline-block' : 'none';
+            followBtn.classList.remove('is-busy');
+        }
+        document.getElementById('image-viewer-follow-pill').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const btn = e.currentTarget;
+            const targetUid = btn.dataset.uid;
+            if (!targetUid || btn.classList.contains('is-busy')) return;
+            btn.classList.add('is-busy');
+            try {
+                await followUser(targetUid);
+                btn.style.display = 'none';
+                document.querySelectorAll(`.feed-post-follow-pill[data-uid="${CSS.escape(targetUid)}"]`).forEach(pill => pill.remove());
+            } catch (err) {
+                console.error('Follow from image viewer failed', err);
+                btn.classList.remove('is-busy');
+                notify("Couldn't follow this user", 'error');
+            }
+        });
         // Reflects cachedPosts[currentViewerPostId] (likeCount/commentCount/repostCount and
         // whether I've liked/reposted it) onto the bottom action bar. Called on open, and again
         // whenever that post's data changes in Firebase (see patchFeedPostCounts call sites).
@@ -10070,6 +10142,24 @@
             const canDownload = isVerifiedUid(myUid);
             return `
                 <div class="reel-item" data-post-id="${postId}">
+                    <div class="reel-item-topbar">
+                        <div class="reel-item-topbar-row">
+                            <button type="button" class="reel-item-back-btn" aria-label="Back">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
+                            <button type="button" class="reel-item-menu-btn" aria-label="More">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+                            </button>
+                        </div>
+                        <div class="media-viewer-author-bar">
+                            <div class="avatar media-viewer-author-avatar reel-item-topbar-avatar"></div>
+                            <div class="media-viewer-author-info">
+                                <div class="media-viewer-author-name"><span class="reel-item-topbar-name"></span><span class="reel-item-topbar-badge"></span></div>
+                                <div class="media-viewer-author-username reel-item-topbar-username"></div>
+                            </div>
+                            <button type="button" class="media-viewer-follow-pill reel-item-topbar-follow" style="display:none;">Follow</button>
+                        </div>
+                    </div>
                     <div class="reel-item-media">
                         <div class="reel-item-spinner"></div>
                     </div>
@@ -10123,6 +10213,24 @@
             if (captionEl) captionEl.innerHTML = (post && post.text) ? linkifyHashtags(post.text) : '';
             const musicEl = itemEl.querySelector('.reel-item-music span');
             if (musicEl && post && post.music) musicEl.textContent = `${post.music.trackName || ''}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+
+            // Top header row (see .reel-item-topbar in buildReelItemHtml) — same
+            // avatar/name/username/Follow treatment as the image viewer's author bar.
+            const topAvatarEl = itemEl.querySelector('.reel-item-topbar-avatar');
+            if (topAvatarEl) topAvatarEl.style.backgroundImage = `url('${author.photoURL || (post && post.photoURL) || DEFAULT_AVATAR_URL}')`;
+            const topNameEl = itemEl.querySelector('.reel-item-topbar-name');
+            if (topNameEl) topNameEl.textContent = author.name || (post && post.name) || 'User';
+            const topBadgeEl = itemEl.querySelector('.reel-item-topbar-badge');
+            if (topBadgeEl) topBadgeEl.innerHTML = verifiedBadgeFor(uid, uid === AI_UID);
+            const topUsernameEl = itemEl.querySelector('.reel-item-topbar-username');
+            if (topUsernameEl) topUsernameEl.textContent = author.username ? '@' + author.username : '';
+            const topFollowBtn = itemEl.querySelector('.reel-item-topbar-follow');
+            if (topFollowBtn) {
+                const myUid = auth.currentUser && auth.currentUser.uid;
+                topFollowBtn.dataset.uid = uid || '';
+                topFollowBtn.style.display = (myUid && uid && uid !== myUid && !cachedContacts[uid]) ? 'inline-block' : 'none';
+                topFollowBtn.classList.remove('is-busy');
+            }
         }
 
         function reelExtendQueueIfNeeded() {
@@ -10261,6 +10369,32 @@
         }
 
         function bindReelItem(itemEl, postId) {
+            const backBtn = itemEl.querySelector('.reel-item-back-btn');
+            if (backBtn) backBtn.addEventListener('click', (e) => { e.stopPropagation(); history.back(); });
+            const topMenuBtn = itemEl.querySelector('.reel-item-menu-btn');
+            if (topMenuBtn) topMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const post = cachedPosts[postId];
+                if (post) openPostOptions(postId, post, null);
+            });
+            const topFollowBtn = itemEl.querySelector('.reel-item-topbar-follow');
+            if (topFollowBtn) topFollowBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (topFollowBtn.classList.contains('is-busy')) return;
+                const targetUid = topFollowBtn.dataset.uid;
+                if (!targetUid) return;
+                topFollowBtn.classList.add('is-busy');
+                try {
+                    await followUser(targetUid);
+                    document.querySelectorAll(`.reel-item-topbar-follow[data-uid="${CSS.escape(targetUid)}"], .feed-post-follow-pill[data-uid="${CSS.escape(targetUid)}"]`).forEach(el => {
+                        if (el.classList.contains('feed-post-follow-pill')) el.remove(); else el.style.display = 'none';
+                    });
+                } catch (err) {
+                    console.error('Follow from reel viewer failed', err);
+                    topFollowBtn.classList.remove('is-busy');
+                    notify("Couldn't follow this user", 'error');
+                }
+            });
             const likeBtn = itemEl.querySelector('.reel-like-btn');
             if (likeBtn) likeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();

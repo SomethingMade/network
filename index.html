@@ -7396,8 +7396,8 @@
     </div>
 
     <!-- Dedicated "Get Verified" page — reached from the Verified Badge row in Settings.
-         Reuses the same trial/purchase element IDs and click handlers as before (see
-         refreshTrialBadgeUI / refreshVerifiedBadgePurchaseUI below),
+         Reuses the same purchase element IDs and click handlers as before (see
+         refreshVerifiedBadgePurchaseUI below),
          just moved from a compact settings row into a full standalone page. -->
     <div id="verified-badge-page-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet vb-promo-sheet" style="max-height: 94vh; display:flex; flex-direction:column; padding:0;">
@@ -7448,18 +7448,6 @@
             </div>
 
             <div class="vb-promo-footer">
-                <div class="vb-promo-plan-card" id="trial-plan-card">
-                    <div class="vb-promo-plan-head">
-                        <span class="vb-promo-plan-name">Free Trial</span>
-                        <span class="vb-promo-plan-badge">14 DAYS FREE</span>
-                    </div>
-                    <p class="vb-promo-plan-sub" id="trial-badge-status">Try the full Verified Badge free for 14 days</p>
-                    <div class="wa-earnings-progress-track" id="trial-badge-progress-track" style="display:none; margin-top:10px;">
-                        <div class="wa-earnings-progress-fill" id="trial-badge-progress-fill"></div>
-                    </div>
-                    <button type="button" id="btn-trial-badge" class="vb-promo-cta">Start Trial</button>
-                </div>
-
                 <!-- Buy Verified card removed — purchases are no longer offered from this sheet.
                      "paid-verified-pill" is kept (hidden, id preserved) purely so
                      refreshVerifiedBadgePurchaseUI's DOM lookups still resolve for accounts that
@@ -9543,21 +9531,14 @@
         // `count`/`longest` numbers are the source of truth, history is display-only and pruned
         // on every write so it can't grow unbounded.
         let currentStreakData = { count: 0, longest: 0, lastCheckIn: null, history: {} };
-        // Streaks of STREAK_TRIAL_THRESHOLD days or more (checked in every day, no gaps — a
-        // missed day resets the streak to 1, so "8-day streak" already means "consistent")
-        // earn the same free 14-day Verified Badge trial as the manual "Start Trial" button in
-        // Settings (see grantStreakTrialBadge / TRIAL_BADGE_DURATION_MS below) — one nudge to
-        // reward the habit, not a separate badge type.
-        const STREAK_TRIAL_THRESHOLD = 8;
-        // Past this many consecutive days, the Verified Badge stops being something to buy or
-        // trial at all — it's granted permanently and free (see grantStreakPermanentVerified /
-        // verifiedBadgeFor). "More than 13 days" means 14 is the first day it fires.
-        const STREAK_PERMANENT_VERIFY_THRESHOLD = 14;
+        // Past this many consecutive days, the Verified Badge stops being something to buy at
+        // all — it's granted permanently and free (see grantStreakPermanentVerified /
+        // verifiedBadgeFor). "More than 20 days" means 21 is the first day it fires.
+        const STREAK_PERMANENT_VERIFY_THRESHOLD = 21;
         const STREAK_MILESTONES = {
             3: "Nice, 3 days in a row! 🔥",
             7: "One week strong! 🎉",
-            8: "8-day streak — you've unlocked a free 14-day Verified Badge! ✅",
-            14: "Two weeks running — you've earned a permanent free Verified Badge! ✅",
+            21: "Three weeks running — you've earned a permanent free Verified Badge! ✅",
             30: "A whole month streak! 🏆",
             60: "60 days of showing up. Incredible.",
             100: "100-day streak. Legendary. 🎖️",
@@ -9669,48 +9650,12 @@
             document.getElementById('streak-modal-overlay').classList.remove('active');
             openProfileSheet({ preventDefault: () => {} });
         });
-        // TRIAL_BADGE_DURATION_MS itself lives further down with the rest of the badge code (see
-        // verifiedBadgeFor), but as a top-level const it's already defined by the time any of
-        // these streak functions actually run (they're only called after sign-in, long after the
-        // whole script has parsed), so referencing it here is safe.
-        //
-        // A trial is "available" to grant via streak if the account has never had one, OR had one
-        // that has since fully expired (14 days elapsed) — NOT while a trial/purchase is still
-        // active. This lets a lapsed-trial user earn it again by rebuilding an 8-day streak,
-        // without letting the streak grant stack on top of (or prematurely renew) a still-active
-        // trial.
-        function streakTrialBadgeAvailable(trialBadgeActivatedAt) {
-            if (!trialBadgeActivatedAt) return true;
-            return (Date.now() - trialBadgeActivatedAt) >= TRIAL_BADGE_DURATION_MS;
-        }
-        // Rewards an account that's kept an STREAK_TRIAL_THRESHOLD-day-or-longer daily streak
-        // with the free 14-day Verified Badge trial, the exact same grant the manual "Start
-        // Trial" button in Settings makes (see refreshTrialBadgeUI). Unlike the manual button
-        // (a strict one-time-ever grant), this can fire more than once per account: each call
-        // sets a fresh trialBadgeActivatedAt, so a new 8-day streak built after a previous trial
-        // has expired re-activates another 14-day trial. Callers gate this with
-        // streakTrialBadgeAvailable() so it never fires while a trial/purchase is still active.
-        async function grantStreakTrialBadge(uid) {
-            await update(ref(database, `users/${uid}`), { trialBadgeActivatedAt: serverTimestamp() });
-            // Optimistic local estimate, same reasoning as the manual "Start Trial" button —
-            // the server's own clock (serverTimestamp() above) is what's actually stored.
-            if (cachedUsers[uid]) cachedUsers[uid].trialBadgeActivatedAt = Date.now();
-            notify(`${STREAK_TRIAL_THRESHOLD}-day streak! Your free 14-day Verified Badge trial is active 🎉`);
-            const user = auth.currentUser;
-            if (user && user.uid === uid) {
-                const myProfile = cachedUsers[uid] || { trialBadgeActivatedAt: Date.now() };
-                refreshTrialBadgeUI(myProfile);
-                refreshVerifiedBadgeSettingsRow(myProfile);
-            }
-        }
-
         // Rewards an account that's kept a STREAK_PERMANENT_VERIFY_THRESHOLD-day-or-longer daily
         // streak (14+, i.e. "more than 13 days") with a permanent, free Verified Badge —
         // `streakVerifiedAt` is checked by verifiedBadgeFor/isVerifiedUid exactly like
         // `paidVerifiedAt`, with no expiry, so from this point on the person never needs to buy
-        // or trial the badge. Unlike the 14-day trial (grantStreakTrialBadge), this is a strict
-        // one-time-ever grant per account: once streakVerifiedAt is set it's never re-written or
-        // cleared, even if the streak later breaks.
+        // the badge. This is a strict one-time-ever grant per account: once streakVerifiedAt is
+        // set it's never re-written or cleared, even if the streak later breaks.
         async function grantStreakPermanentVerified(uid) {
             await update(ref(database, `users/${uid}`), { streakVerifiedAt: serverTimestamp() });
             if (cachedUsers[uid]) cachedUsers[uid].streakVerifiedAt = Date.now();
@@ -9728,10 +9673,9 @@
         // the profile (avoids a second DB read — the caller already fetched the profile). Only
         // writes to the DB and pops the celebration modal the first time this local day sees the
         // person open the app; every other app-open/tab-switch today just re-renders from
-        // currentStreakData with no network call. `trialBadgeActivatedAt` (also from that same
-        // already-fetched profile) gates the STREAK_TRIAL_THRESHOLD-day badge grant below, and
-        // `streakVerifiedAt` gates the STREAK_PERMANENT_VERIFY_THRESHOLD-day permanent grant.
-        async function processDailyStreak(uid, existingStreak, trialBadgeActivatedAt, streakVerifiedAt) {
+        // currentStreakData with no network call. `streakVerifiedAt` (from that same
+        // already-fetched profile) gates the STREAK_PERMANENT_VERIFY_THRESHOLD-day permanent grant.
+        async function processDailyStreak(uid, existingStreak, streakVerifiedAt) {
             const today = streakLocalDateStr();
             const streak = existingStreak || {};
             let count = streak.count || 0;
@@ -9745,11 +9689,6 @@
                 // Covers an account that already had a long-enough streak before this feature
                 // existed (or a previous grant attempt failed) — catches it up next time they
                 // open the app, not just on the exact day the count first crosses the threshold.
-                // Also covers a lapsed trial: streakTrialBadgeAvailable() lets this re-fire once
-                // a previously-granted trial has fully expired.
-                if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
-                    grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
-                }
                 if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
                     grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
                 }
@@ -9766,9 +9705,6 @@
             await update(ref(database, `users/${uid}/streak`), { count, longest, lastCheckIn: today, history });
             currentStreakData = { count, longest, lastCheckIn: today, history };
             updateStreakBadgeUI();
-            if (count >= STREAK_TRIAL_THRESHOLD && streakTrialBadgeAvailable(trialBadgeActivatedAt)) {
-                grantStreakTrialBadge(uid).catch((err) => console.error('Streak trial badge grant failed', err));
-            }
             if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
                 grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
             }
@@ -12903,16 +12839,13 @@
         const VERIFIED_BADGE_SVG = '<svg class="verified-badge" viewBox="0 0 22 22" width="16" height="16" aria-label="Verified"><path fill="#0A84FF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>';
 
         // Reaching FOLLOWERS_BADGE_THRESHOLD organically earns the same blue Verified Badge below —
-        // there's no separate look for it, same as trial/purchase (see verifiedBadgeFor).
+        // there's no separate look for it, same as a purchase (see verifiedBadgeFor).
         const FRIENDS_BADGE_THRESHOLD = 5000;
-        // One-time, 14-day trial that grants the same blue Verified Badge as a purchase would,
-        // regardless of follower count — a taste of the real thing, not a lesser look-alike.
-        const TRIAL_BADGE_DURATION_MS = 14 * 24 * 60 * 60 * 1000;
 
         // --- PAID VERIFIED BADGE (personal accounts) ---
         // A permanent blue badge (VERIFIED_BADGE_SVG) any personal account can buy outright for
-        // R2.99, independent of the free 14-day trial and of follower count. Business accounts
-        // already get the gold badge for free, so the purchase option is hidden for them.
+        // R2.99, independent of follower count. Business accounts already get the gold badge for
+        // free, so the purchase option is hidden for them.
         //
         // Payment is collected client-side via Paystack Inline (https://js.paystack.co/v1/inline.js,
         // loaded in <head>), which pops up a hosted checkout and hands back a transaction
@@ -12976,23 +12909,21 @@
 
         // Returns the badge markup (or '') for a given uid. There are only two badges in the app:
         // gold for a Business Account, and blue (VERIFIED_BADGE_SVG) for everyone else who's
-        // verified — Goza AI, a purchased or trial Verified Badge, or reaching
-        // FRIENDS_BADGE_THRESHOLD followers organically. Same blue badge, no matter which path
-        // got them there.
+        // verified — Goza AI, a purchased Verified Badge, or reaching FRIENDS_BADGE_THRESHOLD
+        // followers organically. Same blue badge, no matter which path got them there.
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
             const profile = cachedUsers[uid];
             if (profile && profile.isBusinessAccount) return BUSINESS_BADGE_SVG;
             if (profile && profile.paidVerifiedAt) return VERIFIED_BADGE_SVG;
             if (profile && profile.streakVerifiedAt) return VERIFIED_BADGE_SVG;
-            if (profile && profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return VERIFIED_BADGE_SVG;
             if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return VERIFIED_BADGE_SVG;
             return '';
         }
 
         // Boolean counterpart to verifiedBadgeFor, for gating verified-only features (rather than
-        // rendering a badge): true for AI, a Business Account, a purchased, streak-earned, or
-        // trial Verified Badge, or reaching FRIENDS_BADGE_THRESHOLD followers organically.
+        // rendering a badge): true for AI, a Business Account, a purchased or streak-earned
+        // Verified Badge, or reaching FRIENDS_BADGE_THRESHOLD followers organically.
         function isVerifiedUid(uid) {
             if (uid === AI_UID) return true;
             const profile = cachedUsers[uid];
@@ -13000,7 +12931,6 @@
             if (profile.isBusinessAccount) return true;
             if (profile.paidVerifiedAt) return true;
             if (profile.streakVerifiedAt) return true;
-            if (profile.trialBadgeActivatedAt && (Date.now() - profile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS) return true;
             if ((profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return true;
             return false;
         }
@@ -14673,7 +14603,7 @@
             const engagementScore = (post.likeCount || 0) * 2 + (post.commentCount || 0) * 4;
             // Affinity: a flat boost for posts from people in your contacts.
             const contactBonus = (cachedContacts && cachedContacts[post.uid]) ? 40 : 0;
-            // Verified boost: a flat bump for posts from verified authors (badge/business/trial/
+            // Verified boost: a flat bump for posts from verified authors (badge/business/
             // organic threshold — see isVerifiedUid) — the "feed ranking" perk on the Get Verified
             // page. Smaller than the contacts bonus since a badge is a weaker affinity signal than
             // actually knowing the person, but still a consistent, meaningful edge in ordering.
@@ -16244,31 +16174,18 @@
 
         // --- Dedicated "Get Verified" page (see verified-badge-page-overlay) ---
         const verifiedBadgePageOverlay = document.getElementById('verified-badge-page-overlay');
-        // Trial status/progress is time-based (days left, % elapsed), so it can go stale just
-        // sitting on screen — refreshTrialBadgeUI only re-runs when the profile listener fires.
-        // This interval keeps it accurate for as long as the sheet stays open, independent of
-        // any profile write; refreshTrialBadgeUI itself is defined further below, but function
-        // declarations are hoisted so it's safe to reference here.
-        let verifiedBadgePageTickInterval = null;
         document.getElementById('open-verified-badge-page-row').addEventListener('click', () => {
             verifiedBadgePageOverlay.classList.add('active');
             const user = auth.currentUser;
             const myProfile = (user && cachedUsers[user.uid]) || {};
-            refreshTrialBadgeUI(myProfile);
-            clearInterval(verifiedBadgePageTickInterval);
-            verifiedBadgePageTickInterval = setInterval(() => {
-                const u = auth.currentUser;
-                refreshTrialBadgeUI((u && cachedUsers[u.uid]) || {});
-            }, 60 * 1000);
+            refreshVerifiedBadgePurchaseUI(myProfile);
         });
         document.getElementById('btn-close-verified-badge-page').addEventListener('click', () => {
             verifiedBadgePageOverlay.classList.remove('active');
-            clearInterval(verifiedBadgePageTickInterval);
         });
         verifiedBadgePageOverlay.addEventListener('click', (e) => {
             if (e.target === verifiedBadgePageOverlay) {
                 verifiedBadgePageOverlay.classList.remove('active');
-                clearInterval(verifiedBadgePageTickInterval);
             }
         });
 
@@ -21209,7 +21126,6 @@
                 refreshTaggedBusinessSettingsRow(myProfile);
                 refreshBusinessWelcomeSettingsRow(myProfile);
 
-                refreshTrialBadgeUI(myProfile);
                 refreshVerifiedBadgePurchaseUI(myProfile);
                 refreshVerifiedBadgeSettingsRow(myProfile);
 
@@ -21258,67 +21174,6 @@
         }
         document.getElementById('profile-about').addEventListener('input', updateProfileAboutCounter);
 
-        // --- Trial Verified Badge: one-time, free 14-day activation of the same blue badge a
-        // purchase grants (see TRIAL_BADGE_DURATION_MS / verifiedBadgeFor), independent of follower
-        // count. Same badge, same verified-only perks (isVerifiedUid) — trial just isn't permanent.
-        function refreshTrialBadgeUI(myProfile) {
-            const statusEl = document.getElementById('trial-badge-status');
-            const btn = document.getElementById('btn-trial-badge');
-            const track = document.getElementById('trial-badge-progress-track');
-            const fill = document.getElementById('trial-badge-progress-fill');
-
-            // trialBadgeActivatedAt is written with serverTimestamp(); on the writer's own
-            // client this can briefly resolve to a placeholder object before the server value
-            // lands, rather than a number. Guard against that (and against any other non-number)
-            // so we never show a bogus countdown or a stuck/garbled progress bar.
-            const activatedAt = typeof myProfile.trialBadgeActivatedAt === 'number' ? myProfile.trialBadgeActivatedAt : null;
-
-            if (!activatedAt) {
-                statusEl.textContent = 'Try the full Verified Badge free for 14 days';
-                btn.textContent = 'Start Trial';
-                btn.disabled = false;
-                btn.style.display = 'inline-flex';
-                track.style.display = 'none';
-                return;
-            }
-
-            const elapsedMs = Math.max(0, Date.now() - activatedAt);
-            const msLeft = TRIAL_BADGE_DURATION_MS - elapsedMs;
-            const pct = Math.min(100, Math.max(0, (elapsedMs / TRIAL_BADGE_DURATION_MS) * 100));
-            track.style.display = 'block';
-            fill.style.width = pct + '%';
-            btn.style.display = 'none';
-
-            if (msLeft > 0) {
-                const daysLeft = Math.max(1, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
-                statusEl.textContent = `Active — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
-            } else {
-                statusEl.textContent = 'Your free trial has ended';
-            }
-        }
-
-        document.getElementById('btn-trial-badge').addEventListener('click', async () => {
-            const user = auth.currentUser;
-            if (!user) return;
-            const myProfile = cachedUsers[user.uid] || {};
-            if (myProfile.trialBadgeActivatedAt) return;
-            const btn = document.getElementById('btn-trial-badge');
-            btn.disabled = true;
-            try {
-                await update(ref(database, `users/${user.uid}`), { trialBadgeActivatedAt: serverTimestamp() });
-                notify('Your 14-day verified badge trial is active!');
-                // Optimistic local estimate for the immediate UI update — the value actually
-                // stored (and what every other client reads) is the server's own clock, set by
-                // serverTimestamp() above and locked in place by the database rules below, so a
-                // user editing their own local time or replaying requests can't move it.
-                refreshTrialBadgeUI({ ...myProfile, trialBadgeActivatedAt: Date.now() });
-                refreshVerifiedBadgeSettingsRow({ ...myProfile, trialBadgeActivatedAt: Date.now() });
-            } catch (err) {
-                btn.disabled = false;
-                notify('Could not start your trial. Try again.');
-            }
-        });
-
         // --- Permanent Verified Badge status (see verifiedBadgeFor for background) ---
         // Purchasing is no longer offered from this sheet — there's no buy button anymore —
         // but accounts that already earned a permanent badge (old purchase, or a
@@ -21338,13 +21193,12 @@
         }
 
         // Compact summary shown on the "Get Verified" row back in Settings, kept in sync with
-        // the same profile fields as the two functions above so the row reflects trial/purchase
+        // the same profile fields as the two functions above so the row reflects purchase
         // status without needing the dedicated page to be open.
         function refreshVerifiedBadgeSettingsRow(myProfile) {
             const statusEl = document.getElementById('settings-verified-badge-status');
             const pill = document.getElementById('settings-verified-pill');
             if (!statusEl || !pill) return;
-            const trialActive = myProfile.trialBadgeActivatedAt && (Date.now() - myProfile.trialBadgeActivatedAt) < TRIAL_BADGE_DURATION_MS;
             if (myProfile.isBusinessAccount) {
                 statusEl.textContent = 'Business accounts get a gold badge automatically';
                 pill.style.display = 'none';
@@ -21353,9 +21207,6 @@
                 pill.style.display = 'inline-block';
             } else if (myProfile.paidVerifiedAt) {
                 statusEl.textContent = "You've bought the permanent blue Verified Badge";
-                pill.style.display = 'inline-block';
-            } else if (trialActive) {
-                statusEl.textContent = 'Your free trial badge is active';
                 pill.style.display = 'inline-block';
             } else {
                 statusEl.textContent = 'Stand out with a blue badge on your profile';
@@ -22280,7 +22131,7 @@
                 const myProfile = cachedUsers[user.uid] || {};
                 // isBusiness is the toggle's new value, which cachedUsers may not reflect yet
                 // (the listener hasn't caught up) — isVerifiedUid(user.uid) still correctly
-                // covers every OTHER verification path (paid, streak, trial, follower count),
+                // covers every OTHER verification path (paid, streak, follower count),
                 // so OR-ing the two together gives the right answer either way.
                 const stillVerified = isBusiness || isVerifiedUid(user.uid);
                 const usernameLocked = myProfile.usernameChanged && !stillVerified;
@@ -30520,7 +30371,7 @@
 
                 // Fire-and-forget: today's check-in shouldn't hold up the rest of login. Reuses
                 // existingProfileData fetched just above instead of a second DB read.
-                processDailyStreak(user.uid, existingProfileData.streak, existingProfileData.trialBadgeActivatedAt, existingProfileData.streakVerifiedAt).catch((err) => console.error('Daily streak check-in failed', err));
+                processDailyStreak(user.uid, existingProfileData.streak, existingProfileData.streakVerifiedAt).catch((err) => console.error('Daily streak check-in failed', err));
 
                 try {
                     const username = await ensureUsername(user);

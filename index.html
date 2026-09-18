@@ -18184,7 +18184,7 @@
             setReplyToComment(null);
             clearCommentGif();
 
-            const post = cachedPosts[postId];
+            const post = cachedPosts[postId] || opts.preloadedPost || null;
             const authorProfile = post ? (cachedUsers[post.uid] || {}) : {};
             const authorHandle = authorProfile.username ? `@${authorProfile.username}` : (authorProfile.name || (post && post.name) || 'this post');
             commentInput.placeholder = `Add a comment for ${authorHandle}`;
@@ -19399,6 +19399,33 @@
             if (attemptsLeft > 0) setTimeout(() => goToPostInFeed(postId, attemptsLeft - 1), 150);
         }
 
+        // Opens the full Post view (post content + comments, same "Post" page used when tapping
+        // a result from search) for a notification, instead of switching to the feed tab and
+        // scrolling to find the post there. Reuses whatever ensureNotifPostPreview already
+        // fetched for the notification's thumbnail, if anything, rather than fetching twice.
+        async function openNotificationPostView(postId) {
+            if (cachedPosts[postId]) {
+                openPostComments(postId, { fullView: true });
+                return;
+            }
+            let post = (postId in notifPostPreviewCache) ? notifPostPreviewCache[postId] : undefined;
+            if (post === undefined) {
+                try {
+                    const snap = await get(ref(database, `posts/${postId}`));
+                    post = snap.exists() ? snap.val() : null;
+                } catch (err) {
+                    console.error('Failed to load post for notification', err);
+                    post = null;
+                }
+                notifPostPreviewCache[postId] = post;
+            }
+            if (!post) {
+                notify('This post is no longer available.', 'error');
+                return;
+            }
+            openPostComments(postId, { fullView: true, preloadedPost: post });
+        }
+
         function openNotificationTarget(notifId, notif) {
             if (!notif.read) {
                 const user = auth.currentUser;
@@ -19406,8 +19433,7 @@
             }
             closeNotificationsSheet();
             if (notif.postId) {
-                goToTab('tab-status');
-                goToPostInFeed(notif.postId);
+                openNotificationPostView(notif.postId);
             } else if (notif.type === 'job_application' && notif.jobId) {
                 openJobApplicantsSheet(notif.jobId);
             } else if (notif.type === 'follow' && notif.fromUid) {

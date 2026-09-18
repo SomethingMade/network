@@ -5325,6 +5325,10 @@
                 </button>
             </div>
             <div class="options-sheet-group">
+                <button class="msg-option-btn with-icon" id="btn-post-save" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Save Post</span>
+                </button>
                 <button class="msg-option-btn with-icon" id="btn-post-share">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                     <span>Share Post</span>
@@ -9065,9 +9069,6 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
                 <span id="image-viewer-view-count">0</span>
             </div>
-            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-save-btn" title="Save">
-                <svg id="image-viewer-save-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-            </button>
         </div>
     </div>
 
@@ -9872,7 +9873,6 @@
             const myUid = user ? user.uid : null;
             const likedByMe = !!(post.reactions && myUid && post.reactions[myUid]);
             const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
-            const savedByMe = !!cachedSavedPosts[currentViewerPostId];
 
             const likeBtn = document.getElementById('image-viewer-like-btn');
             likeBtn.classList.toggle('liked', likedByMe);
@@ -9882,9 +9882,6 @@
             document.getElementById('image-viewer-repost-btn').classList.toggle('reposted', repostedByMe);
             document.getElementById('image-viewer-repost-count').textContent = formatFeedCount(post.repostCount || 0);
             document.getElementById('image-viewer-view-count').textContent = formatFeedCount(post.impressionCount || 0);
-            const saveBtn = document.getElementById('image-viewer-save-btn');
-            saveBtn.classList.toggle('saved', savedByMe);
-            document.getElementById('image-viewer-save-icon').setAttribute('fill', savedByMe ? 'currentColor' : 'none');
         }
         // Same 1s-dwell-then-count-once approach as getFeedImpressionObserver, just without an
         // IntersectionObserver — the image viewer is already fully on-screen the moment it opens,
@@ -9913,13 +9910,10 @@
             if (!currentViewerPostId) return;
             onRepostButtonTap(currentViewerPostId, e.currentTarget);
         });
-        document.getElementById('image-viewer-save-btn').addEventListener('click', () => {
-            if (currentViewerPostId) { triggerHaptic(15); toggleSavePost(currentViewerPostId); } // saved_posts listener flips .saved back onto this button once it lands, same as reel-save-btn
-        });
         document.getElementById('image-viewer-post-menu-btn').addEventListener('click', () => {
             if (!currentViewerPostId) return;
             const post = cachedPosts[currentViewerPostId];
-            if (post) openPostOptions(currentViewerPostId, post, null);
+            if (post) openPostOptions(currentViewerPostId, post, null, { fromViewer: true, kind: 'image' });
         });
         // Builds the bottom dot indicators when the viewer is opened on a multi-image gallery
         // (mirrors the feed's .x-media-carousel-dots), one dot per image, active dot marking
@@ -10139,12 +10133,8 @@
             const myUid = user ? user.uid : null;
             const likedByMe = !!(post && post.reactions && myUid && post.reactions[myUid]);
             const repostedByMe = !!(post && post.reposts && myUid && post.reposts[myUid]);
-            const savedByMe = !!cachedSavedPosts[postId];
-            // Same verified-only gate as the plain video viewer's download icon (see
-            // #video-viewer-save wiring) — gated on the CURRENT viewer's own verified status,
-            // not the post author's, since this is "can I save this to my device", not a
-            // property of the post itself.
-            const canDownload = isVerifiedUid(myUid);
+            // Save + Download now live in the three-dot menu (see openPostOptions, opts.kind
+            // 'video'), which applies the same verified-only download gate.
             return `
                 <div class="reel-item" data-post-id="${postId}">
                     <div class="reel-item-topbar">
@@ -10189,13 +10179,6 @@
                             ${repostArrowsSvg()}
                             <span>${formatFeedCount((post && post.repostCount) || 0)}</span>
                         </button>
-                        <button type="button" class="reel-item-action-btn reel-save-btn${savedByMe ? ' saved' : ''}" data-post-id="${postId}" title="Save">
-                            <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                        </button>
-                        ${canDownload ? `
-                        <button type="button" class="reel-item-action-btn reel-download-btn" data-post-id="${postId}" title="Download">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        </button>` : ''}
                     </div>
                     <div class="reel-item-progress-track">
                         <div class="reel-item-progress-fill"></div>
@@ -10377,7 +10360,7 @@
             if (topMenuBtn) topMenuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const post = cachedPosts[postId];
-                if (post) openPostOptions(postId, post, null);
+                if (post) openPostOptions(postId, post, null, { fromViewer: true, kind: 'video' });
             });
             const topFollowBtn = itemEl.querySelector('.reel-item-topbar-follow');
             if (topFollowBtn) topFollowBtn.addEventListener('click', async (e) => {
@@ -10412,18 +10395,6 @@
             if (repostBtn) repostBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 onRepostButtonTap(postId, repostBtn);
-            });
-            const saveBtn = itemEl.querySelector('.reel-save-btn');
-            if (saveBtn) saveBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                triggerHaptic(15);
-                toggleSavePost(postId); // saved_posts listener (see initFeedListeners) flips .saved back onto this button once it lands
-            });
-            const downloadBtn = itemEl.querySelector('.reel-download-btn');
-            if (downloadBtn) downloadBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const post = cachedPosts[postId];
-                if (post && post.videoUrl) downloadMediaFile(post.videoUrl, 'video');
             });
         }
 
@@ -10518,13 +10489,6 @@
             const viewCountEl = itemEl.querySelector('.reel-item-view-stat span'); // views line below the caption, not the action-icon row
             if (viewCountEl) viewCountEl.textContent = formatFeedCount(post.impressionCount || 0);
 
-            const savedByMe = !!cachedSavedPosts[postId];
-            const saveBtn = itemEl.querySelector('.reel-save-btn');
-            if (saveBtn) {
-                saveBtn.classList.toggle('saved', savedByMe);
-                const svgEl = saveBtn.querySelector('svg');
-                if (svgEl) svgEl.setAttribute('fill', savedByMe ? 'currentColor' : 'none');
-            }
         }
 
         // reel-viewer-close was replaced by the reel viewer's own header (see #reel-viewer-overlay
@@ -14992,20 +14956,6 @@
                     const postId = card && (card.dataset.postId || card.dataset.msgId);
                     if (postId) btn.classList.toggle('saved', !!cachedSavedPosts[postId]);
                 });
-                document.querySelectorAll('.reel-save-btn').forEach(btn => {
-                    const postId = btn.dataset.postId;
-                    if (!postId) return;
-                    const saved = !!cachedSavedPosts[postId];
-                    btn.classList.toggle('saved', saved);
-                    const svgEl = btn.querySelector('svg');
-                    if (svgEl) svgEl.setAttribute('fill', saved ? 'currentColor' : 'none');
-                });
-                if (currentViewerPostId) {
-                    const imgSaveBtn = document.getElementById('image-viewer-save-btn');
-                    const saved = !!cachedSavedPosts[currentViewerPostId];
-                    imgSaveBtn.classList.toggle('saved', saved);
-                    document.getElementById('image-viewer-save-icon').setAttribute('fill', saved ? 'currentColor' : 'none');
-                }
                 const savedList = document.getElementById('my-profile-saved-list');
                 if (savedList && savedList.style.display !== 'none') buildProfileSavedList(savedList);
             });
@@ -16045,10 +15995,20 @@
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (activePostOptions) openReportPostSheet(activePostOptions.postId, activePostOptions.post);
             });
+            document.getElementById('btn-post-save').addEventListener('click', () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
+                if (!activePostOptions) return;
+                triggerHaptic(15);
+                toggleSavePost(activePostOptions.postId);
+            });
             document.getElementById('btn-post-download').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
-                const { postId, post } = activePostOptions;
+                const { postId, post, kind } = activePostOptions;
+                if (kind === 'video') {
+                    if (post.videoUrl) downloadMediaFile(post.videoUrl, 'video');
+                    return;
+                }
                 // If this was opened from the image viewer on this exact post, download whichever
                 // image is currently on screen (gallery position included) rather than always the
                 // post's first image.
@@ -16107,8 +16067,13 @@
             });
         }
 
-        function openPostOptions(postId, post, card) {
-            activePostOptions = { postId, post, card };
+        function openPostOptions(postId, post, card, opts) {
+            // opts.fromViewer / opts.kind ('image' | 'video') are passed by the image viewer and
+            // Reel viewer's three-dot buttons — Save and (for videos) Download live in this sheet
+            // there, since those viewers no longer carry their own Save/Download icons.
+            const fromViewer = !!(opts && opts.fromViewer);
+            const kind = fromViewer ? (opts.kind || 'image') : null;
+            activePostOptions = { postId, post, card, kind };
             const user = auth.currentUser;
             const isOwn = !!(user && post.uid === user.uid);
             const isRepost = !!post.repostOf;
@@ -16132,11 +16097,20 @@
             }
             document.getElementById('btn-post-share').style.display = 'block';
             // Download moved here from the image viewer's old floating icon (see
-            // updateImageViewerPostBarVisibility) — images only (videos already have their own
-            // download icon in the Reel viewer's action rail, .reel-download-btn), gated on the
-            // CURRENT viewer's own verified status same as that icon was.
+            // updateImageViewerPostBarVisibility) and the Reel viewer's action rail — gated on
+            // the CURRENT viewer's own verified status same as those icons were. From the feed
+            // it's images only; from the Reel viewer (kind 'video') it downloads the video.
             const hasImage = !!(post.imageUrl || (post.imageUrls && post.imageUrls.length));
-            document.getElementById('btn-post-download').style.display = (hasImage && isVerifiedUid(user && user.uid)) ? 'block' : 'none';
+            const canDownloadHere = kind === 'video' ? !!post.videoUrl : hasImage;
+            document.getElementById('btn-post-download').style.display = (canDownloadHere && isVerifiedUid(user && user.uid)) ? 'block' : 'none';
+            // Save/Unsave only from the viewers — feed cards keep their own bookmark icon.
+            const saveBtn = document.getElementById('btn-post-save');
+            saveBtn.style.display = fromViewer ? 'block' : 'none';
+            if (fromViewer) {
+                const isSaved = !!cachedSavedPosts[postId];
+                saveBtn.querySelector('span').textContent = isSaved ? 'Remove from Saved' : 'Save Post';
+                saveBtn.querySelector('svg').setAttribute('fill', isSaved ? 'currentColor' : 'none');
+            }
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-post-delete').querySelector('span').textContent = isRepost ? 'Undo Repost' : 'Delete Post';

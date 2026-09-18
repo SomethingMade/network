@@ -3169,10 +3169,12 @@
         #map-permission-hint::after { content: ''; position: absolute; bottom: 100%; right: 14px; border: 6px solid transparent; border-bottom-color: rgba(28,28,30,0.94); }
         .map-location-btn-wrap { position: relative; }
 
-        /* ── HABA RIDE bottom sheet (Uber-style) — three panels toggled by JS, only one
-           visible at a time: home (ride type + nearby count), options (destination chosen,
-           pick a ride type with price/eta), confirm (review + request). UI-only for now —
-           no real driver matching, see requestHabaRide(). */
+        /* ── HABA RIDE bottom sheet (Uber-style) — panels toggled by JS, only one visible at
+           a time: home (ride type + real nearby-driver count), options (destination chosen,
+           pick a ride type with price/eta), confirm (review + request), searching (request
+           written to ride_requests/{id}, waiting on the drivers app), trip (a driver accepted
+           — live driver_profiles + drivers/{uid} location). See requestHabaRide() and
+           handleHabaRideRequestUpdate(). */
         .haba-ride-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg-surface); border-radius: 22px 22px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,0.12); padding: 16px 18px calc(16px + var(--nav-bar-total) + env(safe-area-inset-bottom)); }
         .haba-ride-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; cursor: pointer; border-radius: 16px; padding: 6px; margin-left: -6px; margin-right: -6px; transition: background 0.15s; }
         .haba-ride-hero:active { background: var(--bg-alt); transform: scale(0.99); }
@@ -3223,6 +3225,26 @@
         .haba-ride-trip-label { font-size: 12px; color: var(--text-secondary); }
         .haba-ride-trip-value { font-size: 14px; font-weight: 700; color: var(--text-primary); }
         #btn-haba-ride-request:disabled { opacity: 0.6; }
+
+        /* ── SEARCHING panel: request written to ride_requests/{id}, waiting for a driver
+           (from the not-yet-built drivers app) to accept it. ── */
+        .haba-ride-searching { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 10px 4px 4px; }
+        .haba-ride-searching-spinner { width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--primary-blue); border-radius: 50%; animation: spin 0.9s linear infinite; margin-bottom: 16px; }
+        .haba-ride-searching-title { font-size: 16px; font-weight: 800; color: var(--text-primary); }
+        .haba-ride-searching-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+        .haba-ride-searching-cancel { margin-top: 18px; background: none; border: 1.5px solid var(--border-color); color: var(--danger-red); font-weight: 700; font-size: 14px; padding: 10px 22px; border-radius: var(--radius-pill); cursor: pointer; }
+
+        /* ── TRIP panel: a driver has accepted (status accepted/arriving/in_progress) — shows
+           the real driver_profiles/{uid} card and tracks their live drivers/{uid} lat/lng. ── */
+        .haba-ride-trip-status { font-size: 13px; font-weight: 700; color: var(--primary-blue); background: rgba(var(--primary-rgb),0.08); border-radius: 10px; padding: 8px 10px; text-align: center; margin-bottom: 14px; }
+        .haba-ride-driver-card { display: flex; align-items: center; gap: 12px; padding: 4px 2px 16px; border-bottom: 1px solid var(--border-color); margin-bottom: 14px; }
+        .haba-ride-driver-avatar { width: 48px; height: 48px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-alt); flex-shrink: 0; }
+        .haba-ride-driver-info { flex: 1; min-width: 0; }
+        .haba-ride-driver-name { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+        .haba-ride-driver-vehicle { font-size: 12.5px; color: var(--text-secondary); margin-top: 1px; }
+        .haba-ride-driver-eta { font-size: 15px; font-weight: 800; color: var(--text-primary); flex-shrink: 0; text-align: right; }
+        .haba-ride-driver-eta-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+        .haba-ride-trip-cancel { width: 100%; background: none; border: 1.5px solid var(--border-color); color: var(--danger-red); font-weight: 700; font-size: 14px; padding: 12px; border-radius: var(--radius-pill); cursor: pointer; margin-top: 4px; }
 
         /* Scrollable vertical feed container — same scroll behavior as the Home feed's
            .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
@@ -8310,7 +8332,7 @@
                                 <div class="haba-ride-options-list" id="haba-ride-options-list"></div>
                             </div>
 
-                            <!-- CONFIRM: a ride type was tapped in Options — review and (fake) request it -->
+                            <!-- CONFIRM: a ride type was tapped in Options — review and request it -->
                             <div id="haba-ride-confirm-panel" style="display:none;">
                                 <button type="button" class="haba-ride-back-to-options" id="btn-haba-ride-back-to-options">‹ Back</button>
                                 <div class="haba-ride-confirm-header">
@@ -8331,6 +8353,39 @@
                                     <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot dropoff"></span><div><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-confirm-dest">--</div></div></div>
                                 </div>
                                 <button type="button" class="btn-pill btn-primary" id="btn-haba-ride-request">Request Haba Car</button>
+                            </div>
+
+                            <!-- SEARCHING: request written to ride_requests/{id}, waiting on a driver
+                                 (from the drivers app) to accept it in real time. -->
+                            <div id="haba-ride-searching-panel" style="display:none;">
+                                <div class="haba-ride-searching">
+                                    <div class="haba-ride-searching-spinner"></div>
+                                    <div class="haba-ride-searching-title">Finding your driver…</div>
+                                    <div class="haba-ride-searching-sub" id="haba-ride-searching-sub">Requesting a nearby driver</div>
+                                    <button type="button" class="haba-ride-searching-cancel" id="btn-haba-ride-cancel-searching">Cancel request</button>
+                                </div>
+                            </div>
+
+                            <!-- TRIP: a driver has accepted — real driver_profiles/{uid} card, live
+                                 drivers/{uid} location tracked for the ETA below. -->
+                            <div id="haba-ride-trip-panel" style="display:none;">
+                                <div class="haba-ride-trip-status" id="haba-ride-trip-status">Driver is on the way</div>
+                                <div class="haba-ride-driver-card">
+                                    <div class="haba-ride-driver-avatar" id="haba-ride-driver-avatar"></div>
+                                    <div class="haba-ride-driver-info">
+                                        <div class="haba-ride-driver-name" id="haba-ride-driver-name">Driver</div>
+                                        <div class="haba-ride-driver-vehicle" id="haba-ride-driver-vehicle">--</div>
+                                    </div>
+                                    <div>
+                                        <div class="haba-ride-driver-eta" id="haba-ride-driver-eta">-- min</div>
+                                        <div class="haba-ride-driver-eta-label" id="haba-ride-driver-eta-label">away</div>
+                                    </div>
+                                </div>
+                                <div class="haba-ride-confirm-trip">
+                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot pickup"></span><div><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-trip-pickup-value">Your location</div></div></div>
+                                    <div class="haba-ride-trip-row"><span class="haba-ride-trip-dot dropoff"></span><div><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-trip-dest-value">--</div></div></div>
+                                </div>
+                                <button type="button" class="haba-ride-trip-cancel" id="btn-haba-ride-cancel-trip">Cancel trip</button>
                             </div>
                         </div>
                     </div>
@@ -24873,10 +24928,14 @@
             document.getElementById('haba-ride-home-panel').style.display = step === 'home' ? '' : 'none';
             document.getElementById('haba-ride-options-panel').style.display = step === 'options' ? '' : 'none';
             document.getElementById('haba-ride-confirm-panel').style.display = step === 'confirm' ? '' : 'none';
+            document.getElementById('haba-ride-searching-panel').style.display = step === 'searching' ? '' : 'none';
+            document.getElementById('haba-ride-trip-panel').style.display = step === 'trip' ? '' : 'none';
         }
 
         // Clears the chosen destination/route and drops the sheet back to the home screen —
-        // used by "Edit" on the destination row and after a (fake) ride request completes.
+        // used by "Edit" on the destination row and after a ride request/trip finishes. Does
+        // NOT touch an in-flight ride_requests listener — call teardownHabaRideRequest() first
+        // if one is active (see cancelHabaRideRequest/finishHabaRideRequest below).
         function resetHabaRideFlow() {
             habaRideRoute = null;
             habaRideArrivalByType = {};
@@ -24889,6 +24948,160 @@
             }
             showHabaRideStep('home');
             updateHabaRideHomeStats(habaHomeSelectedType);
+        }
+
+        // ── Live ride-request lifecycle ──────────────────────────────────────────────
+        // Schema written by this app / read from the (upcoming) drivers app:
+        //   ride_requests/{requestId}: {
+        //     riderUid, riderName, riderPhoto, rideType, seats,
+        //     pickup: {lat,lng,label}, dropoff: {lat,lng,label},
+        //     distanceKm, durationMin, price,
+        //     status: 'requested' | 'accepted' | 'arriving' | 'in_progress' | 'completed' | 'cancelled',
+        //     driverId, createdAt, updatedAt, cancelledBy, cancelReason
+        //   }
+        //   driver_profiles/{uid}: { name, photoURL, vehicleModel, vehicleColor, plate, rating }
+        // The drivers app claims a request by setting status:'accepted' + driverId, then moves
+        // it through 'arriving' → 'in_progress' → 'completed' (or 'cancelled'). This app just
+        // listens and reflects whatever state it sees — it never assigns a driver itself.
+        let habaCurrentRideRequestId = null;
+        let habaRideRequestUnsub = null;
+        let habaDriverProfileUnsub = null;
+        let habaDriverLocationUnsub = null;
+        let habaSearchTimeoutHandle = null;
+        let habaMatchedDriverId = null;
+        const habaTripDriverMarker = { marker: null };
+        const HABA_RIDE_SEARCH_TIMEOUT_MS = 60000;
+
+        function teardownHabaRideRequestListeners() {
+            if (habaRideRequestUnsub) { habaRideRequestUnsub(); habaRideRequestUnsub = null; }
+            if (habaDriverProfileUnsub) { habaDriverProfileUnsub(); habaDriverProfileUnsub = null; }
+            if (habaDriverLocationUnsub) { habaDriverLocationUnsub(); habaDriverLocationUnsub = null; }
+            if (habaSearchTimeoutHandle) { clearTimeout(habaSearchTimeoutHandle); habaSearchTimeoutHandle = null; }
+            if (habaTripDriverMarker.marker) { habaTripDriverMarker.marker.setMap(null); habaTripDriverMarker.marker = null; }
+            habaMatchedDriverId = null;
+        }
+
+        function habaRideStatusLabel(status) {
+            if (status === 'accepted') return 'Driver is on the way';
+            if (status === 'arriving') return 'Driver is arriving';
+            if (status === 'in_progress') return 'Trip in progress';
+            return 'Driver is on the way';
+        }
+
+        // Subscribes to a driver's real live position (drivers/{uid}) so the ETA and marker on
+        // the trip panel track the actual driver, not a simulated one.
+        function watchMatchedDriverLocation(driverId, request) {
+            if (habaDriverLocationUnsub) habaDriverLocationUnsub();
+            const driverRef = ref(database, `drivers/${driverId}`);
+            const handler = (snap) => {
+                const d = snap.val();
+                if (!d || typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
+                const map = communitiesMapState && communitiesMapState.map;
+                if (map) {
+                    if (!habaTripDriverMarker.marker) {
+                        habaTripDriverMarker.marker = new google.maps.Marker({
+                            position: { lat: d.lat, lng: d.lng },
+                            map,
+                            icon: {
+                                url: HABA_RIDE_MARKER_ICON_URLS[request.rideType] || HABA_RIDE_MARKER_ICON_URLS.car,
+                                scaledSize: new google.maps.Size(32, 32),
+                                anchor: new google.maps.Point(16, 16)
+                            }
+                        });
+                    } else {
+                        habaTripDriverMarker.marker.setPosition({ lat: d.lat, lng: d.lng });
+                    }
+                }
+                const target = request.status === 'in_progress' ? request.dropoff : request.pickup;
+                if (target && typeof target.lat === 'number') {
+                    const km = habaHaversineKm({ lat: d.lat, lng: d.lng }, { lat: target.lat, lng: target.lng });
+                    const mins = Math.max(1, Math.round(km / 0.5)); // ~30km/h effective city speed
+                    document.getElementById('haba-ride-driver-eta').textContent = `${mins} min`;
+                    document.getElementById('haba-ride-driver-eta-label').textContent = request.status === 'in_progress' ? 'to drop-off' : 'away';
+                }
+            };
+            onValue(driverRef, handler);
+            habaDriverLocationUnsub = () => off(driverRef, 'value', handler);
+        }
+
+        // Pulls the driver's real profile (driver_profiles/{uid} — name/photo/vehicle/plate,
+        // written by the drivers app at onboarding) once a driver is matched.
+        async function loadMatchedDriverProfile(driverId) {
+            try {
+                const snap = await get(ref(database, `driver_profiles/${driverId}`));
+                const p = snap.exists() ? snap.val() : {};
+                document.getElementById('haba-ride-driver-avatar').style.backgroundImage = `url('${p.photoURL || DEFAULT_AVATAR_URL}')`;
+                document.getElementById('haba-ride-driver-name').textContent = p.name || 'Your driver';
+                const vehicleBits = [p.vehicleColor, p.vehicleModel].filter(Boolean).join(' ');
+                document.getElementById('haba-ride-driver-vehicle').textContent = [vehicleBits, p.plate].filter(Boolean).join(' · ') || 'Vehicle details unavailable';
+            } catch (err) {
+                console.error('[haba-ride] failed to read driver profile', err);
+                document.getElementById('haba-ride-driver-avatar').style.backgroundImage = `url('${DEFAULT_AVATAR_URL}')`;
+                document.getElementById('haba-ride-driver-name').textContent = 'Your driver';
+                document.getElementById('haba-ride-driver-vehicle').textContent = 'Vehicle details unavailable';
+            }
+        }
+
+        function showHabaRideTripPanel(request) {
+            showHabaRideStep('trip');
+            document.getElementById('haba-ride-trip-status').textContent = habaRideStatusLabel(request.status);
+            document.getElementById('haba-ride-trip-pickup-value').textContent = (request.pickup && request.pickup.label) || 'Your location';
+            document.getElementById('haba-ride-trip-dest-value').textContent = (request.dropoff && request.dropoff.label) || '--';
+            document.getElementById('btn-haba-ride-cancel-trip').style.display = request.status === 'in_progress' ? 'none' : '';
+            if (request.driverId && request.driverId !== habaMatchedDriverId) {
+                habaMatchedDriverId = request.driverId;
+                loadMatchedDriverProfile(request.driverId);
+                watchMatchedDriverLocation(request.driverId, request);
+            }
+        }
+
+        // Central handler for every update to the live ride_requests/{id} node — reflects
+        // whatever the drivers app has written, it never decides the status itself.
+        function handleHabaRideRequestUpdate(request) {
+            if (!request) return; // request node was removed
+            if (request.status === 'requested') {
+                showHabaRideStep('searching');
+                return;
+            }
+            if (request.status === 'accepted' || request.status === 'arriving' || request.status === 'in_progress') {
+                if (habaSearchTimeoutHandle) { clearTimeout(habaSearchTimeoutHandle); habaSearchTimeoutHandle = null; }
+                showHabaRideTripPanel(request);
+                return;
+            }
+            if (request.status === 'completed') {
+                notify('Trip completed. Thanks for riding with Haba!', 'success');
+                finishHabaRideRequest();
+                return;
+            }
+            if (request.status === 'cancelled') {
+                const byDriver = request.cancelledBy === 'driver';
+                notify(byDriver ? 'Your driver cancelled the trip.' : 'Ride request cancelled.', byDriver ? 'error' : 'info');
+                finishHabaRideRequest();
+            }
+        }
+
+        function finishHabaRideRequest() {
+            teardownHabaRideRequestListeners();
+            habaCurrentRideRequestId = null;
+            resetHabaRideFlow();
+        }
+
+        async function cancelHabaRideRequest() {
+            if (!habaCurrentRideRequestId) return;
+            const requestId = habaCurrentRideRequestId;
+            try {
+                await update(ref(database, `ride_requests/${requestId}`), {
+                    status: 'cancelled',
+                    cancelledBy: 'rider',
+                    updatedAt: serverTimestamp()
+                });
+            } catch (err) {
+                console.error('[haba-ride] failed to cancel request', err);
+                notify("Couldn't cancel the request — try again.", 'error');
+                return;
+            }
+            notify('Ride request cancelled.', 'info');
+            finishHabaRideRequest();
         }
 
         function renderHabaRideOptionsList() {
@@ -24942,22 +25155,81 @@
             showHabaRideStep('confirm');
         }
 
-        // Driver availability is real (read from Realtime DB), but there's no dispatch/matching
-        // backend yet to actually assign one of those drivers to this request.
-        function requestHabaRide() {
+        // Writes a real ride_requests/{id} record and switches to the "searching" panel, which
+        // listens live for the drivers app to accept it (see handleHabaRideRequestUpdate).
+        async function requestHabaRide() {
             const drivers = (communitiesMapState.nearbyDrivers && communitiesMapState.nearbyDrivers[habaSelectedRideTypeId]) || [];
             if (drivers.length === 0) {
                 notify('No nearby drivers for this ride type. Drivers will be added later.', 'info');
                 return;
             }
+            const user = auth.currentUser;
+            if (!user) { notify('Sign in to request a ride.', 'error'); return; }
+            const state = communitiesMapState;
+            const pickupLatLng = state.pickupLatLng || state.userLatLng;
+            if (!pickupLatLng || !habaRideRoute) {
+                notify("Couldn't determine your pickup location. Try again.", 'error');
+                return;
+            }
+            const typeId = habaSelectedRideTypeId;
+            const t = HABA_RIDE_TYPES[typeId];
+            const price = habaRidePrice(typeId, habaRideRoute.distanceKm);
+
             const btn = document.getElementById('btn-haba-ride-request');
             btn.disabled = true;
             btn.textContent = 'Requesting…';
-            setTimeout(() => {
-                notify("Driver matching isn't wired up yet — this won't actually dispatch a driver.", 'info');
+
+            const requestData = {
+                riderUid: user.uid,
+                riderName: user.displayName || 'Rider',
+                riderPhoto: user.photoURL || '',
+                rideType: typeId,
+                seats: t.seats,
+                pickup: { lat: pickupLatLng.lat, lng: pickupLatLng.lng, label: state.pickupLabel || 'Your location' },
+                dropoff: {
+                    lat: typeof habaRideRoute.destLatLng.lat === 'function' ? habaRideRoute.destLatLng.lat() : habaRideRoute.destLatLng.lat,
+                    lng: typeof habaRideRoute.destLatLng.lng === 'function' ? habaRideRoute.destLatLng.lng() : habaRideRoute.destLatLng.lng,
+                    label: habaRideRoute.destLabel
+                },
+                distanceKm: habaRideRoute.distanceKm,
+                durationMin: habaRideRoute.durationMin,
+                price,
+                status: 'requested',
+                driverId: null,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            };
+
+            try {
+                const newRequestRef = push(ref(database, 'ride_requests'));
+                await set(newRequestRef, requestData);
+                habaCurrentRideRequestId = newRequestRef.key;
+
+                showHabaRideStep('searching');
+                document.getElementById('haba-ride-searching-sub').textContent = `Looking for a nearby ${t.label.toLowerCase()} driver`;
+
+                const requestRef = ref(database, `ride_requests/${newRequestRef.key}`);
+                const handler = (snap) => handleHabaRideRequestUpdate(snap.val());
+                onValue(requestRef, handler);
+                habaRideRequestUnsub = () => off(requestRef, 'value', handler);
+
+                habaSearchTimeoutHandle = setTimeout(async () => {
+                    if (!habaCurrentRideRequestId) return;
+                    try {
+                        await update(ref(database, `ride_requests/${habaCurrentRideRequestId}`), {
+                            status: 'cancelled', cancelledBy: 'system', cancelReason: 'timeout', updatedAt: serverTimestamp()
+                        });
+                    } catch (err) { console.error('[haba-ride] timeout cancel failed', err); }
+                    notify('No drivers responded in time. Try again.', 'info');
+                    finishHabaRideRequest();
+                }, HABA_RIDE_SEARCH_TIMEOUT_MS);
+            } catch (err) {
+                console.error('[haba-ride] failed to create request', err);
+                notify("Couldn't send your ride request — try again.", 'error');
+            } finally {
                 btn.disabled = false;
-                resetHabaRideFlow();
-            }, 1400);
+                btn.textContent = typeId === 'womandrive' ? 'Request Woman Drive Woman' : `Request Haba ${t.label}`;
+            }
         }
 
         async function initCommunitiesMap() {
@@ -25087,6 +25359,8 @@
                 });
 
                 document.getElementById('btn-haba-ride-request').addEventListener('click', requestHabaRide);
+                document.getElementById('btn-haba-ride-cancel-searching').addEventListener('click', () => { triggerHaptic(10); cancelHabaRideRequest(); });
+                document.getElementById('btn-haba-ride-cancel-trip').addEventListener('click', () => { triggerHaptic(10); cancelHabaRideRequest(); });
 
                 updateHabaRideHomeStats('car');
                 centerMapOnUserLocation(false);

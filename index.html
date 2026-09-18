@@ -1590,10 +1590,10 @@
         .notif-sheet-header { padding: 0 20px 12px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-sheet-header svg { flex-shrink: 0; }
         .notif-sheet-header svg:active { opacity: 0.6; }
-        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border-color); cursor: pointer; user-select: none; -webkit-user-select: none; }
-        .notif-item:last-child { border-bottom: none; }
-        .notif-item.unread { background: rgba(var(--primary-rgb), 0.06); border-radius: 12px; }
-        .notif-item.selected { background: rgba(255, 69, 58, 0.1); border-radius: 12px; }
+        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; margin-bottom: 2px; cursor: pointer; user-select: none; -webkit-user-select: none; transition: background 0.15s ease; }
+        .notif-item:active { background: var(--bg-hover); }
+        .notif-item.unread { background: rgba(var(--primary-rgb), 0.06); }
+        .notif-item.selected { background: rgba(255, 69, 58, 0.1); }
         .notif-item-checkbox { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; margin-top: 8px; display: none; align-items: center; justify-content: center; }
         .notif-item.selection-mode .notif-item-checkbox { display: flex; }
         .notif-item.selected .notif-item-checkbox { background: var(--danger-red); border-color: var(--danger-red); }
@@ -1615,6 +1615,11 @@
         .notif-item-text b { font-weight: 700; }
         .notif-item-time { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
         .notif-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-blue); flex-shrink: 0; margin-top: 6px; }
+        .notif-item-thumb-wrap { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; align-self: center; overflow: hidden; background: var(--bg-alt); }
+        .notif-item-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .notif-item-thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+        .notif-item-thumb-placeholder svg { width: 16px; height: 16px; }
+        .notif-item-thumb-text { width: 100%; height: 100%; box-sizing: border-box; padding: 4px 5px; font-size: 9px; line-height: 1.25; color: var(--text-secondary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
         .notif-empty-state { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 40px 0; }
 
         /* Jobs — structured listings created by Business Accounts (see the "Jobs" header
@@ -19225,6 +19230,61 @@
             return `<b>${name}</b> interacted with your post`;
         }
 
+        // --- Notification post previews: a small thumbnail (or text snippet, for a text-only
+        // post) shown on the right of a like/comment/reply/mention/repost notification, so you
+        // can tell at a glance which post it's about without opening it. cachedPosts (fed by the
+        // main feed listener) already has most of these — a post you were notified about is
+        // usually your own recent post or one in the loaded feed window — but it can miss an
+        // older post outside that window, so notifPostPreviewCache holds a one-off fetch for
+        // anything cachedPosts doesn't have. Kept separate from cachedPosts itself so a fetched
+        // preview never leaks into feed-rendering logic that iterates cachedPosts expecting only
+        // actual feed posts.
+        let notifPostPreviewCache = {};
+        let notifPreviewFetchInFlight = new Set();
+
+        function notifPreviewThumbInnerHtml(post) {
+            if (!post) {
+                return `<div class="notif-item-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M4 15l4-4 4 4 4-6 4 4"></path></svg></div>`;
+            }
+            const thumbUrl = post.imageUrl || (post.imageUrls && post.imageUrls[0]) || (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+            if (thumbUrl) {
+                return `<img class="notif-item-thumb" src="${escapeHtmlForPost(thumbUrl)}" alt="">`;
+            }
+            if (post.text) {
+                return `<div class="notif-item-thumb-text">${escapeHtmlForPost(post.text.slice(0, 60))}</div>`;
+            }
+            return `<div class="notif-item-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M4 15l4-4 4 4 4-6 4 4"></path></svg></div>`;
+        }
+
+        // Fetches a post notifPreviewWrapHtml couldn't find in cachedPosts, then patches every
+        // matching thumbnail already in the DOM in place — not a full renderNotificationsList()
+        // re-render, so scroll position and selection state survive previews trickling in.
+        async function ensureNotifPostPreview(postId) {
+            if (!postId || cachedPosts[postId] || (postId in notifPostPreviewCache) || notifPreviewFetchInFlight.has(postId)) return;
+            notifPreviewFetchInFlight.add(postId);
+            let post = null;
+            try {
+                const snap = await get(ref(database, `posts/${postId}`));
+                post = snap.exists() ? snap.val() : null;
+            } catch (err) {
+                console.error('Notification post preview fetch failed', err);
+            }
+            notifPreviewFetchInFlight.delete(postId);
+            notifPostPreviewCache[postId] = post;
+            document.querySelectorAll(`.notif-item-thumb-wrap[data-preview-post-id="${postId}"]`).forEach((wrap) => {
+                wrap.innerHTML = notifPreviewThumbInnerHtml(post);
+            });
+        }
+
+        function notifPreviewWrapHtml(postId) {
+            if (!postId) return '';
+            const post = cachedPosts[postId] || notifPostPreviewCache[postId] || null;
+            if (!cachedPosts[postId] && !(postId in notifPostPreviewCache)) {
+                ensureNotifPostPreview(postId); // fire-and-forget; patches the DOM once it resolves
+            }
+            return `<div class="notif-item-thumb-wrap" data-preview-post-id="${postId}">${notifPreviewThumbInnerHtml(post)}</div>`;
+        }
+
         // --- Notification selection mode: long-press a notification to start selecting,
         // then delete the selected ones (or all of them) straight out of the database. ---
         let notifSelectionMode = false;
@@ -19266,6 +19326,7 @@
                         <div class="notif-item-time" data-rel-ts="${notif.timestamp}">${formatTime(notif.timestamp)}</div>
                     </div>
                     ${(!notif.read && !notifSelectionMode) ? '<div class="notif-item-dot"></div>' : ''}
+                    ${notifSelectionMode ? '' : notifPreviewWrapHtml(notif.postId)}
                 `;
                 item.querySelector('.notif-item-text').innerHTML = notifSentenceFor(notif);
                 list.appendChild(item);

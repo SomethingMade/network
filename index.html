@@ -2992,6 +2992,32 @@
         #search-fullscreen-body .explore-tabs-bar { display: flex; margin: 4px 0 2px; border-bottom: 1px solid var(--border-color); }
         #search-fullscreen-body .explore-panel.active { display: block; }
         .explore-tabs-bar .feed-subtab-btn { padding: 12px 0 10px; font-size: 14.5px; }
+
+        /* "Suggested for you" — horizontally scrollable row of compact follow cards that sits
+           directly under the search bar. Like the Explore tabs it only ever shows while parked
+           inside the search fullscreen view (see initFullscreenSearch), never on the plain Home
+           tab. Every card is the same fixed width and height, so the row reads as one tidy,
+           aligned strip regardless of how long anyone's name/handle is. */
+        .suggested-people-section { display: none; }
+        #search-fullscreen-body .suggested-people-section { display: block; padding: 10px 0 6px; }
+        .suggested-people-header { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 8px; }
+        .suggested-people-title { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+        .suggested-people-see-all { border: none; background: none; color: var(--primary-blue); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; padding: 4px 2px; }
+        .suggested-people-scroll { display: flex; align-items: stretch; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x proximity; padding: 2px 2px 6px; margin: 0 -14px; padding-left: 14px; padding-right: 14px; scroll-padding-left: 14px; }
+        .suggested-people-scroll::-webkit-scrollbar { display: none; }
+        .sp-card { position: relative; flex: 0 0 146px; width: 146px; box-sizing: border-box; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 16px 10px 12px; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; cursor: pointer; transition: transform 0.18s ease, opacity 0.18s ease; }
+        .sp-card:active { transform: scale(0.98); }
+        .sp-card.is-dismissing { opacity: 0; transform: scale(0.85); pointer-events: none; }
+        .sp-card-dismiss { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; border: none; background: transparent; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .sp-card-dismiss:hover { background: var(--bg-hover); }
+        .sp-card-dismiss svg { width: 12px; height: 12px; }
+        .sp-card-avatar { width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0; margin-bottom: 8px; }
+        .sp-card .avatar { width: 100%; height: 100%; margin: 0; border-radius: 50%; background-size: cover; background-position: center; box-sizing: border-box; }
+        .sp-card-name { display: flex; align-items: center; justify-content: center; gap: 2px; max-width: 100%; margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sp-card-username, .sp-card-meta { display: block; max-width: 100%; font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sp-card-meta { font-size: 12px; margin-top: 2px; }
+        .sp-card .discover-card-add-btn { width: 100%; margin-top: auto; padding: 8px 0; font-size: 13px; }
+        .sp-card-follow-slot { width: 100%; margin-top: 10px; display: flex; }
         .trend-item { padding: 10px 2px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
         .trend-item:last-child { border-bottom: none; }
         .trend-item:hover { background: var(--bg-hover); }
@@ -8246,6 +8272,16 @@
                         </div>
                     </div>
                     <div class="discover-grid-scroll" id="discover-grid-scroll">
+                        <!-- "Suggested for you": compact horizontally scrolling follow cards right under
+                             the search bar. Search-view only (see .suggested-people-section CSS),
+                             filled by renderSuggestedPeopleRow() each time the search opens. -->
+                        <div class="suggested-people-section" id="suggested-people-section" style="display:none;">
+                            <div class="suggested-people-header">
+                                <span class="suggested-people-title">Suggested for you</span>
+                                <button type="button" class="suggested-people-see-all" id="suggested-people-see-all">See all</button>
+                            </div>
+                            <div class="suggested-people-scroll" id="suggested-people-scroll"></div>
+                        </div>
                         <!-- X-style Explore tabs — only ever visible inside the search fullscreen
                              view (see #search-fullscreen-body .explore-tabs-bar CSS), so the plain
                              Home tab looks exactly as it did before. Sits first, right below the
@@ -11197,6 +11233,7 @@
                 if (btn.id === 'home-search-icon-btn') {
                     renderExploreTrending();
                     renderExplorePeople();
+                    renderSuggestedPeopleRow();
                 }
 
                 pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the search sheet
@@ -14235,6 +14272,8 @@
             const term = (searchTerm || '').trim().toLowerCase();
             const exploreTabsBar = document.getElementById('explore-tabs-bar');
             const explorePanels = document.querySelectorAll('.explore-panel');
+            const suggestedPeopleSection = document.getElementById('suggested-people-section');
+            const suggestedPeopleScroll = document.getElementById('suggested-people-scroll');
 
             // No search term: the feed (with suggestion cards woven through it) is how people
             // get discovered, so hide the standalone results list and let the feed show. Inside
@@ -14254,6 +14293,9 @@
                 }
                 if (exploreTabsBar) exploreTabsBar.style.display = '';
                 explorePanels.forEach(p => p.style.display = '');
+                // Restore the suggested row only if it actually has cards (renderSuggestedPeopleRow
+                // hides it when there's no one left to suggest).
+                if (suggestedPeopleSection) suggestedPeopleSection.style.display = (suggestedPeopleScroll && suggestedPeopleScroll.children.length) ? '' : 'none';
                 sprinkleSuggestedPeople();
                 return;
             }
@@ -14268,6 +14310,7 @@
             if (feedContainer) feedContainer.style.display = 'none';
             if (exploreTabsBar) exploreTabsBar.style.display = 'none';
             explorePanels.forEach(p => p.style.display = 'none');
+            if (suggestedPeopleSection) suggestedPeopleSection.style.display = 'none';
         }
 
         function renderDiscoverGridIfActive() {
@@ -14312,7 +14355,7 @@
         function renderExplorePeople() {
             const grid = document.getElementById('explore-people-grid');
             if (!grid) return;
-            const uids = shuffleWithSeed(getSuggestableUsers(), 'explore-people-' + discoverShuffleSeed).slice(0, 15);
+            const uids = rankByMutuals(shuffleWithSeed(getSuggestableUsers(), 'explore-people-' + discoverShuffleSeed), getFreshMutualsCache()).slice(0, 15);
             if (!uids.length) {
                 grid.innerHTML = `<div class="explore-empty">No one new to find right now</div>`;
                 return;
@@ -14336,6 +14379,117 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        // ── Mutual connections ──
+        // "Mutual connection" here = someone I follow who also follows the suggested person
+        // ("followed by people you follow"), the same signal X/Instagram use. contacts/{uid} is
+        // who {uid} follows, so reading contacts/{f} for each person I follow (capped) and
+        // tallying who shows up gives every candidate's mutuals in a bounded number of reads,
+        // instead of one followers/{candidate} read per user in the app. Cached for a few
+        // minutes and rebuilt if my own following list changes size.
+        const MUTUALS_CACHE_TTL_MS = 5 * 60 * 1000;
+        const MUTUALS_MAX_FOLLOWEES = 40;
+        let mutualConnectionsCache = null; // { at, followingSize, map: { candidateUid: [followeeUid, ...] } }
+
+        function getFreshMutualsCache() {
+            const size = Object.keys(cachedContacts || {}).length;
+            if (mutualConnectionsCache && mutualConnectionsCache.followingSize === size && Date.now() - mutualConnectionsCache.at < MUTUALS_CACHE_TTL_MS) {
+                return mutualConnectionsCache.map;
+            }
+            return null;
+        }
+
+        async function loadMutualConnections() {
+            const cached = getFreshMutualsCache();
+            if (cached) return cached;
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const following = Object.keys(cachedContacts || {})
+                .filter(u => u !== AI_UID && !cachedBlocked[u])
+                .slice(0, MUTUALS_MAX_FOLLOWEES);
+            const map = {};
+            await Promise.all(following.map(async (followee) => {
+                try {
+                    const snap = await get(ref(database, `contacts/${followee}`));
+                    if (!snap.exists()) return;
+                    Object.keys(snap.val()).forEach(uid => {
+                        if (uid === myUid || uid === AI_UID) return;
+                        (map[uid] || (map[uid] = [])).push(followee);
+                    });
+                } catch (err) { /* one unreadable list shouldn't sink the rest */ }
+            }));
+            mutualConnectionsCache = { at: Date.now(), followingSize: Object.keys(cachedContacts || {}).length, map };
+            return map;
+        }
+
+        // Most mutual connections first; ties go to people who already follow me, then fall
+        // back to the seeded shuffle order so equal candidates still vary between refreshes.
+        function rankByMutuals(uids, mutualsMap) {
+            const mutualCount = uid => (mutualsMap && mutualsMap[uid] ? mutualsMap[uid].length : 0);
+            const followsMe = uid => (cachedFollowers && cachedFollowers[uid]) ? 1 : 0;
+            return uids.slice().sort((a, b) => (mutualCount(b) - mutualCount(a)) || (followsMe(b) - followsMe(a)));
+        }
+
+        // "Suggested for you" row under the search bar (search view only): compact cards, same
+        // suggestable pool as Explore ▸ People (already excludes people you follow, blocked
+        // users and anyone dismissed with ×), ranked by mutual connections.
+        function suggestedPeopleCardHtml(uid, mutualsMap) {
+            const profile = cachedUsers[uid] || {};
+            const name = profile.name || 'Haba User';
+            const followers = profile.followersCount || 0;
+            const mutualUids = (mutualsMap && mutualsMap[uid]) || [];
+            let meta;
+            let titleAttr = '';
+            if (mutualUids.length) {
+                meta = `${mutualUids.length} mutual connection${mutualUids.length === 1 ? '' : 's'}`;
+                const names = mutualUids.slice(0, 3).map(u => (cachedUsers[u] && cachedUsers[u].name) || 'Someone');
+                const more = mutualUids.length - names.length;
+                titleAttr = ` title="${escapeHtmlForPost('Followed by ' + names.join(', ') + (more > 0 ? ` and ${more} other${more === 1 ? '' : 's'}` : ''))}"`;
+            } else if (cachedFollowers && cachedFollowers[uid]) {
+                meta = 'Follows you';
+            } else {
+                meta = followers > 0 ? `${formatProfileCount(followers)} follower${followers === 1 ? '' : 's'}` : 'New to Haba';
+            }
+            return `
+                <div class="sp-card" data-uid="${uid}"${titleAttr}>
+                    <button type="button" class="sp-card-dismiss" data-uid="${uid}" title="Not interested" aria-label="Dismiss suggestion">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                    <div class="sp-card-avatar">${feedAvatarHtml(profile)}</div>
+                    <h4 class="sp-card-name">${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h4>
+                    <span class="sp-card-username">${profile.username ? '@' + escapeHtmlForPost(profile.username) : 'On Haba'}</span>
+                    <span class="sp-card-meta">${meta}</span>
+                    <div class="sp-card-follow-slot"><button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button></div>
+                </div>
+            `;
+        }
+
+        let suggestedPeopleRenderId = 0;
+        async function renderSuggestedPeopleRow() {
+            const section = document.getElementById('suggested-people-section');
+            const scroll = document.getElementById('suggested-people-scroll');
+            if (!section || !scroll) return;
+            const myRenderId = ++suggestedPeopleRenderId;
+            let mutualsMap = getFreshMutualsCache();
+            if (!mutualsMap) {
+                try { mutualsMap = await loadMutualConnections(); } catch (err) { mutualsMap = {}; }
+                if (myRenderId !== suggestedPeopleRenderId) return; // a newer open/render superseded this one
+            }
+            const pool = shuffleWithSeed(getSuggestableUsers(), 'sp-row-' + discoverShuffleSeed);
+            const uids = rankByMutuals(pool, mutualsMap).slice(0, 12);
+            if (!uids.length) {
+                scroll.innerHTML = '';
+                section.style.display = 'none';
+                return;
+            }
+            scroll.innerHTML = uids.map(uid => suggestedPeopleCardHtml(uid, mutualsMap)).join('');
+            scroll.scrollLeft = 0;
+            // Don't pop the row back in over a search the person has already started typing.
+            const searchEl = document.getElementById('search-discover');
+            section.style.display = (searchEl && searchEl.value.trim()) ? 'none' : '';
+            // Keep the People tab ("See all") in the same order as this row.
+            renderExplorePeople();
         }
 
         // Renders the shared news batch (see fetchNewsHeadlines — same sharedNewsCache/latest
@@ -14386,9 +14540,30 @@
         })();
 
         document.getElementById('discover-grid-scroll').addEventListener('click', async (e) => {
+            if (e.target.closest('#suggested-people-see-all')) {
+                const peopleTab = document.querySelector('#explore-tabs-bar [data-explore-tab="people"]');
+                if (peopleTab) peopleTab.click();
+                return;
+            }
+            const spDismiss = e.target.closest('.sp-card-dismiss');
+            if (spDismiss) {
+                const spCard = spDismiss.closest('.sp-card');
+                if (!spCard) return;
+                if (spCard.dataset.uid) dismissSuggestion(spCard.dataset.uid);
+                spCard.classList.add('is-dismissing');
+                setTimeout(() => {
+                    const scroll = spCard.parentElement;
+                    spCard.remove();
+                    if (scroll && !scroll.querySelector('.sp-card')) {
+                        const section = document.getElementById('suggested-people-section');
+                        if (section) section.style.display = 'none';
+                    }
+                }, 180);
+                return;
+            }
             const btn = e.target.closest('.discover-card-add-btn');
             if (!btn) {
-                const card = e.target.closest('.discover-card');
+                const card = e.target.closest('.discover-card, .sp-card');
                 if (card && card.dataset.uid) openUserProfileSheet(card.dataset.uid);
                 return;
             }

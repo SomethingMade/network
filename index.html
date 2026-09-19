@@ -901,7 +901,7 @@
         #repost-options-sheet-overlay { z-index: 100010; }
         #comment-options-sheet-overlay { z-index: 100010; }
         /* Search can be opened while the Reels full-screen overlay (z-index 100007) is up
-           (see nav-search-btn handler, which closes Reels first) — kept above it as a safety
+           (the header search icons on Calls/Contacts) — kept above it as a safety
            net so search is never rendered invisibly underneath. */
         #search-fullscreen-overlay { z-index: 100010; }
         /* The story row can now be triggered from inside the search fullscreen view (Discover
@@ -2868,6 +2868,19 @@
            #search-fullscreen-overlay by openFullscreenSearch(). */
         .search-box-collapsible { display: none; }
 
+        /* ── SEARCH TAB (#tab-search) ──
+           Column: header (avatar + search bar) / scrollable body (suggested people, Explore
+           tabs, results) / results dropdown. While the dropdown is open (recent searches or
+           live results) it takes over the page below the header, X-style, and the body steps
+           aside (.search-results-open, toggled by initSearchTab). */
+        .search-tab-header { padding-bottom: 12px; }
+        .search-tab-header-row { display: flex; align-items: center; gap: 10px; }
+        .search-tab-header .search-box { flex: 1; min-width: 0; margin-bottom: 0; }
+        .search-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px max(16px, env(safe-area-inset-bottom)); }
+        #tab-search > .chat-search-dropdown { position: static; flex: 1; min-height: 0; width: 100%; max-height: none; margin: 0; padding: 6px 10px 24px; border: none; border-radius: 0; box-shadow: none; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; overflow-y: auto; -webkit-overflow-scrolling: touch; display: none; }
+        #tab-search > .chat-search-dropdown.active { display: block; }
+        #tab-search.search-results-open .search-tab-scroll { display: none; }
+
         #search-fullscreen-overlay .bottom-sheet { display: flex; flex-direction: column; padding: 0 !important; }
         #search-fullscreen-overlay .sheet-handle { display: none; }
         .search-fullscreen-header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
@@ -2911,7 +2924,6 @@
            reordered after the moved #discover-grid-scroll instead of relying on DOM position.
            The old rule that hid every later sibling while the dropdown was active would have
            hidden the stories row too, so it's replaced by hiding just the feed below. */
-        #search-fullscreen-body > .chat-search-dropdown#discover-search-dropdown { order: 2; }
         /* flex-shrink:0 (the old "0 0 auto" shorthand) meant this box never shrank to fit the
            column's available height and had overflow:visible (no scroll region of its own) —
            so once the People/Trending panel's content (e.g. a long people list) grew taller
@@ -2989,8 +3001,8 @@
            ever render while parked inside the search fullscreen view; on the plain Home tab
            they stay hidden so nothing changes there. */
         .explore-tabs-bar, .explore-panel { display: none; }
-        #search-fullscreen-body .explore-tabs-bar { display: flex; margin: 4px 0 2px; border-bottom: 1px solid var(--border-color); }
-        #search-fullscreen-body .explore-panel.active { display: block; }
+        #tab-search .explore-tabs-bar { display: flex; margin: 4px 0 2px; border-bottom: 1px solid var(--border-color); }
+        #tab-search .explore-panel.active { display: block; }
         .explore-tabs-bar .feed-subtab-btn { padding: 12px 0 10px; font-size: 14.5px; }
 
         /* "Suggested for you" — horizontally scrollable row of compact follow cards that sits
@@ -2999,7 +3011,7 @@
            tab. Every card is the same fixed width and height, so the row reads as one tidy,
            aligned strip regardless of how long anyone's name/handle is. */
         .suggested-people-section { display: none; }
-        #search-fullscreen-body .suggested-people-section { display: block; padding: 10px 0 6px; }
+        #tab-search .suggested-people-section { display: block; padding: 10px 0 6px; }
         .suggested-people-header { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 8px; }
         .suggested-people-title { font-size: 15px; font-weight: 800; color: var(--text-primary); }
         .suggested-people-see-all { border: none; background: none; color: var(--primary-blue); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; padding: 4px 2px; }
@@ -4554,6 +4566,27 @@
         @media (min-width: 1025px) {
             body.feed-open .app-grid { grid-template-columns: 240px 1fr; }
         }
+        /* Search tab: same wide-and-centered treatment as Home. */
+        @media (min-width: 769px) {
+            body.search-open .workspace-pane { display: none; }
+            body.search-open .chat-pane { max-width: none; border-right: none; }
+            body.search-open #tab-search .chat-header-area {
+                padding-left: max(16px, calc((100% - 640px) / 2));
+                padding-right: max(16px, calc((100% - 640px) / 2));
+            }
+            body.search-open #tab-search .search-tab-scroll,
+            body.search-open #tab-search > .chat-search-dropdown {
+                max-width: 640px;
+                width: 100%;
+                margin: 0 auto;
+            }
+        }
+        @media (min-width: 769px) and (max-width: 1024px) {
+            body.search-open .app-grid { grid-template-columns: 190px 1fr; }
+        }
+        @media (min-width: 1025px) {
+            body.search-open .app-grid { grid-template-columns: 240px 1fr; }
+        }
         @media (max-width: 768px) {
 
             .app-grid { grid-template-columns: 1fr; }
@@ -4655,6 +4688,8 @@
             }
             .chat-list-container { padding-bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); }
             .discover-grid-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
+            .search-tab-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
+            #tab-search > .chat-search-dropdown { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #communities-feed-container { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
             .chat-view-overlay { left: 0; }
@@ -8129,7 +8164,7 @@
                     </svg>
                     <span>Home</span>
                 </div>
-                <div class="nav-item" id="nav-search-btn">
+                <div class="nav-item" data-tab="tab-search" id="nav-search-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <circle class="icon-line" cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.8"/>
                         <line class="icon-line" x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="1.8"/>
@@ -8236,9 +8271,6 @@
                                     <svg class="streak-flame" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2c1 3-2 4.5-2 7a3 3 0 0 0 6 0c1.5 1.5 2 3.5 2 5.5A6.5 6.5 0 0 1 11.5 21 6.5 6.5 0 0 1 5 14.5C5 9 9 6 12 2z"/></svg>
                                     <span id="streak-badge-count">0</span>
                                 </button>
-                                <div class="search-icon-btn js-search-open" id="home-search-icon-btn" data-search-list="discover-grid-scroll" title="Search" style="display:none;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                </div>
                                 <button type="button" class="search-icon-btn" id="home-header-settings-btn" aria-label="Settings" title="Settings">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                                 </button>
@@ -8265,61 +8297,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="search-box search-box-collapsible">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <input type="search" id="search-discover" placeholder="Search by name or @handle" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
-                            <div class="chat-search-dropdown" id="discover-search-dropdown"></div>
-                        </div>
                     </div>
                     <div class="discover-grid-scroll" id="discover-grid-scroll">
-                        <!-- "Suggested for you": compact horizontally scrolling follow cards right under
-                             the search bar. Search-view only (see .suggested-people-section CSS),
-                             filled by renderSuggestedPeopleRow() each time the search opens. -->
-                        <div class="suggested-people-section" id="suggested-people-section" style="display:none;">
-                            <div class="suggested-people-header">
-                                <span class="suggested-people-title">Suggested for you</span>
-                                <button type="button" class="suggested-people-see-all" id="suggested-people-see-all">See all</button>
-                            </div>
-                            <div class="suggested-people-scroll" id="suggested-people-scroll"></div>
-                        </div>
-                        <!-- X-style Explore tabs — only ever visible inside the search fullscreen
-                             view (see #search-fullscreen-body .explore-tabs-bar CSS), so the plain
-                             Home tab looks exactly as it did before. Sits first, right below the
-                             search bar. -->
-                        <div class="explore-tabs-bar" id="explore-tabs-bar">
-                            <button type="button" class="feed-subtab-btn active" data-explore-tab="trending">Trending</button>
-                            <button type="button" class="feed-subtab-btn" data-explore-tab="people">People</button>
-                            <button type="button" class="feed-subtab-btn" data-explore-tab="news">News</button>
-                        </div>
-                        <div class="explore-panel active" id="explore-panel-trending">
-                            <div id="explore-trending-list"></div>
-                        </div>
-                        <div class="explore-panel" id="explore-panel-people">
-                            <div class="discover-grid" id="explore-people-grid"></div>
-                        </div>
-                        <!-- Headlines used to be sprinkled directly into the Home feed's own post
-                             list (see the old sprinkleNewsCards() comment above fetchNewsHeadlines);
-                             they now live only here, as their own tab, so Home stays pure posts. -->
-                        <div class="explore-panel" id="explore-panel-news">
-                            <div id="explore-news-list"></div>
-                        </div>
-
-                        <p class="discover-section-label" id="discover-stories-label">Status</p>
-                        <div class="story-card-scroll" id="stories-scroll-discover"></div>
-
-                        <!-- People-search results: only shown while the person is actively searching;
-                             otherwise the feed below (with suggestion cards sprinkled through it) is
-                             how people get discovered, X-style. -->
-                        <div id="discover-search-results" style="display:none;">
-                            <p class="discover-section-label" id="discover-section-label">People you may know</p>
-                            <div class="discover-grid" id="discover-grid"></div>
-                            <div class="discover-grid-empty" id="discover-grid-empty" style="display:none;">
-                                <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
-                                <p id="discover-empty-title">No one new to find right now</p>
-                                <span id="discover-empty-sub">Check back later, or invite friends to join Haba</span>
-                            </div>
-                        </div>
-
                         <div class="feed-sticky-header" id="feed-sticky-header">
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"></path></svg>For you</button>
@@ -8364,6 +8343,70 @@
                             <p class="live-hub-empty" id="feed-stories-empty" style="display:none;">No stories yet. Be the first to share one!</p>
                         </div>
                     </div>
+                </div>
+
+                <!-- SEARCH TAB (bottom nav): a real tab now, not an overlay. Holds the search bar and
+                     everything that used to be parked inside the old full-screen search view —
+                     Suggested for you, Trending / People / News, and the results dropdown. -->
+                <div id="tab-search" class="tab-content">
+                    <div class="chat-header-area search-tab-header">
+                        <div class="search-tab-header-row">
+                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            <div class="search-box search-tab-box">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="search" id="search-discover" placeholder="Search by name or @handle" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="search-tab-scroll" id="search-tab-scroll">
+                        <!-- "Suggested for you": compact horizontally scrolling follow cards right under
+                             the search bar. Search tab only, filled by renderSuggestedPeopleRow() each
+                             time the tab is entered (see onSearchTabEntered). -->
+                        <div class="suggested-people-section" id="suggested-people-section" style="display:none;">
+                            <div class="suggested-people-header">
+                                <span class="suggested-people-title">Suggested for you</span>
+                                <button type="button" class="suggested-people-see-all" id="suggested-people-see-all">See all</button>
+                            </div>
+                            <div class="suggested-people-scroll" id="suggested-people-scroll"></div>
+                        </div>
+                        <!-- X-style Explore tabs — live in the Search tab, right below the search
+                             bar and suggested people. -->
+                        <div class="explore-tabs-bar" id="explore-tabs-bar">
+                            <button type="button" class="feed-subtab-btn active" data-explore-tab="trending">Trending</button>
+                            <button type="button" class="feed-subtab-btn" data-explore-tab="people">People</button>
+                            <button type="button" class="feed-subtab-btn" data-explore-tab="news">News</button>
+                        </div>
+                        <div class="explore-panel active" id="explore-panel-trending">
+                            <div id="explore-trending-list"></div>
+                        </div>
+                        <div class="explore-panel" id="explore-panel-people">
+                            <div class="discover-grid" id="explore-people-grid"></div>
+                        </div>
+                        <!-- Headlines used to be sprinkled directly into the Home feed's own post
+                             list (see the old sprinkleNewsCards() comment above fetchNewsHeadlines);
+                             they now live only here, as their own tab, so Home stays pure posts. -->
+                        <div class="explore-panel" id="explore-panel-news">
+                            <div id="explore-news-list"></div>
+                        </div>
+
+                        <p class="discover-section-label" id="discover-stories-label">Status</p>
+                        <div class="story-card-scroll" id="stories-scroll-discover"></div>
+
+                        <!-- People-search results: only shown while the person is actively searching;
+                             otherwise the feed below (with suggestion cards sprinkled through it) is
+                             how people get discovered, X-style. -->
+                        <div id="discover-search-results" style="display:none;">
+                            <p class="discover-section-label" id="discover-section-label">People you may know</p>
+                            <div class="discover-grid" id="discover-grid"></div>
+                            <div class="discover-grid-empty" id="discover-grid-empty" style="display:none;">
+                                <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+                                <p id="discover-empty-title">No one new to find right now</p>
+                                <span id="discover-empty-sub">Check back later, or invite friends to join Haba</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="chat-search-dropdown" id="discover-search-dropdown"></div>
                 </div>
 
                 <div id="tab-groups" class="tab-content">
@@ -11227,15 +11270,6 @@
                     body.appendChild(el);
                 });
 
-                // Explore (Trending/People) only lives inside this Home search overlay — refresh
-                // it with the latest cached data every time it's opened, so a trend/suggestion
-                // list from an earlier session never lingers stale.
-                if (btn.id === 'home-search-icon-btn') {
-                    renderExploreTrending();
-                    renderExplorePeople();
-                    renderSuggestedPeopleRow();
-                }
-
                 pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the search sheet
 
                 // Some search bars (e.g. Discover) carry a history/results panel that's normally
@@ -11360,7 +11394,7 @@
 
         // Shared by handleHashChange (to animate the right direction) and the swipe gesture below
         // (to know what "next" and "previous" mean) — left-to-right, matching the nav bar order.
-        const TAB_ORDER = ['tab-status', 'tab-chats', 'tab-groups', 'tab-contacts'];
+        const TAB_ORDER = ['tab-status', 'tab-search', 'tab-chats', 'tab-groups', 'tab-contacts'];
         let previousActiveTabHash = null;
 
         // Tracks whatever the hash was immediately before the CURRENT handleHashChange call
@@ -11487,6 +11521,7 @@
                 // explicit stop pauseAllAppMedia() already does for the search sheet, notifications,
                 // etc. — otherwise a feed video (and its audio) keeps playing behind whichever tab
                 // is now on screen.
+                const tabBeforeThisChange = previousActiveTabHash; // previousActiveTabHash is overwritten further down
                 if (previousActiveTabHash !== hash) pauseAllAppMedia();
                 document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab', 'tab-slide-in-left', 'tab-slide-in-right'));
@@ -11550,6 +11585,9 @@
                 // on tablet/desktop. Widen chat-pane to the full row while Home is active —
                 // see the body.feed-open CSS — instead of sharing space with that pane.
                 document.body.classList.toggle('feed-open', hash === 'tab-status');
+                document.body.classList.toggle('search-open', hash === 'tab-search');
+                if (hash === 'tab-search' && tabBeforeThisChange !== 'tab-search') onSearchTabEntered();
+                if (tabBeforeThisChange === 'tab-search' && hash !== 'tab-search') onSearchTabLeft();
 
                 if (hash === 'tab-status') {
                     renderDiscoverGrid(document.getElementById('search-discover') ? document.getElementById('search-discover').value : '');
@@ -11812,27 +11850,8 @@
                     goToTab(item.getAttribute('data-tab'));
                 });
             });
-            // Search isn't a persistent tab-content either — tapping it just opens the same
-            // full-screen search overlay used by the header search icons elsewhere (see
-            // initFullscreenSearch/js-search-open), borrowing Home's search bar + results list,
-            // so there's no separate search UI to build or keep in sync.
-            const searchNavBtn = document.getElementById('nav-search-btn');
-            if (searchNavBtn) {
-                searchNavBtn.addEventListener('click', () => {
-                    triggerHaptic(12);
-                    // Reels can still be open full-screen (from a feed post's expand button —
-                    // see openReelViewer) — the search overlay opened below sits at a lower
-                    // z-index, so without this it would open invisibly underneath the reel
-                    // viewer. Close it first, same way its own close button does (history.back(),
-                    // which routes through handleHashChange -> closeReelViewer()).
-                    if (document.getElementById('reel-viewer-overlay').classList.contains('active')) {
-                        closeReelViewer();
-                        if (window.location.hash === '#reel-viewer') history.back();
-                    }
-                    const homeSearchBtn = document.getElementById('home-search-icon-btn');
-                    if (homeSearchBtn) homeSearchBtn.click();
-                });
-            }
+            // Search is a real tab now (#tab-search, a normal data-tab nav item handled by the
+            // loop above); its enter/leave hooks live in onSearchTabEntered/onSearchTabLeft.
             // Notifications isn't a persistent tab-content either — tapping it just opens
             // the same notifications sheet used by the header bell icons elsewhere (see
             // openNotificationsSheet/js-notif-bell), so there's no separate list to build
@@ -14315,12 +14334,48 @@
 
         function renderDiscoverGridIfActive() {
             const tab = document.getElementById('tab-status');
-            if (tab && tab.classList.contains('active-tab')) {
+            const searchTab = document.getElementById('tab-search');
+            const onHome = tab && tab.classList.contains('active-tab');
+            const onSearch = searchTab && searchTab.classList.contains('active-tab');
+            if (onHome || onSearch) {
                 const searchEl = document.getElementById('search-discover');
                 renderDiscoverGrid(searchEl ? searchEl.value : '');
                 renderExploreTrending();
             }
+            // Users/follows can land after the tab was opened — fill the suggested row if it
+            // came up empty, without reshuffling one that's already showing.
+            if (onSearch) {
+                const spScroll = document.getElementById('suggested-people-scroll');
+                if (spScroll && !spScroll.children.length) renderSuggestedPeopleRow();
+            }
         }
+
+        // ── SEARCH TAB lifecycle ──
+        // Entering refreshes Trending / People / Suggested from the latest cached data so
+        // nothing from an earlier visit lingers stale; leaving clears the query, like the old
+        // overlay did on close, so the tab always opens fresh.
+        function onSearchTabEntered() {
+            renderExploreTrending();
+            renderExplorePeople();
+            renderSuggestedPeopleRow();
+        }
+        function onSearchTabLeft() {
+            const input = document.getElementById('search-discover');
+            if (input) { input.value = ''; input.blur(); }
+            const dd = document.getElementById('discover-search-dropdown');
+            if (dd) dd.classList.remove('active');
+            renderDiscoverGrid('');
+        }
+        // While the results dropdown is up it becomes the page (body steps aside) — mirror its
+        // .active class onto the tab so CSS can hide the body.
+        (function initSearchTabResultsToggle() {
+            const dd = document.getElementById('discover-search-dropdown');
+            const tab = document.getElementById('tab-search');
+            if (!dd || !tab) return;
+            const sync = () => tab.classList.toggle('search-results-open', dd.classList.contains('active'));
+            new MutationObserver(sync).observe(dd, { attributes: true, attributeFilter: ['class'] });
+            sync();
+        })();
 
         // --- Explore tabs (Trending / People) ---
         // X-style Explore, built entirely from real app data: trending hashtags are counted
@@ -14539,7 +14594,7 @@
             }
         })();
 
-        document.getElementById('discover-grid-scroll').addEventListener('click', async (e) => {
+        document.getElementById('search-tab-scroll').addEventListener('click', async (e) => {
             if (e.target.closest('#suggested-people-see-all')) {
                 const peopleTab = document.querySelector('#explore-tabs-bar [data-explore-tab="people"]');
                 if (peopleTab) peopleTab.click();
@@ -14786,8 +14841,7 @@
         searchDiscoverInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && searchDiscoverInput.value.trim()) {
                 addDiscoverSearchHistory(searchDiscoverInput.value.trim());
-                hideDiscoverSearchDropdown();
-                searchDiscoverInput.blur();
+                searchDiscoverInput.blur(); // results stay on screen; just dismiss the keyboard
             } else if (e.key === 'Escape') {
                 hideDiscoverSearchDropdown();
                 searchDiscoverInput.blur();
@@ -14795,7 +14849,11 @@
         });
         document.addEventListener('pointerdown', (e) => {
             if (!discoverSearchDropdownEl.classList.contains('active')) return;
-            if (!e.target.closest('#search-discover') && !e.target.closest('#discover-search-dropdown')) hideDiscoverSearchDropdown();
+            if (e.target.closest('#search-discover') || e.target.closest('#discover-search-dropdown')) return;
+            // Recent-searches popup closes on an outside tap, but live results are the page
+            // itself in the Search tab — keep them up while there's still a term typed.
+            if (searchDiscoverInput.value.trim()) return;
+            hideDiscoverSearchDropdown();
         });
         searchDiscoverInput.addEventListener('input', renderDiscoverSearchDropdown);
 
@@ -24503,7 +24561,7 @@
             const nav = document.querySelector('.side-nav');
             const askBar = document.getElementById('ask-anything-bar');
             if (!nav) return;
-            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
+            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'search-tab-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
             const THRESHOLD = 6; // ignore tiny scroll jitter
             scrollIds.forEach(id => {
                 const scrollEl = document.getElementById(id);

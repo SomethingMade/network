@@ -3179,7 +3179,21 @@
         #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
         .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
-        #communities-map-canvas { position: absolute; inset: 0; z-index: 1; background: var(--bg-alt); }
+        #communities-map-canvas { position: absolute; inset: 0; z-index: 1; background: #F1F1F1; }
+        /* Uber-style pickup / drop-off markers with pop-up tags on the Haba Ride map */
+        .hrm-point { position: absolute; width: 0; height: 0; }
+        .hrm-dot { position: absolute; left: 0; top: 0; width: 18px; height: 18px; transform: translate(-50%, -50%); background: #111; box-shadow: 0 0 0 2.5px #fff, 0 2px 8px rgba(0,0,0,0.35); }
+        .hrm-dot::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #fff; }
+        .hrm-dot.circle, .hrm-dot.circle::after { border-radius: 50%; }
+        .hrm-dot.square { border-radius: 3px; } .hrm-dot.square::after { border-radius: 1px; }
+        .hrm-tag { position: absolute; top: 0; transform: translateY(-50%); display: flex; align-items: stretch; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.28); cursor: pointer; white-space: nowrap; font-family: 'Inter', sans-serif; }
+        .hrm-point.side-right .hrm-tag { left: 22px; } .hrm-point.side-left .hrm-tag { right: 22px; }
+        .hrm-point.tag-hidden .hrm-tag { display: none; }
+        .hrm-min { background: #111; color: #fff; padding: 6px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 44px; }
+        .hrm-min b { font-size: 19px; font-weight: 700; line-height: 1; } .hrm-min span { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
+        .hrm-body { padding: 9px 6px 9px 11px; display: flex; flex-direction: column; justify-content: center; max-width: 150px; }
+        .hrm-title { font-size: 15px; font-weight: 700; color: #111; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+        .hrm-chev { align-self: center; padding: 0 10px 0 4px; font-size: 20px; font-weight: 700; color: #111; line-height: 1; }
         #map-permission-hint { position: absolute; top: calc(100% + 10px); right: 0; z-index: 5; background: rgba(28,28,30,0.94); color: #fff; font-size: 12.5px; line-height: 1.35; padding: 8px 12px; border-radius: 10px; width: 190px; text-align: left; box-shadow: 0 4px 14px rgba(0,0,0,0.28); }
         #map-permission-hint::after { content: ''; position: absolute; bottom: 100%; right: 14px; border: 6px solid transparent; border-bottom-color: rgba(28,28,30,0.94); }
         .map-location-btn-wrap { position: relative; }
@@ -24970,6 +24984,8 @@
                 communitiesMapState.directionsRenderer.setDirections({ routes: [] });
                 communitiesMapState.routed = false;
                 clearAnimatedRoute();
+                if (communitiesMapState.userMarker) communitiesMapState.userMarker.setVisible(true);
+                if (communitiesMapState.pickupMarker) communitiesMapState.pickupMarker.setVisible(true);
             }
             showHabaRideStep('home');
             updateHabaRideHomeStats(habaHomeSelectedType);
@@ -25041,6 +25057,7 @@
                 if (target && typeof target.lat === 'number') {
                     const km = habaHaversineKm({ lat: d.lat, lng: d.lng }, { lat: target.lat, lng: target.lng });
                     const mins = Math.max(1, Math.round(km / 0.5)); // ~30km/h effective city speed
+                    updateHabaRideTripTags(habaRideTripStatus || request.status, mins);
                     document.getElementById('haba-ride-driver-eta').textContent = `${mins} min`;
                     document.getElementById('haba-ride-driver-eta-label').textContent = request.status === 'in_progress' ? 'to drop-off' : 'away';
                 }
@@ -25069,6 +25086,8 @@
 
         function showHabaRideTripPanel(request) {
             showHabaRideStep('trip');
+            habaRideTripStatus = request.status;
+            updateHabaRideTripTags(request.status);
             document.getElementById('haba-ride-trip-status').textContent = habaRideStatusLabel(request.status);
             document.getElementById('haba-ride-trip-pickup-value').textContent = (request.pickup && request.pickup.label) || 'Your location';
             document.getElementById('haba-ride-trip-dest-value').textContent = (request.dropoff && request.dropoff.label) || '--';
@@ -25173,6 +25192,7 @@
             document.getElementById('haba-ride-confirm-eta').textContent = `${tripMin} min`;
             document.getElementById('haba-ride-confirm-price').textContent = `R${price.toFixed(2)}`;
             const arrival = habaRideArrivalMin(typeId);
+            setHabaRidePickupMinutes(arrival);
             document.getElementById('haba-ride-confirm-arrival').textContent = arrival === null ? 'N/A' : `${arrival} min`;
             document.getElementById('haba-ride-confirm-seats').textContent = t.seats;
             document.getElementById('haba-ride-confirm-dest').textContent = habaRideRoute.destLabel;
@@ -25257,6 +25277,184 @@
             }
         }
 
+        // Light, muted basemap (white roads, soft grey land, pale green parks) — Uber-style.
+        const HABA_RIDE_MAP_STYLE = [
+            { elementType: 'geometry', stylers: [{ color: '#F1F1F1' }] },
+            { elementType: 'labels.icon', stylers: [{ saturation: -100 }, { lightness: 15 }] },
+            { elementType: 'labels.text.fill', stylers: [{ color: '#5F6673' }] },
+            { elementType: 'labels.text.stroke', stylers: [{ color: '#FFFFFF' }, { weight: 3 }] },
+            { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+            { featureType: 'administrative.neighborhood', elementType: 'labels.text.fill', stylers: [{ color: '#8A8F98' }] },
+            { featureType: 'landscape.natural', elementType: 'geometry', stylers: [{ color: '#EFEFEF' }] },
+            { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#E9E9E9' }] },
+            { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+            { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#DCEBD3' }] },
+            { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6F8A63' }] },
+            { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#FFFFFF' }] },
+            { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#E6E6E6' }] },
+            { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8A8F98' }] },
+            { featureType: 'road.highway', elementType: 'geometry.fill', stylers: [{ color: '#C5CEE8' }] },
+            { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#B3BEDD' }] },
+            { featureType: 'transit.line', elementType: 'geometry', stylers: [{ color: '#E0E0E0' }] },
+            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#C9D8EC' }] },
+            { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#7A8CA8' }] }
+        ];
+
+        // ── Uber-style trip overlay: circle (pickup) / square (drop-off) markers with pop-up tags ──
+        let habaRideHtmlOverlayClass = null;
+        let habaRideTripStatus = null;
+        function getHabaRideOverlayClass() {
+            if (habaRideHtmlOverlayClass) return habaRideHtmlOverlayClass;
+            habaRideHtmlOverlayClass = class extends google.maps.OverlayView {
+                constructor(position, el) { super(); this.position = position; this.el = el; }
+                onAdd() { this.getPanes().overlayMouseTarget.appendChild(this.el); }
+                draw() {
+                    const proj = this.getProjection();
+                    if (!proj) return;
+                    const pt = proj.fromLatLngToDivPixel(new google.maps.LatLng(this.position.lat, this.position.lng));
+                    if (!pt) return;
+                    this.el.style.left = pt.x + 'px';
+                    this.el.style.top = pt.y + 'px';
+                }
+                onRemove() { if (this.el.parentNode) this.el.parentNode.removeChild(this.el); }
+                // Puts the pop-up tag on whichever side has room so it never runs off screen.
+                autoSide() {
+                    const proj = this.getProjection();
+                    if (!proj || !this.getMap()) return;
+                    const pt = proj.fromLatLngToContainerPixel(new google.maps.LatLng(this.position.lat, this.position.lng));
+                    const w = this.getMap().getDiv().clientWidth;
+                    const left = !!(pt && pt.x > w * 0.5);
+                    this.el.classList.toggle('side-left', left);
+                    this.el.classList.toggle('side-right', !left);
+                }
+            };
+            return habaRideHtmlOverlayClass;
+        }
+
+        function habaRideShortLabel(label, fallback) {
+            return String(label || '').split(',')[0].trim() || fallback;
+        }
+
+        function habaRideLatLngLiteral(p) {
+            return { lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng };
+        }
+
+        function addHabaRideMapPoint({ position, shape, minutes, title }) {
+            const state = communitiesMapState;
+            const el = document.createElement('div');
+            el.className = 'hrm-point side-right';
+            const dot = document.createElement('div');
+            dot.className = 'hrm-dot ' + shape;
+            el.appendChild(dot);
+
+            const tag = document.createElement('div');
+            tag.className = 'hrm-tag';
+            const minBox = document.createElement('div');
+            minBox.className = 'hrm-min';
+            const minNum = document.createElement('b');
+            const minUnit = document.createElement('span'); minUnit.textContent = 'MIN';
+            minBox.append(minNum, minUnit);
+            tag.appendChild(minBox);
+            const body = document.createElement('div');
+            body.className = 'hrm-body';
+            const t = document.createElement('div'); t.className = 'hrm-title'; t.textContent = title;
+            body.appendChild(t);
+            tag.appendChild(body);
+            const chev = document.createElement('div'); chev.className = 'hrm-chev'; chev.textContent = '›';
+            tag.appendChild(chev);
+            el.appendChild(tag);
+
+            const point = {
+                overlay: null,
+                setMinutes(n) {
+                    if (n === null || n === undefined) { minBox.style.display = 'none'; }
+                    else { minBox.style.display = ''; minNum.textContent = n; }
+                },
+                setTagHidden(hidden) { el.classList.toggle('tag-hidden', !!hidden); }
+            };
+            point.setMinutes(minutes);
+
+            // Tapping a tag focuses the map on that point; taps/drags on the tag don't move the map.
+            if (google.maps.OverlayView.preventMapHitsAndGesturesFrom) google.maps.OverlayView.preventMapHitsAndGesturesFrom(tag);
+            tag.addEventListener('click', () => {
+                state.map.panTo(position);
+                if ((state.map.getZoom() || 0) < 16) state.map.setZoom(16);
+            });
+
+            const overlay = new (getHabaRideOverlayClass())(position, el);
+            overlay.setMap(state.map);
+            state.routeOverlays.push(overlay);
+            point.overlay = overlay;
+            return point;
+        }
+
+        // Fastest arrival among ride types that actually have a nearby driver (null if none).
+        function habaRideBestArrivalMin() {
+            let best = null;
+            Object.keys(HABA_RIDE_TYPES).forEach(id => {
+                const a = habaRideArrivalMin(id);
+                if (a !== null && (best === null || a < best)) best = a;
+            });
+            return best;
+        }
+
+        function setHabaRidePickupMinutes(mins) {
+            const pts = communitiesMapState && communitiesMapState.routePoints;
+            if (pts) pts.pickup.setMinutes(mins);
+        }
+
+        // While a driver is coming, the pickup tag counts down their ETA; once the trip starts the
+        // pickup tag goes away and the drop-off tag shows the time left instead.
+        function updateHabaRideTripTags(status, mins) {
+            const pts = communitiesMapState && communitiesMapState.routePoints;
+            if (!pts) return;
+            if (status === 'in_progress') {
+                pts.pickup.setTagHidden(true);
+                pts.dropoff.setMinutes(mins === undefined ? null : mins);
+            } else {
+                pts.pickup.setTagHidden(false);
+                if (mins !== undefined) pts.pickup.setMinutes(mins);
+                pts.dropoff.setMinutes(null);
+            }
+        }
+
+        function fitHabaRideRoute(bounds) {
+            const state = communitiesMapState;
+            if (!state || !bounds) return;
+            const view = document.getElementById('communities-map-view');
+            const top = view.querySelector('.map-top-overlay');
+            const sheet = document.getElementById('haba-ride-sheet');
+            const topPad = (top ? top.offsetHeight : 0) + 20;
+            const bottomPad = Math.min((sheet ? sheet.offsetHeight : 0) + 30, view.clientHeight * 0.5);
+            const map = state.map;
+            map.fitBounds(bounds, { top: topPad, right: 40, bottom: bottomPad, left: 40 });
+            google.maps.event.addListenerOnce(map, 'idle', () => {
+                const settle = () => state.routeOverlays.forEach(o => o.autoSide());
+                if (map.getZoom() > 17) { map.setZoom(17); google.maps.event.addListenerOnce(map, 'idle', settle); }
+                else settle();
+            });
+        }
+
+        function showHabaRideRouteOnMap(origin, destLatLng, destLabel, path) {
+            const state = communitiesMapState;
+            // The pickup circle below replaces the plain "you are here" dot while a route is showing.
+            if (state.userMarker) state.userMarker.setVisible(false);
+            if (state.pickupMarker) state.pickupMarker.setVisible(false);
+            const pickup = addHabaRideMapPoint({
+                position: habaRideLatLngLiteral(origin), shape: 'circle',
+                minutes: habaRideBestArrivalMin(),
+                title: habaRideShortLabel(state.pickupLabel, 'Your location')
+            });
+            const dropoff = addHabaRideMapPoint({
+                position: habaRideLatLngLiteral(destLatLng), shape: 'square',
+                minutes: null, title: habaRideShortLabel(destLabel, 'Destination')
+            });
+            state.routePoints = { pickup, dropoff };
+            const bounds = new google.maps.LatLngBounds();
+            path.forEach(p => bounds.extend(p));
+            fitHabaRideRoute(bounds);
+        }
+
         async function initCommunitiesMap() {
             await loadGoogleMapsScript();
 
@@ -25267,13 +25465,16 @@
                     center: defaultCenter,
                     zoom: 13,
                     disableDefaultUI: true,
-                    zoomControl: true,
-                    gestureHandling: 'greedy'
+                    zoomControl: false,
+                    gestureHandling: 'greedy',
+                    clickableIcons: false,
+                    styles: HABA_RIDE_MAP_STYLE,
+                    backgroundColor: '#F1F1F1'
                 });
                 const directionsService = new google.maps.DirectionsService();
-                const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: false, suppressPolyline: true });
+                const directionsRenderer = new google.maps.DirectionsRenderer({ map, suppressMarkers: true, suppressPolyline: true });
 
-                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, pickupAutocomplete: null, pickupLatLng: null, pickupLabel: null, pickupMarker: null, directionsService, directionsRenderer, nearbyDrivers: null, routeBasePolyline: null, routeShimmerPolyline: null, routeAnimationInterval: null };
+                communitiesMapState = { map, userMarker: null, userLatLng: null, autocomplete: null, pickupAutocomplete: null, pickupLatLng: null, pickupLabel: null, pickupMarker: null, directionsService, directionsRenderer, nearbyDrivers: null, routeBasePolyline: null, routeShimmerPolyline: null, routeAnimationInterval: null, routeOverlays: [], routePoints: null };
 
                 const pickupInput = document.getElementById('map-pickup-search');
                 const pickupAutocomplete = new google.maps.places.Autocomplete(pickupInput, { fields: ['geometry', 'name', 'formatted_address'] });
@@ -25380,6 +25581,7 @@
 
                 document.getElementById('btn-haba-ride-back-to-options').addEventListener('click', () => {
                     triggerHaptic(8);
+                    setHabaRidePickupMinutes(habaRideBestArrivalMin());
                     showHabaRideStep('options');
                 });
 
@@ -25445,8 +25647,12 @@
                 state.routeShimmerPolyline.setMap(null);
                 state.routeShimmerPolyline = null;
             }
+            (state.routeOverlays || []).forEach(o => o.setMap(null));
+            state.routeOverlays = [];
+            state.routePoints = null;
         }
 
+        // Uber-style route: a plain solid black line.
         function drawAnimatedRoute(path) {
             const state = communitiesMapState;
             clearAnimatedRoute();
@@ -25456,29 +25662,9 @@
                 map: state.map,
                 strokeColor: '#000000',
                 strokeOpacity: 1,
-                strokeWeight: 5,
+                strokeWeight: 4,
                 zIndex: 1
             });
-
-            state.routeShimmerPolyline = new google.maps.Polyline({
-                path,
-                map: state.map,
-                strokeOpacity: 0,
-                zIndex: 2,
-                icons: [{
-                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3, scale: 4 },
-                    offset: '0%',
-                    repeat: '40px'
-                }]
-            });
-
-            let offset = 0;
-            state.routeAnimationInterval = setInterval(() => {
-                offset = (offset + 1) % 100;
-                const icons = state.routeShimmerPolyline.get('icons');
-                icons[0].offset = offset + '%';
-                state.routeShimmerPolyline.set('icons', icons);
-            }, 30);
         }
 
         function routeToDestination(destLatLng, destLabel) {
@@ -25517,6 +25703,7 @@
                     document.getElementById('haba-ride-confirm-pickup-value').textContent = state.pickupLabel || 'Your location';
                     renderHabaRideOptionsList();
                     showHabaRideStep('options');
+                    showHabaRideRouteOnMap(origin, destLatLng, destLabel, result.routes[0].overview_path);
                 }
             );
         }

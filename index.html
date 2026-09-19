@@ -3155,11 +3155,11 @@
 
         /* ── COMMUNITIES "MAP" SUBTAB — full-bleed navigation map ──
            Sibling of #communities-feed-container inside the same flex column; only one of
-           the two is ever visible at a time (toggled in the subtab click handler). Fills all
+           the two is ever visible at a time (toggled by openHabaRide / closeHabaRide). Fills all
            remaining vertical space below the header/subtabs, same way #communities-feed-container
            does, so the map canvas itself gets a true "full mapview" rather than a small embed.
            When active, #tab-groups also gets .map-fullview, which hides .chat-header-area
-           entirely (header row + Home/Explore/Map subtabs + category chips) so the map owns
+           entirely (header row + Home/Explore subtabs + category chips) so the map owns
            the whole screen — the map's own top bar below carries a back button and the profile
            avatar that would otherwise have lived in that now-hidden header. */
         #tab-groups.map-fullview .chat-header-area { display: none; }
@@ -7337,6 +7337,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     <span>Communities</span>
                 </button>
+                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-haba-ride">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v5h-2"></path><path d="M3 12h18"></path><circle cx="7.5" cy="17" r="2"></circle><circle cx="16.5" cy="17" r="2"></circle></svg>
+                    <span>Haba Ride</span>
+                </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-live">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
                     <span>Live</span>
@@ -8357,7 +8361,6 @@
                         <div class="segmented-control" id="communities-sub-tabs">
                             <button type="button" class="active" data-subtab="home">Home</button>
                             <button type="button" data-subtab="explore">Explore</button>
-                            <button type="button" data-subtab="map">Haba Ride</button>
                         </div>
                         <div class="community-category-chips" id="community-category-chips"></div>
                     </div>
@@ -11498,6 +11501,13 @@
                 const sideNavEl = document.querySelector('.side-nav');
                 if (sideNavEl) sideNavEl.classList.remove('nav-scroll-hidden'); // always start visible on tab entry
                 document.body.classList.toggle('communities-open', hash === 'tab-groups');
+                // Haba Ride's map lives inside #tab-groups — if we've moved to any other tab
+                // (drawer item, back button, nav bar), tuck it away so Communities itself
+                // doesn't reopen on the map. Ride state is kept so an active trip survives.
+                if (hash !== 'tab-groups') {
+                    const habaMapView = document.getElementById('communities-map-view');
+                    if (habaMapView && habaMapView.classList.contains('active')) hideCommunitiesMapSubtab(true);
+                }
                 // Home's timeline was built to live in the chat-list column, but that leaves
                 // it squeezed to list-width next to an idle, unrelated "select a chat" pane
                 // on tablet/desktop. Widen chat-pane to the full row while Home is active —
@@ -12314,13 +12324,11 @@
             });
 
             // "Request ride" doesn't book anything inline in the DM — it hands off to the
-            // real Haba Ride flow that already lives under Communities > Haba Ride (map
-            // subtab), same UI whether you get there from the nav bar or from here.
+            // real Haba Ride flow (openHabaRide — the same full-screen map opened from the
+            // side drawer).
             document.getElementById('chat-view-menu-ride').addEventListener('click', () => {
                 closeMenu();
-                goToTab('tab-groups');
-                const mapSubtabBtn = document.querySelector('#communities-sub-tabs button[data-subtab="map"]');
-                if (mapSubtabBtn && !mapSubtabBtn.classList.contains('active')) mapSubtabBtn.click();
+                openHabaRide();
             });
         })();
 
@@ -21497,6 +21505,10 @@
             closeSidebarDrawer();
             goToTab('tab-groups');
         });
+        document.getElementById('sidebar-drawer-haba-ride').addEventListener('click', () => {
+            closeSidebarDrawer();
+            openHabaRide();
+        });
         document.getElementById('sidebar-drawer-insights').addEventListener('click', () => {
             closeSidebarDrawer();
             document.getElementById('btn-open-insights').click();
@@ -24692,7 +24704,7 @@
         // no lost scroll position — so a genuine network refresh only happens the first time a
         // given view is opened this session (i.e. effectively "on app reload").
         const COMMUNITY_CATEGORIES = ['All', 'Sports', 'Technology', 'Art', 'Entertainment', 'Gaming', 'News', 'General'];
-        let activeCommunitySubtab = 'home'; // 'home' (joined communities) | 'explore' (public, not yet joined)
+        let activeCommunitySubtab = 'home'; // 'home' (joined communities) | 'explore' (public, not yet joined). Haba Ride is no longer a subtab — see openHabaRide().
         let activeCommunityCategory = 'All';
         const COMMUNITY_FEED_GROUPS_PER_BATCH = 15; // how many not-yet-sampled communities to pull in per page
         const COMMUNITY_FEED_MSGS_PER_GROUP = 6;     // messages fetched per community per page
@@ -24745,12 +24757,7 @@
             document.querySelectorAll('#communities-sub-tabs button').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeCommunitySubtab = btn.dataset.subtab;
-            if (activeCommunitySubtab === 'map') {
-                showCommunitiesMapSubtab();
-            } else {
-                hideCommunitiesMapSubtab();
-                loadCommunityFeed();
-            }
+            loadCommunityFeed();
         });
 
         // ── COMMUNITIES "MAP" SUBTAB ──────────────────────────────────────────────
@@ -24813,12 +24820,37 @@
             });
         }
 
-        function hideCommunitiesMapSubtab() {
+        // keepRideState: true when the map is only being tucked away because the person
+        // navigated to another tab (so an in-progress ride/request isn't wiped); false on an
+        // explicit exit via the map's own back arrow.
+        function hideCommunitiesMapSubtab(keepRideState) {
             document.getElementById('communities-map-view').classList.remove('active');
             document.getElementById('tab-groups').classList.remove('map-fullview');
             document.getElementById('community-category-chips').style.display = '';
             document.getElementById('communities-feed-container').style.display = '';
-            if (communitiesMapState) resetHabaRideFlow();
+            if (!keepRideState && communitiesMapState) resetHabaRideFlow();
+        }
+
+        // ── HABA RIDE entry point ──
+        // Haba Ride is no longer a Communities subtab. It's opened from the side drawer (and
+        // from the "Request ride" shortcuts in a DM / contact card) and takes over the whole
+        // screen. The map view still physically lives inside #tab-groups, so this switches to
+        // that tab and shows the map; leaving any other way (hash change / back button) tucks
+        // it away again in handleHashChange, so opening Communities never lands on the map.
+        let habaRideReturnTab = 'tab-status';
+        function openHabaRide() {
+            const mapView = document.getElementById('communities-map-view');
+            if (mapView.classList.contains('active')) return;
+            const current = window.location.hash.replace('#', '') || 'tab-status';
+            // Where the back arrow should return to: the tab we came from. If we came from
+            // inside a chat (hash '#chat' etc., not a real tab), go back to the chats tab.
+            habaRideReturnTab = TAB_ORDER.includes(current) ? current : 'tab-chats';
+            goToTab('tab-groups');
+            showCommunitiesMapSubtab();
+        }
+        function closeHabaRide() {
+            hideCommunitiesMapSubtab(false);
+            if (habaRideReturnTab && habaRideReturnTab !== 'tab-groups') goToTab(habaRideReturnTab);
         }
 
         // Simple generic (non-branded) line icons for the ride-type picker — deliberately
@@ -25617,7 +25649,7 @@
 
                 document.getElementById('btn-map-exit-fullview').addEventListener('click', () => {
                     triggerHaptic(10);
-                    document.querySelector('#communities-sub-tabs button[data-subtab="home"]').click();
+                    closeHabaRide();
                 });
 
                 document.getElementById('haba-ride-type-picker').addEventListener('click', (e) => {
@@ -27589,9 +27621,7 @@
         });
         document.getElementById('contact-more-ride').addEventListener('click', () => {
             contactCardMoreSheet.classList.remove('active');
-            goToTab('tab-groups');
-            const mapSubtabBtn = document.querySelector('#communities-sub-tabs button[data-subtab="map"]');
-            if (mapSubtabBtn && !mapSubtabBtn.classList.contains('active')) mapSubtabBtn.click();
+            openHabaRide();
         });
         document.getElementById('btn-contact-card-disappearing').addEventListener('click', () => {
             contactCardSheet.classList.remove('active');

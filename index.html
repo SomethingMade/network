@@ -2439,6 +2439,24 @@
         .payout-status-pill.pending { background: rgba(255, 159, 10, 0.14); color: #B26B00; }
         .payout-status-pill.approved, .payout-status-pill.paid { background: rgba(52, 199, 89, 0.14); color: #1F8A3B; }
         .payout-status-pill.rejected { background: rgba(255, 69, 58, 0.12); color: var(--danger-red); }
+
+        /* ── Haba Ride history sheet (opened from the clock button on the Haba Ride map) ── */
+        .payout-status-pill.completed { background: rgba(52, 199, 89, 0.14); color: #1F8A3B; }
+        .payout-status-pill.cancelled { background: rgba(255, 69, 58, 0.12); color: var(--danger-red); }
+        .payout-status-pill.active { background: rgba(255, 159, 10, 0.14); color: #B26B00; }
+        .payout-status-pill.expired { background: var(--bg-alt); color: var(--text-secondary); }
+        .ride-history-item { padding: 14px 0; border-bottom: 1px solid var(--border-color); }
+        .ride-history-item:last-child { border-bottom: none; }
+        .ride-history-top { display: flex; align-items: flex-start; gap: 12px; }
+        .ride-history-icon { width: 42px; height: 42px; border-radius: 12px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; overflow: hidden; }
+        .ride-history-main { flex: 1; min-width: 0; }
+        .ride-history-title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ride-history-date { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .ride-history-main .payout-status-pill { display: inline-block; margin-top: 7px; }
+        .ride-history-price { font-size: 14.5px; font-weight: 700; color: var(--text-primary); flex-shrink: 0; padding-top: 1px; }
+        .ride-history-price.muted { color: var(--text-secondary); font-weight: 600; text-decoration: line-through; }
+        .ride-history-route { margin: 12px 0 0 4px; }
+        .ride-history-meta { font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 4px; }
         .setting-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-color); gap: 12px; }
         .setting-item:last-child { border-bottom: none; }
         .setting-item span { font-size: 15px; font-weight: 500; color: var(--text-primary); }
@@ -3214,7 +3232,7 @@
            does, so the map canvas itself gets a true "full mapview" rather than a small embed.
            When active, #tab-groups also gets .map-fullview, which hides .chat-header-area
            entirely (header row + Home/Explore subtabs + category chips) so the map owns
-           the whole screen — the map's own top bar below carries a back button and the profile
+           the whole screen — the map's own top bar below carries the ride-history button and the profile
            avatar that would otherwise have lived in that now-hidden header. */
         #tab-groups.map-fullview .chat-header-area { display: none; }
         #communities-map-view { flex: 1; display: none; flex-direction: column; min-height: 0; position: relative; overflow: hidden; }
@@ -3230,8 +3248,8 @@
         .haba-search-dot { position: absolute; left: 14px; top: 11px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
         .haba-search-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%; }
         .haba-search-dot.pickup::before { background: var(--text-primary); }
-        #btn-map-exit-fullview, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
-        #btn-map-exit-fullview:active, #btn-map-use-location:active { transform: scale(0.94); }
+        #btn-ride-history, #btn-map-use-location { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
+        #btn-ride-history:active, #btn-map-use-location:active { transform: scale(0.94); }
         .map-search-bar .profile-btn.header-profile-btn { width: 40px; height: 40px; flex-shrink: 0; margin: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
         #communities-map-canvas { position: absolute; inset: 0; z-index: 1; background: #F1F1F1; }
         /* Uber-style pickup / drop-off markers with pop-up tags on the Haba Ride map */
@@ -7422,6 +7440,22 @@
         </div>
     </div>
 
+    <!-- Haba Ride history (opened from the clock button in the Haba Ride map's top bar, see
+         openRideHistorySheet): this rider's own ride_requests, newest first. -->
+    <div id="ride-history-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet notif-page-sheet">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px; padding-left:8px;">Ride history</h3>
+                <svg id="btn-close-ride-history-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 4px 20px 24px;">
+                <div id="ride-history-list"></div>
+                <div id="ride-history-empty" class="notif-empty-state" style="display:none;">No rides yet — your trips will show up here.</div>
+                <div id="ride-history-error" class="notif-empty-state" style="display:none;">Couldn't load your ride history. Please try again.</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Auto Welcome Message editor (Settings ▸ Business ▸ Auto Welcome Message, business
          accounts only — see open-business-welcome-row / refreshBusinessWelcomeSettingsRow).
          Saves users/$uid/businessAutoReply = { enabled, message }, read by
@@ -8615,8 +8649,8 @@
                         <div id="communities-map-canvas"></div>
                         <div class="map-top-overlay">
                             <div class="map-search-bar">
-                                <div id="btn-map-exit-fullview" title="Back">
-                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+                                <div id="btn-ride-history" role="button" tabindex="0" title="Ride history" aria-label="Ride history">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
                                 </div>
                                 <div class="map-search-inputs">
                                     <div class="search-box haba-pickup-search-box" style="margin-bottom:0;">
@@ -25311,7 +25345,7 @@
 
         // keepRideState: true when the map is only being tucked away because the person
         // navigated to another tab (so an in-progress ride/request isn't wiped); false on an
-        // explicit exit via the map's own back arrow.
+        // explicit exit (closeHabaRide).
         function hideCommunitiesMapSubtab(keepRideState) {
             document.getElementById('communities-map-view').classList.remove('active');
             document.getElementById('tab-groups').classList.remove('map-fullview');
@@ -25331,12 +25365,14 @@
             const mapView = document.getElementById('communities-map-view');
             if (mapView.classList.contains('active')) return;
             const current = window.location.hash.replace('#', '') || 'tab-status';
-            // Where the back arrow should return to: the tab we came from. If we came from
-            // inside a chat (hash '#chat' etc., not a real tab), go back to the chats tab.
+            // The tab we came from (used by closeHabaRide). If we came from inside a chat
+            // (hash '#chat' etc., not a real tab), that's the chats tab.
             habaRideReturnTab = TAB_ORDER.includes(current) ? current : 'tab-chats';
             goToTab('tab-groups');
             showCommunitiesMapSubtab();
         }
+        // Not currently wired to a button (the map's top-left button is now Ride history) — Haba Ride is
+        // left via the bottom nav / device back, which tuck the map away in handleHashChange.
         function closeHabaRide() {
             hideCommunitiesMapSubtab(false);
             if (habaRideReturnTab && habaRideReturnTab !== 'tab-groups') goToTab(habaRideReturnTab);
@@ -25881,6 +25917,136 @@
             }
         }
 
+        // ── Ride history ─────────────────────────────────────────────────────────────
+        // The clock button in the Haba Ride map's top bar opens this: the signed-in rider's own
+        // ride_requests (queried by riderUid — that field needs an .indexOn in the database rules,
+        // same as withdrawal_requests/uid), newest first. It doesn't need the map, so it's wired up
+        // here rather than inside initCommunitiesMap and still works if the map fails to load.
+        const RIDE_HISTORY_LIMIT = 50;
+        const rideHistoryDriverNames = {};
+
+        function rideHistoryStatus(req, id) {
+            const s = req.status;
+            if (s === 'completed') return { label: 'Completed', cls: 'completed' };
+            if (s === 'cancelled') {
+                if (req.cancelReason === 'timeout') return { label: 'No driver found', cls: 'expired' };
+                return { label: req.cancelledBy === 'driver' ? 'Driver cancelled' : 'Cancelled', cls: 'cancelled' };
+            }
+            if (s === 'accepted' || s === 'arriving' || s === 'in_progress') return { label: habaRideStatusLabel(s).replace('Driver is ', 'Driver '), cls: 'active' };
+            // Still 'requested': live only if it's the search happening right now; otherwise the
+            // app was closed before the search timed out, so it's just a stale request.
+            if (s === 'requested' && id === habaCurrentRideRequestId) return { label: 'Finding driver', cls: 'active' };
+            return { label: 'Expired', cls: 'expired' };
+        }
+
+        function renderRideHistory(entries) {
+            const listEl = document.getElementById('ride-history-list');
+            const emptyEl = document.getElementById('ride-history-empty');
+            document.getElementById('ride-history-error').style.display = 'none';
+            if (!entries.length) {
+                listEl.innerHTML = '';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+            listEl.innerHTML = entries.map(req => {
+                const t = HABA_RIDE_TYPES[req.rideType];
+                const title = t ? (t.womenOnly ? t.label : `Haba ${t.label}`) : 'Haba Ride';
+                const st = rideHistoryStatus(req, req.id);
+                const when = typeof req.createdAt === 'number' ? new Date(req.createdAt) : null;
+                const sameYear = when && when.getFullYear() === new Date().getFullYear();
+                const dateLabel = when
+                    ? `${when.toLocaleDateString(undefined, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' })} · ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+                    : '';
+                const price = typeof req.price === 'number' ? `R${req.price.toFixed(2)}` : '';
+                const pickup = escapeHtmlForPost((req.pickup && req.pickup.label) || 'Pickup');
+                const dropoff = escapeHtmlForPost((req.dropoff && req.dropoff.label) || 'Drop-off');
+                const metaBits = [];
+                if (typeof req.distanceKm === 'number') metaBits.push(`${req.distanceKm.toFixed(1)} km`);
+                if (typeof req.durationMin === 'number') metaBits.push(`${Math.round(req.durationMin)} min`);
+                const driverSpan = (req.status === 'completed' && req.driverId)
+                    ? `<span class="ride-history-driver" data-driver-id="${escapeHtmlForPost(req.driverId)}"></span>` : '';
+                return `
+                    <div class="ride-history-item">
+                        <div class="ride-history-top">
+                            <div class="ride-history-icon">${t ? t.icon : ''}</div>
+                            <div class="ride-history-main">
+                                <div class="ride-history-title">${escapeHtmlForPost(title)}</div>
+                                <div class="ride-history-date">${escapeHtmlForPost(dateLabel)}</div>
+                                <span class="payout-status-pill ${st.cls}">${escapeHtmlForPost(st.label)}</span>
+                            </div>
+                            ${price ? `<div class="ride-history-price${req.status === 'completed' ? '' : ' muted'}">${price}</div>` : ''}
+                        </div>
+                        <div class="hrs-route ride-history-route">
+                            <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value">${pickup}</div></div>
+                            <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value">${dropoff}</div></div>
+                        </div>
+                        ${(metaBits.length || driverSpan) ? `<div class="ride-history-meta">${metaBits.join(' · ')}${metaBits.length && driverSpan ? ' · ' : ''}${driverSpan}</div>` : ''}
+                    </div>`;
+            }).join('');
+            fillRideHistoryDriverNames();
+        }
+
+        // Driver names live in driver_profiles/{uid}; fetched once per driver (best effort) and
+        // dropped into the completed rides after the list has already rendered.
+        async function fillRideHistoryDriverNames() {
+            const spans = Array.from(document.querySelectorAll('#ride-history-list .ride-history-driver'));
+            const ids = [...new Set(spans.map(sp => sp.dataset.driverId))].filter(id => !(id in rideHistoryDriverNames));
+            await Promise.all(ids.map(async (id) => {
+                try {
+                    const snap = await get(ref(database, `driver_profiles/${id}`));
+                    rideHistoryDriverNames[id] = (snap.exists() && snap.val().name) || '';
+                } catch (err) { rideHistoryDriverNames[id] = ''; }
+            }));
+            spans.forEach(sp => {
+                const name = rideHistoryDriverNames[sp.dataset.driverId];
+                if (name) sp.textContent = `with ${name}`;
+            });
+        }
+
+        let rideHistoryLoadToken = 0;
+        async function openRideHistorySheet() {
+            const user = auth.currentUser;
+            if (!user) { notify('Sign in to see your ride history.', 'error'); return; }
+            triggerHaptic(10);
+            const overlay = document.getElementById('ride-history-sheet-overlay');
+            const listEl = document.getElementById('ride-history-list');
+            const emptyEl = document.getElementById('ride-history-empty');
+            const errorEl = document.getElementById('ride-history-error');
+            overlay.classList.add('active');
+            emptyEl.style.display = 'none';
+            errorEl.style.display = 'none';
+            if (!listEl.children.length) listEl.innerHTML = '<div class="notif-empty-state">Loading…</div>';
+            const token = ++rideHistoryLoadToken;
+            try {
+                const snap = await get(query(ref(database, 'ride_requests'), orderByChild('riderUid'), equalTo(user.uid), limitToLast(RIDE_HISTORY_LIMIT)));
+                if (token !== rideHistoryLoadToken) return; // a newer open superseded this one
+                const entries = Object.entries(snap.val() || {})
+                    .map(([id, req]) => ({ id, ...req }))
+                    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                renderRideHistory(entries);
+            } catch (err) {
+                console.error('[haba-ride] failed to load ride history', err);
+                if (token !== rideHistoryLoadToken) return;
+                listEl.innerHTML = '';
+                errorEl.style.display = 'block';
+            }
+        }
+        function closeRideHistorySheet() {
+            document.getElementById('ride-history-sheet-overlay').classList.remove('active');
+        }
+        (() => {
+            const btn = document.getElementById('btn-ride-history');
+            btn.addEventListener('click', openRideHistorySheet);
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRideHistorySheet(); }
+            });
+            document.getElementById('btn-close-ride-history-sheet').addEventListener('click', closeRideHistorySheet);
+            document.getElementById('ride-history-sheet-overlay').addEventListener('click', (e) => {
+                if (e.target.id === 'ride-history-sheet-overlay') closeRideHistorySheet();
+            });
+        })();
+
         // Light, muted basemap (white roads, soft grey land, pale green parks) — Uber-style.
         const HABA_RIDE_MAP_STYLE = [
             { elementType: 'geometry', stylers: [{ color: '#F1F1F1' }] },
@@ -26134,11 +26300,6 @@
                 document.getElementById('btn-map-use-location').addEventListener('click', () => {
                     triggerHaptic(10);
                     centerMapOnUserLocation(true);
-                });
-
-                document.getElementById('btn-map-exit-fullview').addEventListener('click', () => {
-                    triggerHaptic(10);
-                    closeHabaRide();
                 });
 
                 document.getElementById('haba-ride-type-picker').addEventListener('click', (e) => {

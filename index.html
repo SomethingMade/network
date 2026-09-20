@@ -4387,6 +4387,7 @@
         .image-viewer-dots .dot.active { background: #fff; width: 14px; border-radius: 3px; }
         .image-viewer-post-actions { display: flex; align-items: center; gap: 8px; background: transparent; }
         .image-viewer-post-actions .image-viewer-post-action-btn { flex: 1; justify-content: center; }
+        .image-viewer-post-actions #image-viewer-bookmark-btn { flex: 0 0 auto; }
         /* Bottom stack (caption + views, gallery dots, glass action pills) floats over the photo on a
            soft scrim — same treatment as the video viewer — instead of a separate black bar. */
         #image-viewer-bottom { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; padding: 56px 14px calc(12px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0)); transition: opacity 0.2s ease; pointer-events: none; }
@@ -9799,6 +9800,9 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <span id="image-viewer-repost-count">0</span>
             </button>
+            <button type="button" class="image-viewer-post-action-btn" id="image-viewer-bookmark-btn" title="Save" aria-label="Save to bookmarks">
+                <svg id="image-viewer-bookmark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            </button>
         </div>
         </div>
     </div>
@@ -10618,9 +10622,20 @@
             document.getElementById('image-viewer-comment-count').textContent = post.commentCount || 0;
             document.getElementById('image-viewer-repost-btn').classList.toggle('reposted', repostedByMe);
             document.getElementById('image-viewer-repost-count').textContent = formatFeedCount(post.repostCount || 0);
+            syncImageViewerBookmark();
             const viewCount = post.impressionCount || 0;
             document.getElementById('image-viewer-view-count').textContent = `${formatFeedCount(viewCount)} ${viewCount === 1 ? 'view' : 'views'}`;
             syncImageViewerCaption(post);
+        }
+        // Bookmark state for the photo viewer's save button — follows the private saved_posts list
+        // (cachedSavedPosts), same as the feed cards' bookmark icon. Also called from that listener.
+        function syncImageViewerBookmark() {
+            const btn = document.getElementById('image-viewer-bookmark-btn');
+            if (!btn) return;
+            const saved = !!(currentViewerPostId && cachedSavedPosts && cachedSavedPosts[currentViewerPostId]);
+            btn.classList.toggle('saved', saved);
+            const icon = document.getElementById('image-viewer-bookmark-icon');
+            if (icon) icon.setAttribute('fill', saved ? 'currentColor' : 'none');
         }
         // Caption under the photo: clamps to two lines with a "more" toggle (linkified like feed
         // captions). syncImageViewerPostBar re-runs on every live count change, so only rebuild it
@@ -10673,6 +10688,9 @@
         document.getElementById('image-viewer-repost-btn').addEventListener('click', (e) => {
             if (!currentViewerPostId) return;
             onRepostButtonTap(currentViewerPostId, e.currentTarget);
+        });
+        document.getElementById('image-viewer-bookmark-btn').addEventListener('click', () => {
+            if (currentViewerPostId) { triggerHaptic(15); toggleSavePost(currentViewerPostId); }
         });
         document.getElementById('image-viewer-post-menu-btn').addEventListener('click', () => {
             if (!currentViewerPostId) return;
@@ -16354,6 +16372,7 @@
                     if (postId) btn.classList.toggle('saved', !!cachedSavedPosts[postId]);
                 });
                 syncReelSaveButtons();
+                syncImageViewerBookmark();
                 const savedList = document.getElementById('my-profile-saved-list');
                 if (savedList && savedList.style.display !== 'none') buildProfileSavedList(savedList);
             });

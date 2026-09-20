@@ -11040,7 +11040,7 @@
             if (!currentViewerVideoUrl) return;
             const startTime = vid.currentTime;
             const musicUrl = musicAudio.src || null;
-            openFloatingVideoPlayer(currentViewerVideoUrl, { musicUrl, startTime });
+            openFloatingVideoPlayer(currentViewerVideoUrl, { musicUrl, startTime, muted: vid.muted });
             history.back();
         });
         document.getElementById('video-viewer-overlay').addEventListener('click', (e) => {
@@ -11080,6 +11080,26 @@
                 if (musicAudio) musicAudio.muted = reelSoundMuted;
             });
             track.querySelectorAll('.reel-item-mute-btn').forEach(btn => btn.classList.toggle('is-muted', reelSoundMuted));
+        }
+
+        // Restores sound after a blocked-autoplay fallback (see activateReelItem): the first user
+        // gesture turns it back on, since unmuting is allowed once the person has interacted. A tap
+        // on the mute button itself is left to its own handler, which already toggles the state.
+        let reelSoundRestoreArmed = false;
+        function armReelSoundRestore() {
+            if (reelSoundRestoreArmed) return;
+            reelSoundRestoreArmed = true;
+            const events = ['pointerup', 'touchend', 'click', 'keydown'];
+            const restore = (e) => {
+                events.forEach(evt => document.removeEventListener(evt, restore, true));
+                reelSoundRestoreArmed = false;
+                if (e.target && e.target.closest && e.target.closest('.reel-item-mute-btn')) return;
+                const overlay = document.getElementById('reel-viewer-overlay');
+                if (!overlay || !overlay.classList.contains('active') || !reelSoundMuted) return;
+                reelSoundMuted = false;
+                applyReelMuteState();
+            };
+            events.forEach(evt => document.addEventListener(evt, restore, true));
         }
 
         // The top bar + mute button fade out ~3s into playback so the video is uncluttered, and come
@@ -11380,10 +11400,13 @@
             const activeMusicAudio = itemEl.querySelector('.reel-item-music-audio');
             if (activeMusicAudio) activeMusicAudio.muted = reelSoundMuted;
             video.play().catch(() => {
-                // Browser refused autoplay with sound — fall back to muted, and show that state on the button.
+                // Browser refused autoplay with sound (typically iOS Safari, since this runs outside
+                // the tap that opened the viewer). Start muted so the video still plays, show that on
+                // the button, and switch sound back on at the very next tap / swipe / key press.
                 video.muted = true;
                 reelSoundMuted = true;
                 applyReelMuteState();
+                armReelSoundRestore();
                 video.play().catch(() => {});
             });
 
@@ -11532,6 +11555,9 @@
             const startPost = cachedPosts[startPostId];
             if (!startPost || !startPost.videoUrl) return;
             pauseAllAppMedia();
+            // Sound is on by default every time the viewer opens; a mute from an earlier viewing
+            // (or from a blocked-autoplay fallback) shouldn't carry over into this one.
+            reelSoundMuted = false;
 
             reelPostIds = [startPostId, ...getShuffledVideoPostIds([startPostId])];
             reelActiveIndex = -1;
@@ -11646,7 +11672,9 @@
 
             floatingVideoState = { videoUrl, musicUrl: opts.musicUrl || null, sourceVideo: opts.sourceVideo || null };
             floatingVideoEl.src = videoUrl;
-            floatingVideoEl.muted = feedVideoMuted;
+            // Popped out of the video viewer, it keeps that viewer's sound state (unmuted by default);
+            // popped out of a feed post, it follows the feed's own mute setting.
+            floatingVideoEl.muted = (typeof opts.muted === 'boolean') ? opts.muted : feedVideoMuted;
             floatingVideoEl.currentTime = opts.startTime || 0;
             floatingVideoEl.play().catch(() => {});
             updateFloatingMuteUI();

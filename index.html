@@ -25440,8 +25440,10 @@
         function habaRidePrice(typeId, distanceKm) {
             const t = HABA_RIDE_TYPES[typeId];
             const price = (t.baseFare + t.perKm * Math.max(distanceKm, 1)) * habaRideSurgeMultiplier();
-            return Math.round(price * 2) / 2; // round to nearest 50 cents, feels more like a real fare
+            return Math.round(price); // whole rand — fares are shown (and sent to drivers) with no cents
         }
+        // "R88" — ride prices are always displayed as whole rand, never with decimals.
+        function habaFormatPrice(amount) { return 'R' + Math.round(Number(amount) || 0); }
 
         function habaRideArrivalMin(typeId) {
             const drivers = (communitiesMapState.nearbyDrivers && communitiesMapState.nearbyDrivers[typeId]) || [];
@@ -25549,14 +25551,14 @@
             }
             const priceEl = document.getElementById('haba-ride-hero-price');
             if (habaRideRoute) {
-                priceEl.textContent = `R${habaRidePrice(typeId, habaRideRoute.distanceKm).toFixed(2)}`;
+                priceEl.textContent = habaFormatPrice(habaRidePrice(typeId, habaRideRoute.distanceKm));
             } else {
-                priceEl.textContent = `From R${(t.baseFare * habaRideSurgeMultiplier()).toFixed(2)}`;
+                priceEl.textContent = `From ${habaFormatPrice(t.baseFare * habaRideSurgeMultiplier())}`;
             }
             const womandriveT = HABA_RIDE_TYPES.womandrive;
             document.getElementById('haba-womandrive-price').textContent = habaRideRoute
-                ? `R${habaRidePrice('womandrive', habaRideRoute.distanceKm).toFixed(2)}`
-                : `From R${(womandriveT.baseFare * habaRideSurgeMultiplier()).toFixed(2)}`;
+                ? habaFormatPrice(habaRidePrice('womandrive', habaRideRoute.distanceKm))
+                : `From ${habaFormatPrice(womandriveT.baseFare * habaRideSurgeMultiplier())}`;
         }
 
         function showHabaRideStep(step) {
@@ -25797,7 +25799,7 @@
                         <div class="haba-ride-option-meta">${metaText}</div>
                         <div class="haba-ride-option-tag">${t.sub}</div>
                     </div>
-                    <div class="haba-ride-option-price">R${price.toFixed(2)}</div>
+                    <div class="haba-ride-option-price">${habaFormatPrice(price)}</div>
                 </div>`;
             }).join('');
             list.querySelectorAll('.haba-ride-option-card').forEach(card => {
@@ -25830,7 +25832,7 @@
             document.getElementById('haba-ride-confirm-title').textContent = t.label;
             document.getElementById('haba-ride-confirm-sub').textContent = t.sub;
             document.getElementById('haba-ride-confirm-eta').textContent = `${tripMin} min`;
-            document.getElementById('haba-ride-confirm-price').textContent = `R${price.toFixed(2)}`;
+            document.getElementById('haba-ride-confirm-price').textContent = habaFormatPrice(price);
             const arrival = habaRideArrivalMin(typeId);
             setHabaRidePickupMinutes(arrival);
             document.getElementById('haba-ride-confirm-arrival').textContent = arrival === null ? 'N/A' : `${arrival} min`;
@@ -25958,7 +25960,7 @@
                 const dateLabel = when
                     ? `${when.toLocaleDateString(undefined, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' })} · ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
                     : '';
-                const price = typeof req.price === 'number' ? `R${req.price.toFixed(2)}` : '';
+                const price = typeof req.price === 'number' ? habaFormatPrice(req.price) : '';
                 const pickup = escapeHtmlForPost((req.pickup && req.pickup.label) || 'Pickup');
                 const dropoff = escapeHtmlForPost((req.dropoff && req.dropoff.label) || 'Drop-off');
                 const metaBits = [];

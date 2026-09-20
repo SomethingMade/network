@@ -2088,6 +2088,11 @@
         .feed-post-video-wrap.controls-hidden .feed-video-controls,
         .feed-post-video-wrap.controls-hidden .feed-video-popout-btn { opacity: 0; pointer-events: none; }
         .feed-post-video-wrap.controls-hidden .feed-video-controls { transform: translateY(6px); }
+        /* Home feed videos have no bottom control bar (play/pause, seek, time, mute) — just the
+           video with its center play button, expand and pop-out buttons. Tapping the video opens
+           the full viewer, which has the sound and seek controls. Post view / DM / community
+           videos keep their bar. */
+        #feed-posts-list .feed-video-controls { display: none; }
 
         .feed-post-reactors { display: flex; align-items: center; gap: 6px; margin-top: 8px; margin-left: 60px; }
         .feed-post-reactors-avatars { display: flex; }
@@ -18219,7 +18224,9 @@
             video.addEventListener('pause', keepControlsVisible);
             video.addEventListener('ended', keepControlsVisible);
             wrap.addEventListener('pointerdown', () => {
-                tapGateActive = wrap.classList.contains('controls-hidden');
+                // The "first tap only reveals the controls" gate only makes sense while the control bar
+                // is actually on screen; on feed videos where it's hidden, a tap should just open the video.
+                tapGateActive = !!track.offsetParent && wrap.classList.contains('controls-hidden');
                 clearTimeout(tapGateTimer);
                 if (tapGateActive) tapGateTimer = setTimeout(() => { tapGateActive = false; }, 700);
                 showControls();

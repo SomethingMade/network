@@ -3354,6 +3354,19 @@
         .haba-ride-stat-label { font-size: 11.5px; color: var(--text-secondary); text-align: center; margin-top: 2px; }
         #btn-haba-ride-request:disabled { opacity: 0.6; }
 
+        /* ── PAYMENT: Cash/Card picker on the confirm panel, payment line on the trip panel,
+           and the "pay for your trip" panel shown after a card trip completes. Deliberately not
+           a .segmented-control so the global swipe-to-switch-subtab gesture leaves it alone. ── */
+        .hrs-pay { margin: 2px 0 4px; }
+        .hrs-pay-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        .hrs-pay-picker { display: flex; padding: 3px; border-radius: 10px; background: var(--bg-alt); }
+        .hrs-pay-picker button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; border: none; background: transparent; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 700; color: var(--text-secondary); cursor: pointer; transition: background 0.15s, color 0.15s; }
+        .hrs-pay-picker button.active { background: var(--text-primary); color: var(--bg-surface); }
+        .hrs-pay-hint { font-size: 12.5px; color: var(--text-secondary); margin: 8px 2px 0; line-height: 1.4; }
+        .hrs-pay-line { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 6px 0 2px; }
+        .hrs-paydue-amount { font-size: 36px; font-weight: 800; color: var(--text-primary); margin: 0 0 8px; letter-spacing: -0.5px; }
+        .ride-history-pay { margin-top: 10px; padding: 11px; font-size: 14px; }
+
         /* ── SEARCHING panel: request written to ride_requests/{id}, waiting for a driver
            (from the not-yet-built drivers app) to accept it. ── */
         .hrs-progress { position: relative; height: 4px; overflow: hidden; background: var(--bg-alt); margin: -8px -18px 16px; }
@@ -8740,6 +8753,14 @@
                                     <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-confirm-pickup-value">Your location</div></div>
                                     <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-confirm-dest">--</div></div>
                                 </div>
+                                <div class="hrs-pay">
+                                    <div class="hrs-pay-label">Pay with</div>
+                                    <div class="hrs-pay-picker" id="haba-ride-pay-picker" role="radiogroup" aria-label="Payment method">
+                                        <button type="button" data-pay-method="cash" class="active" role="radio" aria-checked="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 12h.01M18 12h.01"></path></svg>Cash</button>
+                                        <button type="button" data-pay-method="card" role="radio" aria-checked="false"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></svg>Card</button>
+                                    </div>
+                                    <div class="hrs-pay-hint" id="haba-ride-pay-hint">Pay your driver in cash at the end of the trip.</div>
+                                </div>
                                 <button type="button" class="hrs-cta" id="btn-haba-ride-request">Request Haba Car</button>
                             </div>
 
@@ -8774,7 +8795,23 @@
                                     <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-trip-pickup-value">Your location</div></div>
                                     <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-trip-dest-value">--</div></div>
                                 </div>
+                                <div class="hrs-pay-line" id="haba-ride-trip-payment"></div>
                                 <button type="button" class="hrs-btn-secondary" id="btn-haba-ride-cancel-trip">Cancel trip</button>
+                            </div>
+
+                            <!-- PAY: a card trip has completed (or an earlier one is still unpaid) — collects the
+                                 fare through Paystack Inline, then marks ride_requests/{id} paymentStatus:'paid'. -->
+                            <div id="haba-ride-pay-panel" style="display:none;">
+                                <div class="haba-ride-searching-title">Trip complete</div>
+                                <div class="haba-ride-searching-sub" id="haba-ride-pay-sub">Pay for your ride</div>
+                                <div class="hrs-paydue-amount" id="haba-ride-pay-amount">R--</div>
+                                <div class="hrs-route">
+                                    <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-pay-pickup">--</div></div>
+                                    <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-pay-dropoff">--</div></div>
+                                </div>
+                                <button type="button" class="hrs-cta" id="btn-haba-ride-pay-now">Pay with card</button>
+                                <button type="button" class="hrs-btn-secondary" id="btn-haba-ride-pay-later">Pay later</button>
+                                <div class="hrs-pay-hint">Secure card payment by Paystack. An unpaid ride needs to be settled before you can book another.</div>
                             </div>
                         </div>
                     </div>
@@ -25370,6 +25407,7 @@
             habaRideReturnTab = TAB_ORDER.includes(current) ? current : 'tab-chats';
             goToTab('tab-groups');
             showCommunitiesMapSubtab();
+            checkHabaOutstandingPayment();
         }
         // Not currently wired to a button (the map's top-left button is now Ride history) — Haba Ride is
         // left via the bottom nav / device back, which tuck the map away in handleHashChange.
@@ -25413,6 +25451,13 @@
         let habaSelectedRideTypeId = null;
         let habaHomeSelectedType = 'car'; // which type the home panel hero/picker is currently showing (car/bike/scoot/womandrive)
         const habaDriverMarkers = [];
+        let habaRideCurrentStep = 'home';
+        // Payment method for the next ride — remembered between sessions.
+        const HABA_PAY_METHOD_KEY = 'habaRidePayMethod';
+        let habaRidePayMethod = 'cash';
+        try { const savedPay = localStorage.getItem(HABA_PAY_METHOD_KEY); if (savedPay === 'card' || savedPay === 'cash') habaRidePayMethod = savedPay; } catch (e) {}
+        let habaPayTarget = null; // the completed ride currently being paid for: { id, price, paidRef }
+        let habaPayInFlight = false;
 
         function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
@@ -25562,6 +25607,8 @@
         }
 
         function showHabaRideStep(step) {
+            habaRideCurrentStep = step;
+            document.getElementById('haba-ride-pay-panel').style.display = step === 'pay' ? '' : 'none';
             document.getElementById('haba-ride-home-panel').style.display = step === 'home' ? '' : 'none';
             document.getElementById('haba-ride-options-panel').style.display = step === 'options' ? '' : 'none';
             document.getElementById('haba-ride-confirm-panel').style.display = step === 'confirm' ? '' : 'none';
@@ -25590,6 +25637,146 @@
             updateHabaRideHomeStats(habaHomeSelectedType);
         }
 
+        // ── Ride payments ────────────────────────────────────────────────────────────
+        // Two ways to pay, chosen on the confirm panel:
+        //   Cash — nothing happens in-app; the driver collects the fare (paymentStatus:'cash').
+        //   Card — charged through Paystack Inline once the trip completes (paymentStatus:'pending'
+        //          → 'paid'). Charging after the trip means a cancelled/unanswered request never
+        //          needs a refund. If the rider dismisses the checkout they can pay later from Ride
+        //          history, but can't book another ride until it's settled.
+        // Same client-side trust model as the coin/verified-badge purchases: the popup's callback is
+        // trusted and the reference is stored, not verified against Paystack's API (needs a server).
+        function isHabaPaystackReady() {
+            return !!PAYSTACK_PUBLIC_KEY && !PAYSTACK_PUBLIC_KEY.includes('REPLACE_WITH_YOUR');
+        }
+
+        function renderHabaRidePayPicker() {
+            document.querySelectorAll('#haba-ride-pay-picker button').forEach(b => {
+                const on = b.dataset.payMethod === habaRidePayMethod;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+            document.getElementById('haba-ride-pay-hint').textContent = habaRidePayMethod === 'card'
+                ? "You'll pay by card when the trip ends."
+                : 'Pay your driver in cash at the end of the trip.';
+        }
+
+        function setHabaRidePayMethod(method) {
+            if (method !== 'cash' && method !== 'card') return;
+            if (method === 'card' && !isHabaPaystackReady()) {
+                notify("Card payments aren't available right now. Pay cash for this ride.", 'info');
+                return;
+            }
+            habaRidePayMethod = method;
+            try { localStorage.setItem(HABA_PAY_METHOD_KEY, method); } catch (e) {}
+            renderHabaRidePayPicker();
+        }
+
+        // Most recent completed card ride that was never paid for, or null.
+        async function findHabaUnpaidCardRide(uid) {
+            try {
+                const snap = await get(query(ref(database, 'ride_requests'), orderByChild('riderUid'), equalTo(uid), limitToLast(20)));
+                let found = null;
+                snap.forEach(child => {
+                    const r = child.val();
+                    if (r && r.status === 'completed' && r.paymentMethod === 'card' && r.paymentStatus !== 'paid') {
+                        if (!found || (r.createdAt || 0) > (found.createdAt || 0)) found = { id: child.key, ...r };
+                    }
+                });
+                return found;
+            } catch (err) {
+                console.error('[haba-ride] failed to check unpaid rides', err);
+                return null;
+            }
+        }
+
+        function showHabaRidePayPanel(requestId, request) {
+            const price = Number(request.price) || 0;
+            habaPayTarget = { id: requestId, price, paidRef: null };
+            const dropoff = (request.dropoff && request.dropoff.label) || '--';
+            document.getElementById('haba-ride-pay-amount').textContent = habaFormatPrice(price);
+            document.getElementById('haba-ride-pay-sub').textContent = `Your ride to ${dropoff}`;
+            document.getElementById('haba-ride-pay-pickup').textContent = (request.pickup && request.pickup.label) || 'Your location';
+            document.getElementById('haba-ride-pay-dropoff').textContent = dropoff;
+            const btn = document.getElementById('btn-haba-ride-pay-now');
+            btn.disabled = false;
+            btn.textContent = `Pay ${habaFormatPrice(price)} with card`;
+            showHabaRideStep('pay');
+        }
+
+        // Runs when the rider reopens Haba Ride: a card trip that finished while the app was closed
+        // (or a checkout that was dismissed) puts the pay panel back up.
+        async function checkHabaOutstandingPayment() {
+            const user = auth.currentUser;
+            if (!user || habaCurrentRideRequestId || habaPayInFlight) return;
+            const unpaid = await findHabaUnpaidCardRide(user.uid);
+            if (!unpaid) return;
+            if (habaCurrentRideRequestId || habaRideCurrentStep !== 'home') return; // rider already moved on
+            showHabaRidePayPanel(unpaid.id, unpaid);
+        }
+
+        async function recordHabaRidePayment(target, reference) {
+            await update(ref(database, `ride_requests/${target.id}`), {
+                paymentStatus: 'paid',
+                paymentRef: reference,
+                paidAmount: target.price,
+                paidAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            notify('Payment received. Thanks for riding with Haba!', 'success');
+            habaPayTarget = null;
+            resetHabaRideFlow();
+        }
+
+        function payHabaRideWithCard() {
+            const target = habaPayTarget;
+            const user = auth.currentUser;
+            if (!target || !user || habaPayInFlight) return;
+            const btn = document.getElementById('btn-haba-ride-pay-now');
+            const idleLabel = () => `Pay ${habaFormatPrice(target.price)} with card`;
+            const settle = () => { habaPayInFlight = false; btn.disabled = false; btn.textContent = target.paidRef ? 'Confirm payment' : idleLabel(); };
+
+            // Card was already charged but saving the result failed last time — retry the save,
+            // never charge twice.
+            if (target.paidRef) {
+                habaPayInFlight = true; btn.disabled = true; btn.textContent = 'Confirming…';
+                recordHabaRidePayment(target, target.paidRef)
+                    .catch(err => { console.error('[haba-ride] payment record retry failed', err); notify("Still couldn't confirm your payment. Try again in a moment.", 'error'); })
+                    .finally(settle);
+                return;
+            }
+            if (!isHabaPaystackReady()) { notify("Card payments aren't available right now.", 'error'); return; }
+            if (typeof PaystackPop === 'undefined') { notify('Payment system failed to load. Check your connection and try again.', 'error'); return; }
+            if (!(target.price > 0)) { notify("Couldn't work out the fare for this ride. Contact support.", 'error'); return; }
+
+            habaPayInFlight = true; btn.disabled = true; btn.textContent = 'Opening…';
+            const handler = PaystackPop.setup({
+                key: PAYSTACK_PUBLIC_KEY,
+                email: user.email || `${user.uid}@haba.app`,
+                amount: Math.round(target.price * 100), // cents
+                currency: 'ZAR',
+                ref: `haba_ride_${target.id}_${Date.now()}`,
+                metadata: {
+                    uid: user.uid,
+                    product: 'ride_fare',
+                    requestId: target.id,
+                    custom_fields: [{ display_name: 'Product', variable_name: 'product', value: 'Haba Ride fare' }]
+                },
+                callback: (response) => {
+                    target.paidRef = response.reference;
+                    btn.textContent = 'Finishing up…';
+                    recordHabaRidePayment(target, response.reference)
+                        .catch(err => {
+                            console.error('[haba-ride] failed to record payment', err);
+                            notify("Your payment went through, but we couldn't save it yet. Tap Confirm payment to retry — you won't be charged again.", 'error');
+                        })
+                        .finally(settle);
+                },
+                onClose: () => { if (!target.paidRef) settle(); }
+            });
+            handler.openIframe();
+        }
+
         // ── Live ride-request lifecycle ──────────────────────────────────────────────
         // Schema written by this app / read from the (upcoming) drivers app:
         //   ride_requests/{requestId}: {
@@ -25597,7 +25784,10 @@
         //     pickup: {lat,lng,label}, dropoff: {lat,lng,label},
         //     distanceKm, durationMin, price,
         //     status: 'requested' | 'accepted' | 'arriving' | 'in_progress' | 'completed' | 'cancelled',
-        //     driverId, createdAt, updatedAt, cancelledBy, cancelReason
+        //     driverId, createdAt, updatedAt, cancelledBy, cancelReason,
+        //     paymentMethod: 'cash' | 'card',
+        //     paymentStatus: 'cash' (driver collects) | 'pending' (card, not yet paid) | 'paid',
+        //     paymentRef, paidAmount, paidAt   (written by the rider app once Paystack succeeds)
         //   }
         //   driver_profiles/{uid}: { name, photoURL, vehicleModel, vehicleColor, plate, rating }
         // The drivers app claims a request by setting status:'accepted' + driverId, then moves
@@ -25697,6 +25887,9 @@
             document.getElementById('haba-ride-trip-pickup-value').textContent = (request.pickup && request.pickup.label) || 'Your location';
             document.getElementById('haba-ride-trip-dest-value').textContent = (request.dropoff && request.dropoff.label) || '--';
             document.getElementById('btn-haba-ride-cancel-trip').style.display = request.status === 'in_progress' ? 'none' : '';
+            const tripPayEl = document.getElementById('haba-ride-trip-payment');
+            const tripAmt = typeof request.price === 'number' ? ` · ${habaFormatPrice(request.price)}` : '';
+            tripPayEl.textContent = request.paymentMethod === 'card' ? `Paying by card after the trip${tripAmt}` : `Paying cash to your driver${tripAmt}`;
             if (request.driverId && request.driverId !== habaMatchedDriverId) {
                 habaMatchedDriverId = request.driverId;
                 loadMatchedDriverProfile(request.driverId);
@@ -25718,8 +25911,15 @@
                 return;
             }
             if (request.status === 'completed') {
-                notify('Trip completed. Thanks for riding with Haba!', 'success');
+                const completedId = habaCurrentRideRequestId;
+                const needsPayment = request.paymentMethod === 'card' && request.paymentStatus !== 'paid';
                 finishHabaRideRequest();
+                if (needsPayment && completedId) {
+                    notify('Trip completed. Pay for your ride to finish up.', 'success');
+                    showHabaRidePayPanel(completedId, request);
+                } else {
+                    notify('Trip completed. Thanks for riding with Haba!', 'success');
+                }
                 return;
             }
             if (request.status === 'cancelled') {
@@ -25839,6 +26039,7 @@
             document.getElementById('haba-ride-confirm-seats').textContent = t.seats;
             document.getElementById('haba-ride-confirm-dest').textContent = habaRideRoute.destLabel;
             document.getElementById('btn-haba-ride-request').textContent = typeId === 'womandrive' ? 'Request Woman Drive Woman' : `Request Haba ${t.label}`;
+            renderHabaRidePayPicker();
             showHabaRideStep('confirm');
         }
 
@@ -25881,6 +26082,8 @@
                 distanceKm: habaRideRoute.distanceKm,
                 durationMin: habaRideRoute.durationMin,
                 price,
+                paymentMethod: habaRidePayMethod,
+                paymentStatus: habaRidePayMethod === 'card' ? 'pending' : 'cash',
                 status: 'requested',
                 driverId: null,
                 createdAt: serverTimestamp(),
@@ -25888,6 +26091,13 @@
             };
 
             try {
+                // A finished card ride that was never paid blocks new bookings until it's settled.
+                const unpaid = await findHabaUnpaidCardRide(user.uid);
+                if (unpaid) {
+                    notify('Please pay for your last ride before booking another.', 'error');
+                    showHabaRidePayPanel(unpaid.id, unpaid);
+                    return;
+                }
                 const newRequestRef = push(ref(database, 'ride_requests'));
                 await set(newRequestRef, requestData);
                 habaCurrentRideRequestId = newRequestRef.key;
@@ -25926,6 +26136,7 @@
         // here rather than inside initCommunitiesMap and still works if the map fails to load.
         const RIDE_HISTORY_LIMIT = 50;
         const rideHistoryDriverNames = {};
+        let rideHistoryEntries = [];
 
         function rideHistoryStatus(req, id) {
             const s = req.status;
@@ -25942,6 +26153,7 @@
         }
 
         function renderRideHistory(entries) {
+            rideHistoryEntries = entries;
             const listEl = document.getElementById('ride-history-list');
             const emptyEl = document.getElementById('ride-history-empty');
             document.getElementById('ride-history-error').style.display = 'none';
@@ -25966,6 +26178,8 @@
                 const metaBits = [];
                 if (typeof req.distanceKm === 'number') metaBits.push(`${req.distanceKm.toFixed(1)} km`);
                 if (typeof req.durationMin === 'number') metaBits.push(`${Math.round(req.durationMin)} min`);
+                const cardDue = req.status === 'completed' && req.paymentMethod === 'card' && req.paymentStatus !== 'paid';
+                if (req.status === 'completed') metaBits.push(req.paymentMethod === 'card' ? (cardDue ? 'Card payment due' : 'Paid by card') : 'Cash');
                 const driverSpan = (req.status === 'completed' && req.driverId)
                     ? `<span class="ride-history-driver" data-driver-id="${escapeHtmlForPost(req.driverId)}"></span>` : '';
                 return `
@@ -25984,6 +26198,7 @@
                             <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value">${dropoff}</div></div>
                         </div>
                         ${(metaBits.length || driverSpan) ? `<div class="ride-history-meta">${metaBits.join(' · ')}${metaBits.length && driverSpan ? ' · ' : ''}${driverSpan}</div>` : ''}
+                        ${cardDue ? `<button type="button" class="hrs-btn-secondary ride-history-pay" data-request-id="${escapeHtmlForPost(req.id)}">Pay ${habaFormatPrice(req.price)}</button>` : ''}
                     </div>`;
             }).join('');
             fillRideHistoryDriverNames();
@@ -26046,6 +26261,36 @@
             document.getElementById('btn-close-ride-history-sheet').addEventListener('click', closeRideHistorySheet);
             document.getElementById('ride-history-sheet-overlay').addEventListener('click', (e) => {
                 if (e.target.id === 'ride-history-sheet-overlay') closeRideHistorySheet();
+            });
+        })();
+
+        // Payment wiring — kept outside initCommunitiesMap so it works even if the map fails to load.
+        (() => {
+            renderHabaRidePayPicker();
+            document.getElementById('haba-ride-pay-picker').addEventListener('click', (e) => {
+                const b = e.target.closest('button[data-pay-method]');
+                if (!b) return;
+                triggerHaptic(8);
+                setHabaRidePayMethod(b.dataset.payMethod);
+            });
+            document.getElementById('btn-haba-ride-pay-now').addEventListener('click', () => { triggerHaptic(10); payHabaRideWithCard(); });
+            document.getElementById('btn-haba-ride-pay-later').addEventListener('click', () => {
+                if (habaPayInFlight) return;
+                triggerHaptic(8);
+                habaPayTarget = null;
+                resetHabaRideFlow();
+                notify("You can pay from Ride history. It needs to be settled before your next ride.", 'info');
+            });
+            // "Pay" buttons on unpaid card rides in Ride history.
+            document.getElementById('ride-history-list').addEventListener('click', (e) => {
+                const b = e.target.closest('.ride-history-pay');
+                if (!b) return;
+                const req = rideHistoryEntries.find(r => r.id === b.dataset.requestId);
+                if (!req) return;
+                if (habaCurrentRideRequestId) { notify('Finish your current ride first.', 'info'); return; }
+                triggerHaptic(10);
+                closeRideHistorySheet();
+                showHabaRidePayPanel(req.id, req);
             });
         })();
 

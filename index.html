@@ -4355,23 +4355,19 @@
         /* ── FULL IMAGE VIEWER (avatar preview) ── */
         #image-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
         #image-viewer-overlay.active { opacity: 1; visibility: visible; }
-        .image-viewer-media { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; align-items: flex-start; justify-content: center; -webkit-overflow-scrolling: touch; }
-        /* Width always spans edge-to-edge (matches WhatsApp/Instagram full-image view); height
-           follows the image's natural aspect ratio instead of being capped to the container, so a
-           tall/portrait photo (e.g. a screenshot) no longer gets shrunk-and-letterboxed with black
-           bars down the sides — it just scrolls vertically within .image-viewer-media instead.
-           margin:auto (rather than align-items:center on the container) is what actually centers
-           it vertically when it's shorter than the container: auto-margins on a flex item resolve
-           to equal top/bottom space when there's room, but drop to 0 once the image is taller than
-           the container, so the top of a tall image stays reachable by scrolling instead of being
-           clipped off-screen (a plain align-items:center would clip the overflow in most browsers).
-        */
-        #image-viewer-img { width: 100%; height: auto; display: block; margin: auto 0; }
+        /* The media layer now fills the whole overlay (top bar + bottom caption/actions float over it)
+           and the photo is shown with object-fit: contain, so it can be pinch/double-tap zoomed and
+           panned (see initImageViewerGestures) instead of scrolling — swipe down dismisses. */
+        .image-viewer-media { position: absolute; inset: 0; z-index: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        #image-viewer-img { width: 100%; height: 100%; object-fit: contain; display: block; transform-origin: 50% 50%; will-change: transform; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
+        #image-viewer-img.iv-animating { transition: transform 0.22s var(--ease-smooth); }
         .image-viewer-close { position: absolute; top: 20px; right: 20px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
         .image-viewer-close:hover { opacity: 0.75; }
-        .image-viewer-post-menu-btn { position: absolute; top: 20px; right: 68px; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border: none; border-radius: 50%; color: white; cursor: pointer; transition: 0.2s; z-index: 2; }
-        .image-viewer-post-menu-btn:hover { opacity: 0.75; }
-        .image-viewer-post-menu-btn svg { width: 100%; height: 100%; }
+        .media-viewer-icon-btn { flex-shrink: 0; background: none; border: none; color: #fff; padding: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; -webkit-tap-highlight-color: transparent; transition: background 0.15s ease; }
+        .media-viewer-icon-btn:active { background: rgba(255,255,255,0.14); }
+        .media-viewer-icon-btn svg { width: 22px; height: 22px; }
+
+
         .image-viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.45); border: none; color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 2; transition: background 0.15s ease; }
         .image-viewer-nav:hover { background: rgba(0,0,0,0.7); }
         .image-viewer-nav svg { width: 22px; height: 22px; }
@@ -4381,13 +4377,33 @@
         /* Below 768px, swipe replaces the arrow buttons as the nav gesture — hide arrows even
            when .visible is set, so they don't clutter the viewer on phones. */
         @media (max-width: 768px) { .image-viewer-nav.visible { display: none; } }
-        .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; }
+        .image-viewer-counter { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.45); color: #fff; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 50px; display: none; z-index: 2; transition: opacity 0.2s ease; }
+        /* Post images: the counter drops under the top bar, at the right, instead of colliding with it. */
+        #image-viewer-overlay.has-post-bar .image-viewer-counter { top: calc(env(safe-area-inset-top, 0px) + 66px); left: auto; right: 12px; transform: none; }
         .image-viewer-counter.visible { display: block; }
-        .image-viewer-dots { position: absolute; bottom: 14px; left: 0; right: 0; display: none; justify-content: center; align-items: center; gap: 6px; z-index: 2; pointer-events: none; }
+        .image-viewer-dots { position: relative; display: none; justify-content: center; align-items: center; gap: 6px; padding: 2px 0 10px; pointer-events: none; }
         .image-viewer-dots.visible { display: flex; }
         .image-viewer-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); transition: 0.2s ease; }
         .image-viewer-dots .dot.active { background: #fff; width: 14px; border-radius: 3px; }
-        .image-viewer-post-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: space-around; background: #000; padding: 12px 16px calc(12px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); border-top: 1px solid rgba(255,255,255,0.08); }
+        .image-viewer-post-actions { display: flex; align-items: center; gap: 8px; background: transparent; }
+        .image-viewer-post-actions .image-viewer-post-action-btn { flex: 1; justify-content: center; }
+        /* Bottom stack (caption + views, gallery dots, glass action pills) floats over the photo on a
+           soft scrim — same treatment as the video viewer — instead of a separate black bar. */
+        #image-viewer-bottom { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; padding: 56px 14px calc(12px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0)); transition: opacity 0.2s ease; pointer-events: none; }
+        #image-viewer-bottom > * { pointer-events: auto; }
+        #image-viewer-bottom > .image-viewer-dots { pointer-events: none; }
+        #image-viewer-overlay:not(.has-post-bar) #image-viewer-bottom { background: none; padding-top: 0; }
+        .image-viewer-caption-wrap { margin-bottom: 10px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .image-viewer-caption { font-size: 13.5px; font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+        .image-viewer-caption.expanded { display: block; max-height: 34vh; overflow-y: auto; }
+        .image-viewer-caption-more { background: none; border: none; padding: 3px 0 0; color: rgba(255,255,255,0.75); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .image-viewer-view-meta { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.72); }
+        /* Tap the photo (or zoom in) to hide the chrome for an uncluttered view. */
+        #image-viewer-overlay.iv-chrome-hidden #image-viewer-author-bar-wrap,
+        #image-viewer-overlay.iv-chrome-hidden #image-viewer-bottom,
+        #image-viewer-overlay.iv-chrome-hidden .image-viewer-counter,
+        #image-viewer-overlay.iv-chrome-hidden .image-viewer-close,
+        #image-viewer-overlay.iv-chrome-hidden .image-viewer-save { opacity: 0; pointer-events: none; }
         .image-viewer-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 12px; border-radius: 20px; transition: background 0.15s ease, color 0.15s ease; }
         .image-viewer-post-action-btn:hover { background: rgba(255,255,255,0.08); }
         .image-viewer-post-action-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
@@ -4500,8 +4516,8 @@
            (.media-viewer-author-bar) so a post's video view and image view read the same way.
            Lives inside each .reel-item (not a shared fixed bar) since every swiped-to item has
            a different author — see buildReelItemHtml / fillReelItemText / bindReelItem. */
-        .reel-item-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.25) 70%, transparent); padding-top: env(safe-area-inset-top, 0px); }
-        .reel-item-topbar-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 6px 2px; }
+        .reel-item-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.25) 70%, transparent); padding-top: env(safe-area-inset-top, 0px); transition: opacity 0.2s ease; }
+        .reel-item-topbar-row { display: flex; align-items: center; gap: 4px; padding: 8px 8px 12px 4px; }
         .reel-item-back-btn, .reel-item-menu-btn { background: none; border: none; color: #fff; padding: 8px; cursor: pointer; display: flex; align-items: center; }
         .reel-item-back-btn svg, .reel-item-menu-btn svg { width: 22px; height: 22px; }
         /* Shared "avatar · name+badge / @username · Follow" row — used both inside
@@ -4519,12 +4535,18 @@
         .media-viewer-follow-pill.is-busy { opacity: 0.6; pointer-events: none; }
         /* Positions the same author-bar row (used bare inside .reel-item-topbar above) as its
            own dark strip under the image viewer's existing floating close/menu icons. */
-        .media-viewer-author-bar-wrap { position: absolute; top: 56px; left: 0; right: 0; background: rgba(0,0,0,0.55); z-index: 1; }
+        .media-viewer-author-bar-wrap { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding-top: env(safe-area-inset-top, 0px); background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0.25) 70%, transparent); transition: opacity 0.2s ease; }
+        .media-viewer-topbar-row { display: flex; align-items: center; gap: 4px; padding: 8px 8px 12px 4px; }
+        /* One row for both viewers: back · author (avatar, name, badge, @username) · Follow · ⋯ */
+        .media-viewer-topbar-row .media-viewer-author-bar,
+        .reel-item-topbar-row .media-viewer-author-bar { flex: 1; min-width: 0; padding: 0; }
         .reel-item-info { position: absolute; left: 14px; right: 14px; bottom: calc(80px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); color: #fff; z-index: 2; }
         .reel-item-author { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; margin-bottom: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         .reel-item-author .avatar { width: 30px; height: 30px; font-size: 13px; }
-        .reel-item-caption { font-size: 13.5px; font-weight: 700; line-height: 1.35; opacity: 1; text-shadow: 0 1px 6px rgba(0,0,0,0.55); max-height: 4.1em; overflow: hidden; }
-        .reel-item-music { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; font-weight: 600; max-width: 100%; }
+        .reel-item-caption { font-size: 13.5px; font-weight: 700; line-height: 1.35; opacity: 1; text-shadow: 0 1px 6px rgba(0,0,0,0.55); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+        .reel-item-caption.expanded { display: block; max-height: 34vh; overflow-y: auto; }
+        .reel-item-caption-more { background: none; border: none; padding: 3px 0 0; color: rgba(255,255,255,0.75); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+        .reel-item-music { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; font-weight: 600; max-width: 100%; width: fit-content; background: rgba(255,255,255,0.16); border-radius: 50px; padding: 4px 11px; }
         .reel-item-music svg { width: 14px; height: 14px; flex-shrink: 0; }
         .reel-item-music span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
         /* X-style action row: one horizontal bar pinned along the bottom, icon+count pairs
@@ -4576,8 +4598,31 @@
         .reel-item-view-stat svg { width: 16px; height: 16px; flex-shrink: 0; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
         /* Thin TikTok/Reels-style playback progress line pinned to the very bottom edge of
            each video, replacing the removed top header as the viewer's only chrome. */
-        .reel-item-progress-track { position: absolute; left: 0; right: 0; bottom: calc(6px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); height: 3px; background: rgba(255,255,255,0.25); z-index: 3; }
+        .reel-item-progress-track { position: absolute; left: 0; right: 0; bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom)) - 5px); height: 24px; display: flex; align-items: center; z-index: 3; touch-action: none; cursor: pointer; }
+        .reel-item-progress-line { position: relative; width: 100%; height: 3px; background: rgba(255,255,255,0.25); transition: height 0.12s ease; }
+        .reel-item.scrubbing .reel-item-progress-line { height: 7px; }
+        .reel-item-progress-thumb { position: absolute; top: 50%; left: 0%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #fff; transform: scale(0); transition: transform 0.12s ease; pointer-events: none; }
+        .reel-item.scrubbing .reel-item-progress-thumb { transform: scale(1); }
         .reel-item-progress-fill { height: 100%; width: 0%; background: #0A84FF; }
+        /* Mute toggle, double-tap seek hints, 2x speed chip and scrub-time bubble (video viewer). */
+        .reel-item-mute-btn { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 66px); right: 12px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(0,0,0,0.45); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s ease; }
+        .reel-item-mute-btn svg { width: 18px; height: 18px; }
+        .reel-item-mute-btn .reel-icon-muted { display: none; }
+        .reel-item-mute-btn.is-muted .reel-icon-muted { display: block; }
+        .reel-item-mute-btn.is-muted .reel-icon-unmuted { display: none; }
+        .reel-item.chrome-hidden .reel-item-topbar, .reel-item.chrome-hidden .reel-item-mute-btn { opacity: 0; pointer-events: none; }
+        .reel-item-seek-hint { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; padding: 10px 16px; border-radius: 50px; background: rgba(0,0,0,0.45); color: #fff; font-size: 14px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+        .reel-item-seek-hint.seek-left { left: 18px; }
+        .reel-item-seek-hint.seek-right { right: 18px; }
+        .reel-item-seek-hint.visible { opacity: 1; }
+        .reel-item-speed-chip { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 72px); left: 50%; transform: translateX(-50%); z-index: 3; padding: 5px 12px; border-radius: 50px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12.5px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+        .reel-item.speeding .reel-item-speed-chip { opacity: 1; }
+        .reel-item-scrub-time { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; padding: 8px 18px; border-radius: 12px; background: rgba(0,0,0,0.55); color: #fff; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+        .reel-item.scrubbing .reel-item-scrub-time { opacity: 1; }
+        #reel-viewer-overlay.comments-shrink .reel-item-mute-btn,
+        #reel-viewer-overlay.comments-shrink .reel-item-seek-hint,
+        #reel-viewer-overlay.comments-shrink .reel-item-speed-chip,
+        #reel-viewer-overlay.comments-shrink .reel-item-scrub-time { display: none; }
 
         @keyframes statusShimmer { 0% { background-position: 150% 0; } 100% { background-position: -50% 0; } }
 
@@ -9482,21 +9527,6 @@
     </div>
 
     <div id="image-viewer-overlay">
-        <svg class="image-viewer-save" id="image-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        <button type="button" class="image-viewer-post-menu-btn" id="image-viewer-post-menu-btn" title="More" style="display:none;">
-            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
-        </button>
-        <div class="media-viewer-author-bar-wrap" id="image-viewer-author-bar-wrap" style="display:none;">
-            <div class="media-viewer-author-bar">
-                <div class="avatar media-viewer-author-avatar" id="image-viewer-author-avatar"></div>
-                <div class="media-viewer-author-info">
-                    <div class="media-viewer-author-name"><span id="image-viewer-author-name"></span><span id="image-viewer-author-badge"></span></div>
-                    <div class="media-viewer-author-username" id="image-viewer-author-username"></div>
-                </div>
-                <button type="button" class="media-viewer-follow-pill" id="image-viewer-follow-pill" style="display:none;">Follow</button>
-            </div>
-        </div>
         <div class="image-viewer-media" id="image-viewer-media">
             <img id="image-viewer-img" src="" alt="Full image">
             <button type="button" class="image-viewer-nav image-viewer-nav-prev" id="image-viewer-prev" aria-label="Previous image">
@@ -9506,8 +9536,34 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
             <div class="image-viewer-counter" id="image-viewer-counter"></div>
-            <div class="image-viewer-dots" id="image-viewer-dots"></div>
         </div>
+        <svg class="image-viewer-save" id="image-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <svg class="image-viewer-close" id="image-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <div class="media-viewer-author-bar-wrap" id="image-viewer-author-bar-wrap" style="display:none;">
+            <div class="media-viewer-topbar-row">
+            <button type="button" class="media-viewer-icon-btn" id="image-viewer-back-btn" aria-label="Back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="media-viewer-author-bar">
+                <div class="avatar media-viewer-author-avatar" id="image-viewer-author-avatar"></div>
+                <div class="media-viewer-author-info">
+                    <div class="media-viewer-author-name"><span id="image-viewer-author-name"></span><span id="image-viewer-author-badge"></span></div>
+                    <div class="media-viewer-author-username" id="image-viewer-author-username"></div>
+                </div>
+                <button type="button" class="media-viewer-follow-pill" id="image-viewer-follow-pill" style="display:none;">Follow</button>
+            </div>
+            <button type="button" class="media-viewer-icon-btn image-viewer-post-menu-btn" id="image-viewer-post-menu-btn" title="More" aria-label="More" style="display:none;">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+            </button>
+            </div>
+        </div>
+        <div id="image-viewer-bottom">
+            <div class="image-viewer-caption-wrap" id="image-viewer-caption-wrap" style="display:none;">
+                <div class="image-viewer-caption" id="image-viewer-caption"></div>
+                <button type="button" class="image-viewer-caption-more" id="image-viewer-caption-more" style="display:none;">more</button>
+                <span class="image-viewer-view-meta" id="image-viewer-view-count">0 views</span>
+            </div>
+            <div class="image-viewer-dots" id="image-viewer-dots"></div>
         <div class="image-viewer-post-actions" id="image-viewer-post-actions" style="display:none;">
             <button type="button" class="image-viewer-post-action-btn" id="image-viewer-like-btn">
                 <svg class="image-viewer-like-icon" id="image-viewer-like-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
@@ -9521,10 +9577,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 23l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                 <span id="image-viewer-repost-count">0</span>
             </button>
-            <div class="image-viewer-post-action-btn image-viewer-view-stat" title="Views">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
-                <span id="image-viewer-view-count">0</span>
-            </div>
+        </div>
         </div>
     </div>
 
@@ -10258,12 +10311,18 @@
             document.getElementById('image-viewer-next').classList.toggle('visible', isGallery);
             document.getElementById('image-viewer-counter').classList.toggle('visible', isGallery);
             renderImageViewerDots();
+            imageViewerResetGestures(false); // fresh open: no leftover zoom / hidden chrome from last time
             updateImageViewerPostBarVisibility();
             overlay.classList.add('active');
             if (window.location.hash !== '#image-viewer') window.location.hash = 'image-viewer';
         }
         let currentViewerHideSave = false;
         function updateImageViewerPostBarVisibility() {
+            // Post images get the shared top bar (back · author · Follow · ⋯) and the caption/actions
+            // stack; everything else (chat photo, avatar…) keeps the plain floating close button.
+            document.getElementById('image-viewer-overlay').classList.toggle('has-post-bar', !!currentViewerPostId);
+            document.getElementById('image-viewer-close').style.display = currentViewerPostId ? 'none' : '';
+            document.getElementById('image-viewer-caption-wrap').style.display = currentViewerPostId ? '' : 'none';
             document.getElementById('image-viewer-post-actions').style.display = currentViewerPostId ? 'flex' : 'none';
             document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
             document.getElementById('image-viewer-author-bar-wrap').style.display = currentViewerPostId ? 'block' : 'none';
@@ -10337,8 +10396,35 @@
             document.getElementById('image-viewer-comment-count').textContent = post.commentCount || 0;
             document.getElementById('image-viewer-repost-btn').classList.toggle('reposted', repostedByMe);
             document.getElementById('image-viewer-repost-count').textContent = formatFeedCount(post.repostCount || 0);
-            document.getElementById('image-viewer-view-count').textContent = formatFeedCount(post.impressionCount || 0);
+            const viewCount = post.impressionCount || 0;
+            document.getElementById('image-viewer-view-count').textContent = `${formatFeedCount(viewCount)} ${viewCount === 1 ? 'view' : 'views'}`;
+            syncImageViewerCaption(post);
         }
+        // Caption under the photo: clamps to two lines with a "more" toggle (linkified like feed
+        // captions). syncImageViewerPostBar re-runs on every live count change, so only rebuild it
+        // when the post or its text actually changed.
+        function syncImageViewerCaption(post) {
+            const captionEl = document.getElementById('image-viewer-caption');
+            const moreBtn = document.getElementById('image-viewer-caption-more');
+            const text = post && post.text ? post.text : '';
+            if (captionEl.dataset.postId === String(currentViewerPostId) && captionEl.dataset.rendered === text) return;
+            captionEl.dataset.postId = String(currentViewerPostId);
+            captionEl.dataset.rendered = text;
+            captionEl.classList.remove('expanded');
+            captionEl.innerHTML = text ? linkifyHashtags(text) : '';
+            captionEl.style.display = text ? '' : 'none';
+            moreBtn.textContent = 'more';
+            moreBtn.style.display = 'none';
+            if (text) requestAnimationFrame(() => {
+                moreBtn.style.display = captionEl.scrollHeight > captionEl.clientHeight + 1 ? '' : 'none';
+            });
+        }
+        document.getElementById('image-viewer-caption-more').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const captionEl = document.getElementById('image-viewer-caption');
+            const expanded = captionEl.classList.toggle('expanded');
+            e.currentTarget.textContent = expanded ? 'less' : 'more';
+        });
         // Same 1s-dwell-then-count-once approach as getFeedImpressionObserver, just without an
         // IntersectionObserver — the image viewer is already fully on-screen the moment it opens,
         // so a plain timer does the same job. Shares impressedPostIds with the feed/reel so a
@@ -10393,6 +10479,7 @@
             currentViewerImageUrl = url;
             currentViewerHideSave = !!hideSave;
             const imgEl = document.getElementById('image-viewer-img');
+            imageViewerResetGestures(true); // new frame → back to fit-to-screen (keeps the chrome state)
             imgEl.src = url;
             imgEl.draggable = !hideSave;
             imgEl.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
@@ -10415,37 +10502,213 @@
         }
         document.getElementById('image-viewer-prev').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(-1); });
         document.getElementById('image-viewer-next').addEventListener('click', (e) => { e.stopPropagation(); stepImageViewer(1); });
-        // Swipe-left/right to navigate between images in a gallery, on touch devices.
-        // Tracks horizontal vs vertical intent from the first meaningful move so a mostly-vertical
-        // drag doesn't get hijacked (lets pinch/scroll-adjacent gestures pass through untouched).
-        (function initImageViewerSwipe() {
+        // Gestures on the photo (touch + mouse):
+        //   pinch / double-tap / wheel  → zoom (up to 4x), drag to pan while zoomed
+        //   swipe left/right            → previous/next image in a gallery (when not zoomed)
+        //   swipe down                  → dismiss, with the backdrop fading as you drag
+        //   single tap                  → hide/show the top bar + caption/actions
+        // Everything is driven by three numbers (scale, tx, ty) painted onto #image-viewer-img as a
+        // transform; tx/ty are measured from the media area's centre, matching object-fit: contain.
+        let imageViewerResetGestures = function () {};
+        (function initImageViewerGestures() {
+            const overlay = document.getElementById('image-viewer-overlay');
             const media = document.getElementById('image-viewer-media');
-            let startX = 0, startY = 0, tracking = false, isHorizontal = null;
+            const img = document.getElementById('image-viewer-img');
+            const MAX_SCALE = 4;
+            let scale = 1, tx = 0, ty = 0, dragY = 0;
+            let chromeHiddenByTap = false;
+            let mode = null; // 'pan' | 'pinch' | 'swipe' | 'dismiss' | 'ignore' | null
+            let tracking = false, moved = false;
+            let startX = 0, startY = 0, startTx = 0, startTy = 0;
+            let pinchDist = 1, pinchScale = 1, pinchMidX = 0, pinchMidY = 0, pinchTx = 0, pinchTy = 0;
+            let lastClickAt = 0, lastClickX = 0, lastClickY = 0, tapTimer = null, suppressClickUntil = 0;
+            let mouseDown = false, mouseStartX = 0, mouseStartY = 0;
+
+            function contentSize() {
+                const cw = media.clientWidth, ch = media.clientHeight;
+                const nw = img.naturalWidth || cw, nh = img.naturalHeight || ch;
+                const fit = Math.min(cw / nw, ch / nh);
+                return { cw, ch, w: nw * fit, h: nh * fit };
+            }
+            function clampPan() {
+                const { cw, ch, w, h } = contentSize();
+                const maxX = Math.max(0, (w * scale - cw) / 2);
+                const maxY = Math.max(0, (h * scale - ch) / 2);
+                tx = Math.min(maxX, Math.max(-maxX, tx));
+                ty = Math.min(maxY, Math.max(-maxY, ty));
+            }
+            function paint() {
+                const dismissScale = dragY > 0 ? 1 - Math.min(dragY / 1200, 0.15) : 1;
+                img.style.transform = `translate3d(${tx}px, ${ty + dragY}px, 0) scale(${scale * dismissScale})`;
+            }
+            function syncChrome() {
+                overlay.classList.toggle('iv-chrome-hidden', chromeHiddenByTap || scale > 1.05 || dragY > 0);
+            }
+            function animatePaint() {
+                img.classList.add('iv-animating');
+                paint();
+                setTimeout(() => img.classList.remove('iv-animating'), 240);
+            }
+            // Zoom to newScale keeping the point under (clientX, clientY) fixed on screen.
+            function zoomAt(newScale, clientX, clientY) {
+                const rect = media.getBoundingClientRect();
+                const cx = clientX - rect.left - rect.width / 2;
+                const cy = clientY - rect.top - rect.height / 2;
+                const ratio = newScale / scale;
+                tx = cx - (cx - tx) * ratio;
+                ty = cy - (cy - ty) * ratio;
+                scale = newScale;
+                clampPan();
+            }
+            function settleZoom() {
+                if (scale < 1.02) { scale = 1; tx = 0; ty = 0; }
+                else { scale = Math.min(scale, MAX_SCALE); clampPan(); }
+                animatePaint();
+                syncChrome();
+            }
+
+            imageViewerResetGestures = function (keepChrome) {
+                scale = 1; tx = 0; ty = 0; dragY = 0;
+                mode = null; tracking = false; mouseDown = false;
+                if (!keepChrome) chromeHiddenByTap = false;
+                clearTimeout(tapTimer);
+                img.classList.remove('iv-animating');
+                overlay.style.backgroundColor = '';
+                paint();
+                syncChrome();
+            };
+
             media.addEventListener('touchstart', (e) => {
-                if (!currentViewerGallery || e.touches.length !== 1) { tracking = false; return; }
-                tracking = true;
-                isHorizontal = null;
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
+                img.classList.remove('iv-animating');
+                if (e.touches.length === 2) {
+                    const a = e.touches[0], b = e.touches[1];
+                    mode = 'pinch'; tracking = true; moved = true;
+                    pinchDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+                    pinchScale = scale; pinchTx = tx; pinchTy = ty;
+                    pinchMidX = (a.clientX + b.clientX) / 2;
+                    pinchMidY = (a.clientY + b.clientY) / 2;
+                    return;
+                }
+                if (e.touches.length !== 1) return;
+                tracking = true; moved = false; mode = null;
+                startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                startTx = tx; startTy = ty;
             }, { passive: true });
+
             media.addEventListener('touchmove', (e) => {
-                if (!tracking || e.touches.length !== 1) return;
+                if (!tracking) return;
+                if (mode === 'pinch' && e.touches.length === 2) {
+                    e.preventDefault();
+                    const a = e.touches[0], b = e.touches[1];
+                    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+                    const rect = media.getBoundingClientRect();
+                    const c0x = pinchMidX - rect.left - rect.width / 2, c0y = pinchMidY - rect.top - rect.height / 2;
+                    const c1x = (a.clientX + b.clientX) / 2 - rect.left - rect.width / 2;
+                    const c1y = (a.clientY + b.clientY) / 2 - rect.top - rect.height / 2;
+                    const newScale = Math.min(MAX_SCALE * 1.15, Math.max(0.7, pinchScale * dist / pinchDist));
+                    const ratio = newScale / pinchScale;
+                    scale = newScale;
+                    tx = c1x - (c0x - pinchTx) * ratio;
+                    ty = c1y - (c0y - pinchTy) * ratio;
+                    paint(); syncChrome();
+                    return;
+                }
+                if (e.touches.length !== 1) return;
                 const dx = e.touches[0].clientX - startX;
                 const dy = e.touches[0].clientY - startY;
-                if (isHorizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-                    isHorizontal = Math.abs(dx) > Math.abs(dy);
+                if (mode === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                    moved = true;
+                    if (scale > 1.02) mode = 'pan';
+                    else if (Math.abs(dx) > Math.abs(dy)) mode = currentViewerGallery ? 'swipe' : 'ignore';
+                    else mode = dy > 0 ? 'dismiss' : 'ignore';
                 }
-                if (isHorizontal) e.preventDefault();
+                if (mode === 'pan') {
+                    e.preventDefault();
+                    tx = startTx + dx; ty = startTy + dy;
+                    clampPan(); paint();
+                } else if (mode === 'swipe') {
+                    e.preventDefault();
+                } else if (mode === 'dismiss') {
+                    e.preventDefault();
+                    dragY = Math.max(0, dy);
+                    overlay.style.backgroundColor = `rgba(0,0,0,${1 - Math.min(dragY / 320, 0.75)})`;
+                    paint(); syncChrome();
+                }
             }, { passive: false });
-            media.addEventListener('touchend', (e) => {
+
+            function endTouch(e) {
                 if (!tracking) return;
+                if (mode === 'pinch') {
+                    settleZoom();
+                    suppressClickUntil = Date.now() + 350;
+                    if (e.touches && e.touches.length >= 1) {
+                        // One finger is still down — carry on as a pan from here.
+                        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+                        startTx = tx; startTy = ty;
+                        mode = scale > 1.02 ? 'pan' : 'ignore';
+                    } else { tracking = false; mode = null; }
+                    return;
+                }
                 tracking = false;
-                if (!isHorizontal) return;
-                const dx = e.changedTouches[0].clientX - startX;
-                const SWIPE_THRESHOLD = 50;
-                if (dx <= -SWIPE_THRESHOLD) stepImageViewer(1);
-                else if (dx >= SWIPE_THRESHOLD) stepImageViewer(-1);
+                if (moved) suppressClickUntil = Date.now() + 350;
+                if (mode === 'swipe' && e.changedTouches && e.changedTouches[0]) {
+                    const dx = e.changedTouches[0].clientX - startX;
+                    if (dx <= -50) stepImageViewer(1);
+                    else if (dx >= 50) stepImageViewer(-1);
+                } else if (mode === 'dismiss') {
+                    if (dragY > 110) {
+                        requestCloseImageViewer(); // state is reset once the fade-out finishes (closeImageViewer)
+                    } else {
+                        dragY = 0;
+                        overlay.style.backgroundColor = '';
+                        animatePaint(); syncChrome();
+                    }
+                }
+                mode = null;
+            }
+            media.addEventListener('touchend', endTouch);
+            media.addEventListener('touchcancel', endTouch);
+
+            // Single tap toggles the chrome; a quick second tap zooms in/out around the tap point.
+            media.addEventListener('click', (e) => {
+                if (Date.now() < suppressClickUntil) return;
+                if (e.target.closest('.image-viewer-nav')) return;
+                const now = Date.now();
+                const isDouble = now - lastClickAt < 300 && Math.hypot(e.clientX - lastClickX, e.clientY - lastClickY) < 40;
+                lastClickAt = now; lastClickX = e.clientX; lastClickY = e.clientY;
+                clearTimeout(tapTimer);
+                if (isDouble) {
+                    lastClickAt = 0;
+                    if (scale > 1.05) { scale = 1; tx = 0; ty = 0; }
+                    else zoomAt(2.5, e.clientX, e.clientY);
+                    animatePaint(); syncChrome();
+                    return;
+                }
+                tapTimer = setTimeout(() => { chromeHiddenByTap = !chromeHiddenByTap; syncChrome(); }, 260);
             });
+
+            // Desktop: wheel to zoom, drag to pan while zoomed.
+            media.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const next = Math.min(MAX_SCALE, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+                if (next === scale) return;
+                zoomAt(next, e.clientX, e.clientY);
+                if (scale < 1.02) { scale = 1; tx = 0; ty = 0; }
+                paint(); syncChrome();
+            }, { passive: false });
+            media.addEventListener('mousedown', (e) => {
+                if (e.button !== 0 || scale <= 1.02) return;
+                mouseDown = true; mouseStartX = e.clientX; mouseStartY = e.clientY; startTx = tx; startTy = ty;
+                e.preventDefault();
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!mouseDown) return;
+                const dx = e.clientX - mouseStartX, dy = e.clientY - mouseStartY;
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) suppressClickUntil = Date.now() + 350;
+                tx = startTx + dx; ty = startTy + dy;
+                clampPan(); paint();
+            });
+            window.addEventListener('mouseup', () => { mouseDown = false; });
         })();
         function closeImageViewer() {
             const overlay = document.getElementById('image-viewer-overlay');
@@ -10465,12 +10728,15 @@
             setTimeout(() => {
                 if (imageViewerCycleToken !== myToken) return;
                 document.getElementById('image-viewer-img').src = '';
+                imageViewerResetGestures(false);
             }, 300);
         }
-        document.getElementById('image-viewer-close').addEventListener('click', () => {
+        function requestCloseImageViewer() {
             if (window.location.hash === '#image-viewer') { history.back(); }
             else { closeImageViewer(); }
-        });
+        }
+        document.getElementById('image-viewer-close').addEventListener('click', requestCloseImageViewer);
+        document.getElementById('image-viewer-back-btn').addEventListener('click', requestCloseImageViewer);
         document.getElementById('image-viewer-save').addEventListener('click', (e) => {
             e.stopPropagation();
             if (currentViewerImageUrl) downloadMediaFile(currentViewerImageUrl, 'image');
@@ -10580,6 +10846,96 @@
             return ids;
         }
 
+        // Sound on/off for the video viewer, shared across every reel in the swipe queue (like the
+        // mute button on X/Instagram). When a song is attached the clip's own audio stays muted
+        // regardless, and this flag mutes/unmutes the song instead.
+        let reelSoundMuted = false;
+        function applyReelMuteState() {
+            const track = document.getElementById('reel-viewer-track');
+            if (!track) return;
+            track.querySelectorAll('.reel-item').forEach(itemEl => {
+                const video = itemEl.querySelector('.reel-item-media video');
+                const musicAudio = itemEl.querySelector('.reel-item-music-audio');
+                if (video) video.muted = !!musicAudio || reelSoundMuted;
+                if (musicAudio) musicAudio.muted = reelSoundMuted;
+            });
+            track.querySelectorAll('.reel-item-mute-btn').forEach(btn => btn.classList.toggle('is-muted', reelSoundMuted));
+        }
+
+        // The top bar + mute button fade out ~3s into playback so the video is uncluttered, and come
+        // back on any touch, pause, or scrub (caption and actions always stay put).
+        function showReelChrome(itemEl) {
+            itemEl.classList.remove('chrome-hidden');
+            clearTimeout(itemEl.__chromeTimer);
+            const video = itemEl.querySelector('.reel-item-media video');
+            if (video && !video.paused && !itemEl.classList.contains('scrubbing')) {
+                itemEl.__chromeTimer = setTimeout(() => itemEl.classList.add('chrome-hidden'), 3000);
+            }
+        }
+
+        function seekReelBy(itemEl, video, deltaSeconds) {
+            if (!video.duration) return;
+            video.currentTime = Math.min(video.duration - 0.05, Math.max(0, video.currentTime + deltaSeconds));
+            const hint = itemEl.querySelector(deltaSeconds < 0 ? '.seek-left' : '.seek-right');
+            if (!hint) return;
+            hint.textContent = deltaSeconds < 0 ? '\u221210s' : '+10s';
+            hint.classList.add('visible');
+            clearTimeout(hint.__t);
+            hint.__t = setTimeout(() => hint.classList.remove('visible'), 600);
+        }
+
+        // Tap = play/pause (after a short delay so a double-tap can be told apart), double-tap on the
+        // left/right side = seek -/+10s, press-and-hold = 2x speed until release.
+        function bindReelVideoGestures(itemEl, video) {
+            let lastTapAt = 0, tapTimer = null, pressTimer = null, pressed = false, suppressClick = false;
+            const setSpeed = (rate) => {
+                video.playbackRate = rate;
+                const musicAudio = itemEl.querySelector('.reel-item-music-audio');
+                if (musicAudio) musicAudio.playbackRate = rate;
+                itemEl.classList.toggle('speeding', rate !== 1);
+            };
+            const endPress = () => {
+                clearTimeout(pressTimer);
+                if (!pressed) return;
+                pressed = false;
+                setSpeed(1);
+                suppressClick = true;
+                setTimeout(() => { suppressClick = false; }, 400);
+            };
+            video.addEventListener('touchstart', (e) => {
+                showReelChrome(itemEl);
+                clearTimeout(pressTimer);
+                if (e.touches.length !== 1) return;
+                pressTimer = setTimeout(() => {
+                    pressed = true;
+                    if (video.paused) video.play().catch(() => {});
+                    setSpeed(2);
+                    triggerHaptic(10);
+                }, 450);
+            }, { passive: true });
+            video.addEventListener('touchmove', () => { if (!pressed) clearTimeout(pressTimer); }, { passive: true });
+            video.addEventListener('touchend', endPress);
+            video.addEventListener('touchcancel', endPress);
+            video.addEventListener('click', (e) => {
+                if (suppressClick) return;
+                const now = Date.now();
+                const rect = video.getBoundingClientRect();
+                const x = rect.width ? (e.clientX - rect.left) / rect.width : 0.5;
+                const isDouble = now - lastTapAt < 300;
+                lastTapAt = now;
+                clearTimeout(tapTimer);
+                if (isDouble) {
+                    lastTapAt = 0;
+                    if (x < 0.35) seekReelBy(itemEl, video, -10);
+                    else if (x > 0.65) seekReelBy(itemEl, video, 10);
+                    return;
+                }
+                tapTimer = setTimeout(() => toggleReelItemPlayback(itemEl, video), 260);
+            });
+            video.addEventListener('play', () => showReelChrome(itemEl));
+            video.addEventListener('pause', () => showReelChrome(itemEl));
+        }
+
         function buildReelItemHtml(postId) {
             const post = cachedPosts[postId];
             const author = (post && cachedUsers[post.uid]) || {};
@@ -10598,11 +10954,7 @@
                             <button type="button" class="reel-item-back-btn" aria-label="Back">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                             </button>
-                            <button type="button" class="reel-item-menu-btn" aria-label="More">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
-                            </button>
-                        </div>
-                        <div class="media-viewer-author-bar">
+                            <div class="media-viewer-author-bar">
                             <div class="avatar media-viewer-author-avatar reel-item-topbar-avatar"></div>
                             <div class="media-viewer-author-info">
                                 <div class="media-viewer-author-name"><span class="reel-item-topbar-name"></span><span class="reel-item-topbar-badge"></span></div>
@@ -10610,15 +10962,27 @@
                             </div>
                             <button type="button" class="media-viewer-follow-pill reel-item-topbar-follow" style="display:none;">Follow</button>
                         </div>
+                            <button type="button" class="reel-item-menu-btn" aria-label="More">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+                            </button>
+                        </div>
                     </div>
+                    <button type="button" class="reel-item-mute-btn${reelSoundMuted ? ' is-muted' : ''}" aria-label="Mute or unmute">
+                        <svg class="reel-icon-unmuted" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"></path></svg>
+                        <svg class="reel-icon-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12l3-3-1-1-3 3-3-3-1 1 3 3-3 3 1 1 3-3 3 3 1-1z"></path></svg>
+                    </button>
                     <div class="reel-item-media">
                         <div class="reel-item-spinner"></div>
                     </div>
                     <div class="reel-item-play-hint">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </div>
+                    <div class="reel-item-seek-hint seek-left"></div>
+                    <div class="reel-item-seek-hint seek-right"></div>
+                    <div class="reel-item-speed-chip">2x speed</div>
+                    <div class="reel-item-scrub-time"></div>
                     <div class="reel-item-info">
-                        ${caption ? `<div class="reel-item-caption"></div>` : ''}
+                        ${caption ? `<div class="reel-item-caption"></div><button type="button" class="reel-item-caption-more" style="display:none;">more</button>` : ''}
                         <div class="reel-item-view-stat" title="Views"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Views"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg><span>${formatFeedCount((post && post.impressionCount) || 0)}</span></div>
                         ${post && post.music ? `<div class="reel-item-music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg><span></span></div>` : ''}
                     </div>
@@ -10636,8 +11000,11 @@
                             <span>${formatFeedCount((post && post.repostCount) || 0)}</span>
                         </button>
                     </div>
-                    <div class="reel-item-progress-track">
-                        <div class="reel-item-progress-fill"></div>
+                    <div class="reel-item-progress-track" role="slider" aria-label="Seek">
+                        <div class="reel-item-progress-line">
+                            <div class="reel-item-progress-fill"></div>
+                            <div class="reel-item-progress-thumb"></div>
+                        </div>
                     </div>
                 </div>`;
         }
@@ -10652,6 +11019,13 @@
             const author = (post && cachedUsers[uid]) || {};
             const captionEl = itemEl.querySelector('.reel-item-caption');
             if (captionEl) captionEl.innerHTML = (post && post.text) ? linkifyHashtags(post.text) : '';
+            const captionMoreBtn = itemEl.querySelector('.reel-item-caption-more');
+            if (captionEl && captionMoreBtn) {
+                // Show "more" only when the 3-line clamp is actually cutting the caption off.
+                requestAnimationFrame(() => {
+                    captionMoreBtn.style.display = (!captionEl.classList.contains('expanded') && captionEl.scrollHeight > captionEl.clientHeight + 1) ? '' : 'none';
+                });
+            }
             const musicEl = itemEl.querySelector('.reel-item-music span');
             if (musicEl && post && post.music) musicEl.textContent = `${post.music.trackName || ''}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
 
@@ -10741,13 +11115,16 @@
                 // resets to 0 on each loop restart (loop=true means timeupdate fires with a
                 // near-zero currentTime right after the video wraps).
                 const progressFill = itemEl.querySelector('.reel-item-progress-fill');
+                const progressThumb = itemEl.querySelector('.reel-item-progress-thumb');
                 video.addEventListener('timeupdate', () => {
                     if (!progressFill || !video.duration) return;
-                    progressFill.style.width = ((video.currentTime / video.duration) * 100) + '%';
+                    const pct = (video.currentTime / video.duration) * 100;
+                    progressFill.style.width = pct + '%';
+                    if (progressThumb) progressThumb.style.left = pct + '%';
                 });
                 video.src = videoUrl;
                 media.appendChild(video);
-                video.addEventListener('click', () => toggleReelItemPlayback(itemEl, video));
+                bindReelVideoGestures(itemEl, video);
                 if (!videoUrl) video.dispatchEvent(new Event('error'));
 
                 // When a song is attached, the clip's own audio stays muted permanently and the
@@ -10779,8 +11156,16 @@
                     });
                 }
             }
-            video.muted = hasMusic;
-            video.play().catch(() => { video.muted = true; video.play().catch(() => {}); });
+            video.muted = hasMusic || reelSoundMuted;
+            const activeMusicAudio = itemEl.querySelector('.reel-item-music-audio');
+            if (activeMusicAudio) activeMusicAudio.muted = reelSoundMuted;
+            video.play().catch(() => {
+                // Browser refused autoplay with sound — fall back to muted, and show that state on the button.
+                video.muted = true;
+                reelSoundMuted = true;
+                applyReelMuteState();
+                video.play().catch(() => {});
+            });
 
             const user = auth.currentUser;
             if (user && post && post.uid !== user.uid && !itemEl.__impressed) {
@@ -10807,9 +11192,78 @@
             if (musicAudio && !musicAudio.paused) musicAudio.pause();
             const hint = itemEl.querySelector('.reel-item-play-hint');
             if (hint) hint.classList.remove('visible');
+            if (video) video.playbackRate = 1;
+            if (musicAudio) musicAudio.playbackRate = 1;
+            itemEl.classList.remove('speeding', 'scrubbing', 'chrome-hidden');
+            clearTimeout(itemEl.__chromeTimer);
         }
 
         function bindReelItem(itemEl, postId) {
+            const captionEl = itemEl.querySelector('.reel-item-caption');
+            const captionMoreBtn = itemEl.querySelector('.reel-item-caption-more');
+            if (captionEl && captionMoreBtn) captionMoreBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const expanded = captionEl.classList.toggle('expanded');
+                captionMoreBtn.textContent = expanded ? 'less' : 'more';
+            });
+            const muteBtn = itemEl.querySelector('.reel-item-mute-btn');
+            if (muteBtn) muteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                reelSoundMuted = !reelSoundMuted;
+                applyReelMuteState();
+                showReelChrome(itemEl);
+            });
+            // Draggable scrubber: pointer events cover touch and mouse; the track has touch-action: none
+            // so a horizontal drag scrubs instead of the reel list trying to scroll. Playback pauses
+            // while dragging and resumes on release if it was playing.
+            const scrubTrack = itemEl.querySelector('.reel-item-progress-track');
+            if (scrubTrack) {
+                const line = scrubTrack.querySelector('.reel-item-progress-line');
+                const fill = scrubTrack.querySelector('.reel-item-progress-fill');
+                const thumb = scrubTrack.querySelector('.reel-item-progress-thumb');
+                const timeEl = itemEl.querySelector('.reel-item-scrub-time');
+                let scrubbing = false, wasPlaying = false, activePointer = null;
+                const getVideo = () => itemEl.querySelector('.reel-item-media video');
+                const seekFromEvent = (e) => {
+                    const video = getVideo();
+                    if (!video || !video.duration) return;
+                    const rect = line.getBoundingClientRect();
+                    const p = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+                    video.currentTime = p * video.duration;
+                    fill.style.width = (p * 100) + '%';
+                    thumb.style.left = (p * 100) + '%';
+                    if (timeEl) timeEl.textContent = `${formatVideoTime(video.currentTime)} / ${formatVideoTime(video.duration)}`;
+                };
+                scrubTrack.addEventListener('pointerdown', (e) => {
+                    const video = getVideo();
+                    if (!video || !video.duration) return;
+                    e.stopPropagation();
+                    e.preventDefault();
+                    scrubbing = true;
+                    activePointer = e.pointerId;
+                    try { scrubTrack.setPointerCapture(e.pointerId); } catch (_) {}
+                    wasPlaying = !video.paused;
+                    if (wasPlaying) video.pause();
+                    itemEl.classList.add('scrubbing');
+                    clearTimeout(itemEl.__chromeTimer);
+                    seekFromEvent(e);
+                });
+                scrubTrack.addEventListener('pointermove', (e) => {
+                    if (scrubbing && e.pointerId === activePointer) seekFromEvent(e);
+                });
+                const endScrub = (e) => {
+                    if (!scrubbing || e.pointerId !== activePointer) return;
+                    scrubbing = false;
+                    itemEl.classList.remove('scrubbing');
+                    const video = getVideo();
+                    if (video && wasPlaying) video.play().catch(() => {});
+                    showReelChrome(itemEl);
+                };
+                scrubTrack.addEventListener('pointerup', endScrub);
+                scrubTrack.addEventListener('pointercancel', endScrub);
+                scrubTrack.addEventListener('click', (e) => e.stopPropagation());
+            }
+            itemEl.addEventListener('touchstart', () => showReelChrome(itemEl), { passive: true });
             const backBtn = itemEl.querySelector('.reel-item-back-btn');
             if (backBtn) backBtn.addEventListener('click', (e) => { e.stopPropagation(); history.back(); });
             const topMenuBtn = itemEl.querySelector('.reel-item-menu-btn');

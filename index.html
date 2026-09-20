@@ -3514,6 +3514,12 @@
         .chat-view-info p { font-size: 12px; color: var(--success-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-view-messages-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
         .chat-view-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 10px; overflow-x: hidden; background: var(--bg-alt); scroll-behavior: smooth; transition: background-color 0.2s ease; scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+        /* Infinite-scroll history: older pages are prepended above the viewport while the person is
+           reading, so the scroller must (a) let the browser's native scroll anchoring hold the
+           reading position through those insertions (overflow-anchor) — that path doesn't cancel
+           an in-flight fling the way a programmatic scrollTop write does — and (b) not chain its
+           overscroll into the page behind it. */
+        .chat-view-messages { overflow-anchor: auto; overscroll-behavior-y: contain; }
         .chat-view-messages::-webkit-scrollbar { width: 6px; }
         .chat-view-messages::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
         .chat-view-messages::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
@@ -8789,10 +8795,6 @@
         
         <div class="chat-view-messages-wrap">
             <div class="chat-view-messages" id="chat-view-messages"></div>
-            <button type="button" class="load-older-msgs-pill" id="load-older-msgs-pill">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-                <span id="load-older-msgs-pill-label">Load earlier messages</span>
-            </button>
         </div>
         <button type="button" class="scroll-to-bottom-btn" id="scroll-to-bottom-btn" title="Scroll to latest">
             <span class="unread-dot"></span>
@@ -28539,6 +28541,7 @@
                     );
                     const snap = await get(olderQuery);
                     let fetchedCount = 0;
+                    const newlyLoaded = [];
 
                     if (snap.exists()) {
                         const entries = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val }));
@@ -28548,15 +28551,16 @@
                                 oldestLoadedMessageTimestamp = msg.createdAt;
                             }
                             cachedThreadMessages[msg.key] = msg;
+                            newlyLoaded.push(msg);
                         });
                     }
 
                     if (activeGroupId !== groupId) return; // navigated away while the fetch was in flight
-                    // A single empty page is a deterministic, consistent read — it already
-                    // proves nothing older exists, so there's no need to wait for a second
-                    // miss before retiring the pill.
-                    if (fetchedCount === 0) noMoreOlderMessages = true;
-                    renderGroupThread();
+                    // A short page (fewer than MSG_PAGE_SIZE) already proves nothing older exists.
+                    if (fetchedCount < MSG_PAGE_SIZE) noMoreOlderMessages = true;
+                    // Prepend just this page above what's already on screen (no full re-render).
+                    prependOlderChatItems(messagesEl, buildGroupItemsInto, newlyLoaded.sort((a, b) => a.createdAt - b.createdAt), skeletonNodes);
+                    initChatMessagesScrollListener(messagesEl, loadOlderGroupMessages);
                     writeCachedThreadMessagesToDisk(groupId, cachedThreadMessages);
                 } catch (e) {
                     console.warn('loadOlderGroupMessages failed:', e);
@@ -28566,21 +28570,17 @@
                 }
             }
 
-            // Renders the thread from cachedThreadMessages (the live limitToLast window merged
-            // with any older pages fetched via loadOlderGroupMessages). Called both by the live
-            // messages listener below and by loadOlderGroupMessages after a paginated fetch.
-            function renderGroupThread() {
-                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
-                const prevScrollTop = messagesEl.scrollTop;
-                const prevScrollHeight = messagesEl.scrollHeight;
-                messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
-                const items = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
-                if (items.length) {
-                    let lastDateKey = null;
-                    items.forEach(msg => {
+            // Builds bubbles (with day separators) for a sorted list of messages into `container` —
+            // the live thread element for a full render, or a DocumentFragment when an older page
+            // is being prepended (see prependOlderChatItems).
+            function buildGroupItemsInto(container, items) {
+                let lastDateKey = null;
+                items.forEach(msg => {
                         const msgDateKey = dayKey(msg.createdAt);
                         if (msgDateKey !== lastDateKey) {
-                            messagesEl.appendChild(buildDateSeparator(msg.createdAt));
+                            const daySep = buildDateSeparator(msg.createdAt);
+                            daySep.dataset.dayKey = String(msgDateKey);
+                            container.appendChild(daySep);
                             lastDateKey = msgDateKey;
                         }
                         const isOwn = msg.senderUid === user.uid;
@@ -28611,7 +28611,7 @@
                             deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
                             bubble.appendChild(deletedEl);
                             bubble.appendChild(buildMsgMetaWrap(msg.createdAt, !!group.isBusinessPage));
-                            messagesEl.appendChild(bubble);
+                            container.appendChild(bubble);
                             return;
                         }
 
@@ -28707,9 +28707,20 @@
                             if (badge) bubble.appendChild(badge);
                         }
 
-                        messagesEl.appendChild(bubble);
-                    });
-                }
+                        container.appendChild(bubble);
+                });
+            }
+
+            // Renders the thread from cachedThreadMessages (the live limitToLast window merged
+            // with any older pages fetched via loadOlderGroupMessages). Called both by the live
+            // messages listener below and by loadOlderGroupMessages after a paginated fetch.
+            function renderGroupThread() {
+                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
+                const prevScrollTop = messagesEl.scrollTop;
+                const prevScrollHeight = messagesEl.scrollHeight;
+                messagesEl.innerHTML = ''; // Wipes the DOM, so re-append the typing bubble below if it was active
+                const items = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                if (items.length) buildGroupItemsInto(messagesEl, items);
                 renderPendingUploadsInto(messagesEl, groupId);
                 appendGroupTypingBubbleIfNeeded();
                 if (shouldStickToBottom) {
@@ -28718,7 +28729,7 @@
                     // Keeps the view visually stable whether new content landed at the bottom
                     // (delta ~0) or an older page just got prepended at the top (delta = the
                     // height that page added).
-                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
+                    setChatScrollTopInstant(messagesEl, prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight));
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;
@@ -31422,8 +31433,7 @@
         let oldestLoadedMessageTimestamp = Infinity;
         let isLoadingMoreMessages = false;
         let noMoreOlderMessages = false;
-        let chatMessagesScrollHandler = null; // scroll listener bound to the open thread's messages pane, toggles the pill below
-        let chatMessagesPillClickHandler = null;
+        let chatMessagesScrollHandler = null; // scroll listener bound to the open thread's messages pane, auto-loads older pages near the top
         let liveThreadSnapshotReceived = false; // true once the live listener has fired at least once for the currently open thread — see the offline message cache below
 
         // Resets all of the pagination bookkeeping above — call this every time a chat or group
@@ -31435,12 +31445,8 @@
             noMoreOlderMessages = false;
             liveThreadSnapshotReceived = false;
             const messagesEl = document.getElementById('chat-view-messages');
-            const pill = document.getElementById('load-older-msgs-pill');
             if (messagesEl && chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
-            if (pill && chatMessagesPillClickHandler) pill.removeEventListener('click', chatMessagesPillClickHandler);
             chatMessagesScrollHandler = null;
-            chatMessagesPillClickHandler = null;
-            if (pill) { pill.classList.remove('visible', 'is-loading'); setLoadOlderPillLabel(false); }
         }
 
         // --- OFFLINE MESSAGE CACHE (IndexedDB) ---
@@ -31511,11 +31517,6 @@
             });
         }
 
-        function setLoadOlderPillLabel(isLoading) {
-            const label = document.getElementById('load-older-msgs-pill-label');
-            if (label) label.textContent = isLoading ? 'Loading…' : 'Load earlier messages';
-        }
-
         function buildChatMsgSkeletonBubble(isOwn) {
             const bubble = document.createElement('div');
             bubble.className = 'msg-bubble msg-skeleton ' + (isOwn ? 'out' : 'in');
@@ -31523,76 +31524,114 @@
             return bubble;
         }
 
-        // Prepends a few shimmering placeholder bubbles above the current top of the thread
-        // while an older page loads, so pagination reads as "more history above" rather than a
-        // blank stall, and holds the user's current scroll position steady as they're inserted.
+        // ── Infinite-scroll plumbing shared by DM and group threads ──
+        // Older pages load automatically as the person scrolls up: the next page is requested
+        // while there are still ~CHAT_LOAD_MORE_THRESHOLD_PX (a couple of screens) of history
+        // left above the viewport, so it has usually landed before they reach the top. Older
+        // messages are then *prepended* to the existing DOM instead of rebuilding the whole
+        // thread, so nothing already on screen is torn down (no image/video reload flicker) and
+        // the reading position holds:
+        //   • Chromium/Firefox: native scroll anchoring (overflow-anchor) keeps the view steady
+        //     with no scrollTop writes — which also means an in-flight fling isn't cancelled.
+        //   • Safari (no overflow-anchor): the height added above the viewport is added back to
+        //     scrollTop in the same frame, with smooth-scroll suppressed so it doesn't animate.
+        const CHAT_LOAD_MORE_THRESHOLD_PX = 900;
+        const CHAT_SUPPORTS_SCROLL_ANCHORING = !!(window.CSS && CSS.supports && CSS.supports('overflow-anchor', 'auto'));
+
+        // .chat-view-messages has scroll-behavior: smooth (for scroll-to-latest), which would
+        // turn a compensating scrollTop write into a visible slide — force an instant jump.
+        function setChatScrollTopInstant(el, top) {
+            if (!el) return;
+            const prev = el.style.scrollBehavior;
+            el.style.scrollBehavior = 'auto';
+            el.scrollTop = top;
+            el.style.scrollBehavior = prev;
+        }
+
+        // Runs a DOM mutation that changes content height *above* the viewport and keeps what
+        // the person is looking at exactly where it was (see the note above for how).
+        function withChatScrollCompensation(el, mutateFn) {
+            if (!el) { mutateFn(); return; }
+            const prevScrollHeight = el.scrollHeight;
+            const prevScrollTop = el.scrollTop;
+            mutateFn();
+            if (!CHAT_SUPPORTS_SCROLL_ANCHORING) {
+                setChatScrollTopInstant(el, prevScrollTop + (el.scrollHeight - prevScrollHeight));
+            }
+        }
+
+        // Shimmering placeholder bubbles above the top of the thread while an older page loads,
+        // so pagination reads as "more history above" rather than a blank stall.
         function showChatLoadingSkeletons(messagesEl) {
             if (!messagesEl) return [];
             const nodes = [];
-            const anchor = messagesEl.firstChild;
-            const prevScrollHeight = messagesEl.scrollHeight;
-            const prevScrollTop = messagesEl.scrollTop;
-            for (let i = 0; i < MSG_SKELETON_COUNT; i++) {
-                const bubble = buildChatMsgSkeletonBubble(i % 2 === 0);
-                messagesEl.insertBefore(bubble, anchor);
-                nodes.push(bubble);
-            }
-            messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
+            withChatScrollCompensation(messagesEl, () => {
+                const anchor = messagesEl.firstChild;
+                for (let i = 0; i < MSG_SKELETON_COUNT; i++) {
+                    const bubble = buildChatMsgSkeletonBubble(i % 2 === 0);
+                    messagesEl.insertBefore(bubble, anchor);
+                    nodes.push(bubble);
+                }
+            });
             return nodes;
         }
 
         function removeChatLoadingSkeletons(messagesEl, nodes) {
             if (!messagesEl || !nodes || !nodes.length) return;
-            const prevScrollHeight = messagesEl.scrollHeight;
-            const prevScrollTop = messagesEl.scrollTop;
-            nodes.forEach(node => node.remove());
-            messagesEl.scrollTop = prevScrollTop - (prevScrollHeight - messagesEl.scrollHeight);
+            withChatScrollCompensation(messagesEl, () => nodes.forEach(node => node.remove()));
         }
 
-        // Wires up the floating "Load earlier messages" pill (see .load-older-msgs-pill): it
-        // fades in whenever the user has scrolled up near the top of the thread and there's
-        // more history to fetch, and fetches the next page on tap — same idea as WhatsApp's
-        // floating "load more" chip, an explicit user action rather than a silent auto-load.
+        // Inserts an already-fetched older page above everything currently in the thread.
+        // buildIntoFn(container, items) is the thread's own bubble builder (DM or group), so
+        // older bubbles are identical to live ones. The skeletons are swapped out in the same
+        // mutation, so there's a single measured layout change. If the page starts on the same
+        // calendar day the thread's current first message is on, that day's separator is
+        // dropped so it isn't shown twice.
+        function prependOlderChatItems(messagesEl, buildIntoFn, olderItems, skeletonNodes) {
+            if (!messagesEl) return;
+            withChatScrollCompensation(messagesEl, () => {
+                const frag = document.createDocumentFragment();
+                if (olderItems.length) buildIntoFn(frag, olderItems);
+                (skeletonNodes || []).forEach(node => node.remove());
+                if (!olderItems.length) return;
+                const firstBubble = messagesEl.querySelector(':scope > .msg-bubble[data-key]');
+                if (firstBubble) {
+                    const sepAbove = firstBubble.previousElementSibling;
+                    const lastOlder = olderItems[olderItems.length - 1];
+                    if (sepAbove && sepAbove.dataset && sepAbove.dataset.dayKey === String(dayKey(lastOlder.createdAt))) sepAbove.remove();
+                }
+                messagesEl.insertBefore(frag, messagesEl.firstChild);
+            });
+        }
+
+        // Auto-loads the next older page whenever the person scrolls within
+        // CHAT_LOAD_MORE_THRESHOLD_PX of the top and more history exists. Throttled to one
+        // check per frame; passive so it never delays scrolling.
         function initChatMessagesScrollListener(messagesEl, loadOlderFn) {
-            const pill = document.getElementById('load-older-msgs-pill');
-            if (!messagesEl || !pill) return;
+            if (!messagesEl) return;
             if (chatMessagesScrollHandler) messagesEl.removeEventListener('scroll', chatMessagesScrollHandler);
-            if (chatMessagesPillClickHandler) pill.removeEventListener('click', chatMessagesPillClickHandler);
+            chatMessagesScrollHandler = null;
+            if (noMoreOlderMessages) return;
 
-            if (noMoreOlderMessages) {
-                pill.classList.remove('visible');
-                return;
-            }
-
-            chatMessagesScrollHandler = () => {
-                if (noMoreOlderMessages) { pill.classList.remove('visible'); return; }
-                pill.classList.toggle('visible', messagesEl.scrollTop < 250);
-            };
-            chatMessagesPillClickHandler = () => {
+            let checkQueued = false;
+            const maybeLoadOlder = () => {
+                checkQueued = false;
                 if (isLoadingMoreMessages || noMoreOlderMessages) return;
-                pill.classList.add('is-loading');
-                setLoadOlderPillLabel(true);
-                // Remember whichever message currently sits at the top of the viewport, so
-                // that once the older batch loads in above it we can scroll up and land
-                // inside the newly loaded history — the click should visibly take the user
-                // to the new messages, not just quietly extend the top of a static view.
-                const anchorBubble = messagesEl.querySelector('.msg-bubble[data-key]');
-                const anchorKey = anchorBubble ? anchorBubble.dataset.key : null;
-                Promise.resolve(loadOlderFn()).then(() => {
-                    if (!anchorKey) return;
-                    const newAnchor = messagesEl.querySelector(`.msg-bubble[data-key="${anchorKey}"]`);
-                    if (newAnchor) {
-                        const targetTop = Math.max(0, newAnchor.offsetTop - messagesEl.clientHeight * 0.6);
-                        messagesEl.scrollTop = targetTop;
-                    }
-                }).finally(() => {
-                    pill.classList.remove('is-loading');
-                    setLoadOlderPillLabel(false);
-                });
+                if (messagesEl.scrollTop < CHAT_LOAD_MORE_THRESHOLD_PX) loadOlderFn();
             };
-            messagesEl.addEventListener('scroll', chatMessagesScrollHandler);
-            pill.addEventListener('click', chatMessagesPillClickHandler);
-            chatMessagesScrollHandler();
+            chatMessagesScrollHandler = () => {
+                if (checkQueued) return;
+                checkQueued = true;
+                requestAnimationFrame(maybeLoadOlder);
+            };
+            messagesEl.addEventListener('scroll', chatMessagesScrollHandler, { passive: true });
+
+            // A thread whose first page doesn't even fill the screen can't be scrolled, so no
+            // scroll event will ever fire — fetch the next page straight away in that case.
+            if (messagesEl.scrollHeight <= messagesEl.clientHeight + 40) {
+                checkQueued = true;
+                requestAnimationFrame(maybeLoadOlder);
+            }
         }
         const EDIT_WINDOW_MS = 15 * 60 * 1000;
         let activeContextMenuMsg = null;
@@ -34408,6 +34447,7 @@
                     );
                     const snap = await get(olderQuery);
                     let fetchedCount = 0;
+                    const newlyLoaded = [];
 
                     if (snap.exists()) {
                         const entries = Object.entries(snap.val()).map(([key, val]) => ({ key, ...val }));
@@ -34427,15 +34467,23 @@
                                 oldestLoadedMessageTimestamp = msg.createdAt;
                             }
                             cachedThreadMessages[msg.key] = msg;
+                            newlyLoaded.push(msg);
                         });
                     }
 
                     if (activeChatUid !== otherUid) return; // navigated away while the fetch was in flight
-                    // A single empty page is a deterministic, consistent read — it already
-                    // proves nothing older exists, so there's no need to wait for a second
-                    // miss before retiring the pill.
-                    if (fetchedCount === 0) noMoreOlderMessages = true;
-                    renderDmThread();
+                    // A short page (fewer than MSG_PAGE_SIZE) already proves nothing older
+                    // exists, so there's no need for one more round trip to find that out.
+                    if (fetchedCount < MSG_PAGE_SIZE) noMoreOlderMessages = true;
+                    const nowTs = Date.now();
+                    const olderItems = newlyLoaded
+                        .filter(m => isAIThread || !m.expiresAt || m.expiresAt > nowTs)
+                        .sort((a, b) => a.createdAt - b.createdAt);
+                    // Prepend just this page above what's already on screen (no full re-render).
+                    prependOlderChatItems(messagesEl, buildDmItemsInto, olderItems, skeletonNodes);
+                    if (noMoreOlderMessages) ensureDmStartBanners();
+                    if (!isAIThread) scheduleDisappearingSweep(Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt));
+                    initChatMessagesScrollListener(messagesEl, loadOlderDmMessages);
                     writeCachedThreadMessagesToDisk(threadId, cachedThreadMessages);
                 } catch (e) {
                     // Pagination hitting the start of the thread (or a transient read issue)
@@ -34480,24 +34528,17 @@
                 }
             }
 
-            function renderDmThread() {
-                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
-                const prevScrollTop = messagesEl.scrollTop;
-                const prevScrollHeight = messagesEl.scrollHeight;
-                messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
-                if (!isAIThread) messagesEl.appendChild(buildE2EBanner());
-                if (!isAIThread && (cachedUsers[otherUid] || {}).isBusinessAccount) messagesEl.appendChild(buildBusinessAccountBanner());
-                const allItems = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
-                if (!isAIThread) scheduleDisappearingSweep(allItems);
-                const now = Date.now();
-                const items = isAIThread ? allItems : allItems.filter(m => !m.expiresAt || m.expiresAt > now);
-                if (items.length) {
-                    let lastDateKey = null;
-
-                    items.forEach(msg => {
+            // Builds bubbles (with day separators) for a sorted list of messages into `container` —
+            // the live thread element for a full render, or a DocumentFragment when an older page
+            // is being prepended (see prependOlderChatItems).
+            function buildDmItemsInto(container, items) {
+                let lastDateKey = null;
+                items.forEach(msg => {
                         const msgDateKey = dayKey(msg.createdAt);
                         if (msgDateKey !== lastDateKey) {
-                            messagesEl.appendChild(buildDateSeparator(msg.createdAt));
+                            const daySep = buildDateSeparator(msg.createdAt);
+                            daySep.dataset.dayKey = String(msgDateKey);
+                            container.appendChild(daySep);
                             lastDateKey = msgDateKey;
                         }
 
@@ -34505,7 +34546,7 @@
                             const sysEl = document.createElement('div');
                             sysEl.className = 'date-separator';
                             sysEl.innerHTML = `<span>${msg.systemText}</span>`;
-                            messagesEl.appendChild(sysEl);
+                            container.appendChild(sysEl);
                             return;
                         }
 
@@ -34528,7 +34569,7 @@
                             deletedEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="4" x2="20" y2="20"></line><path d="M6 6h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6z"></path></svg>This message was deleted';
                             bubble.appendChild(deletedEl);
                             bubble.appendChild(buildMsgMetaWrap(msg.createdAt, false));
-                            messagesEl.appendChild(bubble);
+                            container.appendChild(bubble);
                             return;
                         }
 
@@ -34768,9 +34809,41 @@
                             if (badge) bubble.appendChild(badge);
                         }
 
-                        messagesEl.appendChild(bubble);
-                    });
-                }
+                        container.appendChild(bubble);
+                });
+            }
+
+            function appendDmStartBanners(container) {
+                if (isAIThread) return;
+                container.appendChild(buildE2EBanner());
+                if ((cachedUsers[otherUid] || {}).isBusinessAccount) container.appendChild(buildBusinessAccountBanner());
+            }
+
+            // Reached the true start of the thread while scrolling up: pin the banners above
+            // the oldest message (measured/compensated like any other insertion above the view).
+            function ensureDmStartBanners() {
+                if (isAIThread || messagesEl.querySelector(':scope > .dm-e2e-banner-row')) return;
+                withChatScrollCompensation(messagesEl, () => {
+                    const frag = document.createDocumentFragment();
+                    appendDmStartBanners(frag);
+                    messagesEl.insertBefore(frag, messagesEl.firstChild);
+                });
+            }
+
+            function renderDmThread() {
+                const shouldStickToBottom = isActiveThreadInitialLoad || isNearBottom(messagesEl);
+                const prevScrollTop = messagesEl.scrollTop;
+                const prevScrollHeight = messagesEl.scrollHeight;
+                messagesEl.innerHTML = ''; // This resets the HTML, so we need to re-append typing bubble if active
+                // The pinned "end-to-end encrypted" / "Business Account" notes describe the very
+                // start of the conversation, so they only belong at the top once the oldest
+                // message has actually been loaded (see ensureDmStartBanners for the scroll-up case).
+                if (noMoreOlderMessages) appendDmStartBanners(messagesEl);
+                const allItems = Object.values(cachedThreadMessages).sort((a, b) => a.createdAt - b.createdAt);
+                if (!isAIThread) scheduleDisappearingSweep(allItems);
+                const now = Date.now();
+                const items = isAIThread ? allItems : allItems.filter(m => !m.expiresAt || m.expiresAt > now);
+                if (items.length) buildDmItemsInto(messagesEl, items);
                 renderPendingUploadsInto(messagesEl, otherUid);
                 renderReadReceipt(messagesEl, isAIThread);
                 if (!isAIThread && isReadReceiptsEnabled()) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
@@ -34790,7 +34863,7 @@
                     // Keeps the view visually stable whether new content landed at the bottom
                     // (delta ~0, we were already scrolled up reading older messages) or an older
                     // page just got prepended at the top (delta = the height that page added).
-                    messagesEl.scrollTop = prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight);
+                    setChatScrollTopInstant(messagesEl, prevScrollTop + (messagesEl.scrollHeight - prevScrollHeight));
                     updateScrollToBottomBtnVisibility();
                 }
                 isActiveThreadInitialLoad = false;

@@ -11526,7 +11526,7 @@
                 // Status home — so however the viewer gets closed (X button, tap-to-exit, or
                 // the device/browser back button), always land back there instead of stranding
                 // the person on whatever tab happened to be underneath in the history stack.
-                if (hash !== 'tab-status') {
+                if (hash !== 'tab-status' && !explicitTabNavigation) {
                     history.replaceState(null, '', '#tab-status');
                     onNonHomeTab = false;
                     hash = 'tab-status';
@@ -11839,24 +11839,83 @@
         // non-Home tab always pops directly to the Home entry (one hop, whichever tab you were
         // on), and a back press from Home — which has nothing pushed behind it — falls through to
         // the native default and exits the app, exactly like a fresh page with no history.
+        // onNonHomeTab is kept for the few older call sites that still read/reset it, but
+        // goToTab no longer trusts it: a flag in memory drifts out of sync with the real
+        // history stack as soon as chats, viewers or sheets get opened/closed on top of a tab.
+        // Instead every tab entry that goToTab pushes directly above Home is stamped with
+        // { habaTabFromHome: true } in its own history.state — that travels with the entry
+        // itself, so "popping this entry lands on Home" can be verified rather than assumed.
         let onNonHomeTab = false;
+        // True only for the synchronous part of a goToTab(): lets handleHashChange know a tab
+        // switch was asked for explicitly, so it doesn't apply the "closing a story always
+        // returns to Home" rule on top of it and land somewhere the person didn't ask for.
+        let explicitTabNavigation = false;
+
+        // Closes every tracked bottom sheet (Post view, Settings, pickers, Contact Info's
+        // sub-sheets, …) that is open on top of the current screen. Their history entries are
+        // being superseded by the tab switch itself, so syncSheetHistory is told (via
+        // closingSheetViaBackButton) to update its stack but leave history alone.
+        function dismissOpenSheetsForTabNavigation() {
+            if (!sheetOpenStack.length) return false;
+            const ids = sheetOpenStack.slice();
+            closingSheetViaBackButton = true;
+            try {
+                ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('active'); });
+                syncSheetHistory();
+            } finally {
+                closingSheetViaBackButton = false;
+            }
+            return true;
+        }
+
+        // Switches to a tab from wherever the person currently is — another tab, a chat, a
+        // story, an image/video viewer, the composer, a profile sheet, or any stack of bottom
+        // sheets — and always ends up on that tab with everything layered above it closed.
         function goToTab(tabId) {
             const current = window.location.hash.replace('#', '') || 'tab-status';
-            if (current === tabId) return;
-            if (tabId === 'tab-status') {
-                if (onNonHomeTab) {
-                    onNonHomeTab = false;
-                    history.back(); // pops the single non-Home entry, landing back on Home
-                    return; // the resulting popstate/hashchange finishes the switch
-                }
-                history.replaceState(null, '', '#tab-status');
-            } else if (onNonHomeTab) {
-                history.replaceState(null, '', '#' + tabId); // swap in place, stay one level deep
-            } else {
-                history.pushState(null, '', '#' + tabId); // first hop away from Home
-                onNonHomeTab = true;
+            const sheetsWereOpen = dismissOpenSheetsForTabNavigation();
+            const onOverlayHash = !current.startsWith('tab-'); // '#chat', '#story', '#user-info', viewers, composer…
+
+            if (current === tabId) {
+                // Already on this tab. The only things that can be in the way are sheets
+                // (closed above) or a tab that isn't actually showing — resync in either case.
+                const tabEl = document.getElementById(tabId);
+                if (sheetsWereOpen) history.replaceState(null, '', '#' + tabId); // drop the sheet's leftover marker entry
+                if (sheetsWereOpen || (tabEl && !tabEl.classList.contains('active-tab'))) handleHashChange();
+                return;
             }
-            handleHashChange(); // replaceState/pushState don't fire hashchange themselves
+
+            const layered = sheetsWereOpen || onOverlayHash; // history has entries on top we can't reason about
+            const entryState = history.state || {};
+
+            // Cleanest case: going Home from a tab entry that was pushed straight above Home —
+            // popping that one entry lands on Home and keeps the back stack tidy.
+            if (tabId === 'tab-status' && !layered && entryState.habaTabFromHome) {
+                onNonHomeTab = false;
+                history.back(); // the resulting popstate/hashchange finishes the switch
+                return;
+            }
+
+            explicitTabNavigation = true;
+            try {
+                if (tabId === 'tab-status') {
+                    history.replaceState(null, '', '#tab-status');
+                    onNonHomeTab = false;
+                } else if (!layered && current === 'tab-status') {
+                    history.pushState({ habaTabFromHome: true }, '', '#' + tabId); // first hop away from Home
+                    onNonHomeTab = true;
+                } else {
+                    // Tab → tab keeps the provenance stamp of the entry it replaces; from on top of
+                    // an overlay/sheet the entry underneath is unknown, so it's left unstamped
+                    // (a later trip Home then uses replaceState instead of trusting a back()).
+                    const keepStamp = !layered && entryState.habaTabFromHome;
+                    history.replaceState(keepStamp ? { habaTabFromHome: true } : null, '', '#' + tabId);
+                    onNonHomeTab = true;
+                }
+                handleHashChange(); // replaceState/pushState don't fire hashchange themselves
+            } finally {
+                explicitTabNavigation = false;
+            }
         }
         window.addEventListener('popstate', () => {
             const hash = window.location.hash.replace('#', '');

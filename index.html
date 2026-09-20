@@ -2080,6 +2080,14 @@
         .feed-video-time { display: flex; align-items: baseline; gap: 3px; font-size: 11.5px; flex-shrink: 0; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
         .feed-video-time .t-cur { color: #fff; font-weight: 700; }
         .feed-video-time .t-dur { color: rgba(255,255,255,0.62); font-weight: 600; }
+        /* Auto-hide: while a feed/post-view video is playing, the overlay controls (control bar +
+           pop-out button) fade away after 5s of no interaction and come back on touch — see the
+           "auto-hide" block in initFeedVideoPlayer. Paused videos always keep them visible. */
+        .feed-video-controls { transition: opacity 0.25s ease, transform 0.25s ease; }
+        .feed-video-popout-btn { transition: opacity 0.25s ease, transform 0.18s cubic-bezier(.34,1.56,.64,1), background-color 0.15s ease; }
+        .feed-post-video-wrap.controls-hidden .feed-video-controls,
+        .feed-post-video-wrap.controls-hidden .feed-video-popout-btn { opacity: 0; pointer-events: none; }
+        .feed-post-video-wrap.controls-hidden .feed-video-controls { transform: translateY(6px); }
 
         .feed-post-reactors { display: flex; align-items: center; gap: 6px; margin-top: 8px; margin-left: 60px; }
         .feed-post-reactors-avatars { display: flex; }
@@ -17320,7 +17328,61 @@
                 thumb.style.left = (ratio * 100) + '%';
             }
 
+            // ── Auto-hide the overlay controls ──
+            // While the video is playing, the control bar and pop-out button fade out after 5s
+            // without interaction and return when the video is touched (or the mouse moves over
+            // it). A paused video always keeps them visible. The tap that *reveals* hidden controls
+            // is swallowed (tapGateActive) so it doesn't also open the full view / toggle playback —
+            // otherwise hidden controls could never be used without triggering the video's tap action.
+            const CONTROLS_HIDE_MS = 5000;
+            let controlsHideTimer = null;
+            let tapGateActive = false;
+            let tapGateTimer = null;
+            let lastMouseReveal = 0;
+            function scheduleControlsHide() {
+                clearTimeout(controlsHideTimer);
+                if (video.paused) return;
+                controlsHideTimer = setTimeout(() => {
+                    if (video.paused) return;
+                    if (track.classList.contains('dragging')) { scheduleControlsHide(); return; } // never hide mid-scrub
+                    wrap.classList.add('controls-hidden');
+                }, CONTROLS_HIDE_MS);
+            }
+            function showControls() {
+                wrap.classList.remove('controls-hidden');
+                scheduleControlsHide();
+            }
+            function keepControlsVisible() {
+                clearTimeout(controlsHideTimer);
+                wrap.classList.remove('controls-hidden');
+            }
+            video.addEventListener('play', showControls);
+            video.addEventListener('pause', keepControlsVisible);
+            video.addEventListener('ended', keepControlsVisible);
+            wrap.addEventListener('pointerdown', () => {
+                tapGateActive = wrap.classList.contains('controls-hidden');
+                clearTimeout(tapGateTimer);
+                if (tapGateActive) tapGateTimer = setTimeout(() => { tapGateActive = false; }, 700);
+                showControls();
+            }, true);
+            wrap.addEventListener('pointerup', scheduleControlsHide);
+            // The revealing tap can land on a control that only just became clickable (the bar fades
+            // back in on pointerdown) — make sure it can't seek/toggle/mute/pop out as a side effect.
+            ['touchstart', 'mousedown', 'click'].forEach(type => wrap.addEventListener(type, (e) => {
+                if (!tapGateActive || e.target === video) return; // taps on the video itself are handled by its click handler
+                e.stopPropagation();
+                if (type === 'click') tapGateActive = false;
+            }, true));
+            wrap.addEventListener('pointermove', (e) => {
+                if (e.pointerType !== 'mouse') return;
+                const now = Date.now();
+                if (now - lastMouseReveal < 250) return;
+                lastMouseReveal = now;
+                showControls();
+            });
+
             video.addEventListener('click', (e) => {
+                if (tapGateActive) { tapGateActive = false; e.stopPropagation(); return; } // this tap only revealed the controls
                 // Tapping the video itself now opens the full video view (like tapping a post
                 // image opens the image viewer), rather than just toggling play/pause inline —
                 // the dedicated center play/pause button below still does that. Callers that

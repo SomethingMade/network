@@ -2873,6 +2873,14 @@
            tabs, results) / results dropdown. While the dropdown is open (recent searches or
            live results) it takes over the page below the header, X-style, and the body steps
            aside (.search-results-open, toggled by initSearchTab). */
+        /* ── NOTIFICATIONS TAB (#tab-notifications) ── */
+        #tab-notifications .chat-header-area { padding-bottom: 8px; }
+        .notif-tab-header-action { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; padding: 6px; cursor: pointer; }
+        .notif-tab-header-action svg:active { opacity: 0.6; }
+        .notif-tab-selection-header { margin-bottom: 14px; min-height: 36px; }
+        #tab-notifications #notif-filter-row { padding: 0; margin: 0; }
+        .notif-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 14px max(16px, env(safe-area-inset-bottom)); }
+
         .search-tab-header { padding-bottom: 12px; }
         .search-tab-header-row { display: flex; align-items: center; gap: 10px; }
         .search-tab-header .search-box { flex: 1; min-width: 0; margin-bottom: 0; }
@@ -4566,26 +4574,28 @@
         @media (min-width: 1025px) {
             body.feed-open .app-grid { grid-template-columns: 240px 1fr; }
         }
-        /* Search tab: same wide-and-centered treatment as Home. */
+        /* Search + Notifications tabs: same wide-and-centered treatment as Home. */
         @media (min-width: 769px) {
-            body.search-open .workspace-pane { display: none; }
-            body.search-open .chat-pane { max-width: none; border-right: none; }
-            body.search-open #tab-search .chat-header-area {
+            body.search-open .workspace-pane, body.notif-open .workspace-pane { display: none; }
+            body.search-open .chat-pane, body.notif-open .chat-pane { max-width: none; border-right: none; }
+            body.search-open #tab-search .chat-header-area,
+            body.notif-open #tab-notifications .chat-header-area {
                 padding-left: max(16px, calc((100% - 640px) / 2));
                 padding-right: max(16px, calc((100% - 640px) / 2));
             }
             body.search-open #tab-search .search-tab-scroll,
-            body.search-open #tab-search > .chat-search-dropdown {
+            body.search-open #tab-search > .chat-search-dropdown,
+            body.notif-open #tab-notifications .notif-tab-scroll {
                 max-width: 640px;
                 width: 100%;
                 margin: 0 auto;
             }
         }
         @media (min-width: 769px) and (max-width: 1024px) {
-            body.search-open .app-grid { grid-template-columns: 190px 1fr; }
+            body.search-open .app-grid, body.notif-open .app-grid { grid-template-columns: 190px 1fr; }
         }
         @media (min-width: 1025px) {
-            body.search-open .app-grid { grid-template-columns: 240px 1fr; }
+            body.search-open .app-grid, body.notif-open .app-grid { grid-template-columns: 240px 1fr; }
         }
         @media (max-width: 768px) {
 
@@ -4688,7 +4698,7 @@
             }
             .chat-list-container { padding-bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); }
             .discover-grid-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
-            .search-tab-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
+            .search-tab-scroll, .notif-tab-scroll { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #tab-search > .chat-search-dropdown { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #communities-feed-container { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
@@ -5761,39 +5771,6 @@
             <div id="gif-picker-grid" class="gif-picker-grid"></div>
             <p id="gif-picker-loading" style="text-align:center; color:var(--text-secondary); font-size:13px; padding: 10px 0 20px;">Loading GIFs…</p>
             <p id="gif-picker-empty" style="display:none; text-align:center; color:var(--text-secondary); font-size:13px; padding: 10px 0 20px;">No GIFs found.</p>
-        </div>
-    </div>
-
-    <div id="notifications-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet notif-page-sheet">
-            <div class="notif-sheet-header" id="notif-header-default">
-                <div style="display:flex; align-items:center; gap:4px;">
-                    <button type="button" id="btn-close-notifs-sheet" class="tm-profile-back-btn" aria-label="Close" title="Close">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    </button>
-                    <h3 style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.3px;">Notifications</h3>
-                </div>
-                <svg id="btn-mark-all-notifs-read" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg>
-            </div>
-            <div class="notif-sheet-header" id="notif-header-selection" style="display:none;">
-                <div style="display:flex; align-items:center; gap:14px;">
-                    <svg id="btn-cancel-notif-selection" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Cancel"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    <span id="notif-selection-count" style="font-size:14.5px; font-weight:600;">1 selected</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <svg id="btn-select-all-notifs" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Select all"><path d="M9 6h11"></path><path d="M9 12h11"></path><path d="M9 18h11"></path><path d="M4 6l1.3 1.3L7.5 5"></path><path d="M4 12l1.3 1.3L7.5 11"></path><path d="M4 18l1.3 1.3L7.5 17"></path></svg>
-                    <svg id="btn-delete-selected-notifs" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;" title="Delete selected"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
-                </div>
-            </div>
-            <div class="wa-filter-row" id="notif-filter-row" style="padding: 10px 20px 4px; margin-bottom: 0;">
-                <button type="button" class="wa-chip active" data-notif-filter="all"><span>All</span></button>
-                <button type="button" class="wa-chip" data-notif-filter="follow"><span>Followers</span></button>
-                <button type="button" class="wa-chip" data-notif-filter="like"><span>Likes</span></button>
-                <button type="button" class="wa-chip" data-notif-filter="repost"><span>Repost</span></button>
-                <button type="button" class="wa-chip" data-notif-filter="comment"><span>Comments</span></button>
-            </div>
-            <div id="notifications-list" style="flex:1; overflow-y:auto; padding: 4px 20px 24px;"></div>
-            <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
         </div>
     </div>
 
@@ -8179,7 +8156,7 @@
                 <!-- Single primary nav-bar action button: icon and click behavior swap
                      per active tab (New Post on Home, New Chat on Messages) via
                      updateFabNavAction() instead of separate floating buttons. -->
-                <div class="nav-item" id="nav-notifications-btn">
+                <div class="nav-item" data-tab="tab-notifications" id="nav-notifications-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
                         <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -8412,6 +8389,40 @@
 
                     </div>
                     <div class="chat-search-dropdown" id="discover-search-dropdown"></div>
+                </div>
+
+                <!-- NOTIFICATIONS TAB (bottom nav): a real tab now, no longer a bottom sheet. Same
+                     ids the old sheet used (list, empty state, filter chips, selection header) so
+                     the render / select / delete logic below is unchanged. -->
+                <div id="tab-notifications" class="tab-content">
+                    <div class="chat-header-area">
+                        <div class="chat-header-top chat-header-top-minimal" id="notif-header-default">
+                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            <h1 class="chat-header-minimal-title">Notifications</h1>
+                            <div class="notif-tab-header-action"><svg id="btn-mark-all-notifs-read" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg></div>
+                        </div>
+                        <div class="chat-header-top notif-tab-selection-header" id="notif-header-selection" style="display:none;">
+                            <div style="display:flex; align-items:center; gap:14px;">
+                                <svg id="btn-cancel-notif-selection" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Cancel"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                <span id="notif-selection-count" style="font-size:14.5px; font-weight:600;">1 selected</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:16px;">
+                                <svg id="btn-select-all-notifs" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Select all"><path d="M9 6h11"></path><path d="M9 12h11"></path><path d="M9 18h11"></path><path d="M4 6l1.3 1.3L7.5 5"></path><path d="M4 12l1.3 1.3L7.5 11"></path><path d="M4 18l1.3 1.3L7.5 17"></path></svg>
+                                <svg id="btn-delete-selected-notifs" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--danger-red)" stroke-width="2" style="cursor:pointer;" title="Delete selected"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+                            </div>
+                        </div>
+                        <div class="wa-filter-row" id="notif-filter-row">
+                            <button type="button" class="wa-chip active" data-notif-filter="all"><span>All</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="follow"><span>Followers</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="like"><span>Likes</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="repost"><span>Repost</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="comment"><span>Comments</span></button>
+                        </div>
+                    </div>
+                    <div class="notif-tab-scroll" id="notif-tab-scroll">
+                        <div id="notifications-list"></div>
+                        <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
+                    </div>
                 </div>
 
                 <div id="tab-groups" class="tab-content">
@@ -11399,7 +11410,7 @@
 
         // Shared by handleHashChange (to animate the right direction) and the swipe gesture below
         // (to know what "next" and "previous" mean) — left-to-right, matching the nav bar order.
-        const TAB_ORDER = ['tab-status', 'tab-search', 'tab-chats', 'tab-groups', 'tab-contacts'];
+        const TAB_ORDER = ['tab-status', 'tab-search', 'tab-notifications', 'tab-chats', 'tab-groups', 'tab-contacts'];
         let previousActiveTabHash = null;
 
         // Tracks whatever the hash was immediately before the CURRENT handleHashChange call
@@ -11591,6 +11602,9 @@
                 // see the body.feed-open CSS — instead of sharing space with that pane.
                 document.body.classList.toggle('feed-open', hash === 'tab-status');
                 document.body.classList.toggle('search-open', hash === 'tab-search');
+                document.body.classList.toggle('notif-open', hash === 'tab-notifications');
+                if (hash === 'tab-notifications' && tabBeforeThisChange !== 'tab-notifications') onNotificationsTabEntered();
+                if (tabBeforeThisChange === 'tab-notifications' && hash !== 'tab-notifications') exitNotifSelectionMode();
                 if (hash === 'tab-search' && tabBeforeThisChange !== 'tab-search') onSearchTabEntered();
                 if (tabBeforeThisChange === 'tab-search' && hash !== 'tab-search') onSearchTabLeft();
 
@@ -11857,17 +11871,8 @@
             });
             // Search is a real tab now (#tab-search, a normal data-tab nav item handled by the
             // loop above); its enter/leave hooks live in onSearchTabEntered/onSearchTabLeft.
-            // Notifications isn't a persistent tab-content either — tapping it just opens
-            // the same notifications sheet used by the header bell icons elsewhere (see
-            // openNotificationsSheet/js-notif-bell), so there's no separate list to build
-            // or keep in sync.
-            const notificationsNavBtn = document.getElementById('nav-notifications-btn');
-            if (notificationsNavBtn) {
-                notificationsNavBtn.addEventListener('click', () => {
-                    triggerHaptic(12);
-                    openNotificationsSheet();
-                });
-            }
+            // Notifications is a real tab now (#tab-notifications, a normal data-tab nav item
+            // handled by the loop above); see onNotificationsTabEntered.
             const fabAddFriend = document.getElementById('fab-add-friend');
             if (fabAddFriend) {
                 const currentHash = window.location.hash.replace('#', '');
@@ -19559,8 +19564,8 @@
             onValue(notifQuery, (snap) => {
                 cachedNotifications = snap.exists() ? snap.val() : {};
                 updateNotifBellUI();
-                const sheet = document.getElementById('notifications-sheet-overlay');
-                if (sheet && sheet.classList.contains('active')) renderNotificationsList();
+                const notifTab = document.getElementById('tab-notifications');
+                if (notifTab && notifTab.classList.contains('active-tab')) renderNotificationsList();
             });
         }
 
@@ -19809,33 +19814,24 @@
                 const user = auth.currentUser;
                 if (user) update(ref(database, `notifications/${user.uid}/${notifId}`), { read: true });
             }
+            // Notifications is a tab, so every target (post view, applicants sheet, profile)
+            // simply opens over it — the device back button pops that layer and lands back on
+            // Notifications, right where the person left it.
             if (notif.postId) {
-                // Deliberately NOT closing the notifications sheet first — opening the post view
-                // on top of it (both are .bottom-sheet-overlay, so the generic sheet-stack
-                // back-button system above tracks them automatically) means the device back
-                // button pops the post view and lands back on Notifications, right where the
-                // person left it, instead of dropping straight to the feed underneath.
                 openNotificationPostView(notif.postId);
             } else if (notif.type === 'job_application' && notif.jobId) {
-                closeNotificationsSheet();
                 openJobApplicantsSheet(notif.jobId);
             } else if (notif.type === 'follow' && notif.fromUid) {
-                closeNotificationsSheet();
                 openUserProfileSheet(notif.fromUid);
-            } else {
-                closeNotificationsSheet();
             }
         }
 
-        function openNotificationsSheet() {
-            pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the sheet
-            document.getElementById('notifications-sheet-overlay').classList.add('active');
-            exitNotifSelectionMode();
-        }
-
-        function closeNotificationsSheet() {
-            document.getElementById('notifications-sheet-overlay').classList.remove('active');
-            exitNotifSelectionMode();
+        // Notifications used to be a bottom sheet; it's a tab now. Entering (from the nav bar or
+        // anywhere else that calls openNotificationsSheet) starts with a fresh list and no
+        // leftover selection; leaving is handled by handleHashChange.
+        function openNotificationsSheet() { goToTab('tab-notifications'); }
+        function onNotificationsTabEntered() {
+            exitNotifSelectionMode(); // also re-renders the list from the latest cachedNotifications
         }
 
         // --- JOBS ---
@@ -21212,10 +21208,6 @@
             } finally { hideLoading(); }
         });
 
-        document.getElementById('btn-close-notifs-sheet').addEventListener('click', closeNotificationsSheet);
-        document.getElementById('notifications-sheet-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'notifications-sheet-overlay') closeNotificationsSheet();
-        });
         document.querySelectorAll('.js-open-jobs-sheet').forEach(btn => {
             btn.addEventListener('click', () => {
                 const dropdown = btn.closest('.chat-view-menu-dropdown');
@@ -24566,7 +24558,7 @@
             const nav = document.querySelector('.side-nav');
             const askBar = document.getElementById('ask-anything-bar');
             if (!nav) return;
-            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'search-tab-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
+            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'search-tab-scroll', 'notif-tab-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
             const THRESHOLD = 6; // ignore tiny scroll jitter
             scrollIds.forEach(id => {
                 const scrollEl = document.getElementById(id);

@@ -4795,6 +4795,157 @@
         @media (min-width: 1025px) {
             body.search-open .app-grid, body.notif-open .app-grid { grid-template-columns: 240px 1fr; }
         }
+        /* ═══════════════════════════════════════════════════════════════════════════
+           X-STYLE DESKTOP LAYOUT — left nav | centered timeline | right rail
+           Home, Search and Notifications get a third column on wide screens: a search
+           box, "Trends for you" and "Who to follow", built from the same cached data the
+           Explore tab already uses. The nav gains a logo, Profile, More and a big Post
+           button, Home gets an inline "What's happening?" row, and the New Post composer
+           opens as a centered dialog instead of a full-screen page. Everything here is
+           desktop/tablet-only (769px+); phones keep the bottom-bar layout untouched.
+           ═══════════════════════════════════════════════════════════════════════════ */
+        .nav-desktop-only, .desktop-home-composer, .right-rail, .post-composer-backdrop { display: none; }
+
+        @media (min-width: 769px) {
+            .side-nav { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+            .side-nav::-webkit-scrollbar { display: none; }
+
+            .side-nav .nav-logo.nav-desktop-only {
+                display: flex; align-items: center; justify-content: center;
+                align-self: flex-start; width: 50px; height: 50px; margin: 0 0 4px 4px; padding: 11px;
+                box-sizing: border-box; border-radius: 50%; color: var(--text-primary);
+                cursor: pointer; flex-shrink: 0; transition: background 0.15s ease;
+            }
+            .nav-logo:hover { background: var(--bg-hover); }
+            .nav-logo svg { width: 100%; height: 100%; display: block; }
+
+            .side-nav .nav-item.nav-desktop-only { display: flex; }
+            .nav-item .nav-avatar {
+                width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+                background-size: cover; background-position: center;
+                background-color: rgba(var(--primary-rgb), 0.12);
+            }
+
+            .side-nav .nav-post-btn.nav-desktop-only {
+                display: block; flex-shrink: 0; width: 100%; height: 52px; margin: 16px 0 0;
+                border: none; border-radius: 999px; background: var(--gradient-brand); color: #fff;
+                font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+                box-shadow: var(--shadow-elevated); transition: opacity 0.15s ease, transform 0.15s ease;
+            }
+            .nav-post-btn:hover { opacity: 0.9; }
+            .nav-post-btn:active { transform: scale(0.98); }
+
+            /* Home: the avatar in the header duplicates the nav's Profile / More items here. */
+            body.feed-open #tab-status .home-header-title-row .header-profile-btn { display: none; }
+            body.feed-open #tab-status .chat-header-area { padding-top: 14px; padding-bottom: 14px; }
+            body.feed-open #tab-status .chat-header-top { margin-bottom: 0; }
+            /* The timeline header stays pinned on desktop (X-style) instead of sliding away. */
+            body:is(.feed-open, .search-open, .notif-open) .chat-header-area.header-scroll-hidden { margin-top: 0 !important; }
+
+            /* Inline "What's happening?" row at the top of the Home timeline. It opens the
+               real composer (as a dialog) rather than duplicating its logic. */
+            .desktop-home-composer {
+                display: flex; gap: 12px; margin: 0 -14px; padding: 14px 16px 10px;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .dhc-avatar {
+                width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+                background-size: cover; background-position: center;
+                background-color: rgba(var(--primary-rgb), 0.12);
+            }
+            .dhc-main { flex: 1; min-width: 0; }
+            .dhc-input { font-size: 20px; line-height: 1.3; color: var(--text-secondary); padding: 10px 0 14px; cursor: text; outline: none; }
+            .dhc-input:focus-visible { box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.25); border-radius: 6px; }
+            .dhc-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+            .dhc-icons { display: flex; align-items: center; gap: 2px; margin-left: -8px; }
+            .dhc-icon-btn {
+                width: 36px; height: 36px; padding: 0; border: none; border-radius: 50%; background: none;
+                color: var(--comment-blue); display: flex; align-items: center; justify-content: center; cursor: pointer;
+                transition: background 0.15s ease;
+            }
+            .dhc-icon-btn:hover { background: rgba(29, 155, 240, 0.1); }
+            .dhc-icon-btn svg { width: 20px; height: 20px; }
+            .dhc-post-btn {
+                height: 36px; padding: 0 20px; border: none; border-radius: 999px; background: var(--gradient-brand);
+                color: #fff; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease;
+            }
+            .dhc-post-btn:hover { opacity: 0.9; }
+
+            /* New Post composer as a centered dialog (with a dimmed backdrop) instead of a
+               full-screen page. The quote composer is left as it was. */
+            #post-composer-overlay {
+                inset: auto; top: 5vh; left: 0; right: 0; bottom: auto; margin: 0 auto;
+                width: min(600px, calc(100vw - 32px)); max-height: 90vh; min-height: 340px;
+                border-radius: 18px; box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+            }
+            #post-composer-overlay .post-composer-header { padding-top: 12px; }
+            #post-composer-overlay.active + .post-composer-backdrop {
+                display: block; position: fixed; inset: 0; z-index: 100000; background: rgba(0, 0, 0, 0.45);
+            }
+        }
+
+        /* Right rail + three-column grid (wide screens only; below 1100px the centered
+           timeline layout above stays as it was). */
+        @media (min-width: 1100px) {
+            body:is(.feed-open, .search-open, .notif-open) .app-grid {
+                grid-template-columns: 240px minmax(0, 600px) minmax(290px, 350px);
+                justify-content: center;
+            }
+            body:is(.feed-open, .search-open, .notif-open) .side-nav { border-right: none; }
+            body:is(.feed-open, .search-open, .notif-open) .chat-pane {
+                max-width: none;
+                border-left: 1px solid var(--border-color);
+                border-right: 1px solid var(--border-color);
+            }
+            /* A chat opened from these tabs covers the timeline + rail, starting at the
+               timeline's left edge (the grid is centered in the shell, so this follows it). */
+            body:is(.feed-open, .search-open, .notif-open) .chat-view-overlay {
+                left: calc(max(0px, (100% - 1190px) / 2) + 240px);
+            }
+            body:is(.feed-open, .search-open, .notif-open) .right-rail {
+                display: block; height: 100%; box-sizing: border-box; overflow-y: auto;
+                padding: 0 16px 24px 24px; scrollbar-width: none;
+            }
+            .right-rail::-webkit-scrollbar { display: none; }
+            /* On Search/Explore the page itself is the search + trends, so the rail keeps only Who to follow. */
+            body.search-open .rr-search, body.search-open #rr-trends-card { display: none; }
+
+            .rr-search { position: sticky; top: 0; z-index: 2; padding: 10px 0 8px; background: var(--bg-base); }
+            .rr-search .search-box { margin-bottom: 0; }
+            .rr-card { background: var(--bg-alt); border-radius: 16px; margin: 4px 0 16px; overflow: hidden; }
+            .rr-card h2 { margin: 0; padding: 12px 16px; font-size: 20px; font-weight: 800; color: var(--text-primary); }
+            .rr-trend { padding: 10px 16px; cursor: pointer; transition: background 0.12s ease; }
+            .rr-trend:hover, .rr-user:hover { background: rgba(var(--primary-rgb), 0.06); }
+            .rr-trend-meta { font-size: 13px; color: var(--text-secondary); }
+            .rr-trend-tag { font-size: 15px; font-weight: 700; color: var(--text-primary); overflow-wrap: anywhere; }
+            .rr-trend-count { font-size: 13px; color: var(--text-secondary); }
+            .rr-empty { padding: 6px 16px 16px; font-size: 14px; color: var(--text-secondary); }
+            .rr-user { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background 0.12s ease; }
+            .rr-user .avatar {
+                width: 40px; height: 40px; margin: 0; border-radius: 50%; flex-shrink: 0;
+                background-size: cover; background-position: center;
+            }
+            .rr-user-info { flex: 1; min-width: 0; }
+            .rr-user-name { display: flex; align-items: center; gap: 2px; font-size: 15px; font-weight: 700; color: var(--text-primary); }
+            .rr-user-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .rr-user-handle { font-size: 14px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .rr-follow-btn {
+                flex-shrink: 0; padding: 7px 16px; border-radius: 999px; background: transparent;
+                border: 1px solid var(--primary-blue); color: var(--primary-blue);
+                font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s ease;
+            }
+            .rr-follow-btn:hover { background: rgba(var(--primary-rgb), 0.08); }
+            .rr-follow-btn.added, .rr-follow-btn:disabled { border-color: var(--border-color); color: var(--text-secondary); cursor: default; background: transparent; }
+            .rr-show-more {
+                display: block; width: 100%; padding: 16px; border: none; background: none; text-align: left;
+                color: var(--comment-blue); font-family: inherit; font-size: 15px; cursor: pointer; transition: background 0.12s ease;
+            }
+            .rr-show-more:hover { background: rgba(var(--primary-rgb), 0.06); }
+        }
+
+        @media (max-width: 768px) {
+            .nav-desktop-only, .desktop-home-composer, .right-rail, .post-composer-backdrop { display: none !important; }
+        }
         @media (max-width: 768px) {
 
             .app-grid { grid-template-columns: 1fr; }
@@ -5515,6 +5666,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Dimmed backdrop behind the New Post dialog on desktop (see #post-composer-overlay CSS). -->
+    <div class="post-composer-backdrop" id="post-composer-backdrop"></div>
 
     <div class="post-composer-overlay" id="quote-composer-overlay">
         <div class="post-composer-header">
@@ -8391,6 +8545,13 @@
 
             <nav class="side-nav">
                 <div class="nav-indicator" id="nav-indicator"></div>
+                <div class="nav-desktop-only nav-logo" id="nav-logo-btn" role="button" tabindex="0" aria-label="Haba home" title="Home">
+                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <polygon points="20,80 170,30 80,110" fill="currentColor" fill-opacity="0.75"/>
+                        <polygon points="120,180 170,30 80,110" fill="currentColor"/>
+                        <polygon points="20,80 80,110 80,140" fill="currentColor" fill-opacity="0.55"/>
+                    </svg>
+                </div>
                 <div class="nav-item active" data-tab="tab-status">
                     <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path class="icon-line" stroke="currentColor" stroke-width="1.8" d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -8430,6 +8591,21 @@
                     </svg>
                     <span>Messages</span>
                 </div>
+                <!-- Desktop/tablet only (hidden on phones): X-style Profile, More and Post. -->
+                <div class="nav-item nav-desktop-only" id="nav-profile-btn" role="button" tabindex="0">
+                    <div class="nav-avatar js-my-avatar"></div>
+                    <span>Profile</span>
+                </div>
+                <div class="nav-item nav-desktop-only" id="nav-more-btn" role="button" tabindex="0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+                        <circle cx="8" cy="12" r="1" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+                        <circle cx="12" cy="12" r="1" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+                        <circle cx="16" cy="12" r="1" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+                    </svg>
+                    <span>More</span>
+                </div>
+                <button type="button" class="nav-post-btn nav-desktop-only" id="nav-post-btn">Post</button>
             </nav>
 
             <aside class="chat-pane">
@@ -8539,6 +8715,29 @@
                         </div>
                     </div>
                     <div class="discover-grid-scroll" id="discover-grid-scroll">
+                    <div class="desktop-home-composer" id="desktop-home-composer">
+                        <div class="dhc-avatar js-my-avatar"></div>
+                        <div class="dhc-main">
+                            <div class="dhc-input" role="button" tabindex="0" data-dhc-action="text">What's happening?</div>
+                            <div class="dhc-actions">
+                                <div class="dhc-icons">
+                                    <button type="button" class="dhc-icon-btn" data-dhc-action="photo" title="Photo/Video" aria-label="Photo or video">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+                                    </button>
+                                    <button type="button" class="dhc-icon-btn" data-dhc-action="gif" title="GIF" aria-label="GIF">
+                                        <svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="12" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect><text x="12" y="15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="6.5" font-weight="700" fill="currentColor">GIF</text></svg>
+                                    </button>
+                                    <button type="button" class="dhc-icon-btn" data-dhc-action="poll" title="Poll" aria-label="Poll">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+                                    </button>
+                                    <button type="button" class="dhc-icon-btn" data-dhc-action="location" title="Location" aria-label="Location">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                                <button type="button" class="dhc-post-btn" data-dhc-action="text">Post</button>
+                            </div>
+                        </div>
+                    </div>
                         <div class="feed-sticky-header" id="feed-sticky-header">
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"></path></svg>For you</button>
@@ -9019,6 +9218,27 @@
                     <p>Select a chat from the list to start messaging, or follow someone to begin a new conversation.</p>
                 </div>
             </main>
+
+            <!-- Right rail (wide desktop only, on Home / Search / Notifications): search, trends and
+                 people to follow. Filled by renderRightRail() from the same cached data Explore uses. -->
+            <aside class="right-rail" id="right-rail" aria-label="Trends and suggestions">
+                <div class="rr-search">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="search" id="rr-search-input" placeholder="Search Haba" autocomplete="off" name="haba-rail-search" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
+                    </div>
+                </div>
+                <section class="rr-card" id="rr-trends-card">
+                    <h2>Trends for you</h2>
+                    <div id="rr-trends-list"></div>
+                    <button type="button" class="rr-show-more" id="rr-trends-more">Show more</button>
+                </section>
+                <section class="rr-card" id="rr-follow-card" style="display:none;">
+                    <h2>Who to follow</h2>
+                    <div id="rr-follow-list"></div>
+                    <button type="button" class="rr-show-more" id="rr-follow-more">Show more</button>
+                </section>
+            </aside>
         </div>
     </div>
 
@@ -15111,6 +15331,7 @@
         }
 
         function renderDiscoverGridIfActive() {
+            try { renderRightRail(); } catch (err) { /* the side rail must never break the feed */ }
             const tab = document.getElementById('tab-status');
             const searchTab = document.getElementById('tab-search');
             const onHome = tab && tab.classList.contains('active-tab');
@@ -22309,6 +22530,9 @@
             btnProfileNavEls.forEach(btnProfileImg => {
                 btnProfileImg.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
                 btnProfileImg.textContent = "";
+            });
+            document.querySelectorAll('.js-my-avatar').forEach(el => {
+                el.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
             });
             // Haba Ride's own header avatar also carries a verified badge overlay — the only
             // avatar shown in that screen, so this is the one place a badge-on-avatar makes
@@ -38326,6 +38550,227 @@
             }
         }
         
+        // ── X-STYLE DESKTOP LAYOUT: right rail, inline composer row, extra nav actions ──
+        // (CSS lives in the "X-STYLE DESKTOP LAYOUT" block near the top; all of this is inert on phones.)
+        let rrFollowUids = [];
+        let rrFollowSeed = null;
+        let rrTrendsSig = null;
+        let rrFollowSig = null;
+
+        function rightRailIsVisible() {
+            const rail = document.getElementById('right-rail');
+            return !!rail && rail.getClientRects().length > 0;
+        }
+
+        // Same hashtag tally the Explore tab's Trending list uses (see renderExploreTrending).
+        function rrTopTrends(limit) {
+            const counts = {};
+            Object.keys(cachedPosts || {}).forEach(postId => {
+                const post = cachedPosts[postId];
+                if (!post) return;
+                extractHashtags(post.text).forEach(tag => { counts[tag] = (counts[tag] || 0) + 1; });
+            });
+            return Object.keys(counts)
+                .sort((a, b) => counts[b] - counts[a])
+                .slice(0, limit)
+                .map(tag => ({ tag, count: counts[tag] }));
+        }
+
+        function renderRightRailTrends() {
+            const list = document.getElementById('rr-trends-list');
+            const moreBtn = document.getElementById('rr-trends-more');
+            if (!list) return;
+            const trends = rrTopTrends(5);
+            const sig = trends.map(t => t.tag + ':' + t.count).join('|');
+            if (sig === rrTrendsSig) return;
+            rrTrendsSig = sig;
+            if (moreBtn) moreBtn.style.display = trends.length ? '' : 'none';
+            if (!trends.length) {
+                list.innerHTML = '<div class="rr-empty">No trends yet. Post with a #hashtag to start one.</div>';
+                return;
+            }
+            list.innerHTML = trends.map((t, i) => `
+                <div class="rr-trend" data-tag="${escapeHtmlForSearch(t.tag)}">
+                    <div class="rr-trend-meta">${i + 1} · Trending on Haba</div>
+                    <div class="rr-trend-tag">#${escapeHtmlForSearch(t.tag)}</div>
+                    <div class="rr-trend-count">${t.count} post${t.count === 1 ? '' : 's'}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderRightRailFollow() {
+            const card = document.getElementById('rr-follow-card');
+            const list = document.getElementById('rr-follow-list');
+            if (!card || !list) return;
+            // Keep the same three people on screen (a followed row flips to "Following" instead
+            // of vanishing) until the list empties or the app's discover seed is refreshed.
+            const stillValid = rrFollowUids.length && rrFollowSeed === discoverShuffleSeed &&
+                rrFollowUids.every(uid => cachedUsers[uid]);
+            if (!stillValid) {
+                const pool = shuffleWithSeed(getSuggestableUsers(), 'rr-follow-' + discoverShuffleSeed);
+                rrFollowUids = rankByMutuals(pool, getFreshMutualsCache()).slice(0, 3);
+                rrFollowSeed = discoverShuffleSeed;
+            }
+            if (!rrFollowUids.length) {
+                card.style.display = 'none';
+                rrFollowSig = null;
+                return;
+            }
+            card.style.display = '';
+            const sig = rrFollowUids.map(uid =>
+                uid + ':' + (cachedContacts[uid] ? 1 : 0) + ':' + ((cachedUsers[uid] && cachedUsers[uid].name) || '')
+            ).join('|');
+            if (sig === rrFollowSig) return;
+            rrFollowSig = sig;
+            list.innerHTML = rrFollowUids.map(uid => {
+                const profile = cachedUsers[uid] || {};
+                const following = !!cachedContacts[uid];
+                const handle = profile.username ? '@' + profile.username : 'On Haba';
+                return `
+                    <div class="rr-user" data-uid="${uid}">
+                        ${feedAvatarHtml(profile)}
+                        <div class="rr-user-info">
+                            <div class="rr-user-name"><span>${escapeHtmlForPost(profile.name || 'Haba User')}</span>${verifiedBadgeFor(uid, false)}</div>
+                            <div class="rr-user-handle">${escapeHtmlForPost(handle)}</div>
+                        </div>
+                        <button type="button" class="rr-follow-btn${following ? ' added' : ''}" data-uid="${uid}"${following ? ' disabled' : ''}>${following ? 'Following' : 'Follow'}</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderRightRail() {
+            if (!rightRailIsVisible()) return;
+            renderRightRailTrends();
+            renderRightRailFollow();
+        }
+
+        // Jump to the Search tab with a query already run (same path the Explore trend rows use).
+        function rrRunSearch(term) {
+            goToTab('tab-search');
+            const input = document.getElementById('search-discover');
+            if (!input) return;
+            input.value = term;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.focus();
+            addDiscoverSearchHistory(term);
+        }
+
+        (function initDesktopXLayout() {
+            // Left nav extras
+            const on = (id, evt, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(evt, fn); };
+            const activateOnKey = (id, fn) => on(id, 'keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+
+            const goHome = () => {
+                goToTab('tab-status');
+                const feedScroll = document.getElementById('discover-grid-scroll');
+                if (feedScroll) feedScroll.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+            on('nav-logo-btn', 'click', goHome);
+            activateOnKey('nav-logo-btn', goHome);
+
+            const openProfile = () => openProfileSheetOnSubtab('posts');
+            on('nav-profile-btn', 'click', openProfile);
+            activateOnKey('nav-profile-btn', openProfile);
+
+            const openMore = () => openSidebarDrawer();
+            on('nav-more-btn', 'click', openMore);
+            activateOnKey('nav-more-btn', openMore);
+
+            on('nav-post-btn', 'click', () => openPostComposer());
+
+            // Inline "What's happening?" row -> opens the real composer, optionally jumping
+            // straight to its photo / GIF / poll / location control.
+            const composerRow = document.getElementById('desktop-home-composer');
+            if (composerRow) {
+                const COMPOSER_TARGETS = {
+                    photo: 'feed-composer-file',
+                    gif: 'feed-composer-gif-btn',
+                    poll: 'feed-composer-poll-btn',
+                    location: 'feed-composer-location-btn'
+                };
+                const openFromRow = (action) => {
+                    openPostComposer();
+                    const target = COMPOSER_TARGETS[action] && document.getElementById(COMPOSER_TARGETS[action]);
+                    if (target) setTimeout(() => target.click(), 80);
+                };
+                composerRow.addEventListener('click', (e) => {
+                    const btn = e.target.closest('[data-dhc-action]');
+                    openFromRow(btn ? btn.dataset.dhcAction : 'text');
+                });
+                composerRow.addEventListener('keydown', (e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('dhc-input')) {
+                        e.preventDefault();
+                        openFromRow('text');
+                    }
+                });
+            }
+
+            // Clicking the dimmed area behind the New Post dialog closes it like the X button does.
+            on('post-composer-backdrop', 'click', () => {
+                const closeBtn = document.getElementById('post-composer-close');
+                if (closeBtn) closeBtn.click();
+            });
+
+            // Right rail
+            const rail = document.getElementById('right-rail');
+            if (rail) {
+                rail.addEventListener('click', async (e) => {
+                    const followBtn = e.target.closest('.rr-follow-btn');
+                    if (followBtn) {
+                        if (followBtn.disabled) return;
+                        const uid = followBtn.dataset.uid;
+                        if (!uid || !auth.currentUser) return;
+                        followBtn.disabled = true;
+                        followBtn.textContent = 'Following...';
+                        try {
+                            await followUser(uid);
+                            followBtn.textContent = 'Following';
+                            followBtn.classList.add('added');
+                            notify('You followed this person');
+                        } catch (err) {
+                            followBtn.disabled = false;
+                            followBtn.textContent = 'Follow';
+                            showCustomModal('Error', 'Could not follow this person.');
+                        }
+                        return;
+                    }
+                    const trend = e.target.closest('.rr-trend');
+                    if (trend && trend.dataset.tag) { rrRunSearch('#' + trend.dataset.tag); return; }
+                    const user = e.target.closest('.rr-user');
+                    if (user && user.dataset.uid) { openUserProfileSheet(user.dataset.uid); return; }
+                    if (e.target.closest('#rr-trends-more')) {
+                        goToTab('tab-search');
+                        const tab = document.querySelector('#explore-tabs-bar [data-explore-tab="trending"]');
+                        if (tab) tab.click();
+                        return;
+                    }
+                    if (e.target.closest('#rr-follow-more')) {
+                        goToTab('tab-search');
+                        const tab = document.querySelector('#explore-tabs-bar [data-explore-tab="people"]');
+                        if (tab) tab.click();
+                    }
+                });
+            }
+            on('rr-search-input', 'keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                const input = e.currentTarget;
+                const term = input.value.trim();
+                if (!term) return;
+                input.value = '';
+                input.blur();
+                rrRunSearch(term);
+            });
+
+            // Keep the rail current: when its tab becomes visible, when the window resizes across
+            // the breakpoint, and on a slow tick (renders are skipped unless the data changed).
+            new MutationObserver(() => requestAnimationFrame(renderRightRail))
+                .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+            window.addEventListener('resize', () => requestAnimationFrame(renderRightRail));
+            setInterval(renderRightRail, 15000);
+            setTimeout(renderRightRail, 1200);
+        })();
+
         // --- PREVENT ZOOMING (pinch, double-tap, ctrl+wheel) ---
         document.addEventListener('gesturestart', (e) => e.preventDefault());
         document.addEventListener('gesturechange', (e) => e.preventDefault());

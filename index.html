@@ -3330,7 +3330,7 @@
         .haba-ride-options-list { display: flex; flex-direction: column; gap: 2px; max-height: 40vh; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
         .haba-ride-option-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: transparent; }
         .haba-ride-option-card.selected { border-color: var(--text-primary); background: var(--bg-alt); }
-        .haba-ride-option-card--unavailable { opacity: 0.45; cursor: not-allowed; }
+        .haba-ride-option-card--unavailable { opacity: 0.6; cursor: pointer; } /* still selectable — the ride can be scheduled for later */
         .haba-ride-option-card--unavailable .haba-ride-option-meta { color: #c0392b; font-weight: 600; }
         .haba-ride-option-card:active { transform: scale(0.99); }
         .haba-ride-option-card .haba-ride-option-icon { width: 64px; height: 52px; border-radius: 0; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 34px; flex-shrink: 0; position: relative; }
@@ -3366,6 +3366,13 @@
         .hrs-pay-line { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 6px 0 2px; }
         .hrs-paydue-amount { font-size: 36px; font-weight: 800; color: var(--text-primary); margin: 0 0 8px; letter-spacing: -0.5px; }
         .ride-history-pay { margin-top: 10px; padding: 11px; font-size: 14px; }
+        .ride-history-cancel-scheduled { margin-top: 10px; padding: 11px; font-size: 14px; color: var(--danger-red); }
+        .hrs-when { margin-bottom: 10px; }
+        .hrs-when-input { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; padding: 12px; border: none; border-radius: 10px; background: var(--bg-alt); color: var(--text-primary); font: inherit; font-size: 15px; font-weight: 700; min-height: 46px; }
+        body.dark-theme .hrs-when-input { color-scheme: dark; }
+        .hrs-sched-banner { display: flex; align-items: center; gap: 10px; padding: 11px 12px; margin-bottom: 10px; border-radius: 10px; background: var(--bg-alt); color: var(--text-primary); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+        .hrs-sched-banner:active { opacity: 0.85; transform: scale(0.99); }
+        .hrs-sched-banner span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* ── SEARCHING panel: request written to ride_requests/{id}, waiting for a driver
            (from the not-yet-built drivers app) to accept it. ── */
@@ -8691,6 +8698,11 @@
                         <div class="haba-ride-sheet" id="haba-ride-sheet">
                             <!-- HOME: no destination chosen yet — pick a ride type, see fake nearby-driver count -->
                             <div id="haba-ride-home-panel">
+                                <div class="hrs-sched-banner" id="haba-ride-sched-banner" style="display:none;" role="button" tabindex="0">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>
+                                    <span id="haba-ride-sched-banner-text"></span>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 18l6-6-6-6"></path></svg>
+                                </div>
                                 <div class="haba-ride-hero" id="haba-ride-hero" role="button" tabindex="0" title="Tap to enter a destination">
                                     <div class="haba-ride-hero-icon" id="haba-ride-hero-icon"></div>
                                     <div class="haba-ride-hero-text">
@@ -8746,12 +8758,21 @@
                                 </div>
                                 <div class="haba-ride-confirm-stats">
                                     <div><div class="haba-ride-stat-value" id="haba-ride-confirm-eta">-- min</div><div class="haba-ride-stat-label">Trip time</div></div>
-                                    <div><div class="haba-ride-stat-value" id="haba-ride-confirm-arrival">-- min</div><div class="haba-ride-stat-label">Driver arrival</div></div>
+                                    <div><div class="haba-ride-stat-value" id="haba-ride-confirm-arrival">-- min</div><div class="haba-ride-stat-label" id="haba-ride-confirm-arrival-label">Driver arrival</div></div>
                                     <div><div class="haba-ride-stat-value" id="haba-ride-confirm-seats">--</div><div class="haba-ride-stat-label">Seats</div></div>
                                 </div>
                                 <div class="hrs-route">
                                     <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-confirm-pickup-value">Your location</div></div>
                                     <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value" id="haba-ride-confirm-dest">--</div></div>
+                                </div>
+                                <div class="hrs-pay hrs-when">
+                                    <div class="hrs-pay-label">When</div>
+                                    <div class="hrs-pay-picker" id="haba-ride-when-picker" role="radiogroup" aria-label="Pickup time">
+                                        <button type="button" data-when="now" class="active" role="radio" aria-checked="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"></path></svg>Now</button>
+                                        <button type="button" data-when="later" role="radio" aria-checked="false"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>Schedule</button>
+                                    </div>
+                                    <input type="datetime-local" id="haba-ride-when-input" class="hrs-when-input" style="display:none;" aria-label="Pickup date and time">
+                                    <div class="hrs-pay-hint" id="haba-ride-when-hint" style="display:none;"></div>
                                 </div>
                                 <div class="hrs-pay">
                                     <div class="hrs-pay-label">Pay with</div>
@@ -25408,6 +25429,7 @@
             goToTab('tab-groups');
             showCommunitiesMapSubtab();
             checkHabaOutstandingPayment();
+            startHabaScheduledWatch();
         }
         // Not currently wired to a button (the map's top-left button is now Ride history) — Haba Ride is
         // left via the bottom nav / device back, which tuck the map away in handleHashChange.
@@ -25482,9 +25504,10 @@
             return 1;
         }
 
-        function habaRidePrice(typeId, distanceKm) {
+        // `when` (optional Date) prices the fare for a booked-ahead ride at that time's surge level.
+        function habaRidePrice(typeId, distanceKm, when) {
             const t = HABA_RIDE_TYPES[typeId];
-            const price = (t.baseFare + t.perKm * Math.max(distanceKm, 1)) * habaRideSurgeMultiplier();
+            const price = (t.baseFare + t.perKm * Math.max(distanceKm, 1)) * habaRideSurgeMultiplier(when);
             return Math.round(price); // whole rand — fares are shown (and sent to drivers) with no cents
         }
         // "R88" — ride prices are always displayed as whole rand, never with decimals.
@@ -25625,6 +25648,7 @@
             habaRideArrivalByType = {};
             habaSelectedRideTypeId = null;
             habaRideOptionsSelectedId = null;
+            habaRideWhen = { mode: 'now', ts: null };
             document.getElementById('map-destination-search').value = '';
             if (communitiesMapState) {
                 communitiesMapState.directionsRenderer.setDirections({ routes: [] });
@@ -25777,6 +25801,230 @@
             handler.openIframe();
         }
 
+        // ── Scheduled rides ──────────────────────────────────────────────────────────
+        // The confirm panel's "When" picker books a ride for later (15 minutes to 30 days out). It's written
+        // to ride_requests/{id} with status:'scheduled' + scheduledFor (ms epoch) and no driver search yet.
+        // HABA_SCHEDULE_DISPATCH_LEAD_MS before pickup it's flipped to 'requested' with a compare-and-set on
+        // status (so this app, a server job and the drivers app can all try and only one wins), then it
+        // follows the normal requested → accepted → arriving → in_progress → completed flow.
+        // A live query on the rider's own requests drives the "Scheduled" banner and the dispatch timer,
+        // and picks a dispatched ride back up — even after the app was closed and reopened — so its
+        // searching/trip panel shows.
+        // NOTE: the timer only runs while this app is open. For rides to dispatch reliably with the app
+        // closed, something server-side (a scheduled Cloud Function, or the drivers app) has to make the
+        // same status flip.
+        const HABA_SCHEDULE_MIN_LEAD_MS = 15 * 60000;
+        const HABA_SCHEDULE_MAX_AHEAD_MS = 30 * 24 * 3600000;
+        const HABA_SCHEDULE_DISPATCH_LEAD_MS = 10 * 60000;
+        const HABA_SCHEDULE_GRACE_MS = 30 * 60000; // past this after pickup time, an undispatched ride shows as Missed
+        const HABA_SCHEDULED_SEARCH_TIMEOUT_MS = 3 * 60000; // more patient than an on-demand request
+        let habaRideWhen = { mode: 'now', ts: null };
+        let habaScheduledRides = []; // upcoming status:'scheduled' rides, soonest first
+        let habaScheduledWatchUnsub = null;
+        let habaScheduledWatchUid = null;
+        let habaDispatchTimer = null;
+
+        function habaRideCtaLabel(typeId) {
+            const verb = habaRideWhen.mode === 'later' ? 'Schedule' : 'Request';
+            return typeId === 'womandrive' ? `${verb} Woman Drive Woman` : `${verb} Haba ${HABA_RIDE_TYPES[typeId].label}`;
+        }
+
+        // "Sat, 27 Sep, 14:30" in the device's own locale/clock.
+        function habaFormatWhen(ms) {
+            return new Date(ms).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        }
+        // <input type="datetime-local"> wants local time as YYYY-MM-DDTHH:mm.
+        function habaLocalInputValue(ms) {
+            const d = new Date(ms);
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        // Half an hour from now, rounded up to the next quarter hour.
+        function habaDefaultScheduleTs() {
+            const d = new Date(Date.now() + 30 * 60000);
+            d.setSeconds(0, 0);
+            d.setMinutes(d.getMinutes() + ((15 - (d.getMinutes() % 15)) % 15));
+            return d.getTime();
+        }
+        function validateHabaScheduleTs(ts) {
+            if (!Number.isFinite(ts)) return 'Pick a pickup date and time.';
+            const now = Date.now();
+            // 60s of slack: the picker only has minute precision.
+            if (ts < now + HABA_SCHEDULE_MIN_LEAD_MS - 60000) return 'Pick a pickup time at least 15 minutes from now.';
+            if (ts > now + HABA_SCHEDULE_MAX_AHEAD_MS) return 'You can schedule a ride up to 30 days ahead.';
+            return null;
+        }
+
+        // Keeps the confirm panel's When row, price, timing stat and button label in step with the chosen mode/time.
+        function renderHabaRideWhen() {
+            const typeId = habaSelectedRideTypeId;
+            if (!typeId || !habaRideRoute) return;
+            const later = habaRideWhen.mode === 'later';
+            if (later && !Number.isFinite(habaRideWhen.ts)) habaRideWhen.ts = habaDefaultScheduleTs();
+            document.querySelectorAll('#haba-ride-when-picker button').forEach(b => {
+                const on = (b.dataset.when === 'later') === later;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+            const input = document.getElementById('haba-ride-when-input');
+            input.style.display = later ? '' : 'none';
+            const whenDate = later ? new Date(habaRideWhen.ts) : undefined;
+            if (later) {
+                input.min = habaLocalInputValue(Date.now() + HABA_SCHEDULE_MIN_LEAD_MS);
+                input.max = habaLocalInputValue(Date.now() + HABA_SCHEDULE_MAX_AHEAD_MS);
+                input.value = habaLocalInputValue(habaRideWhen.ts);
+            }
+            document.getElementById('haba-ride-confirm-price').textContent = habaFormatPrice(habaRidePrice(typeId, habaRideRoute.distanceKm, whenDate));
+            const arrivalEl = document.getElementById('haba-ride-confirm-arrival');
+            const arrivalLabelEl = document.getElementById('haba-ride-confirm-arrival-label');
+            if (later) {
+                arrivalEl.textContent = whenDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                arrivalLabelEl.textContent = 'Pickup time';
+            } else {
+                const arrival = habaRideArrivalMin(typeId);
+                arrivalEl.textContent = arrival === null ? 'N/A' : `${arrival} min`;
+                arrivalLabelEl.textContent = 'Driver arrival';
+            }
+            let hint = '';
+            if (later) {
+                const peak = habaRideSurgeMultiplier(whenDate) > 1;
+                hint = `Pickup ${habaFormatWhen(habaRideWhen.ts)}${peak ? ' · peak fare applies' : ''}. We'll start finding a driver about 10 minutes before.`;
+            } else if (habaRideArrivalMin(typeId) === null) {
+                hint = 'No drivers nearby right now. Schedule this ride for later instead.';
+            }
+            const hintEl = document.getElementById('haba-ride-when-hint');
+            hintEl.textContent = hint;
+            hintEl.style.display = hint ? '' : 'none';
+            document.getElementById('btn-haba-ride-request').textContent = habaRideCtaLabel(typeId);
+        }
+
+        // Starts listening to a live ride_requests/{id} (shared by "request now" and by a scheduled ride
+        // that has been dispatched) and gives up on the search after timeoutMs.
+        function trackHabaRideRequest(requestId, timeoutMs) {
+            habaCurrentRideRequestId = requestId;
+            const requestRef = ref(database, `ride_requests/${requestId}`);
+            const handler = (snap) => handleHabaRideRequestUpdate(snap.val());
+            onValue(requestRef, handler);
+            habaRideRequestUnsub = () => off(requestRef, 'value', handler);
+
+            habaSearchTimeoutHandle = setTimeout(async () => {
+                if (!habaCurrentRideRequestId) return;
+                try {
+                    await update(ref(database, `ride_requests/${habaCurrentRideRequestId}`), {
+                        status: 'cancelled', cancelledBy: 'system', cancelReason: 'timeout', updatedAt: serverTimestamp()
+                    });
+                } catch (err) { console.error('[haba-ride] timeout cancel failed', err); }
+                notify('No drivers responded in time. Try again.', 'info');
+                finishHabaRideRequest();
+            }, timeoutMs);
+        }
+
+        function renderHabaScheduledBanner() {
+            const el = document.getElementById('haba-ride-sched-banner');
+            if (!habaScheduledRides.length) { el.style.display = 'none'; return; }
+            const next = habaScheduledRides[0];
+            document.getElementById('haba-ride-sched-banner-text').textContent = habaScheduledRides.length === 1
+                ? `Scheduled · ${habaFormatWhen(next.scheduledFor)}`
+                : `${habaScheduledRides.length} scheduled rides · next ${habaFormatWhen(next.scheduledFor)}`;
+            el.style.display = 'flex';
+        }
+
+        function armHabaDispatchTimer() {
+            if (habaDispatchTimer) { clearTimeout(habaDispatchTimer); habaDispatchTimer = null; }
+            const next = habaScheduledRides[0];
+            if (!next) return;
+            let delay = next.scheduledFor - HABA_SCHEDULE_DISPATCH_LEAD_MS - Date.now();
+            if (habaCurrentRideRequestId) delay = Math.max(delay, 30000); // busy with another ride — look again shortly
+            habaDispatchTimer = setTimeout(dispatchDueHabaScheduledRide, Math.min(Math.max(delay, 0), 2147483647)); // setTimeout's max
+        }
+
+        async function dispatchDueHabaScheduledRide() {
+            habaDispatchTimer = null;
+            if (habaCurrentRideRequestId) { armHabaDispatchTimer(); return; }
+            const due = habaScheduledRides.find(r => r.scheduledFor - HABA_SCHEDULE_DISPATCH_LEAD_MS <= Date.now());
+            if (!due) { armHabaDispatchTimer(); return; }
+            try {
+                // Compare-and-set: only flips if it's still 'scheduled', so a server job / the drivers app
+                // dispatching the same ride can't double-fire it. (Returning null for null forces the SDK
+                // to check the server value instead of aborting on an empty local cache.)
+                const result = await runTransaction(ref(database, `ride_requests/${due.id}/status`),
+                    (cur) => cur === null ? cur : (cur === 'scheduled' ? 'requested' : undefined));
+                if (result.committed) {
+                    await update(ref(database, `ride_requests/${due.id}`), { dispatchedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                }
+                // The live watch sees the new status and starts tracking the ride.
+            } catch (err) {
+                console.error('[haba-ride] failed to dispatch scheduled ride', err);
+                habaDispatchTimer = setTimeout(dispatchDueHabaScheduledRide, 30000);
+            }
+        }
+
+        // A dispatched booked-ahead ride that's still live and worth showing: on its way / underway, or
+        // just dispatched and still looking for a driver.
+        function isLiveDispatchedScheduledRide(r, now) {
+            if (typeof r.scheduledFor !== 'number') return false;
+            if (r.status === 'accepted' || r.status === 'arriving' || r.status === 'in_progress') return Math.abs(now - r.scheduledFor) < 6 * 3600000;
+            return r.status === 'requested' && now - r.scheduledFor < 15 * 60000;
+        }
+
+        function adoptHabaScheduledRide(ride) {
+            const t = HABA_RIDE_TYPES[ride.rideType];
+            document.getElementById('haba-ride-searching-sub').textContent =
+                `Your scheduled ride is starting. Looking for a nearby ${(t ? t.label : 'ride').toLowerCase()} driver`;
+            if (ride.status === 'requested') notify('Your scheduled ride is starting. Finding a driver now.', 'info');
+            trackHabaRideRequest(ride.id, HABA_SCHEDULED_SEARCH_TIMEOUT_MS);
+        }
+
+        function stopHabaScheduledWatch() {
+            if (habaScheduledWatchUnsub) { habaScheduledWatchUnsub(); habaScheduledWatchUnsub = null; }
+            if (habaDispatchTimer) { clearTimeout(habaDispatchTimer); habaDispatchTimer = null; }
+            habaScheduledWatchUid = null;
+            habaScheduledRides = [];
+            const banner = document.getElementById('haba-ride-sched-banner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        // Idempotent — safe to call on login, on opening Haba Ride and after booking.
+        function startHabaScheduledWatch() {
+            const user = auth.currentUser;
+            if (!user) return;
+            if (habaScheduledWatchUid === user.uid && habaScheduledWatchUnsub) return;
+            stopHabaScheduledWatch();
+            habaScheduledWatchUid = user.uid;
+            const q = query(ref(database, 'ride_requests'), orderByChild('riderUid'), equalTo(user.uid), limitToLast(20));
+            const handler = (snap) => {
+                if (!auth.currentUser || auth.currentUser.uid !== habaScheduledWatchUid) { stopHabaScheduledWatch(); return; }
+                const now = Date.now();
+                const rides = [];
+                snap.forEach(child => { const r = child.val(); if (r) rides.push({ id: child.key, ...r }); });
+                habaScheduledRides = rides
+                    .filter(r => r.status === 'scheduled' && typeof r.scheduledFor === 'number' && r.scheduledFor > now - HABA_SCHEDULE_GRACE_MS)
+                    .sort((a, b) => a.scheduledFor - b.scheduledFor);
+                renderHabaScheduledBanner();
+                armHabaDispatchTimer();
+                if (!habaCurrentRideRequestId && !habaPayInFlight) {
+                    const live = rides.find(r => isLiveDispatchedScheduledRide(r, now));
+                    if (live) adoptHabaScheduledRide(live);
+                }
+            };
+            onValue(q, handler, (err) => {
+                console.error('[haba-ride] scheduled rides watch cancelled', err);
+                stopHabaScheduledWatch();
+            });
+            habaScheduledWatchUnsub = () => off(q, 'value', handler);
+        }
+
+        // Upcoming scheduled rides first (soonest first), then everything else newest first.
+        function compareHabaRideHistory(a, b) {
+            const cutoff = Date.now() - HABA_SCHEDULE_GRACE_MS;
+            const aUp = a.status === 'scheduled' && (a.scheduledFor || 0) > cutoff;
+            const bUp = b.status === 'scheduled' && (b.scheduledFor || 0) > cutoff;
+            if (aUp && bUp) return (a.scheduledFor || 0) - (b.scheduledFor || 0);
+            if (aUp) return -1;
+            if (bUp) return 1;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+        }
+
         // ── Live ride-request lifecycle ──────────────────────────────────────────────
         // Schema written by this app / read from the (upcoming) drivers app:
         //   ride_requests/{requestId}: {
@@ -25788,6 +26036,11 @@
         //     paymentMethod: 'cash' | 'card',
         //     paymentStatus: 'cash' (driver collects) | 'pending' (card, not yet paid) | 'paid',
         //     paymentRef, paidAmount, paidAt   (written by the rider app once Paystack succeeds)
+        //     scheduledFor (ms epoch — only on rides booked ahead), dispatchedAt
+        //   Booked-ahead rides are written with status:'scheduled' and no driver search. About 10 minutes
+        //   before scheduledFor, the rider app — or a server job / the drivers app, whoever gets there
+        //   first (the flip is a compare-and-set on status) — moves it to 'requested', and from there it
+        //   follows the normal flow. See "Scheduled rides" below.
         //   }
         //   driver_profiles/{uid}: { name, photoURL, vehicleModel, vehicleColor, plate, rating }
         // The drivers app claims a request by setting status:'accepted' + driverId, then moves
@@ -25990,7 +26243,7 @@
                 const arrival = habaRideArrivalMin(typeId);
                 const unavailable = arrival === null;
                 const metaText = unavailable
-                    ? 'No drivers available'
+                    ? 'No drivers nearby now · you can schedule'
                     : `${arrival} min away · ${habaRideClock(arrival + tripMin)} dropoff`;
                 return `<div class="haba-ride-option-card${unavailable ? ' haba-ride-option-card--unavailable' : ''}" data-ride-type="${typeId}" ${unavailable ? 'aria-disabled="true"' : ''}>
                     <div class="haba-ride-option-icon">${t.icon}</div>
@@ -26004,10 +26257,6 @@
             }).join('');
             list.querySelectorAll('.haba-ride-option-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    if (card.classList.contains('haba-ride-option-card--unavailable')) {
-                        notify('No drivers available for this ride type yet. Drivers will be added later.', 'info');
-                        return;
-                    }
                     triggerHaptic(10);
                     // Uber-style: first tap selects, tapping the selected ride again continues.
                     if (habaRideOptionsSelectedId === card.dataset.rideType) showHabaRideConfirm(card.dataset.rideType);
@@ -26017,7 +26266,7 @@
 
             // Preselect a ride (like Uber): the one already chosen, else the one picked on Home, else the first with drivers.
             const available = typeIds.filter(id => habaRideArrivalMin(id) !== null);
-            const pre = [habaSelectedRideTypeId, habaHomeSelectedType].find(id => id && available.includes(id)) || available[0] || null;
+            const pre = [habaSelectedRideTypeId, habaHomeSelectedType].find(id => id && available.includes(id)) || available[0] || (typeIds.includes(habaHomeSelectedType) ? habaHomeSelectedType : null);
             habaRideOptionsSelectedId = null;
             document.getElementById('btn-haba-ride-choose').style.display = 'none';
             if (pre) selectHabaRideOption(pre);
@@ -26040,14 +26289,22 @@
             document.getElementById('haba-ride-confirm-dest').textContent = habaRideRoute.destLabel;
             document.getElementById('btn-haba-ride-request').textContent = typeId === 'womandrive' ? 'Request Woman Drive Woman' : `Request Haba ${t.label}`;
             renderHabaRidePayPicker();
+            renderHabaRideWhen();
             showHabaRideStep('confirm');
         }
 
         // Writes a real ride_requests/{id} record and switches to the "searching" panel, which
         // listens live for the drivers app to accept it (see handleHabaRideRequestUpdate).
         async function requestHabaRide() {
+            const scheduling = habaRideWhen.mode === 'later';
+            const scheduledFor = scheduling ? habaRideWhen.ts : null;
+            if (scheduling) {
+                const whenErr = validateHabaScheduleTs(scheduledFor);
+                if (whenErr) { notify(whenErr, 'error'); renderHabaRideWhen(); return; }
+            }
             const drivers = (communitiesMapState.nearbyDrivers && communitiesMapState.nearbyDrivers[habaSelectedRideTypeId]) || [];
-            if (drivers.length === 0) {
+            // A ride for later doesn't need a driver nearby right now — one is found closer to pickup time.
+            if (!scheduling && drivers.length === 0) {
                 notify('No nearby drivers for this ride type. Drivers will be added later.', 'info');
                 return;
             }
@@ -26061,11 +26318,11 @@
             }
             const typeId = habaSelectedRideTypeId;
             const t = HABA_RIDE_TYPES[typeId];
-            const price = habaRidePrice(typeId, habaRideRoute.distanceKm);
+            const price = habaRidePrice(typeId, habaRideRoute.distanceKm, scheduling ? new Date(scheduledFor) : undefined);
 
             const btn = document.getElementById('btn-haba-ride-request');
             btn.disabled = true;
-            btn.textContent = 'Requesting…';
+            btn.textContent = scheduling ? 'Scheduling…' : 'Requesting…';
 
             const requestData = {
                 riderUid: user.uid,
@@ -26084,7 +26341,8 @@
                 price,
                 paymentMethod: habaRidePayMethod,
                 paymentStatus: habaRidePayMethod === 'card' ? 'pending' : 'cash',
-                status: 'requested',
+                status: scheduling ? 'scheduled' : 'requested',
+                ...(scheduling ? { scheduledFor } : {}),
                 driverId: null,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
@@ -26100,32 +26358,23 @@
                 }
                 const newRequestRef = push(ref(database, 'ride_requests'));
                 await set(newRequestRef, requestData);
-                habaCurrentRideRequestId = newRequestRef.key;
+                if (scheduling) {
+                    // Booked for later: nothing to search or track yet — the scheduled-rides watch takes it from here.
+                    notify(`Ride scheduled for ${habaFormatWhen(scheduledFor)}.`, 'success');
+                    resetHabaRideFlow();
+                    startHabaScheduledWatch();
+                    return;
+                }
 
                 showHabaRideStep('searching');
                 document.getElementById('haba-ride-searching-sub').textContent = `Looking for a nearby ${t.label.toLowerCase()} driver`;
-
-                const requestRef = ref(database, `ride_requests/${newRequestRef.key}`);
-                const handler = (snap) => handleHabaRideRequestUpdate(snap.val());
-                onValue(requestRef, handler);
-                habaRideRequestUnsub = () => off(requestRef, 'value', handler);
-
-                habaSearchTimeoutHandle = setTimeout(async () => {
-                    if (!habaCurrentRideRequestId) return;
-                    try {
-                        await update(ref(database, `ride_requests/${habaCurrentRideRequestId}`), {
-                            status: 'cancelled', cancelledBy: 'system', cancelReason: 'timeout', updatedAt: serverTimestamp()
-                        });
-                    } catch (err) { console.error('[haba-ride] timeout cancel failed', err); }
-                    notify('No drivers responded in time. Try again.', 'info');
-                    finishHabaRideRequest();
-                }, HABA_RIDE_SEARCH_TIMEOUT_MS);
+                trackHabaRideRequest(newRequestRef.key, HABA_RIDE_SEARCH_TIMEOUT_MS);
             } catch (err) {
                 console.error('[haba-ride] failed to create request', err);
                 notify("Couldn't send your ride request — try again.", 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = typeId === 'womandrive' ? 'Request Woman Drive Woman' : `Request Haba ${t.label}`;
+                btn.textContent = habaRideCtaLabel(typeId);
             }
         }
 
@@ -26144,6 +26393,11 @@
             if (s === 'cancelled') {
                 if (req.cancelReason === 'timeout') return { label: 'No driver found', cls: 'expired' };
                 return { label: req.cancelledBy === 'driver' ? 'Driver cancelled' : 'Cancelled', cls: 'cancelled' };
+            }
+            if (s === 'scheduled') {
+                // Never dispatched and well past pickup time (app was closed, nothing server-side picked it up).
+                if (typeof req.scheduledFor === 'number' && req.scheduledFor < Date.now() - HABA_SCHEDULE_GRACE_MS) return { label: 'Missed', cls: 'expired' };
+                return { label: 'Scheduled', cls: 'pending' };
             }
             if (s === 'accepted' || s === 'arriving' || s === 'in_progress') return { label: habaRideStatusLabel(s).replace('Driver is ', 'Driver '), cls: 'active' };
             // Still 'requested': live only if it's the search happening right now; otherwise the
@@ -26167,7 +26421,8 @@
                 const t = HABA_RIDE_TYPES[req.rideType];
                 const title = t ? (t.womenOnly ? t.label : `Haba ${t.label}`) : 'Haba Ride';
                 const st = rideHistoryStatus(req, req.id);
-                const when = typeof req.createdAt === 'number' ? new Date(req.createdAt) : null;
+                const whenMs = typeof req.scheduledFor === 'number' ? req.scheduledFor : req.createdAt; // booked-ahead rides show their pickup time
+                const when = typeof whenMs === 'number' ? new Date(whenMs) : null;
                 const sameYear = when && when.getFullYear() === new Date().getFullYear();
                 const dateLabel = when
                     ? `${when.toLocaleDateString(undefined, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' })} · ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
@@ -26198,6 +26453,7 @@
                             <div class="hrs-stop dropoff"><div class="haba-ride-trip-label">Drop-off</div><div class="haba-ride-trip-value">${dropoff}</div></div>
                         </div>
                         ${(metaBits.length || driverSpan) ? `<div class="ride-history-meta">${metaBits.join(' · ')}${metaBits.length && driverSpan ? ' · ' : ''}${driverSpan}</div>` : ''}
+                        ${req.status === 'scheduled' ? `<button type="button" class="hrs-btn-secondary ride-history-cancel-scheduled" data-request-id="${escapeHtmlForPost(req.id)}">Cancel scheduled ride</button>` : ''}
                         ${cardDue ? `<button type="button" class="hrs-btn-secondary ride-history-pay" data-request-id="${escapeHtmlForPost(req.id)}">Pay ${habaFormatPrice(req.price)}</button>` : ''}
                     </div>`;
             }).join('');
@@ -26240,7 +26496,7 @@
                 if (token !== rideHistoryLoadToken) return; // a newer open superseded this one
                 const entries = Object.entries(snap.val() || {})
                     .map(([id, req]) => ({ id, ...req }))
-                    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    .sort(compareHabaRideHistory);
                 renderRideHistory(entries);
             } catch (err) {
                 console.error('[haba-ride] failed to load ride history', err);
@@ -26291,6 +26547,61 @@
                 triggerHaptic(10);
                 closeRideHistorySheet();
                 showHabaRidePayPanel(req.id, req);
+            });
+        })();
+
+        // Scheduled-ride wiring: When picker, time input, home banner, and cancelling from Ride history.
+        (() => {
+            document.getElementById('haba-ride-when-picker').addEventListener('click', (e) => {
+                const b = e.target.closest('button[data-when]');
+                if (!b) return;
+                triggerHaptic(8);
+                habaRideWhen.mode = b.dataset.when === 'later' ? 'later' : 'now';
+                renderHabaRideWhen();
+            });
+            document.getElementById('haba-ride-when-input').addEventListener('change', (e) => {
+                const ts = new Date(e.target.value).getTime(); // datetime-local is parsed as local time
+                const err = validateHabaScheduleTs(ts);
+                if (err) {
+                    notify(err, 'error');
+                    if (validateHabaScheduleTs(habaRideWhen.ts)) habaRideWhen.ts = habaDefaultScheduleTs(); // previous pick went stale too
+                } else {
+                    habaRideWhen.ts = ts;
+                }
+                renderHabaRideWhen();
+            });
+            const banner = document.getElementById('haba-ride-sched-banner');
+            banner.addEventListener('click', () => { triggerHaptic(8); openRideHistorySheet(); });
+            banner.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRideHistorySheet(); }
+            });
+            document.getElementById('ride-history-list').addEventListener('click', async (e) => {
+                const b = e.target.closest('.ride-history-cancel-scheduled');
+                if (!b) return;
+                const id = b.dataset.requestId;
+                const req = rideHistoryEntries.find(r => r.id === id);
+                if (!req) return;
+                const ok = await showCustomModal('Cancel scheduled ride?', `Your ride on ${habaFormatWhen(req.scheduledFor)} will be cancelled.`, true);
+                if (!ok) return;
+                b.disabled = true;
+                try {
+                    const result = await runTransaction(ref(database, `ride_requests/${id}/status`),
+                        (cur) => cur === null ? cur : (cur === 'scheduled' ? 'cancelled' : undefined));
+                    if (!result.committed) {
+                        notify("This ride has already been dispatched, so it can't be cancelled here.", 'info');
+                        b.disabled = false;
+                        return;
+                    }
+                    await update(ref(database, `ride_requests/${id}`), { cancelledBy: 'rider', cancelReason: 'rider_cancelled_scheduled', updatedAt: serverTimestamp() });
+                    req.status = 'cancelled';
+                    req.cancelledBy = 'rider';
+                    renderRideHistory([...rideHistoryEntries].sort(compareHabaRideHistory));
+                    notify('Scheduled ride cancelled.', 'info');
+                } catch (err) {
+                    console.error('[haba-ride] failed to cancel scheduled ride', err);
+                    notify("Couldn't cancel this ride. Try again.", 'error');
+                    b.disabled = false;
+                }
             });
         })();
 
@@ -31911,6 +32222,8 @@
                 // screen if enabled on this device — see maybeShowAppLockGate(). Safe to call on
                 // every onAuthStateChanged refire since it no-ops once appLockCurrentlyUnlocked.
                 maybeShowAppLockGate();
+                // Booked-ahead Haba rides dispatch from a timer + live query, so it has to run app-wide, not just while the ride map is open.
+                startHabaScheduledWatch();
                 // Still hidden behind the branded splash at this point (higher z-index) — this
                 // just gets it ready underneath so hideLoading() below reveals shimmer, not a
                 // blank/half-populated screen, on a fresh open.

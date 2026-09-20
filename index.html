@@ -3398,6 +3398,15 @@
         .haba-ride-driver-vehicle { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
         .hrs-plate { flex-shrink: 0; background: var(--bg-alt); border-radius: 8px; padding: 7px 11px; font-size: 14px; font-weight: 800; letter-spacing: 1px; color: var(--text-primary); }
 
+        /* Ride PIN (Uber-style): the rider reads these 4 digits to the driver, who enters them in the
+           drivers app to start the trip — proves the right rider got into the right car. */
+        .hrs-pin-card { display: flex; align-items: center; gap: 14px; padding: 12px 14px; margin-bottom: 12px; border-radius: 12px; background: var(--bg-alt); }
+        .hrs-pin-text { flex: 1; min-width: 0; }
+        .hrs-pin-title { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+        .hrs-pin-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; line-height: 1.35; }
+        .hrs-pin-digits { display: flex; gap: 6px; flex-shrink: 0; }
+        .hrs-pin-digits span { width: 34px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--text-primary); color: var(--bg-surface); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
         /* Scrollable vertical feed container — same scroll behavior as the Home feed's
            .discover-grid-scroll (flex: 1, overflow-y: auto), so Communities posts stack in a
            single vertical column and scroll independently of the fixed header/tabs above them. */
@@ -8803,6 +8812,14 @@
                                         <div class="haba-ride-driver-eta" id="haba-ride-driver-eta">-- min</div>
                                         <div class="haba-ride-driver-eta-label" id="haba-ride-driver-eta-label">away</div>
                                     </div>
+                                </div>
+                                <!-- Ride PIN: shown while the driver is on the way; hidden once the trip starts -->
+                                <div class="hrs-pin-card" id="haba-ride-pin-card" style="display:none;">
+                                    <div class="hrs-pin-text">
+                                        <div class="hrs-pin-title">Your ride PIN</div>
+                                        <div class="hrs-pin-sub">Give this PIN to your driver to start the trip. Never share it before you're in the car.</div>
+                                    </div>
+                                    <div class="hrs-pin-digits" id="haba-ride-pin-digits" aria-label="Ride PIN"></div>
                                 </div>
                                 <div class="haba-ride-driver-card">
                                     <div class="haba-ride-driver-avatar" id="haba-ride-driver-avatar"></div>
@@ -26037,6 +26054,7 @@
         //     paymentStatus: 'cash' (driver collects) | 'pending' (card, not yet paid) | 'paid',
         //     paymentRef, paidAmount, paidAt   (written by the rider app once Paystack succeeds)
         //     scheduledFor (ms epoch — only on rides booked ahead), dispatchedAt
+        //     pinHash, pinSalt, pinVerified   (ride PIN — see "Ride PIN" below)
         //   Booked-ahead rides are written with status:'scheduled' and no driver search. About 10 minutes
         //   before scheduledFor, the rider app — or a server job / the drivers app, whoever gets there
         //   first (the flip is a compare-and-set on status) — moves it to 'requested', and from there it
@@ -26132,8 +26150,91 @@
             }
         }
 
+        // ── Ride PIN (Uber-style) ────────────────────────────────────────────────────
+        // Every ride gets a random 4-digit PIN when it's requested. The rider sees it on the trip
+        // panel while the driver is on the way and reads it out; the driver types it into the drivers
+        // app, which only starts the trip if it matches. The raw PIN lives at ride_pins/{requestId}
+        // ({riderUid, pin} — rules should let ONLY that rider read it). The ride_request itself
+        // carries just a salted hash, so drivers can't read the PIN off the request:
+        //   pinHash = SHA-256 hex of `${requestId}:${pinSalt}:${pin}`
+        // The drivers app checks the entered PIN against pinHash, then writes pinVerified:true and
+        // status:'in_progress'. If pinHash is absent the ride has no PIN and the driver app skips the check.
+        const habaRidePinCache = {}; // requestId -> pin (this session only)
+
+        function habaGenerateRidePin() {
+            const buf = new Uint32Array(1);
+            crypto.getRandomValues(buf);
+            return String(buf[0] % 10000).padStart(4, '0');
+        }
+
+        async function habaHashRidePin(requestId, salt, pin) {
+            const bytes = new TextEncoder().encode(`${requestId}:${salt}:${pin}`);
+            const digest = await crypto.subtle.digest('SHA-256', bytes);
+            return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Creates the PIN and its stored pieces. Returns null (ride proceeds without a PIN) if anything
+        // fails — e.g. the ride_pins rules aren't deployed yet — rather than blocking the booking.
+        async function createHabaRidePin(requestId, riderUid) {
+            try {
+                const pin = habaGenerateRidePin();
+                const saltBuf = new Uint8Array(8);
+                crypto.getRandomValues(saltBuf);
+                const pinSalt = Array.from(saltBuf).map(b => b.toString(16).padStart(2, '0')).join('');
+                const pinHash = await habaHashRidePin(requestId, pinSalt, pin);
+                await set(ref(database, `ride_pins/${requestId}`), { riderUid, pin });
+                habaRidePinCache[requestId] = pin;
+                return { pinHash, pinSalt, pinVerified: false };
+            } catch (err) {
+                console.error('[haba-ride] failed to create ride PIN', err);
+                return null;
+            }
+        }
+
+        function renderHabaRidePin(pin) {
+            const card = document.getElementById('haba-ride-pin-card');
+            const digitsEl = document.getElementById('haba-ride-pin-digits');
+            if (!pin) { card.style.display = 'none'; digitsEl.textContent = ''; return; }
+            digitsEl.innerHTML = '';
+            String(pin).split('').forEach(d => {
+                const span = document.createElement('span');
+                span.textContent = d;
+                digitsEl.appendChild(span);
+            });
+            digitsEl.setAttribute('aria-label', `Ride PIN ${String(pin).split('').join(' ')}`);
+            card.style.display = '';
+        }
+
+        // Shows the PIN while the driver is on the way; hides it once the trip has started.
+        async function syncHabaRidePin(request) {
+            const requestId = habaCurrentRideRequestId;
+            const waitingForStart = (request.status === 'accepted' || request.status === 'arriving') && request.pinVerified !== true;
+            if (!requestId || !request.pinHash || !waitingForStart) {
+                renderHabaRidePin(null);
+                return;
+            }
+            let pin = habaRidePinCache[requestId];
+            if (!pin) {
+                try {
+                    const snap = await get(ref(database, `ride_pins/${requestId}`));
+                    pin = snap.exists() ? (snap.val().pin || '') : '';
+                    if (pin) habaRidePinCache[requestId] = pin;
+                } catch (err) { console.error('[haba-ride] failed to read ride PIN', err); }
+            }
+            if (habaCurrentRideRequestId === requestId) renderHabaRidePin(pin);
+        }
+
+        // Best-effort tidy-up once the PIN has done its job (trip started, finished or cancelled).
+        function cleanupHabaRidePin(requestId) {
+            if (!requestId) return;
+            delete habaRidePinCache[requestId];
+            remove(ref(database, `ride_pins/${requestId}`)).catch(() => {});
+        }
+
         function showHabaRideTripPanel(request) {
             showHabaRideStep('trip');
+            syncHabaRidePin(request);
+            if (request.status === 'in_progress') cleanupHabaRidePin(habaCurrentRideRequestId);
             habaRideTripStatus = request.status;
             updateHabaRideTripTags(request.status);
             document.getElementById('haba-ride-trip-status').textContent = habaRideStatusLabel(request.status);
@@ -26183,6 +26284,8 @@
         }
 
         function finishHabaRideRequest() {
+            cleanupHabaRidePin(habaCurrentRideRequestId);
+            renderHabaRidePin(null);
             teardownHabaRideRequestListeners();
             habaCurrentRideRequestId = null;
             resetHabaRideFlow();
@@ -26357,6 +26460,9 @@
                     return;
                 }
                 const newRequestRef = push(ref(database, 'ride_requests'));
+                // Ride PIN: written first so the hash is on the request the moment a driver can see it.
+                const pinFields = await createHabaRidePin(newRequestRef.key, user.uid);
+                if (pinFields) Object.assign(requestData, pinFields);
                 await set(newRequestRef, requestData);
                 if (scheduling) {
                     // Booked for later: nothing to search or track yet — the scheduled-rides watch takes it from here.

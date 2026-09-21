@@ -3952,6 +3952,7 @@
            the same bubble shape as a text message, just with the fill swapped for the media itself. */
         .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl); cursor: pointer; background: var(--bg-hover); }
         .msg-media-img { pointer-events: auto; }
+        .msg-bubble img, .msg-bubble video { -webkit-user-drag: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
         .msg-media-video { cursor: default; }
         .msg-media-wrap { position: relative; }
         .msg-media-img, .msg-media-video { opacity: 1; transition: opacity 0.25s ease; }
@@ -36645,12 +36646,16 @@
         // Media fields copied onto a reply's quoted-message snapshot so the reply bubble can show
         // (and open) the picture being replied to. View-once media is never copied.
         function replyMediaFields(m) {
-            if (!m || m.viewOnce || !m.mediaURL || !['image', 'gif', 'video'].includes(m.mediaType)) return {};
-            const f = { mediaURL: m.mediaURL };
-            if (m.mediaPreview) f.mediaPreview = m.mediaPreview;
-            if (m.mediaEncrypted) {
+            if (!m) return {};
+            // The swipe/long-press path only carries a slim copy of the message (no encryption
+            // flags, no view-once flag), so resolve the full one from the loaded thread first.
+            const full = (typeof cachedThreadMessages !== 'undefined' && m.key && cachedThreadMessages[m.key]) || m;
+            if (full.viewOnce || !full.mediaURL || !['image', 'gif', 'video'].includes(full.mediaType)) return {};
+            const f = { mediaURL: full.mediaURL };
+            if (full.mediaPreview) f.mediaPreview = full.mediaPreview;
+            if (full.mediaEncrypted) {
                 f.mediaEncrypted = true;
-                if (m.mediaMimeType) f.mediaMimeType = m.mediaMimeType;
+                if (full.mediaMimeType) f.mediaMimeType = full.mediaMimeType;
             }
             return f;
         }
@@ -37375,6 +37380,37 @@
         // Event Delegation for Swiping & Long Presses on Chat Bubbles
         let interactionState = { active: false, startX: 0, currentX: 0, bubble: null, timer: null, msgData: null };
         const chatMessagesContainer = document.getElementById('chat-view-messages');
+        let lastBubbleMenuAt = 0;
+
+        // Photos/videos: the browser starts its own image long-press/drag gesture, which cancels
+        // the pointer stream before our 600ms timer fires. Stop the drag, and treat the browser's
+        // own long-press (contextmenu) event as the trigger for media bubbles too.
+        chatMessagesContainer.addEventListener('dragstart', (e) => {
+            if (e.target.closest && e.target.closest('.msg-bubble')) e.preventDefault();
+        });
+        chatMessagesContainer.addEventListener('contextmenu', (e) => {
+            const bubble = e.target.closest && e.target.closest('.msg-bubble');
+            if (!bubble || bubble.classList.contains('pending') || bubble.classList.contains('deleted')) return;
+            e.preventDefault();
+            if (Date.now() - lastBubbleMenuAt < 900) return; // the timer already opened it
+            if (interactionState.timer) clearTimeout(interactionState.timer);
+            if (interactionState.bubble) interactionState.bubble.style.transform = '';
+            interactionState.active = false;
+            interactionState.currentX = 0;
+            lastBubbleMenuAt = Date.now();
+            openMessageContextMenu({
+                key: bubble.dataset.key,
+                text: bubble.dataset.text,
+                senderUid: bubble.dataset.senderUid,
+                mediaURL: bubble.dataset.mediaURL,
+                mediaType: bubble.dataset.mediaType,
+                createdAt: bubble.dataset.createdAt ? Number(bubble.dataset.createdAt) : null
+            }, bubble.classList.contains('out'), bubble);
+        });
+        // Releasing a long press over a photo would otherwise also "tap" it and open the viewer.
+        chatMessagesContainer.addEventListener('click', (e) => {
+            if (Date.now() - lastBubbleMenuAt < 700) { e.stopPropagation(); e.preventDefault(); }
+        }, true);
 
         chatMessagesContainer.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -37397,6 +37433,7 @@
             // Long press timer
             interactionState.timer = setTimeout(() => {
                 if (interactionState.active && Math.abs(interactionState.currentX) < 10) {
+                    lastBubbleMenuAt = Date.now();
                     interactionState.active = false;
                     interactionState.bubble.style.transform = '';
                     openMessageContextMenu(interactionState.msgData, bubble.classList.contains('out'), bubble);
@@ -37977,8 +38014,8 @@
                             // original message if it's loaded (covers replies sent before this existed).
                             const origMsg = (typeof cachedThreadMessages !== 'undefined' && cachedThreadMessages[rm.key]) || null;
                             const viewable = ['image', 'gif', 'video'];
-                            const qMedia = rm.mediaURL ? rm
-                                : (origMsg && !origMsg.viewOnce && origMsg.mediaURL && viewable.includes(origMsg.mediaType) ? origMsg : null);
+                            const origUsable = !!(origMsg && !origMsg.viewOnce && origMsg.mediaURL && viewable.includes(origMsg.mediaType));
+                            const qMedia = origUsable ? origMsg : (rm.mediaURL ? rm : null);
                             const qType = rm.mediaType || (origMsg && origMsg.mediaType) || '';
                             const qLabel = qType === 'gif' ? 'GIF' : qType === 'video' ? 'Video' : 'Photo';
                             const quoteText = rm.text || (qMedia ? qLabel : (rm.mediaType ? `[${rm.mediaType}]` : '[Attachment]'));
@@ -37999,6 +38036,15 @@
                                 quoteDiv.classList.add('has-thumb');
                                 const thumbWrap = document.createElement('div');
                                 thumbWrap.className = 'quoted-msg-thumb';
+                                const dropThumb = () => { thumbWrap.remove(); quoteDiv.classList.remove('has-thumb'); };
+                                let thumbRetried = false;
+                                const onThumbError = () => {
+                                    if (thumbRetried || qType === 'video' && !qMedia.mediaEncrypted) { dropThumb(); return; }
+                                    thumbRetried = true;
+                                    decryptMediaUrlForPeer(otherUid, qMedia.mediaURL, qMedia.mediaMimeType, true)
+                                        .then(localUrl => { if (localUrl) setThumbSrc(localUrl); else dropThumb(); })
+                                        .catch(dropThumb);
+                                };
                                 const setThumbSrc = (url) => {
                                     quoteViewUrl = url;
                                     thumbWrap.innerHTML = '';
@@ -38006,7 +38052,9 @@
                                         const poster = !qMedia.mediaEncrypted ? cloudinaryVideoThumbnail(url, 1) : null;
                                         if (poster) {
                                             const im = document.createElement('img');
-                                            im.src = poster; im.alt = '';
+                                            im.alt = '';
+                                            im.addEventListener('error', dropThumb);
+                                            im.src = poster;
                                             thumbWrap.appendChild(im);
                                         } else {
                                             const v = document.createElement('video');
@@ -38019,8 +38067,9 @@
                                         thumbWrap.appendChild(play);
                                     } else {
                                         const im = document.createElement('img');
-                                        im.src = (qType === 'gif' && qMedia.mediaPreview) ? qMedia.mediaPreview : url;
                                         im.alt = '';
+                                        im.addEventListener('error', onThumbError);
+                                        im.src = (qType === 'gif' && qMedia.mediaPreview) ? qMedia.mediaPreview : url;
                                         thumbWrap.appendChild(im);
                                     }
                                 };

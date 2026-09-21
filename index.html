@@ -3698,22 +3698,32 @@
            actually overflowing/scrolling, squashing captioned image bubbles and clipping the
            caption's last line(s). flex-shrink:0 forces every bubble to stay at its full content
            height so the container's overflow-y:auto scrolls instead of compressing bubbles. */
-        .msg-bubble { max-width: 68%; padding: 8px 14px 9px 14px; border-radius: 20px; font-size: 14px; line-height: 1.45; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; flex-shrink: 0; }
+        .msg-bubble { --bubble-r: 22px; --bubble-tight: 6px; --br-tl: var(--bubble-r); --br-tr: var(--bubble-r); --br-br: var(--bubble-r); --br-bl: var(--bubble-r); max-width: 72%; padding: 9px 15px 10px 15px; border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl); font-size: 15px; line-height: 1.42; word-wrap: break-word; transition: transform 0.15s ease-out; touch-action: pan-y; position: relative; animation: bubbleIn 0.22s var(--ease-smooth) both; flex-shrink: 0; }
         .date-separator { display: flex; justify-content: center; align-self: center; margin: 4px 0 8px; }
         .chat-favourite-star { vertical-align: middle; margin: 0 3px; position: relative; top: -1px; }
         .date-separator span { background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 14px; box-shadow: var(--shadow-bubble); letter-spacing: 0.1px; }
         body.glass-theme .date-separator span { backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%); }
         .msg-bubble.in { align-self: flex-start; background: var(--msg-in-bg); color: var(--msg-in-text); box-shadow: var(--shadow-bubble); }
         .msg-bubble.out { align-self: flex-end; background: var(--msg-out-bg); color: var(--msg-out-text); box-shadow: var(--shadow-bubble-out); }
-        .msg-bubble.media.in, .msg-bubble.sticker.in { border-bottom-left-radius: 0; }
-        .msg-bubble.media.out, .msg-bubble.sticker.out { border-bottom-right-radius: 0; }
         /* Modern "smart corner" shape — no protruding triangle tail (the old pointy speech-
            bubble look). Instead, the corner nearest the sender's avatar tapers down to a small
            4px radius while the other three stay fully rounded, the same soft-taper language
            media/sticker bubbles already use below — so every bubble type now reads as one
            consistent, tailless shape. */
-        .msg-bubble.in:not(.media):not(.sticker) { border-bottom-left-radius: 4px; }
-        .msg-bubble.out:not(.media):not(.sticker) { border-bottom-right-radius: 4px; }
+        .msg-bubble:not(.media):not(.sticker) { border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl); }
+
+        /* ── Soft & rounded bubbles with grouped corners ──
+           Consecutive messages from the same sender (see applyBubbleGrouping in JS, which tags
+           them .grp-prev / .grp-next) join into one stack: the corners that touch a neighbouring
+           bubble tighten to --bubble-tight while the outer corners stay fully round, and the gap
+           between stacked bubbles shrinks. The last bubble of a stack (and any lone message) is
+           fully round on every corner. All bubble types — text, media, captioned media, stickers —
+           read these same four --br-* corner variables, so they stay one consistent shape. */
+        .msg-bubble.out.grp-next { --br-br: var(--bubble-tight); }
+        .msg-bubble.out.grp-prev { --br-tr: var(--bubble-tight); }
+        .msg-bubble.in.grp-next  { --br-bl: var(--bubble-tight); }
+        .msg-bubble.in.grp-prev  { --br-tl: var(--bubble-tight); }
+        .msg-bubble.grp-prev { margin-top: -7px; }
         
         .msg-bubble.media { max-width: 75%; min-width: 200px; padding: 0; background: transparent !important; border-radius: 0; box-shadow: none; }
         .read-receipt { align-self: flex-end; font-size: 11px; color: var(--text-secondary); margin-top: -4px; padding-right: 6px; display: flex; align-items: center; gap: 4px; }
@@ -3763,9 +3773,7 @@
            the tail corner clipped to 4px on the side that points at the sender's avatar) instead
            of the previous uniform 16px on all four corners — so photo/video/GIF bubbles read as
            the same bubble shape as a text message, just with the fill swapped for the media itself. */
-        .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; max-height: 320px; object-fit: cover; border-radius: 20px; cursor: pointer; background: var(--bg-hover); }
-        .msg-bubble.in .msg-media-img, .msg-bubble.in .msg-media-video { border-bottom-left-radius: 4px; }
-        .msg-bubble.out .msg-media-img, .msg-bubble.out .msg-media-video { border-bottom-right-radius: 4px; }
+        .msg-media-img, .msg-media-video { display: block; max-width: 100%; width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl); cursor: pointer; background: var(--bg-hover); }
         .msg-media-img { pointer-events: auto; }
         .msg-media-video { cursor: default; }
         .msg-media-wrap { position: relative; }
@@ -3814,15 +3822,12 @@
         .msg-bubble.media:has(.msg-media-caption) {
             background: var(--msg-out-bg) !important;
             box-shadow: var(--shadow-bubble-out);
-            border-radius: 20px;
-            border-bottom-right-radius: 4px;
+            border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl);
             overflow: hidden;
         }
         .msg-bubble.media.in:has(.msg-media-caption) {
             background: var(--msg-in-bg) !important;
             box-shadow: var(--shadow-bubble);
-            border-bottom-left-radius: 4px;
-            border-bottom-right-radius: 20px;
         }
         .msg-bubble.media:has(.msg-media-caption) .msg-media-img,
         .msg-bubble.media:has(.msg-media-caption) .msg-media-video {
@@ -4230,9 +4235,7 @@
         .msg-bubble.sticker { background: transparent !important; padding: 0 !important; box-shadow: none !important; }
         /* Same tail-corner shape as text/media bubbles (see .msg-media-img above), applied to the
            sticker image itself so a sticker reads as the same bubble shape, not a bare square PNG. */
-        .msg-sticker-img { width: 110px; height: 110px; display: block; border-radius: 20px; }
-        .msg-bubble.in .msg-sticker-img { border-bottom-left-radius: 4px; }
-        .msg-bubble.out .msg-sticker-img { border-bottom-right-radius: 4px; }
+        .msg-sticker-img { width: 110px; height: 110px; display: block; border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl); }
         .msg-music-chip { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 200px; max-width: 100%; }
         .msg-music-chip img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--bg-alt); }
         .msg-music-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -13242,6 +13245,42 @@
             return localStorage.getItem('settingReadReceiptsEnabled') !== 'false';
         }
 
+        // --- Bubble grouping (soft & rounded, grouped corners) ---
+        // Tags every bubble in the open thread with .grp-prev / .grp-next when it sits directly
+        // under / above a bubble from the same sender within 5 minutes; the CSS turns those into
+        // tight inner corners and a tighter gap. Driven by a MutationObserver on the thread
+        // container so every path that changes it — full DM/group renders, older-history
+        // prepends, live arrivals, pending uploads, deletes — gets grouped with no per-call hooks,
+        // and because observer callbacks run before the browser paints there's no flash of
+        // ungrouped shapes. It only toggles classes (an attribute change), so it can't re-trigger itself.
+        const BUBBLE_GROUP_GAP_MS = 5 * 60 * 1000;
+        function isGroupableBubble(el) {
+            return !!el && el.classList && el.classList.contains('msg-bubble') && !el.classList.contains('msg-skeleton');
+        }
+        function bubblesShareRun(a, b) {
+            if (!isGroupableBubble(a) || !isGroupableBubble(b)) return false;
+            if (a.classList.contains('out') !== b.classList.contains('out')) return false;
+            const sa = a.dataset.senderUid, sb = b.dataset.senderUid;
+            if (sa && sb && sa !== sb) return false;
+            const ta = Number(a.dataset.createdAt), tb = Number(b.dataset.createdAt);
+            if (ta && tb && Math.abs(tb - ta) > BUBBLE_GROUP_GAP_MS) return false;
+            return true;
+        }
+        function applyBubbleGrouping(container) {
+            if (!container) return;
+            const kids = Array.from(container.children);
+            kids.forEach((el, i) => {
+                if (!isGroupableBubble(el)) return;
+                el.classList.toggle('grp-prev', i > 0 && bubblesShareRun(kids[i - 1], el));
+                el.classList.toggle('grp-next', i < kids.length - 1 && bubblesShareRun(el, kids[i + 1]));
+            });
+        }
+        (function watchBubbleGrouping() {
+            const container = document.getElementById('chat-view-messages');
+            if (!container) return;
+            new MutationObserver(() => applyBubbleGrouping(container)).observe(container, { childList: true });
+        })();
+
         function playNotificationBlip() {
             if (!isMessageSoundEnabled()) return;
             try {
@@ -13260,6 +13299,74 @@
                 osc.stop(ctx.currentTime + 0.3);
                 osc.onended = () => ctx.close();
             } catch (err) { console.error('Could not play notification sound', err); }
+        }
+
+        // --- In-chat message sounds (DM thread) ---
+        // Two short, distinct cues: a quick rising pop when a message goes out, and a softer
+        // two-note ding when one comes in. Synthesised with WebAudio (no audio files to load)
+        // on ONE shared AudioContext — creating a fresh context per sound gets silently blocked
+        // on iOS/Safari unless it happens inside a tap, whereas a single context that was
+        // resumed by the person's first tap/keypress keeps working for later, non-gesture
+        // sounds like an incoming message. Honors the "Message Sound" setting.
+        let chatSoundCtx = null;
+        function ensureChatSoundCtx() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return null;
+                if (!chatSoundCtx) chatSoundCtx = new AudioCtx();
+                if (chatSoundCtx.state === 'suspended') chatSoundCtx.resume().catch(() => {});
+                return chatSoundCtx;
+            } catch (err) { return null; }
+        }
+        function unlockChatSoundCtxOnGesture() {
+            const ctx = ensureChatSoundCtx();
+            if (ctx && ctx.state === 'running') {
+                ['pointerdown', 'touchend', 'keydown'].forEach(evt => document.removeEventListener(evt, unlockChatSoundCtxOnGesture, true));
+            }
+        }
+        ['pointerdown', 'touchend', 'keydown'].forEach(evt => document.addEventListener(evt, unlockChatSoundCtxOnGesture, { capture: true, passive: true }));
+
+        function playChatToneSequence(notes, peakGain) {
+            const ctx = ensureChatSoundCtx();
+            if (!ctx) return;
+            const t0 = ctx.currentTime + 0.01;
+            notes.forEach(({ freq, start, dur }) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, t0 + start);
+                gain.gain.setValueAtTime(0.0001, t0 + start);
+                gain.gain.exponentialRampToValueAtTime(peakGain, t0 + start + 0.012);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t0 + start);
+                osc.stop(t0 + start + dur + 0.02);
+            });
+        }
+
+        function playChatSound(kind) {
+            if (!isMessageSoundEnabled()) return;
+            try {
+                if (kind === 'sent') {
+                    playChatToneSequence([
+                        { freq: 587, start: 0,    dur: 0.09 },
+                        { freq: 880, start: 0.07, dur: 0.14 }
+                    ], 0.14);
+                } else {
+                    playChatToneSequence([
+                        { freq: 988, start: 0,    dur: 0.12 },
+                        { freq: 740, start: 0.11, dur: 0.2 }
+                    ], 0.16);
+                }
+            } catch (err) { console.error('Could not play chat sound', err); }
+        }
+
+        // True when the person is looking at this exact DM thread right now — used to let the
+        // in-chat sounds handle it instead of the generic "new message" blip on the chat list.
+        function isDmThreadOpenAndVisible(chatUid) {
+            const overlay = document.getElementById('chat-view-overlay');
+            return !!chatUid && chatUid === activeChatUid && !!overlay && overlay.classList.contains('active') && document.visibilityState === 'visible';
         }
 
         // --- Privacy Settings Shortcut ---
@@ -37369,6 +37476,7 @@
             // of ever loading the whole thread at once.
             const dmMessagesQuery = query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
             unsubscribeChatMessages = onValue(dmMessagesQuery, async (snap) => {
+                const isFirstLiveSnapshot = !liveThreadSnapshotReceived;
                 liveThreadSnapshotReceived = true;
                 const liveItems = snap.exists() ? Object.entries(snap.val()).map(([key, val]) => ({ key, ...val })) : [];
 
@@ -37379,6 +37487,23 @@
                             msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
                         }
                     }));
+                }
+
+                // Sound cue for a message that just landed in this thread: a brand-new key that's
+                // also newer than everything already loaded (so a page of older history, an edit,
+                // a reaction or the initial load never counts). Mine → "sent" pop; theirs →
+                // "received" ding. Only while this thread is still the one on screen.
+                if (!isFirstLiveSnapshot && !isAIThread && activeChatUid === otherUid) {
+                    let newestKnown = 0;
+                    for (const k in cachedThreadMessages) newestKnown = Math.max(newestKnown, cachedThreadMessages[k].createdAt || 0);
+                    const fresh = liveItems.filter(m => !cachedThreadMessages[m.key] && (m.createdAt || 0) >= newestKnown);
+                    const anySent = fresh.some(m => m.senderUid === user.uid);
+                    const anyReceived = document.visibilityState === 'visible' && fresh.some(m => m.senderUid && m.senderUid !== user.uid); // hidden tab → the chat-list blip covers it
+                    if (anySent) playChatSound('sent');
+                    if (anyReceived) {
+                        if (anySent) setTimeout(() => playChatSound('received'), 220);
+                        else playChatSound('received');
+                    }
                 }
 
                 // Merge the live window into the accumulated cache (this also refreshes any
@@ -38838,7 +38963,12 @@
                         const oldCount = (prevUserChatsData[chatUid] && prevUserChatsData[chatUid].unreadCount) || 0;
                         return newCount > oldCount;
                     });
-                    if (newlyIncoming.length) { playNotificationBlip(); vibrateForNewMessage(); }
+                    if (newlyIncoming.length) {
+                        // A message for the DM that's open on screen already gets the in-chat
+                        // "received" sound from the thread listener, so skip the generic blip.
+                        if (newlyIncoming.some(chatUid => !isDmThreadOpenAndVisible(chatUid))) playNotificationBlip();
+                        vibrateForNewMessage();
+                    }
                     newlyIncoming.forEach(chatUid => maybeShowInAppBannerForDM(chatUid, cachedUserChatsData[chatUid]));
                 }
 

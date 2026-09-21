@@ -4202,6 +4202,14 @@
         .msg-bubble.out .quoted-msg { background: rgba(255,255,255,0.18); border-left-color: #FFFFFF; }
         .quoted-msg strong { display: block; font-size: 12px; margin-bottom: 2px; color: inherit; opacity: 0.9; }
         .quoted-msg span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; opacity: 0.8; }
+        .quoted-msg { cursor: pointer; }
+        .quoted-msg.has-thumb { display: flex; align-items: center; gap: 10px; }
+        .quoted-msg-body { min-width: 0; flex: 1; }
+        .quoted-msg-thumb { position: relative; width: 48px; height: 48px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background: rgba(0,0,0,0.12); order: 2; }
+        .quoted-msg-thumb img, .quoted-msg-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .quoted-msg-thumb-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,0.25); }
+        .msg-bubble.msg-flash { animation: msgFlash 1.3s ease; }
+        @keyframes msgFlash { 0%, 55% { box-shadow: 0 0 0 3px var(--primary-blue); } 100% { box-shadow: 0 0 0 0 transparent; } }
         /* Forward Tag */
         .fwd-tag { font-size: 11px; font-style: italic; opacity: 0.75; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
 
@@ -36634,6 +36642,19 @@
             }
         }
 
+        // Media fields copied onto a reply's quoted-message snapshot so the reply bubble can show
+        // (and open) the picture being replied to. View-once media is never copied.
+        function replyMediaFields(m) {
+            if (!m || m.viewOnce || !m.mediaURL || !['image', 'gif', 'video'].includes(m.mediaType)) return {};
+            const f = { mediaURL: m.mediaURL };
+            if (m.mediaPreview) f.mediaPreview = m.mediaPreview;
+            if (m.mediaEncrypted) {
+                f.mediaEncrypted = true;
+                if (m.mediaMimeType) f.mediaMimeType = m.mediaMimeType;
+            }
+            return f;
+        }
+
         // --- SWIPE TO REPLY & LONG PRESS CONTEXT MENUS LOGIC ---
         function activateReplyMode(msgData) {
             cancelEditMode();
@@ -37949,12 +37970,97 @@
 
                         if (msg.replyToMessage) {
                             bubble.classList.remove('media');
-                            const quoteText = msg.replyToMessage.text || (msg.replyToMessage.mediaType ? `[${msg.replyToMessage.mediaType}]` : '[Attachment]');
-                            const quotedSender = msg.replyToMessage.senderUid === user.uid ? 'You' : (cachedUsers[msg.replyToMessage.senderUid]?.name || 'User');
-                            
+                            const rm = msg.replyToMessage;
+                            const quotedSender = rm.senderUid === user.uid ? 'You' : (cachedUsers[rm.senderUid]?.name || 'User');
+
+                            // Picture being replied to: use what the reply stored, or fall back to the
+                            // original message if it's loaded (covers replies sent before this existed).
+                            const origMsg = (typeof cachedThreadMessages !== 'undefined' && cachedThreadMessages[rm.key]) || null;
+                            const viewable = ['image', 'gif', 'video'];
+                            const qMedia = rm.mediaURL ? rm
+                                : (origMsg && !origMsg.viewOnce && origMsg.mediaURL && viewable.includes(origMsg.mediaType) ? origMsg : null);
+                            const qType = rm.mediaType || (origMsg && origMsg.mediaType) || '';
+                            const qLabel = qType === 'gif' ? 'GIF' : qType === 'video' ? 'Video' : 'Photo';
+                            const quoteText = rm.text || (qMedia ? qLabel : (rm.mediaType ? `[${rm.mediaType}]` : '[Attachment]'));
+
                             const quoteDiv = document.createElement('div');
                             quoteDiv.className = 'quoted-msg';
-                            quoteDiv.innerHTML = `<strong>${quotedSender}</strong><span>${quoteText}</span>`;
+                            const quoteBody = document.createElement('div');
+                            quoteBody.className = 'quoted-msg-body';
+                            const qStrong = document.createElement('strong');
+                            qStrong.textContent = quotedSender;
+                            const qSpan = document.createElement('span');
+                            qSpan.textContent = quoteText;
+                            quoteBody.appendChild(qStrong);
+                            quoteBody.appendChild(qSpan);
+
+                            let quoteViewUrl = null;
+                            if (qMedia && viewable.includes(qType)) {
+                                quoteDiv.classList.add('has-thumb');
+                                const thumbWrap = document.createElement('div');
+                                thumbWrap.className = 'quoted-msg-thumb';
+                                const setThumbSrc = (url) => {
+                                    quoteViewUrl = url;
+                                    thumbWrap.innerHTML = '';
+                                    if (qType === 'video') {
+                                        const poster = !qMedia.mediaEncrypted ? cloudinaryVideoThumbnail(url, 1) : null;
+                                        if (poster) {
+                                            const im = document.createElement('img');
+                                            im.src = poster; im.alt = '';
+                                            thumbWrap.appendChild(im);
+                                        } else {
+                                            const v = document.createElement('video');
+                                            v.src = url + '#t=0.3'; v.muted = true; v.preload = 'metadata'; v.playsInline = true;
+                                            thumbWrap.appendChild(v);
+                                        }
+                                        const play = document.createElement('div');
+                                        play.className = 'quoted-msg-thumb-play';
+                                        play.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+                                        thumbWrap.appendChild(play);
+                                    } else {
+                                        const im = document.createElement('img');
+                                        im.src = (qType === 'gif' && qMedia.mediaPreview) ? qMedia.mediaPreview : url;
+                                        im.alt = '';
+                                        thumbWrap.appendChild(im);
+                                    }
+                                };
+                                if (qMedia.mediaEncrypted) {
+                                    const ready = peekDecryptedMediaUrl(qMedia.mediaURL);
+                                    if (ready) {
+                                        setThumbSrc(ready);
+                                    } else if (qType === 'video') {
+                                        thumbWrap.innerHTML = '<div class="quoted-msg-thumb-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg></div>';
+                                    }
+                                    if (!ready && qType !== 'video') {
+                                        decryptMediaUrlForPeer(otherUid, qMedia.mediaURL, qMedia.mediaMimeType, false).then(localUrl => {
+                                            if (localUrl) setThumbSrc(localUrl);
+                                        });
+                                    }
+                                } else {
+                                    setThumbSrc(qMedia.mediaURL);
+                                }
+                                quoteDiv.appendChild(thumbWrap);
+                            }
+                            quoteDiv.appendChild(quoteBody);
+
+                            // Tap the quote to jump to the original message (highlighted). If it isn't
+                            // loaded in the thread, fall back to opening the picture itself.
+                            quoteDiv.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const targetBubble = rm.key
+                                    ? document.querySelector(`#chat-view-messages .msg-bubble[data-key="${CSS.escape(rm.key)}"]`)
+                                    : null;
+                                if (targetBubble) {
+                                    targetBubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    targetBubble.classList.remove('msg-flash');
+                                    void targetBubble.offsetWidth;
+                                    targetBubble.classList.add('msg-flash');
+                                    setTimeout(() => targetBubble.classList.remove('msg-flash'), 1400);
+                                } else if (quoteViewUrl) {
+                                    if (qType === 'video') openVideoViewer(quoteViewUrl);
+                                    else openImageViewer(quoteViewUrl);
+                                }
+                            });
                             bubble.appendChild(quoteDiv);
                         }
 
@@ -38498,7 +38604,8 @@
                     key: replyingToMessage.key,
                     senderUid: replyingToMessage.senderUid,
                     text: replyingToMessage.text ? await encryptForPeer(activeChatUid, replyingToMessage.text) : '',
-                    mediaType: replyingToMessage.mediaType || ''
+                    mediaType: replyingToMessage.mediaType || '',
+                    ...replyMediaFields(replyingToMessage)
                 };
             }
 
@@ -38809,7 +38916,8 @@
                 key: replyingToMessage.key,
                 senderUid: replyingToMessage.senderUid,
                 text: replyingToMessage.text || '',
-                mediaType: replyingToMessage.mediaType || ''
+                mediaType: replyingToMessage.mediaType || '',
+                ...replyMediaFields(replyingToMessage)
             } : null;
             cancelReplyMode(); cancelEditMode(); 
 

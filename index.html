@@ -2209,11 +2209,7 @@
         }
         .feed-save-btn, .feed-share-btn { padding: 6px 8px; }
         .feed-share-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
-        /* Room for the extra Share icon in the right-hand group: trim the horizontal padding of the
-           buttons in a bar that has one, so like/comment/repost/views don't crowd into it. */
-        .feed-post-actions:has(.feed-share-btn) .feed-post-action-btn { padding: 6px 7px 6px 6px; }
-        .feed-post-actions:has(.feed-share-btn) .feed-save-btn,
-        .feed-post-actions:has(.feed-share-btn) .feed-share-btn { padding: 6px 7px; }
+
         .feed-save-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
         .feed-save-btn.saved { color: var(--text-primary); }
         .feed-save-btn.saved svg { fill: var(--text-primary); stroke: var(--text-primary); }
@@ -5934,7 +5930,7 @@
                 </button>
             </div>
             <div class="options-sheet-group">
-                <button class="msg-option-btn with-icon" id="btn-post-save" style="display:none;">
+                <button class="msg-option-btn with-icon" id="btn-post-save">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                     <span>Save Post</span>
                 </button>
@@ -17696,8 +17692,9 @@
 
         function openPostOptions(postId, post, card, opts) {
             // opts.fromViewer / opts.kind ('image' | 'video') are passed by the image viewer and
-            // Reel viewer's three-dot buttons — Save and (for videos) Download live in this sheet
-            // there, since those viewers no longer carry their own Save/Download icons.
+            // Reel viewer's three-dot buttons — (for videos) Download lives in this sheet there,
+            // since those viewers no longer carry their own Download icon. Save lives here for
+            // every post now, feed cards included.
             const fromViewer = !!(opts && opts.fromViewer);
             const kind = fromViewer ? (opts.kind || 'image') : null;
             activePostOptions = { postId, post, card, kind };
@@ -17730,14 +17727,13 @@
             const hasImage = !!(post.imageUrl || (post.imageUrls && post.imageUrls.length));
             const canDownloadHere = kind === 'video' ? !!post.videoUrl : hasImage;
             document.getElementById('btn-post-download').style.display = (canDownloadHere && isVerifiedUid(user && user.uid)) ? 'block' : 'none';
-            // Save/Unsave only from the viewers — feed cards keep their own bookmark icon.
+            // Save / Remove from Saved: the feed cards no longer carry a bookmark icon, so this menu
+            // entry is the one place to save a post (from the feed and from the viewers alike).
             const saveBtn = document.getElementById('btn-post-save');
-            saveBtn.style.display = fromViewer ? 'block' : 'none';
-            if (fromViewer) {
-                const isSaved = !!cachedSavedPosts[postId];
-                saveBtn.querySelector('span').textContent = isSaved ? 'Remove from Saved' : 'Save Post';
-                saveBtn.querySelector('svg').setAttribute('fill', isSaved ? 'currentColor' : 'none');
-            }
+            saveBtn.style.display = 'block';
+            const isSaved = !!cachedSavedPosts[postId];
+            saveBtn.querySelector('span').textContent = isSaved ? 'Remove from Saved' : 'Save Post';
+            saveBtn.querySelector('svg').setAttribute('fill', isSaved ? 'currentColor' : 'none');
             document.getElementById('btn-post-report').style.display = isOwn ? 'none' : 'block';
             document.getElementById('btn-post-delete').style.display = isOwn ? 'block' : 'none';
             document.getElementById('btn-post-delete').querySelector('span').textContent = isRepost ? 'Undo Repost' : 'Delete Post';
@@ -19184,9 +19180,6 @@
                         ${post.isAd ? '' : `<button type="button" class="feed-post-action-btn feed-share-btn" title="Share" aria-label="Share">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
                         </button>`}
-                        <button type="button" class="feed-post-action-btn feed-save-btn ${savedByMe ? 'saved' : ''}" title="Save">
-                            <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                        </button>
                     </div>
                 </div>
             `;
@@ -19258,7 +19251,6 @@
 
             bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), targetId);
             card.querySelector('.feed-comment-btn').addEventListener('click', (e) => { e.stopPropagation(); openPostComments(targetId, { fullView: true }); });
-            card.querySelector('.feed-save-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleSavePost(targetId); });
             const shareBtn = card.querySelector('.feed-share-btn');
             if (shareBtn) shareBtn.addEventListener('click', (e) => {
                 e.stopPropagation();

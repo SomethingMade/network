@@ -24387,6 +24387,7 @@
             try {
                 await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);
                 await signOut(auth);
+                clearMediaCache();
                 confirmationResult = null;
                 document.getElementById('auth-phone').value = '';
                 clearOtpBoxes();
@@ -25030,6 +25031,7 @@
                 try {
                     await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);
                     await signOut(auth);
+                    clearMediaCache();
                     confirmationResult = null;
                     document.getElementById('auth-phone').value = '';
                     clearOtpBoxes();
@@ -33351,8 +33353,11 @@
         // that first flips it to false, so this thread opens already sitting at the last message
         // (like WhatsApp) instead of visibly smooth-scrolling down to it.
         function hydrateThreadFromDiskCache(threadKey, isStillCurrentThread, renderFn) {
-            readCachedThreadMessagesFromDisk(threadKey).then((cached) => {
+            readCachedThreadMessagesFromDisk(threadKey).then(async (cached) => {
                 if (!cached || !cached.messages) return;
+                // Pull this thread's already-downloaded photos/videos from disk into memory first,
+                // so the very first paint shows them instead of placeholders (bounded, ~300ms max).
+                await warmDecryptedMediaCache(Object.values(cached.messages));
                 if (!isStillCurrentThread() || liveThreadSnapshotReceived) return;
                 cachedThreadMessages = { ...cached.messages };
                 const timestamps = Object.values(cachedThreadMessages).map(m => m.createdAt).filter(t => Number.isFinite(t));
@@ -34843,12 +34848,217 @@
         // storage, etc. — after we cached it), drop the cache and retry once against whatever
         // public key is currently published before giving up.
         const decryptedMediaUrlCache = {};
-        // bypassCache lets a manual "tap to retry" re-attempt from scratch instead of reusing
-        // a previously-cached failure path — used by the retry handlers on the image/video
-        // bubbles below.
-        async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType, bypassCache) {
-            if (!bypassCache && decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
 
+        // ── ON-DEVICE MEDIA CACHE (WhatsApp-style) ───────────────────────────────────────
+        // Encrypted DM media used to be re-downloaded and re-decrypted every time the app was
+        // opened (the cache above only lives in memory), so photos popped in late every session,
+        // and a full thread re-render could even start the same download twice. Now:
+        //   • the decrypted file is saved on the device (IndexedDB) the first time it's opened, or
+        //     right when you send it, and reused from there from then on — no network, no decrypt;
+        //   • concurrent requests for the same file share one download;
+        //   • downloads run a few at a time, newest message first, photos before videos;
+        //   • each photo's size is remembered (localStorage, synchronously available) so its bubble
+        //     is laid out at the right size before the image is even ready — nothing jumps;
+        //   • warmDecryptedMediaCache() puts everything already on disk into memory *before* a
+        //     thread renders, so the bubbles can set their image src synchronously (no placeholder).
+        // The cache is capped (oldest evicted first) and wiped on sign-out. It holds decrypted
+        // copies, like WhatsApp's own media folder — the key that decrypts them lives in this same
+        // browser storage anyway.
+        const MEDIA_CACHE_DB = 'habaDmMediaCache';
+        const MEDIA_CACHE_STORE = 'media';
+        const MEDIA_CACHE_MAX_BYTES = 400 * 1024 * 1024;   // total on-device budget
+        const MEDIA_CACHE_MAX_ITEM_BYTES = 30 * 1024 * 1024; // bigger files stay in memory only
+        const MEDIA_DIMS_KEY = 'habaMediaDims';
+        const MEDIA_DIMS_MAX = 600;
+        const decryptedMediaInflight = {};
+        let mediaCacheDbPromise = null;
+
+        // Firebase download URLs carry a token query string; key on the stable part.
+        function mediaCacheKey(url) { return String(url || '').split('?')[0]; }
+
+        const mediaDimsCache = (() => {
+            try { return JSON.parse(localStorage.getItem(MEDIA_DIMS_KEY) || '{}') || {}; } catch (e) { return {}; }
+        })();
+        function getMediaDims(url) {
+            const d = mediaDimsCache[mediaCacheKey(url)];
+            return d && d[0] > 0 && d[1] > 0 ? { w: d[0], h: d[1] } : null;
+        }
+        let mediaDimsSaveTimer = null;
+        function rememberMediaDims(url, w, h) {
+            if (!url || !(w > 0) || !(h > 0)) return;
+            const k = mediaCacheKey(url);
+            const prev = mediaDimsCache[k];
+            if (prev && prev[0] === w && prev[1] === h) return;
+            delete mediaDimsCache[k]; // re-insert so the most recent stay at the end
+            mediaDimsCache[k] = [w, h];
+            clearTimeout(mediaDimsSaveTimer);
+            mediaDimsSaveTimer = setTimeout(() => {
+                try {
+                    const keys = Object.keys(mediaDimsCache);
+                    if (keys.length > MEDIA_DIMS_MAX) keys.slice(0, keys.length - MEDIA_DIMS_MAX).forEach(x => delete mediaDimsCache[x]);
+                    localStorage.setItem(MEDIA_DIMS_KEY, JSON.stringify(mediaDimsCache));
+                } catch (e) { /* storage full / disabled — sizes just aren't remembered */ }
+            }, 800);
+        }
+
+        function openMediaCacheDB() {
+            if (!mediaCacheDbPromise) {
+                mediaCacheDbPromise = new Promise((resolve, reject) => {
+                    if (!window.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
+                    const req = indexedDB.open(MEDIA_CACHE_DB, 1);
+                    req.onupgradeneeded = () => {
+                        const store = req.result.createObjectStore(MEDIA_CACHE_STORE, { keyPath: 'key' });
+                        store.createIndex('savedAt', 'savedAt');
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                mediaCacheDbPromise.catch(() => { mediaCacheDbPromise = null; });
+            }
+            return mediaCacheDbPromise;
+        }
+
+        // Reads several entries in one transaction → { [mediaURL]: record }.
+        async function readMediaCacheEntries(urls) {
+            const out = {};
+            if (!urls.length) return out;
+            try {
+                const db = await openMediaCacheDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction(MEDIA_CACHE_STORE, 'readonly');
+                    const store = tx.objectStore(MEDIA_CACHE_STORE);
+                    urls.forEach(url => {
+                        const req = store.get(mediaCacheKey(url));
+                        req.onsuccess = () => { if (req.result && req.result.blob) out[url] = req.result; };
+                    });
+                    tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+                });
+            } catch (e) { /* no on-device cache — fall back to the network */ }
+            return out;
+        }
+
+        async function writeMediaCacheEntry(url, blob) {
+            if (!blob || blob.size > MEDIA_CACHE_MAX_ITEM_BYTES) return;
+            try {
+                const db = await openMediaCacheDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction(MEDIA_CACHE_STORE, 'readwrite');
+                    tx.objectStore(MEDIA_CACHE_STORE).put({ key: mediaCacheKey(url), blob, mime: blob.type || '', size: blob.size, savedAt: Date.now() });
+                    tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+                });
+                scheduleMediaCachePrune();
+            } catch (e) { /* quota / private mode — still works from memory this session */ }
+        }
+
+        let mediaPruneTimer = null;
+        function scheduleMediaCachePrune() {
+            if (mediaPruneTimer) return;
+            mediaPruneTimer = setTimeout(async () => {
+                mediaPruneTimer = null;
+                try {
+                    const db = await openMediaCacheDB();
+                    const rows = [];
+                    await new Promise((resolve) => {
+                        const tx = db.transaction(MEDIA_CACHE_STORE, 'readonly');
+                        const req = tx.objectStore(MEDIA_CACHE_STORE).index('savedAt').openCursor(); // oldest first
+                        req.onsuccess = () => {
+                            const cur = req.result;
+                            if (cur) { rows.push({ key: cur.primaryKey, size: cur.value.size || 0 }); cur.continue(); }
+                        };
+                        tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+                    });
+                    let total = rows.reduce((n, r) => n + r.size, 0);
+                    if (total <= MEDIA_CACHE_MAX_BYTES) return;
+                    const target = MEDIA_CACHE_MAX_BYTES * 0.8;
+                    const evict = [];
+                    for (const r of rows) { if (total <= target) break; evict.push(r.key); total -= r.size; }
+                    await new Promise((resolve) => {
+                        const tx = db.transaction(MEDIA_CACHE_STORE, 'readwrite');
+                        evict.forEach(k => tx.objectStore(MEDIA_CACHE_STORE).delete(k));
+                        tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+                    });
+                } catch (e) { /* best effort */ }
+            }, 20000);
+        }
+
+        // Called on sign-out: nothing decrypted for this account stays on the device.
+        async function clearMediaCache() {
+            Object.keys(decryptedMediaUrlCache).forEach(k => {
+                try { URL.revokeObjectURL(decryptedMediaUrlCache[k]); } catch (e) {}
+                delete decryptedMediaUrlCache[k];
+            });
+            Object.keys(mediaDimsCache).forEach(k => delete mediaDimsCache[k]);
+            try { localStorage.removeItem(MEDIA_DIMS_KEY); } catch (e) {}
+            try {
+                const db = await openMediaCacheDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction(MEDIA_CACHE_STORE, 'readwrite');
+                    tx.objectStore(MEDIA_CACHE_STORE).clear();
+                    tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+                });
+            } catch (e) {}
+        }
+
+        function adoptDecryptedMedia(mediaURL, blob) {
+            const url = URL.createObjectURL(blob);
+            decryptedMediaUrlCache[mediaURL] = url;
+            return url;
+        }
+        // Synchronous "is it already here?" — lets a bubble set src in the very same frame it's built.
+        function peekDecryptedMediaUrl(mediaURL) { return decryptedMediaUrlCache[mediaURL] || null; }
+
+        // Loads whatever this batch of messages already has on disk into memory (newest first,
+        // bounded to ~300ms so it can never hold up a render). Call it right before rendering a thread.
+        async function warmDecryptedMediaCache(messages) {
+            try {
+                const list = (messages || []).filter(Boolean).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                const urls = [];
+                for (let i = list.length - 1; i >= 0 && urls.length < 60; i--) {
+                    const m = list[i];
+                    if (m.mediaEncrypted && m.mediaURL && !m.deleted && (m.mediaType === 'image' || m.mediaType === 'video') && !decryptedMediaUrlCache[m.mediaURL]) urls.push(m.mediaURL);
+                }
+                if (!urls.length) return;
+                const entries = await Promise.race([readMediaCacheEntries(urls), new Promise(r => setTimeout(() => r({}), 300))]);
+                Object.keys(entries).forEach(u => { if (!decryptedMediaUrlCache[u]) adoptDecryptedMedia(u, entries[u].blob); });
+            } catch (e) { /* the bubbles will just resolve one by one */ }
+        }
+
+        // The sender already has the plain file, so seed the cache with it: your own photo never
+        // re-downloads (and never "reloads") when the sent message replaces the pending bubble.
+        function primeDecryptedMediaCache(mediaURL, blob, width, height) {
+            try {
+                if (width && height) rememberMediaDims(mediaURL, width, height);
+                adoptDecryptedMedia(mediaURL, blob);
+                writeMediaCacheEntry(mediaURL, blob);
+            } catch (e) {}
+        }
+
+        // Download scheduler: a handful at a time, photos before videos/other files, and within
+        // each the *newest* message first (the bubbles at the bottom are the ones on screen).
+        const MEDIA_FETCH_CONCURRENCY = 4;
+        let mediaFetchActive = 0;
+        const mediaFetchQueues = { high: [], low: [] };
+        function withMediaFetchSlot(task, isLowPriority) {
+            return new Promise((resolve, reject) => {
+                mediaFetchQueues[isLowPriority ? 'low' : 'high'].push({ task, resolve, reject });
+                pumpMediaFetchQueue();
+            });
+        }
+        function pumpMediaFetchQueue() {
+            while (mediaFetchActive < MEDIA_FETCH_CONCURRENCY) {
+                const job = mediaFetchQueues.high.pop() || mediaFetchQueues.low.pop();
+                if (!job) return;
+                mediaFetchActive++;
+                Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
+                    mediaFetchActive--;
+                    pumpMediaFetchQueue();
+                });
+            }
+        }
+
+        // Network path: downloads the ciphertext and decrypts it → Blob, or null on failure.
+        // (Unchanged behaviour from before — including the retry against a re-derived key.)
+        async function fetchAndDecryptMediaBlob(peerUid, mediaURL, mimeType, bypassCache) {
             // Fetching the ciphertext bytes (unlike an <img>/<video> src, which just renders
             // whatever the URL points to) requires reading the response in JS, which means this
             // fetch is subject to CORS. Firebase Storage buckets have no CORS policy configured
@@ -34876,9 +35086,8 @@
 
             const key = await deriveSharedKey(peerUid, bypassCache);
             if (!key) return null;
-            let blob;
             try {
-                blob = await tryWithKey(key);
+                return await tryWithKey(key);
             } catch (e) {
                 // Skip the wasted key-rotation retry when we already know the fetch itself
                 // failed (network/CORS) — a fresh key can't fix that, and re-deriving/re-fetching
@@ -34887,14 +35096,49 @@
                 const freshKey = await deriveSharedKey(peerUid, true);
                 if (!freshKey) return null;
                 try {
-                    blob = await tryWithKey(freshKey);
+                    return await tryWithKey(freshKey);
                 } catch (e2) {
                     return null;
                 }
             }
-            const url = URL.createObjectURL(blob);
-            decryptedMediaUrlCache[mediaURL] = url;
-            return url;
+        }
+
+        // bypassCache lets a manual "tap to retry" re-attempt from scratch instead of reusing
+        // a previously-cached failure path — used by the retry handlers on the image/video
+        // bubbles below.
+        async function decryptMediaUrlForPeer(peerUid, mediaURL, mimeType, bypassCache) {
+            if (!bypassCache) {
+                if (decryptedMediaUrlCache[mediaURL]) return decryptedMediaUrlCache[mediaURL];
+                if (decryptedMediaInflight[mediaURL]) return decryptedMediaInflight[mediaURL]; // share one download
+            }
+            const job = (async () => {
+                if (!bypassCache) {
+                    const hit = (await readMediaCacheEntries([mediaURL]))[mediaURL];
+                    if (hit) return adoptDecryptedMedia(mediaURL, hit.blob);
+                }
+                const isLowPriority = !/^image\//i.test(mimeType || '');
+                const blob = await withMediaFetchSlot(() => fetchAndDecryptMediaBlob(peerUid, mediaURL, mimeType, bypassCache), isLowPriority);
+                if (!blob) return null;
+                const url = adoptDecryptedMedia(mediaURL, blob);
+                writeMediaCacheEntry(mediaURL, blob);
+                return url;
+            })();
+            decryptedMediaInflight[mediaURL] = job;
+            try { return await job; }
+            finally { if (decryptedMediaInflight[mediaURL] === job) delete decryptedMediaInflight[mediaURL]; }
+        }
+
+        // Lays a photo/video bubble out at its final size before the media itself is ready, so
+        // nothing below it jumps when it appears. Uses the size remembered from the last time
+        // this file was shown (or sent). Only for plain media bubbles: with a caption or a quoted
+        // reply the bubble's width depends on more than the picture, so those are left to size
+        // themselves as before.
+        function reserveDmMediaSpace(bubble, mediaEl, msg) {
+            if (!bubble.classList.contains('media') || msg.text) return;
+            const d = getMediaDims(msg.mediaURL);
+            if (!d) return;
+            mediaEl.style.aspectRatio = `${d.w} / ${d.h}`;
+            bubble.style.width = `min(${Math.round(d.w)}px, 75%)`;
         }
 
         // --- PASSPHRASE/PIN-ENCRYPTED KEY BACKUP (solves "new device = lost history") ---
@@ -36563,6 +36807,7 @@
             clearTimeout(disappearingSweepTimeout);
 
             let currentChatIsTyping = false;
+            const dmRenderedMsgKeys = new Set(); // message keys already painted in this open thread (see renderDmThread)
             const threadId = threadIdFor(user.uid, otherUid);
             const isAIThread = otherUid === AI_UID;
 
@@ -36832,6 +37077,8 @@
                             const img = document.createElement('img');
                             img.className = 'msg-media-img';
                             img.alt = 'Photo';
+                            reserveDmMediaSpace(bubble, img, msg);
+                            img.addEventListener('load', () => rememberMediaDims(msg.mediaURL, img.naturalWidth, img.naturalHeight));
                             if (msg.mediaEncrypted) {
                                 // Ciphertext lives at msg.mediaURL — decrypt it locally before it
                                 // ever touches an <img> src. Shows a soft placeholder until ready.
@@ -36840,6 +37087,15 @@
                                 // a real key mismatch, see decryptMediaUrlForPeer above.
                                 const attemptImageDecrypt = (bypassCache) => {
                                     mediaWrap.classList.remove('media-decrypt-failed');
+                                    // Already on this device (memory, warmed from disk before the render)?
+                                    // Then it goes straight in — same frame, no placeholder, no fade.
+                                    const readyUrl = bypassCache ? null : peekDecryptedMediaUrl(msg.mediaURL);
+                                    if (readyUrl) {
+                                        img.decoding = 'sync';
+                                        img.src = readyUrl;
+                                        img.addEventListener('click', () => openImageViewer(readyUrl));
+                                        return;
+                                    }
                                     mediaWrap.classList.add('media-decrypting');
                                     decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType, bypassCache).then(localUrl => {
                                         mediaWrap.classList.remove('media-decrypting');
@@ -36873,6 +37129,8 @@
                             vid.preload = 'metadata';
                             vid.playsInline = true;
                             vid.muted = true;
+                            reserveDmMediaSpace(bubble, vid, msg);
+                            vid.addEventListener('loadedmetadata', () => rememberMediaDims(msg.mediaURL, vid.videoWidth, vid.videoHeight));
                             const playHint = document.createElement('div');
                             playHint.className = 'msg-media-play-hint';
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
@@ -36888,6 +37146,14 @@
                                 // a real key mismatch, see decryptMediaUrlForPeer above.
                                 const attemptVideoDecrypt = (bypassCache) => {
                                     mediaWrap.classList.remove('media-decrypt-failed');
+                                    const readyUrl = bypassCache ? null : peekDecryptedMediaUrl(msg.mediaURL);
+                                    if (readyUrl) {
+                                        vid.src = readyUrl;
+                                        primeVideoPosterFrame(vid);
+                                        vid.addEventListener('click', () => openVideoViewer(readyUrl));
+                                        playHint.addEventListener('click', () => openVideoViewer(readyUrl));
+                                        return;
+                                    }
                                     mediaWrap.classList.add('media-decrypting');
                                     decryptMediaUrlForPeer(otherUid, msg.mediaURL, msg.mediaMimeType, bypassCache).then(localUrl => {
                                         mediaWrap.classList.remove('media-decrypting');
@@ -37041,6 +37307,16 @@
                 const now = Date.now();
                 const items = isAIThread ? allItems : allItems.filter(m => !m.expiresAt || m.expiresAt > now);
                 if (items.length) buildDmItemsInto(messagesEl, items);
+                // Every bubble has a slide/fade-in animation, and this function rebuilds the whole
+                // thread on any change — so without this, opening a chat (and every new message,
+                // reaction or read receipt after it) replayed that animation on *every* bubble,
+                // photos included, which read as the chat "reloading". Only brand-new messages
+                // animate now; the first paint of a thread and anything already shown doesn't.
+                const firstPaintOfThread = dmRenderedMsgKeys.size === 0;
+                messagesEl.querySelectorAll('.msg-bubble[data-key]').forEach(b => {
+                    if (firstPaintOfThread || dmRenderedMsgKeys.has(b.dataset.key)) b.style.animation = 'none';
+                    dmRenderedMsgKeys.add(b.dataset.key);
+                });
                 renderPendingUploadsInto(messagesEl, otherUid);
                 renderReadReceipt(messagesEl, isAIThread);
                 if (!isAIThread && isReadReceiptsEnabled()) set(ref(database, `dm_threads/${threadId}/readReceipts/${user.uid}`), Date.now());
@@ -37098,6 +37374,7 @@
                 // to offer instead of waiting on a round-trip fetch to discover that.
                 if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
 
+                await warmDecryptedMediaCache(liveItems);
                 renderDmThread();
                 // Mirror the refreshed window to disk (fire-and-forget) so the next time this
                 // thread is opened — even after a full reload — it can paint from here instantly.
@@ -37547,6 +37824,47 @@
             }
         }
 
+        // WhatsApp-style photo prep for DMs: phone photos are 3-10MB, which is what made them slow
+        // to arrive and slow to show. Big photos are scaled down (long edge 1600px) and re-encoded
+        // as JPEG before they're encrypted and uploaded; small ones, GIFs and anything the browser
+        // can't decode are sent untouched. Returns the file to send plus its displayed size (0/0 if
+        // unknown), so the sender's own bubble can be laid out and cached immediately.
+        async function prepareDmImage(file) {
+            const untouched = (w, h) => ({ file, width: w || 0, height: h || 0 });
+            let bmp;
+            try {
+                try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+                catch (e) { bmp = await createImageBitmap(file); }
+            } catch (e) { return untouched(0, 0); }
+            const srcW = bmp.width, srcH = bmp.height;
+            const type = (file.type || '').toLowerCase();
+            const MAX_EDGE = 1600;
+            const scale = Math.min(1, MAX_EDGE / Math.max(srcW, srcH));
+            const recompressible = /^image\/(jpeg|jpg|png|webp|heic|heif)$/.test(type);
+            if (!recompressible || (scale === 1 && file.size <= 500 * 1024)) {
+                if (bmp.close) bmp.close();
+                return untouched(srcW, srcH);
+            }
+            try {
+                const w = Math.max(1, Math.round(srcW * scale));
+                const h = Math.max(1, Math.round(srcH * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff'; // JPEG has no transparency
+                ctx.fillRect(0, 0, w, h);
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(bmp, 0, 0, w, h);
+                if (bmp.close) bmp.close();
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+                if (!blob || blob.size >= file.size) return untouched(srcW, srcH);
+                const baseName = (file.name || 'photo').replace(/\.[^.]+$/, '');
+                return { file: new File([blob], baseName + '.jpg', { type: 'image/jpeg' }), width: w, height: h };
+            } catch (e) {
+                return untouched(srcW, srcH);
+            }
+        }
+
         async function queueFileUpload(file, kind, isViewOnce, caption) {
             const user = auth.currentUser;
             const chatUid = activeChatUid;
@@ -37620,15 +37938,23 @@
                         // encrypted before upload — see encryptFileForPeer above. View-once
                         // media keeps using the Cloudinary path below since it already has its
                         // own one-time-view protection.
-                        const { blob, encrypted } = await encryptFileForPeer(chatUid, file);
-                        const safeName = (file.name || (isVideo ? 'video' : 'photo')).replace(/[^a-zA-Z0-9.\-_]/g, '_');
+                        let sendFile = file, sendW = 0, sendH = 0;
+                        if (!isVideo) {
+                            const prepared = await prepareDmImage(file);
+                            sendFile = prepared.file; sendW = prepared.width; sendH = prepared.height;
+                        }
+                        const { blob, encrypted } = await encryptFileForPeer(chatUid, sendFile);
+                        const safeName = (sendFile.name || (isVideo ? 'video' : 'photo')).replace(/[^a-zA-Z0-9.\-_]/g, '_');
                         const storagePath = `dm_media/${threadId}/${Date.now()}_${safeName}`;
                         url = await uploadToFirebaseStorage(blob, storagePath);
                         msgPayload.mediaURL = url;
                         msgPayload.mediaType = isVideo ? 'video' : 'image';
                         if (encrypted) {
                             msgPayload.mediaEncrypted = true;
-                            msgPayload.mediaMimeType = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+                            msgPayload.mediaMimeType = sendFile.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+                            // We already hold the plain file — cache it so the sent message shows
+                            // instantly (no re-download/decrypt of our own photo).
+                            primeDecryptedMediaCache(url, sendFile, sendW, sendH);
                         }
                         previewText = isVideo ? '🎥 Video' : '📷 Photo';
                         if (caption) previewText = caption;

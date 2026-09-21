@@ -2337,10 +2337,14 @@
         /* Skeleton bubbles shown above the earliest loaded message while an older page of
            chat/group history is being fetched — same shimmer technique as the feed skeletons
            above, just shaped like message bubbles instead of post cards. */
-        .msg-bubble.msg-skeleton { pointer-events: none; padding: 10px 14px; max-width: 62%; background: var(--bg-alt); }
-        .msg-bubble.msg-skeleton.out { align-self: flex-end; }
+        /* The .in / .out selectors here matter: the regular .msg-bubble.in / .msg-bubble.out rules
+           sit later in the file, so without this specificity an "out" skeleton picked up the dark
+           outgoing-bubble fill, and with no fixed width the bubble shrink-wrapped its (empty) lines
+           down to a bare pill with no visible content. */
+        .msg-bubble.msg-skeleton.in, .msg-bubble.msg-skeleton.out { pointer-events: none; width: 58%; max-width: 62%; padding: 12px 14px; background: var(--bg-input); color: transparent; box-shadow: none; }
+        .msg-bubble.msg-skeleton.out { align-self: flex-end; width: 46%; }
         .msg-bubble.msg-skeleton.in { align-self: flex-start; }
-        .msg-skeleton-line { position: relative; overflow: hidden; height: 9px; border-radius: 5px; background: var(--border-color); }
+        .msg-skeleton-line { position: relative; overflow: hidden; width: 100%; height: 9px; border-radius: 5px; background: rgba(128,128,128,0.2); }
         .msg-skeleton-line + .msg-skeleton-line { margin-top: 7px; width: 60%; }
         .msg-skeleton-line::after {
             content: ''; position: absolute; inset: 0;
@@ -4315,21 +4319,27 @@
         .chat-view-info h4 { font-size: 15.5px; font-weight: 700; line-height: 1.25; }
         .chat-view-info p { font-size: 12.5px; line-height: 1.3; }
 
-        /* Instagram-style thread header: flat bar with a hairline divider, a large back chevron,
-           a small avatar with a green "active" dot, a bold name over a quiet gray status line
-           ("Active now" / "Active 2h ago"), and thin outlined call icons on the right. The
-           .chat-view-overlay prefix keeps these ahead of the small-screen size overrides further down. */
-        .chat-view-overlay .chat-view-header { gap: 12px; padding: calc(8px + min(env(safe-area-inset-top), 20px)) 12px 8px 4px; border-bottom: 1px solid var(--border-color); box-shadow: none; }
-        .chat-view-overlay .chat-view-back { width: 24px; height: 24px; padding: 8px 6px; box-sizing: content-box; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-right: -4px; -webkit-tap-highlight-color: transparent; }
+        /* Instagram (Meta AI thread) style header: no divider, an arrow-style back button, a small
+           avatar with a green "active" dot, a bold name (verified badge inline) over a quiet gray
+           status line, and a single circled-dots button on the right. The voice/video call buttons
+           stay in the DOM (the open-chat code still toggles them) but are hidden here — the same
+           actions live at the top of the circled-dots menu. The contact's "about" bubble is also
+           hidden in the header. The .chat-view-overlay prefix keeps these ahead of the small-screen
+           size overrides further down. */
+        .chat-view-overlay .chat-view-header { gap: 12px; padding: calc(10px + min(env(safe-area-inset-top), 20px)) 12px 10px 4px; border-bottom: none; box-shadow: none; }
+        .chat-view-overlay .chat-view-back { width: 24px; height: 24px; padding: 8px 6px; box-sizing: content-box; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-right: -2px; -webkit-tap-highlight-color: transparent; }
         .chat-view-overlay .chat-view-avatar { width: 36px; height: 36px; position: relative; }
         .chat-view-overlay .chat-view-avatar::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; box-sizing: content-box; border-radius: 50%; background: var(--success-green); border: 2px solid var(--bg-surface); transform: scale(0); transition: transform 0.2s cubic-bezier(.34,1.56,.64,1); pointer-events: none; }
         .chat-view-overlay .chat-view-avatar.is-online::after { transform: scale(1); }
         .chat-view-overlay .chat-view-info h4 { font-size: 16px; font-weight: 600; line-height: 1.25; letter-spacing: -0.1px; }
-        .chat-view-overlay .chat-view-info p { font-size: 12.5px; line-height: 1.3; color: var(--text-secondary); }
-        .chat-view-overlay .chat-view-header > svg:not(.chat-view-back) { width: 24px; height: 24px; padding: 8px 4px; box-sizing: content-box; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; -webkit-tap-highlight-color: transparent; }
-        .chat-view-overlay .chat-view-header > svg:not(.chat-view-back):active { opacity: 0.55; }
-        .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu { width: 22px; height: 22px; padding: 9px 4px; box-sizing: content-box; }
-        @media (min-width: 1025px) { .chat-view-overlay .chat-view-header { padding-left: 20px; } } /* back chevron is hidden on desktop */
+        .chat-view-overlay .chat-view-info p { font-size: 13px; font-weight: 500; line-height: 1.3; color: var(--text-secondary); }
+        .chat-view-overlay .chat-view-info .about-bubble { display: none !important; }
+        .chat-view-overlay .chat-view-header > #btn-call-voice,
+        .chat-view-overlay .chat-view-header > #btn-call-video,
+        .chat-view-overlay .chat-view-header > #btn-group-call-voice { display: none !important; }
+        .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu { width: 26px; height: 26px; padding: 7px 4px; box-sizing: content-box; stroke-width: 1.8; -webkit-tap-highlight-color: transparent; }
+        .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu:active { opacity: 0.55; }
+        @media (min-width: 1025px) { .chat-view-overlay .chat-view-header { padding-left: 20px; } } /* back arrow is hidden on desktop */
 
         .chat-view-messages:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom) { background: var(--bg-surface); }
         .chat-view-messages { gap: 8px; }
@@ -9523,7 +9533,7 @@
 
     <div id="chat-view-overlay" class="chat-view-overlay">
         <div class="chat-view-header">
-            <svg class="chat-view-back" id="chat-view-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <svg class="chat-view-back" id="chat-view-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="12" x2="4.5" y2="12"></line><polyline points="11 19 4 12 11 5"></polyline></svg>
             <div class="chat-view-avatar" id="chat-view-avatar"></div>
             <div class="chat-view-info">
                 <h4 id="chat-view-name">Contact</h4>
@@ -9542,8 +9552,16 @@
                 <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             </div>
             <div class="chat-view-menu-wrap">
-                <svg id="btn-chat-view-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                <svg id="btn-chat-view-menu" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;" title="More options"><circle cx="12" cy="12" r="10"></circle><circle cx="7.6" cy="12" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="16.4" cy="12" r="1.1" fill="currentColor" stroke="none"></circle></svg>
                 <div class="chat-view-menu-dropdown" id="chat-view-menu-dropdown">
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-voice-call" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        <span>Voice call</span>
+                    </button>
+                    <button type="button" class="chats-menu-item" id="chat-view-menu-video-call" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                        <span>Video call</span>
+                    </button>
                     <button type="button" class="chats-menu-item" id="chat-view-menu-info">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                         <span id="chat-view-menu-info-label">View contact</span>
@@ -13853,12 +13871,30 @@
                 document.getElementById('chat-view-menu-compiler').style.display = state.showCompiler ? 'flex' : 'none';
                 document.getElementById('chat-view-menu-ride').style.display = state.showRide ? 'flex' : 'none';
 
+                // Call buttons no longer sit in the header itself — they live here instead. The
+                // (CSS-hidden) header buttons stay the source of truth for what's available: the
+                // open-chat code shows/hides them per chat type, so the menu just mirrors that.
+                const callVisible = (id) => { const b = document.getElementById(id); return !!(b && b.style.display !== 'none'); };
+                document.getElementById('chat-view-menu-voice-call').style.display = (callVisible('btn-call-voice') || callVisible('btn-group-call-voice')) ? 'flex' : 'none';
+                document.getElementById('chat-view-menu-video-call').style.display = callVisible('btn-call-video') ? 'flex' : 'none';
+
                 dropdown.classList.toggle('open');
             });
             document.addEventListener('click', (e) => {
                 if (dropdown.classList.contains('open') && !dropdown.contains(e.target) && e.target !== menuBtn) {
                     closeMenu();
                 }
+            });
+
+            const fireHeaderCallBtn = (id) => document.getElementById(id).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            document.getElementById('chat-view-menu-voice-call').addEventListener('click', () => {
+                closeMenu();
+                const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
+                fireHeaderCallBtn(isGroup ? 'btn-group-call-voice' : 'btn-call-voice');
+            });
+            document.getElementById('chat-view-menu-video-call').addEventListener('click', () => {
+                closeMenu();
+                fireHeaderCallBtn('btn-call-video');
             });
 
             document.getElementById('chat-view-menu-info').addEventListener('click', () => {
@@ -31137,12 +31173,12 @@
             // Fetches an older page of group messages (one-time read, not a live listener) and
             // merges them into cachedThreadMessages, then re-renders — same pattern as
             // loadOlderDmMessages()/loadOlderPosts(), anchored to the top of the thread.
-            async function loadOlderGroupMessages() {
+            async function loadOlderGroupMessages(opts) {
                 if (isLoadingMoreMessages || noMoreOlderMessages) return;
                 if (!isFinite(oldestLoadedMessageTimestamp)) return;
                 if (activeGroupId !== groupId) return; // user navigated away from this thread
                 isLoadingMoreMessages = true;
-                const skeletonNodes = showChatLoadingSkeletons(messagesEl);
+                const skeletonNodes = (opts && opts.silent) ? [] : showChatLoadingSkeletons(messagesEl);
 
                 try {
                     const olderQuery = query(
@@ -34241,6 +34277,11 @@
                     nodes.push(bubble);
                 }
             });
+            // Safety net: if the older-page fetch never settles (dropped connection, stalled
+            // decrypt), don't leave placeholder bubbles on screen forever.
+            setTimeout(() => {
+                if (nodes.some(n => n.isConnected)) removeChatLoadingSkeletons(messagesEl, nodes);
+            }, 12000);
             return nodes;
         }
 
@@ -34282,23 +34323,24 @@
             if (noMoreOlderMessages) return;
 
             let checkQueued = false;
-            const maybeLoadOlder = () => {
+            const maybeLoadOlder = (silent) => {
                 checkQueued = false;
                 if (isLoadingMoreMessages || noMoreOlderMessages) return;
-                if (messagesEl.scrollTop < CHAT_LOAD_MORE_THRESHOLD_PX) loadOlderFn();
+                if (messagesEl.scrollTop < CHAT_LOAD_MORE_THRESHOLD_PX) loadOlderFn({ silent: !!silent });
             };
             chatMessagesScrollHandler = () => {
                 if (checkQueued) return;
                 checkQueued = true;
-                requestAnimationFrame(maybeLoadOlder);
+                requestAnimationFrame(() => maybeLoadOlder(false));
             };
             messagesEl.addEventListener('scroll', chatMessagesScrollHandler, { passive: true });
 
             // A thread whose first page doesn't even fill the screen can't be scrolled, so no
             // scroll event will ever fire — fetch the next page straight away in that case.
+            // Done silently (no placeholder bubbles) since the person isn't scrolling to it.
             if (messagesEl.scrollHeight <= messagesEl.clientHeight + 40) {
                 checkQueued = true;
-                requestAnimationFrame(maybeLoadOlder);
+                requestAnimationFrame(() => maybeLoadOlder(true));
             }
         }
         const EDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -37698,12 +37740,15 @@
             // merges them into cachedThreadMessages, then re-renders — mirrors loadOlderPosts()
             // on the Home feed, just anchored to the top of the thread instead of the bottom
             // of the feed.
-            async function loadOlderDmMessages() {
+            async function loadOlderDmMessages(opts) {
                 if (isLoadingMoreMessages || noMoreOlderMessages) return;
                 if (!isFinite(oldestLoadedMessageTimestamp)) return;
                 if (activeChatUid !== otherUid) return; // user navigated away from this thread
                 isLoadingMoreMessages = true;
-                const skeletonNodes = showChatLoadingSkeletons(messagesEl);
+                // A silent load (thread too short to scroll — see initChatMessagesScrollListener)
+                // skips the placeholder bubbles: with nothing on screen to scroll past, they just
+                // read as phantom empty messages at the top of the chat.
+                const skeletonNodes = (opts && opts.silent) ? [] : showChatLoadingSkeletons(messagesEl);
 
                 try {
                     const olderQuery = query(

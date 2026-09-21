@@ -13056,7 +13056,7 @@
         // Switches to a tab from wherever the person currently is — another tab, a chat, a
         // story, an image/video viewer, the composer, a profile sheet, or any stack of bottom
         // sheets — and always ends up on that tab with everything layered above it closed.
-        function goToTab(tabId) {
+        function goToTab(tabId, opts = {}) {
             const current = window.location.hash.replace('#', '') || 'tab-status';
             const sheetsWereOpen = dismissOpenSheetsForTabNavigation();
             const onOverlayHash = !current.startsWith('tab-'); // '#chat', '#story', '#user-info', viewers, composer…
@@ -13073,6 +13073,19 @@
             const layered = sheetsWereOpen || onOverlayHash; // history has entries on top we can't reason about
             const entryState = history.state || {};
 
+            // Drill-down entries (opts.push, e.g. Messages → Following via the compose button) sit
+            // on top of the tab they were opened from. Going back to that tab pops the entry
+            // instead of stacking a duplicate, and going Home unwinds the whole small stack.
+            if (!layered && entryState.habaDrilldownOrigin === tabId) {
+                history.back(); // popstate/hashchange finishes the switch
+                return;
+            }
+            if (tabId === 'tab-status' && !layered && entryState.habaDrilldownFromHome) {
+                onNonHomeTab = false;
+                history.go(-2); // back over the drill-down entry and the tab entry under it
+                return;
+            }
+
             // Cleanest case: going Home from a tab entry that was pushed straight above Home —
             // popping that one entry lands on Home and keeps the back stack tidy.
             if (tabId === 'tab-status' && !layered && entryState.habaTabFromHome) {
@@ -13088,6 +13101,11 @@
                     onNonHomeTab = false;
                 } else if (!layered && current === 'tab-status') {
                     history.pushState({ habaTabFromHome: true }, '', '#' + tabId); // first hop away from Home
+                    onNonHomeTab = true;
+                } else if (opts.push && !layered) {
+                    // Drill-down from one tab into another (e.g. Messages → Following): push a
+                    // real entry so the device back button returns to where the person came from.
+                    history.pushState({ habaDrilldownOrigin: current, habaDrilldownFromHome: !!entryState.habaTabFromHome }, '', '#' + tabId);
                     onNonHomeTab = true;
                 } else {
                     // Tab → tab keeps the provenance stamp of the entry it replaces; from on top of
@@ -26279,11 +26297,11 @@
             }
         }
         const msgsComposeBtn = document.getElementById('btn-msgs-compose');
-        if (msgsComposeBtn) msgsComposeBtn.addEventListener('click', () => goToTab('tab-contacts'));
+        if (msgsComposeBtn) msgsComposeBtn.addEventListener('click', () => goToTab('tab-contacts', { push: true }));
         document.getElementById('fab-nav-action').addEventListener('click', () => {
             const hash = window.location.hash.replace('#', '') || 'tab-status';
             if (hash === 'tab-chats') {
-                goToTab('tab-contacts');
+                goToTab('tab-contacts', { push: true });
             } else {
                 document.getElementById('create-options-sheet-overlay').classList.add('active');
             }

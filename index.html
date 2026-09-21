@@ -1835,6 +1835,13 @@
         .x-media-grid:not([data-count="1"]) .x-media-grid-item { flex: 0 0 86%; border: 1px solid var(--border-color); }
         .x-media-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; pointer-events: auto; }
         .x-media-grid[data-count="1"] .x-media-grid-item img { height: auto; max-height: 520px; object-fit: cover; }
+        /* A post image that fails to load: hide the browser's broken-image icon and just leave the
+           plain tile (the item's --bg-alt background) in place, at its normal size. A single-image
+           post has no fixed aspect ratio (its height normally comes from the image), so give it one
+           while failed so the tile doesn't collapse to nothing. Toggled by the delegated
+           error/load listeners in JS; if the image later loads (e.g. a retry), the class comes off. */
+        .x-media-grid-item img.media-failed { visibility: hidden; }
+        .x-media-grid[data-count="1"] .x-media-grid-item:has(> img.media-failed) { aspect-ratio: 4 / 3; }
         .x-media-carousel-counter { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 12px; pointer-events: none; z-index: 2; }
         .x-media-carousel-dots { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 5px; pointer-events: none; z-index: 2; }
         .x-media-carousel-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); transition: 0.2s ease; }
@@ -13244,6 +13251,18 @@
         function isReadReceiptsEnabled() {
             return localStorage.getItem('settingReadReceiptsEnabled') !== 'false';
         }
+
+        // --- Failed feed media: drop the broken-image placeholder ---
+        // <img> load errors don't bubble, so listen in the capture phase on document. That covers
+        // every post card, whenever it's built, without wiring an onerror onto each <img>.
+        document.addEventListener('error', (e) => {
+            const img = e.target;
+            if (img instanceof HTMLImageElement && img.closest('.x-media-grid-item')) img.classList.add('media-failed');
+        }, true);
+        document.addEventListener('load', (e) => {
+            const img = e.target;
+            if (img instanceof HTMLImageElement && img.classList.contains('media-failed')) img.classList.remove('media-failed');
+        }, true);
 
         // --- Bubble grouping (soft & rounded, grouped corners) ---
         // Tags every bubble in the open thread with .grp-prev / .grp-next when it sits directly

@@ -4256,6 +4256,15 @@
         .date-separator span { background: none; box-shadow: none; padding: 0; font-size: 12px; font-weight: 500; }
         .read-receipt { margin-top: -4px; padding-right: 4px; font-size: 12px; }
 
+        /* Sender avatar beside the last incoming bubble of each run (DMs and groups). */
+        .chat-view-messages.peer-avatars .msg-bubble.in { margin-left: 34px; }
+        .chat-view-messages.peer-avatars .msg-bubble.in.show-peer-avatar::before {
+            content: ''; position: absolute; left: -34px; bottom: 0; width: 26px; height: 26px; border-radius: 50%;
+            background-color: var(--bg-input); background-image: var(--peer-avatar, none); background-size: cover; background-position: center;
+            pointer-events: none;
+        }
+        .read-receipt-avatar { width: 14px; height: 14px; border-radius: 50%; background-color: var(--bg-input); background-size: cover; background-position: center; flex-shrink: 0; }
+
         .chat-view-input-row { align-items: center; gap: 8px; padding: 8px 12px 10px; border-top: none; box-shadow: none; }
         .chat-view-input-row #chat-attach-btn:not(.icon-collapsed) { width: 38px; height: 38px; margin-bottom: 0; background: var(--primary-blue); color: #fff; }
         .chat-view-input-row #chat-attach-btn:not(.icon-collapsed):hover { background: var(--primary-blue); opacity: 0.9; }
@@ -13459,6 +13468,24 @@
                 if (!isGroupableBubble(el)) return;
                 el.classList.toggle('grp-prev', i > 0 && bubblesShareRun(kids[i - 1], el));
                 el.classList.toggle('grp-next', i < kids.length - 1 && bubblesShareRun(el, kids[i + 1]));
+            });
+
+            // Small sender avatar beside the last incoming bubble of each run (drawn by CSS from
+            // --peer-avatar); every incoming bubble is indented so the runs line up. Skipped in
+            // the AI thread, which has no profile photo.
+            const isAiThread = !activeGroupId && activeChatUid === AI_UID;
+            container.classList.toggle('peer-avatars', !isAiThread);
+            kids.forEach(el => {
+                if (!isGroupableBubble(el) || !el.classList.contains('in') || isAiThread) {
+                    if (el.classList) el.classList.remove('show-peer-avatar');
+                    return;
+                }
+                const showAvatar = !el.classList.contains('grp-next');
+                el.classList.toggle('show-peer-avatar', showAvatar);
+                if (showAvatar) {
+                    const senderProfile = cachedUsers[el.dataset.senderUid || activeChatUid] || {};
+                    el.style.setProperty('--peer-avatar', `url('${senderProfile.photoURL || DEFAULT_AVATAR_URL}')`);
+                }
             });
         }
         (function watchBubbleGrouping() {
@@ -37199,7 +37226,9 @@
             if (!createdAt || activeChatOtherLastRead < createdAt) return;
             const receipt = document.createElement('div');
             receipt.className = 'read-receipt';
-            receipt.textContent = `Seen ${formatClockTime(activeChatOtherLastRead)}`;
+            const seenProfile = cachedUsers[activeChatUid] || {};
+            receipt.innerHTML = `<span class="read-receipt-avatar" style="background-image:url('${seenProfile.photoURL || DEFAULT_AVATAR_URL}')"></span>`;
+            receipt.appendChild(document.createTextNode(`Seen ${formatClockTime(activeChatOtherLastRead)}`));
             messagesEl.appendChild(receipt);
         }
 

@@ -4315,6 +4315,22 @@
         .chat-view-info h4 { font-size: 15.5px; font-weight: 700; line-height: 1.25; }
         .chat-view-info p { font-size: 12.5px; line-height: 1.3; }
 
+        /* Instagram-style thread header: flat bar with a hairline divider, a large back chevron,
+           a small avatar with a green "active" dot, a bold name over a quiet gray status line
+           ("Active now" / "Active 2h ago"), and thin outlined call icons on the right. The
+           .chat-view-overlay prefix keeps these ahead of the small-screen size overrides further down. */
+        .chat-view-overlay .chat-view-header { gap: 12px; padding: calc(8px + min(env(safe-area-inset-top), 20px)) 12px 8px 4px; border-bottom: 1px solid var(--border-color); box-shadow: none; }
+        .chat-view-overlay .chat-view-back { width: 24px; height: 24px; padding: 8px 6px; box-sizing: content-box; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-right: -4px; -webkit-tap-highlight-color: transparent; }
+        .chat-view-overlay .chat-view-avatar { width: 36px; height: 36px; position: relative; }
+        .chat-view-overlay .chat-view-avatar::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; box-sizing: content-box; border-radius: 50%; background: var(--success-green); border: 2px solid var(--bg-surface); transform: scale(0); transition: transform 0.2s cubic-bezier(.34,1.56,.64,1); pointer-events: none; }
+        .chat-view-overlay .chat-view-avatar.is-online::after { transform: scale(1); }
+        .chat-view-overlay .chat-view-info h4 { font-size: 16px; font-weight: 600; line-height: 1.25; letter-spacing: -0.1px; }
+        .chat-view-overlay .chat-view-info p { font-size: 12.5px; line-height: 1.3; color: var(--text-secondary); }
+        .chat-view-overlay .chat-view-header > svg:not(.chat-view-back) { width: 24px; height: 24px; padding: 8px 4px; box-sizing: content-box; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; -webkit-tap-highlight-color: transparent; }
+        .chat-view-overlay .chat-view-header > svg:not(.chat-view-back):active { opacity: 0.55; }
+        .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu { width: 22px; height: 22px; padding: 9px 4px; box-sizing: content-box; }
+        @media (min-width: 1025px) { .chat-view-overlay .chat-view-header { padding-left: 20px; } } /* back chevron is hidden on desktop */
+
         .chat-view-messages:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom) { background: var(--bg-surface); }
         .chat-view-messages { gap: 8px; }
         @media (max-width: 768px) { .chat-view-messages { padding: 12px 12px 8px; } }
@@ -31067,6 +31083,7 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') cancelVoiceRecording();
 
             const avatarEl = document.getElementById('chat-view-avatar');
+            avatarEl.classList.remove('is-online');
             applyGroupAvatarToElement(avatarEl, group);
 
             const messagesEl = document.getElementById('chat-view-messages');
@@ -36510,9 +36527,14 @@
             const statusEl = document.getElementById('chat-view-status');
             const aboutBubbleEl = document.getElementById('chat-view-about-bubble');
 
+            // Status line stays a quiet gray (Instagram-style); "online" is shown as a green dot on
+            // the header avatar instead (.chat-view-avatar.is-online).
+            const headerAvatarEl = document.getElementById('chat-view-avatar');
+            statusEl.style.color = '';
+
             if (activeChatUid === AI_UID) {
                 statusEl.textContent = 'Always here to help';
-                statusEl.style.color = 'var(--success-green)';
+                if (headerAvatarEl) headerAvatarEl.classList.remove('is-online');
                 aboutBubbleEl.style.display = 'none';
                 return;
             }
@@ -36520,11 +36542,10 @@
             const otherProfile = cachedUsers[activeChatUid] || {};
             const businessPrefix = otherProfile.isBusinessAccount ? 'Business Account · ' : '';
 
+            if (headerAvatarEl) headerAvatarEl.classList.toggle('is-online', otherProfile.status === 'online');
             if (otherProfile.status === 'online') {
                 statusEl.textContent = businessPrefix + 'Active now';
-                statusEl.style.color = 'var(--success-green)';
             } else {
-                statusEl.style.color = 'var(--text-secondary)';
                 if (otherProfile.lastSeen) statusEl.textContent = businessPrefix + `Active ${formatTime(otherProfile.lastSeen)}`;
                 else statusEl.textContent = businessPrefix ? businessPrefix.replace(' · ', '') : 'Offline';
             }

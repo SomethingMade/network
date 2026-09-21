@@ -5326,7 +5326,7 @@
             #tab-search > .chat-search-dropdown { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #communities-feed-container { padding-bottom: calc(var(--nav-bar-total) + 24px + env(safe-area-inset-bottom)); }
             #auth-image-side { display: none; }
-            .chat-view-overlay { left: 0; }
+            .chat-view-overlay { left: 0; bottom: var(--keyboard-inset, 0px); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1), bottom 0.15s ease; }
             .chat-view-back { display: block; }
             .fab-add { position: fixed; bottom: calc(var(--nav-bar-height) + 16px); right: 24px; z-index: 99; }
 
@@ -9639,7 +9639,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
             <div class="chat-input-wrap">
-                <textarea id="chat-view-input" placeholder="Message..." rows="1" autocomplete="off"></textarea>
+                <textarea id="chat-view-input" placeholder="Message..." rows="1" autocomplete="off" enterkeyhint="send"></textarea>
                 <div class="chat-input-actions">
                     <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Send a sticker">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
@@ -14322,7 +14322,12 @@
             const syncKeyboardInset = () => {
                 const vv = window.visualViewport;
                 const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                const chatMsgsEl = document.getElementById('chat-view-messages');
+                const wasNearBottom = !!chatMsgsEl && (chatMsgsEl.scrollHeight - chatMsgsEl.scrollTop - chatMsgsEl.clientHeight) < 200;
                 document.documentElement.style.setProperty('--keyboard-inset', inset + 'px');
+                if (chatMsgsEl && wasNearBottom) {
+                    requestAnimationFrame(() => { chatMsgsEl.scrollTop = chatMsgsEl.scrollHeight; });
+                }
             };
             window.visualViewport.addEventListener('resize', syncKeyboardInset);
             window.visualViewport.addEventListener('scroll', syncKeyboardInset);

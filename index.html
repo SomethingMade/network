@@ -1335,6 +1335,30 @@
 
         .tm-profile-media-section { border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 20px; }
 
+        /* ── PROFILE VIEW (Threads-style) ──
+           Flat white page (no floating card), back arrow top-left, a big bold name with the
+           @username + verified badge under it and a larger avatar on the right, quiet grey
+           follower stats, two equal rounded-rectangle buttons, and text-only tabs with a
+           dark underline under the active one. Applies to both my profile and other people's. */
+        .tm-profile-header { padding: calc(8px + min(env(safe-area-inset-top), 20px)) 10px 0; }
+        .tm-profile-content { margin-top: 0; padding: 6px 20px 32px; border-radius: 0; box-shadow: none; }
+        .ig-profile-toprow { align-items: center; margin-bottom: 8px; }
+        .ig-profile-toprow .tm-profile-id { padding-top: 0; }
+        .tm-profile-name { font-size: 28px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.15; margin: 0 0 6px; }
+        .tm-profile-username { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .ig-profile-avatar, .ig-profile-avatar.avatar-circle { width: 86px; height: 86px; border: none; box-shadow: none; }
+        .tm-profile-bio { font-size: 15px; line-height: 1.45; margin: 10px 0 12px; }
+        .ig-profile-stats-grid { margin: 4px 0 16px; }
+        .ig-profile-stat-num, .ig-profile-stat-label { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+        .tm-profile-actions, .ig-profile-actions-row { gap: 10px; margin: 6px 0 4px; }
+        .tm-profile-actions .btn-pill, .ig-profile-actions-row .btn-pill { border-radius: 14px; padding: 13px 14px; font-size: 15px; font-weight: 700; }
+        .tm-profile-actions .btn-pill svg { display: none; }
+        .tm-profile-media-section { border-top: none; padding-top: 0; margin-top: 14px; }
+        .tm-profile-media-section .profile-subtabs { margin: 0 -20px; border-bottom: 1px solid var(--border-color); }
+        .tm-profile-media-section .profile-subtab-btn { padding: 14px 0 12px; font-size: 15px; font-weight: 600; }
+        .tm-profile-media-section .profile-subtab-state-icon { display: none; }
+        .tm-profile-media-section .profile-subtab-btn.active::after { height: 2px; background: var(--text-primary); }
+
         /* Editable variants of the tm-profile-* text styles, used on the "Profile" (own)
            panel where Contact Info shows static text — same font metrics as their
            read-only counterparts so the two panels line up visually, just transparent/
@@ -23324,8 +23348,8 @@
 
                 // Read-only display (the profile view itself is no longer editable in
                 // place — tapping "Edit Profile" below opens a separate sheet for that).
-                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(user.displayName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
-                document.getElementById('my-profile-username-display').textContent = myProfile.username ? '@' + myProfile.username : '@—';
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(user.displayName || (user.email ? user.email.split('@')[0] : 'User'));
+                document.getElementById('my-profile-username-display').innerHTML = escapeHtmlForPost(myProfile.username ? '@' + myProfile.username : '@—') + verifiedBadgeFor(user.uid, false);
                 const avatarDisplay = document.getElementById('my-profile-avatar-display');
                 avatarDisplay.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
                 const aboutDisplay = document.getElementById('my-profile-about-display');
@@ -25641,7 +25665,7 @@
                 // Refresh the read-only view sheet underneath with the values just saved,
                 // rather than re-fetching — cachedUsers may take a moment to catch up with
                 // the write above.
-                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User'));
                 document.getElementById('my-profile-avatar-display').style.backgroundImage = `url('${finalPhoto}')`;
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = newAbout;
@@ -30121,8 +30145,8 @@
             avatarEl.style.backgroundColor = '';
             avatarEl.textContent = '';
             avatarEl.setAttribute('data-full', profile.photoURL || DEFAULT_AVATAR_URL);
-            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
-            document.getElementById('user-info-username').textContent = profile.username ? '@' + profile.username : '@—';
+            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User');
+            document.getElementById('user-info-username').innerHTML = escapeHtmlForPost(profile.username ? '@' + profile.username : '@—') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
             const joinedRow = document.getElementById('user-info-joined-row');
             const joinedLabel = formatJoinedDate(profile.createdAt);

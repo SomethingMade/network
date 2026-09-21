@@ -2189,6 +2189,33 @@
         #feed-posts-list .feed-video-controls,
         .profile-posts-list .feed-video-controls { display: none; }
 
+        /* Post view video: the glass capsule is replaced by the same seek line the full video
+           viewer uses (.reel-item-progress-*) — thin rail, blue fill, white thumb that grows while
+           scrubbing, and a centered time bubble. Play/pause is tap-on-video plus the center button,
+           and mute is a flat round disc top-right like the viewer's. The controls wrapper becomes
+           display: contents so its children position against the video wrap directly — that lets the
+           seek line stay put while the mute / pop-out buttons auto-hide. */
+        .feed-video-scrub-time { display: none; }
+        #post-comments-post-preview .feed-video-controls { display: contents; }
+        #post-comments-post-preview .feed-video-controls::before { display: none; }
+        #post-comments-post-preview .feed-post-video-wrap::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: linear-gradient(to top, rgba(0,0,0,0.4), transparent); pointer-events: none; z-index: 1; }
+        #post-comments-post-preview .feed-video-playpause-btn,
+        #post-comments-post-preview .feed-video-time { display: none; }
+        #post-comments-post-preview .feed-video-progress-track { position: absolute; left: 14px; right: 14px; bottom: 6px; flex: none; height: 32px; z-index: 3; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+        #post-comments-post-preview .feed-video-progress-track::before { height: 4px; background: rgba(255,255,255,0.3); border-radius: 4px; transition: height 0.12s ease; }
+        #post-comments-post-preview .feed-video-progress-fill { height: 4px; background: #0A84FF; box-shadow: none; border-radius: 4px; transition: height 0.12s ease; }
+        #post-comments-post-preview .feed-video-progress-thumb { width: 14px; height: 14px; transform: translate(-50%, -50%) scale(0.85); box-shadow: 0 1px 4px rgba(0,0,0,0.45); transition: transform 0.12s ease; }
+        #post-comments-post-preview .feed-video-progress-track.dragging::before,
+        #post-comments-post-preview .feed-video-progress-track.dragging .feed-video-progress-fill { height: 8px; }
+        #post-comments-post-preview .feed-video-progress-track.dragging .feed-video-progress-thumb { transform: translate(-50%, -50%) scale(1.45); box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+        #post-comments-post-preview .feed-video-mute-btn { position: absolute; top: 10px; right: 10px; z-index: 3; width: 34px; height: 34px; background: rgba(0,0,0,0.45); box-shadow: none; transition: opacity 0.25s ease, transform 0.18s cubic-bezier(.34,1.56,.64,1); }
+        #post-comments-post-preview .feed-video-mute-btn:active { background: rgba(0,0,0,0.6); }
+        #post-comments-post-preview .feed-video-mute-btn svg { width: 18px; height: 18px; }
+        #post-comments-post-preview .feed-post-video-wrap.controls-hidden .feed-video-mute-btn { opacity: 0; pointer-events: none; }
+        #post-comments-post-preview .feed-post-video-wrap.scrubbing .feed-video-center-btn { opacity: 0; }
+        #post-comments-post-preview .feed-video-scrub-time { display: block; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; padding: 8px 18px; border-radius: 12px; background: rgba(0,0,0,0.55); color: #fff; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+        #post-comments-post-preview .feed-post-video-wrap.scrubbing .feed-video-scrub-time { opacity: 1; }
+
         .feed-post-reactors { display: flex; align-items: center; gap: 6px; margin-top: 8px; margin-left: 60px; }
         .feed-post-reactors-avatars { display: flex; }
         .feed-post-reactors-avatars .avatar { width: 20px; height: 20px; font-size: 9px; font-weight: 700; border: 2px solid var(--bg-surface); border-radius: 50%; margin-left: -7px; flex-shrink: 0; }
@@ -18534,6 +18561,7 @@
             const fill = wrap.querySelector('.feed-video-progress-fill');
             const thumb = wrap.querySelector('.feed-video-progress-thumb');
             const timeLabel = wrap.querySelector('.feed-video-time');
+            const scrubTime = wrap.querySelector('.feed-video-scrub-time');
             const muteBtn = wrap.querySelector('.feed-video-mute-btn');
             const iconUnmuted = muteBtn.querySelector('.icon-unmuted');
             const iconMuted = muteBtn.querySelector('.icon-muted');
@@ -18606,10 +18634,11 @@
             video.addEventListener('play', showControls);
             video.addEventListener('pause', keepControlsVisible);
             video.addEventListener('ended', keepControlsVisible);
-            wrap.addEventListener('pointerdown', () => {
+            wrap.addEventListener('pointerdown', (e) => {
                 // The "first tap only reveals the controls" gate only makes sense while the control bar
                 // is actually on screen; on feed videos where it's hidden, a tap should just open the video.
-                tapGateActive = !!track.offsetParent && wrap.classList.contains('controls-hidden');
+                // The seek line is always live (it never fades), so touching it is never a "reveal" tap.
+                tapGateActive = !!track.offsetParent && wrap.classList.contains('controls-hidden') && !track.contains(e.target);
                 clearTimeout(tapGateTimer);
                 if (tapGateActive) tapGateTimer = setTimeout(() => { tapGateActive = false; }, 700);
                 showControls();
@@ -18670,14 +18699,45 @@
             });
             updateMuteUI();
 
-            let isDragging = false;
-            track.addEventListener('click', (e) => { e.stopPropagation(); seekFromClientX(e.clientX); });
-            track.addEventListener('mousedown', (e) => { e.stopPropagation(); isDragging = true; track.classList.add('dragging'); seekFromClientX(e.clientX); });
-            window.addEventListener('mousemove', (e) => { if (isDragging) seekFromClientX(e.clientX); });
-            window.addEventListener('mouseup', () => { isDragging = false; track.classList.remove('dragging'); });
-            track.addEventListener('touchstart', (e) => { isDragging = true; track.classList.add('dragging'); seekFromClientX(e.touches[0].clientX); }, { passive: true });
-            track.addEventListener('touchmove', (e) => { if (isDragging) seekFromClientX(e.touches[0].clientX); }, { passive: true });
-            track.addEventListener('touchend', () => { isDragging = false; track.classList.remove('dragging'); });
+            // Draggable scrubber — same behavior as the full video viewer's seek line: pointer events
+            // cover touch and mouse (the track has touch-action: none so a horizontal drag scrubs
+            // instead of scrolling), playback pauses while dragging and resumes on release if it was
+            // playing, and a time bubble shows over the video while scrubbing.
+            let scrubbing = false, wasPlaying = false, activePointer = null;
+            function updateScrubTime() {
+                if (scrubTime) scrubTime.textContent = `${formatVideoTime(video.currentTime)} / ${formatVideoTime(video.duration || 0)}`;
+            }
+            track.addEventListener('pointerdown', (e) => {
+                if (!video.duration) return;
+                e.stopPropagation();
+                e.preventDefault();
+                scrubbing = true;
+                activePointer = e.pointerId;
+                try { track.setPointerCapture(e.pointerId); } catch (_) {}
+                wasPlaying = !video.paused;
+                if (wasPlaying) video.pause();
+                track.classList.add('dragging');
+                wrap.classList.add('scrubbing');
+                seekFromClientX(e.clientX);
+                updateScrubTime();
+            });
+            track.addEventListener('pointermove', (e) => {
+                if (!scrubbing || e.pointerId !== activePointer) return;
+                seekFromClientX(e.clientX);
+                updateScrubTime();
+            });
+            function endScrub(e) {
+                if (!scrubbing || e.pointerId !== activePointer) return;
+                scrubbing = false;
+                activePointer = null;
+                track.classList.remove('dragging');
+                wrap.classList.remove('scrubbing');
+                if (wasPlaying) video.play().catch(() => {});
+                scheduleControlsHide();
+            }
+            track.addEventListener('pointerup', endScrub);
+            track.addEventListener('pointercancel', endScrub);
+            track.addEventListener('click', (e) => e.stopPropagation());
 
             updatePlayUI();
             updateMuteUI();
@@ -19244,6 +19304,7 @@
                     <button type="button" class="feed-video-popout-btn" aria-label="Play floating">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="11" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"></rect></svg>
                     </button>
+                    <div class="feed-video-scrub-time"></div>
                     <div class="feed-video-controls">
                         <button type="button" class="feed-video-playpause-btn" aria-label="Play/Pause">
                             <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>

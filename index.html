@@ -1606,16 +1606,39 @@
         .notif-sheet-header { padding: 0 20px 12px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
         .notif-sheet-header svg { flex-shrink: 0; }
         .notif-sheet-header svg:active { opacity: 0.6; }
-        .notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; margin-bottom: 2px; cursor: pointer; user-select: none; -webkit-user-select: none; transition: background 0.15s ease; }
-        .notif-item:active { background: var(--bg-hover); }
-        .notif-item.unread { background: rgba(var(--primary-rgb), 0.06); }
-        .notif-item.selected { background: rgba(255, 69, 58, 0.1); }
-        .notif-item-checkbox { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; margin-top: 8px; display: none; align-items: center; justify-content: center; }
-        .notif-item.selection-mode .notif-item-checkbox { display: flex; }
-        .notif-item.selected .notif-item-checkbox { background: var(--danger-red); border-color: var(--danger-red); }
-        .notif-item.selected .notif-item-checkbox::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
-        .notif-item .avatar { width: 38px; height: 38px; flex-shrink: 0; }
-        .notif-item-avatar-wrap { position: relative; flex-shrink: 0; }
+        /* ── ACTIVITY (the Notifications tab) ──
+           A full-width, divider-separated feed: avatar on the left; name, time, a grey context line
+           ("Liked your post", "Because you follow", "Suggested post"), the text, and a like/comment/
+           repost/share row in the middle; a post thumbnail on the right. Rows are grouped under
+           "New" / "Last 30 days" headings. Real notifications carry .notif-item (the hook the
+           selection / long-press JS uses); suggested posts are plain .activity-row. */
+        .activity-header { margin-bottom: 10px; }
+        .activity-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .activity-title { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; margin: 0; color: var(--text-primary); }
+        .activity-bell-btn { display: flex; align-items: center; justify-content: center; background: none; border: none; padding: 6px; border-radius: 50%; color: var(--text-primary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .activity-bell-btn:active { opacity: 0.6; }
+        .activity-bell-btn svg { width: 22px; height: 22px; display: block; }
+        .activity-header-actions { display: flex; align-items: center; gap: 14px; color: var(--text-primary); }
+        .activity-header-actions #btn-mark-all-notifs-read:active { opacity: 0.6; }
+
+        #notif-filter-row { gap: 8px; padding: 2px 0 6px; }
+        #notif-filter-row .wa-chip { background: transparent; border: 1px solid rgba(128,128,128,0.3); color: var(--text-primary); font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 999px; box-shadow: none; }
+        #notif-filter-row .wa-chip.active { background: var(--bg-input); color: var(--text-primary); box-shadow: none; }
+
+        .activity-section-title { font-size: 15px; font-weight: 700; color: var(--text-primary); padding: 14px 16px 4px; }
+        .activity-section-title:not(:first-child) { margin-top: 6px; padding-top: 18px; border-top: 1px solid var(--border-color); }
+
+        .activity-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px 0; cursor: pointer; user-select: none; -webkit-user-select: none; transition: background 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        .activity-row:active { background: var(--bg-hover); }
+        .activity-row.selected { background: rgba(255, 69, 58, 0.1); }
+        .notif-item-checkbox { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); flex-shrink: 0; margin-top: 14px; display: none; align-items: center; justify-content: center; }
+        .activity-row.selection-mode .notif-item-checkbox { display: flex; }
+        .activity-row.selected .notif-item-checkbox { background: var(--danger-red); border-color: var(--danger-red); }
+        .activity-row.selected .notif-item-checkbox::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+        .activity-row .avatar { width: 44px; height: 44px; flex-shrink: 0; }
+        .activity-avatar-wrap { position: relative; flex-shrink: 0; margin-top: 2px; }
+        .activity-system-avatar { display: flex; align-items: center; justify-content: center; background: var(--bg-input); color: var(--text-primary); }
+        .activity-system-avatar svg { width: 24px; height: 24px; }
         .notif-type-badge { position: absolute; bottom: -3px; right: -3px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-surface); z-index: 2; }
         .notif-type-badge svg { width: 10px; height: 10px; }
         .notif-type-badge.type-like { background: var(--danger-red); }
@@ -1626,17 +1649,38 @@
         .notif-type-badge.type-repost { background: var(--success-green); }
         .notif-type-badge.type-job_application { background: #F59E0B; }
         .notif-type-badge.type-verified { background: #1D9BF0; }
-        .notif-item-body { flex: 1; min-width: 0; }
-        .notif-item-text { font-size: 13.5px; color: var(--text-primary); line-height: 1.4; }
-        .notif-item-text b { font-weight: 700; }
-        .notif-item-time { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
-        .notif-item-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-blue); flex-shrink: 0; margin-top: 6px; }
-        .notif-item-thumb-wrap { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; align-self: center; overflow: hidden; background: var(--bg-alt); }
-        .notif-item-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .notif-item-thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
-        .notif-item-thumb-placeholder svg { width: 16px; height: 16px; }
-        .notif-item-thumb-text { width: 100%; height: 100%; box-sizing: border-box; padding: 4px 5px; font-size: 9px; line-height: 1.25; color: var(--text-secondary); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
-        .notif-empty-state { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 40px 0; }
+
+        /* The bottom divider lives on the content column (not the row) so it starts at the text's
+           left edge, inset past the avatar, and runs under the thumbnail to the screen edge. */
+        .activity-content { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); }
+        .activity-main { flex: 1; min-width: 0; }
+        .activity-head { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 15px; line-height: 1.3; }
+        .activity-name { font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .activity-head .verified-badge { width: 15px; height: 15px; flex-shrink: 0; }
+        .activity-time { flex-shrink: 0; margin-left: 2px; font-size: 14px; color: var(--text-secondary); }
+        .activity-sub { font-size: 14px; color: var(--text-secondary); line-height: 1.35; margin-top: 1px; }
+        .activity-text { font-size: 15px; color: var(--text-primary); line-height: 1.38; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+        .activity-follow-btn { margin-top: 8px; padding: 6px 18px; border-radius: 10px; border: 1px solid rgba(128,128,128,0.35); background: transparent; color: var(--text-primary); font-size: 14px; font-weight: 600; cursor: pointer; }
+        .activity-follow-btn:disabled { color: var(--text-secondary); cursor: default; }
+        .activity-actions { display: flex; align-items: center; gap: 14px; margin: 6px 0 0 -6px; }
+        .activity-act-btn { display: inline-flex; align-items: center; background: none; border: none; padding: 6px; color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .activity-act-btn:active { opacity: 0.6; }
+        .activity-act-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
+        .activity-act-btn span { margin-left: 6px; }
+        .activity-act-btn span:empty { display: none; }
+        .activity-act-btn.liked { color: var(--danger-red); }
+        .activity-act-btn.liked[data-act="like"] svg { fill: currentColor; }
+        .activity-act-btn.reposted { color: var(--success-green); }
+        .activity-row.selection-mode .activity-actions,
+        .activity-row.selection-mode .activity-follow-btn { pointer-events: none; }
+
+        .activity-thumb-col { flex-shrink: 0; }
+        .activity-thumb-col:empty { display: none; }
+        .activity-thumb { position: relative; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--bg-alt); border: 1px solid var(--border-color); box-sizing: border-box; }
+        .activity-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .activity-thumb-play { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(0,0,0,0.55); }
+        .activity-thumb-play::after { content: ''; position: absolute; left: 8px; top: 6px; border-style: solid; border-width: 5px 0 5px 8px; border-color: transparent transparent transparent #fff; }
+        .notif-empty-state { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 40px 24px; line-height: 1.5; }
 
         /* Jobs — structured listings created by Business Accounts (see the "Jobs" header
            menu item and #jobs-sheet-overlay), not filtered feed posts. */
@@ -2933,7 +2977,7 @@
         .notif-tab-header-action svg:active { opacity: 0.6; }
         .notif-tab-selection-header { margin-bottom: 14px; min-height: 36px; }
         #tab-notifications #notif-filter-row { padding: 0; margin: 0; }
-        .notif-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 14px max(16px, env(safe-area-inset-bottom)); }
+        .notif-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 max(16px, env(safe-area-inset-bottom)); }
 
         .search-tab-header { padding-bottom: 12px; }
         .search-tab-header-row { display: flex; align-items: center; gap: 10px; }
@@ -5163,7 +5207,7 @@
             .group-member-row .avatar { width: 34px; height: 34px; }
             .in-app-msg-banner .avatar { width: 38px; height: 38px; }
             .mention-suggestion-item .avatar { width: 28px; height: 28px; }
-            .notif-item .avatar { width: 34px; height: 34px; }
+            .activity-row .avatar { width: 40px; height: 40px; }
             .notif-item-checkbox { width: 18px; height: 18px; }
             .story-viewers-list-item .avatar { width: 40px; height: 40px; font-size: 15px; }
             .tag-people-item .avatar { width: 36px; height: 36px; }
@@ -8892,10 +8936,15 @@
                      the render / select / delete logic below is unchanged. -->
                 <div id="tab-notifications" class="tab-content">
                     <div class="chat-header-area">
-                        <div class="chat-header-top chat-header-top-minimal" id="notif-header-default">
-                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
-                            <h1 class="chat-header-minimal-title">Notifications</h1>
-                            <div class="notif-tab-header-action"><svg id="btn-mark-all-notifs-read" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-blue)" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg></div>
+                        <div class="chat-header-top activity-header" id="notif-header-default">
+                            <div class="activity-title-row">
+                                <h1 class="activity-title">Activity</h1>
+                                <button type="button" id="btn-activity-bell" class="activity-bell-btn" aria-label="Notification settings"></button>
+                            </div>
+                            <div class="activity-header-actions">
+                                <svg id="btn-mark-all-notifs-read" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg>
+                                <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
+                            </div>
                         </div>
                         <div class="chat-header-top notif-tab-selection-header" id="notif-header-selection" style="display:none;">
                             <div style="display:flex; align-items:center; gap:14px;">
@@ -8909,15 +8958,16 @@
                         </div>
                         <div class="wa-filter-row" id="notif-filter-row">
                             <button type="button" class="wa-chip active" data-notif-filter="all"><span>All</span></button>
-                            <button type="button" class="wa-chip" data-notif-filter="follow"><span>Followers</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="follow"><span>Follows</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="conversation"><span>Conversations</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="mention"><span>Mentions</span></button>
                             <button type="button" class="wa-chip" data-notif-filter="like"><span>Likes</span></button>
-                            <button type="button" class="wa-chip" data-notif-filter="repost"><span>Repost</span></button>
-                            <button type="button" class="wa-chip" data-notif-filter="comment"><span>Comments</span></button>
+                            <button type="button" class="wa-chip" data-notif-filter="repost"><span>Reposts</span></button>
                         </div>
                     </div>
                     <div class="notif-tab-scroll" id="notif-tab-scroll">
                         <div id="notifications-list"></div>
-                        <div id="notifications-empty" class="notif-empty-state" style="display:none;">No notifications yet.</div>
+                        <div id="notifications-empty" class="notif-empty-state" style="display:none;">Nothing here yet. Likes, replies, follows and mentions will show up in Activity.</div>
                     </div>
                 </div>
 
@@ -13919,6 +13969,7 @@
 
         
         function updateNotificationBtnVisibility() {
+            updateActivityBellIcon();
             if (!('Notification' in window)) {
                 btnSettingsNotifications.textContent = 'Not Supported';
                 btnSettingsNotifications.disabled = true;
@@ -18572,7 +18623,9 @@
         // up in real time wherever else that same post happens to be rendered right now.
         function patchDuplicateContentCards(contentPostId, post, skipCard) {
             document.querySelectorAll(`[data-content-post-id="${contentPostId}"]`).forEach(card => {
-                if (card !== skipCard) patchFeedPostCounts(card, post);
+                if (card === skipCard) return;
+                if (card.classList.contains('activity-row')) patchActivityRowCounts(card, post);
+                else patchFeedPostCounts(card, post);
             });
         }
 
@@ -20896,22 +20949,8 @@
         let notifPostPreviewCache = {};
         let notifPreviewFetchInFlight = new Set();
 
-        function notifPreviewThumbInnerHtml(post) {
-            if (!post) {
-                return `<div class="notif-item-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M4 15l4-4 4 4 4-6 4 4"></path></svg></div>`;
-            }
-            const thumbUrl = post.imageUrl || (post.imageUrls && post.imageUrls[0]) || (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
-            if (thumbUrl) {
-                return `<img class="notif-item-thumb" src="${escapeHtmlForPost(thumbUrl)}" alt="">`;
-            }
-            if (post.text) {
-                return `<div class="notif-item-thumb-text">${escapeHtmlForPost(post.text.slice(0, 60))}</div>`;
-            }
-            return `<div class="notif-item-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"></path><path d="M4 15l4-4 4 4 4-6 4 4"></path></svg></div>`;
-        }
-
-        // Fetches a post notifPreviewWrapHtml couldn't find in cachedPosts, then patches every
-        // matching thumbnail already in the DOM in place — not a full renderNotificationsList()
+        // Fetches a post that isn't in cachedPosts (e.g. an older post a notification is about), then
+        // patches the matching Activity rows in place — not a full renderNotificationsList()
         // re-render, so scroll position and selection state survive previews trickling in.
         async function ensureNotifPostPreview(postId) {
             if (!postId || cachedPosts[postId] || (postId in notifPostPreviewCache) || notifPreviewFetchInFlight.has(postId)) return;
@@ -20925,18 +20964,7 @@
             }
             notifPreviewFetchInFlight.delete(postId);
             notifPostPreviewCache[postId] = post;
-            document.querySelectorAll(`.notif-item-thumb-wrap[data-preview-post-id="${postId}"]`).forEach((wrap) => {
-                wrap.innerHTML = notifPreviewThumbInnerHtml(post);
-            });
-        }
-
-        function notifPreviewWrapHtml(postId) {
-            if (!postId) return '';
-            const post = cachedPosts[postId] || notifPostPreviewCache[postId] || null;
-            if (!cachedPosts[postId] && !(postId in notifPostPreviewCache)) {
-                ensureNotifPostPreview(postId); // fire-and-forget; patches the DOM once it resolves
-            }
-            return `<div class="notif-item-thumb-wrap" data-preview-post-id="${postId}">${notifPreviewThumbInnerHtml(post)}</div>`;
+            hydrateActivityRowsForPost(postId, post);
         }
 
         // --- Notification selection mode: long-press a notification to start selecting,
@@ -20951,40 +20979,327 @@
         let notifActiveFilter = 'all';
         function notifMatchesFilter(notif, filter) {
             if (filter === 'all') return true;
+            // "Conversations" = comments and replies; "Mentions" is its own chip. ('comment' is
+            // kept as an alias for the old combined bucket.)
+            if (filter === 'conversation') return notif.type === 'comment' || notif.type === 'reply';
             if (filter === 'comment') return notif.type === 'comment' || notif.type === 'reply' || notif.type === 'mention';
             return notif.type === filter;
         }
 
+        // ── ACTIVITY FEED (Notifications tab) ──
+        // Compact relative time for the row header: "now", "12m", "20h", "4d", "3w".
+        function activityTimeLabel(ts) {
+            if (!ts) return '';
+            const mins = Math.floor(Math.max(0, Date.now() - ts) / 60000);
+            if (mins < 1) return 'now';
+            if (mins < 60) return mins + 'm';
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return hours + 'h';
+            const days = Math.floor(hours / 24);
+            if (days < 7) return days + 'd';
+            return Math.floor(days / 7) + 'w';
+        }
+
+        const ACTIVITY_ICONS = {
+            like: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+            comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>',
+            share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>',
+            bellOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>',
+            bellOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 13A17.89 17.89 0 0 1 18 8"></path><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"></path><path d="M18 8a6 6 0 0 0-9.33-5"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>',
+            logo: '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><polygon points="20,80 170,30 80,110" fill="currentColor" fill-opacity="0.75"></polygon><polygon points="120,180 170,30 80,110" fill="currentColor"></polygon><polygon points="20,80 80,110 80,140" fill="currentColor" fill-opacity="0.55"></polygon></svg>'
+        };
+
+        // Bell next to the "Activity" title: crossed-out while push notifications aren't enabled
+        // (tapping it runs the same enable flow as Settings), plain once they are.
+        function updateActivityBellIcon() {
+            const btn = document.getElementById('btn-activity-bell');
+            if (!btn) return;
+            const on = ('Notification' in window) && Notification.permission === 'granted';
+            btn.innerHTML = on ? ACTIVITY_ICONS.bellOn : ACTIVITY_ICONS.bellOff;
+            btn.title = on ? 'Notifications are on' : 'Turn on notifications';
+        }
+
+        function activityPostFor(postId) {
+            return (postId && (cachedPosts[postId] || notifPostPreviewCache[postId])) || null;
+        }
+
+        function activityThumbUrlFor(post) {
+            if (!post) return '';
+            return post.imageUrl || (post.imageUrls && post.imageUrls[0]) || (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1) || '') : '');
+        }
+
+        // Thumbnail for the right edge. Empty string when the post has no media (text-only posts
+        // get no thumbnail) or hasn't loaded yet — hydrateActivityRowsForPost fills it in later.
+        function activityThumbHtml(post) {
+            const url = activityThumbUrlFor(post);
+            if (!url) return '';
+            const isVideoOnly = !!post.videoUrl && !post.imageUrl && !(post.imageUrls && post.imageUrls.length);
+            return `<div class="activity-thumb"><img src="${escapeHtmlForPost(url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">${isVideoOnly ? '<span class="activity-thumb-play"></span>' : ''}</div>`;
+        }
+
+        function activityActionsHtml(post) {
+            const me = auth.currentUser ? auth.currentUser.uid : null;
+            const liked = !!(post && post.reactions && me && post.reactions[me]);
+            const reposted = !!(post && post.reposts && me && post.reposts[me]);
+            const count = (n) => n ? formatFeedCount(n) : '';
+            return `
+                <div class="activity-actions">
+                    <button type="button" class="activity-act-btn${liked ? ' liked' : ''}" data-act="like" aria-label="Like">${ACTIVITY_ICONS.like}<span>${count(post && post.likeCount)}</span></button>
+                    <button type="button" class="activity-act-btn" data-act="comment" aria-label="Comments">${ACTIVITY_ICONS.comment}<span>${count(post && post.commentCount)}</span></button>
+                    <button type="button" class="activity-act-btn${reposted ? ' reposted' : ''}" data-act="repost" aria-label="Repost">${repostArrowsSvg()}<span>${count(post && post.repostCount)}</span></button>
+                    <button type="button" class="activity-act-btn" data-act="share" aria-label="Share">${ACTIVITY_ICONS.share}</button>
+                </div>`;
+        }
+
+        // Keeps a row's like/comment/repost buttons in sync with a post (called from
+        // patchDuplicateContentCards for live updates, and after a lazily-fetched post lands).
+        function patchActivityRowCounts(row, post) {
+            if (!row || !post) return;
+            const me = auth.currentUser ? auth.currentUser.uid : null;
+            const count = (n) => n ? formatFeedCount(n) : '';
+            const setBtn = (act, n, stateClass, on) => {
+                const btn = row.querySelector(`.activity-act-btn[data-act="${act}"]`);
+                if (!btn) return;
+                const span = btn.querySelector('span');
+                if (span) span.textContent = count(n);
+                if (stateClass) btn.classList.toggle(stateClass, !!on);
+            };
+            setBtn('like', post.likeCount, 'liked', !!(post.reactions && me && post.reactions[me]));
+            setBtn('comment', post.commentCount);
+            setBtn('repost', post.repostCount, 'reposted', !!(post.reposts && me && post.reposts[me]));
+        }
+
+        function hydrateActivityRowsForPost(postId, post) {
+            document.querySelectorAll(`.activity-row[data-content-post-id="${postId}"]`).forEach((row) => {
+                const thumbCol = row.querySelector('.activity-thumb-col');
+                if (thumbCol && !thumbCol.firstElementChild) thumbCol.innerHTML = activityThumbHtml(post);
+                patchActivityRowCounts(row, post);
+            });
+        }
+
+        // Posts worth surfacing in Activity: recent posts from people you follow ("Because you
+        // follow") and well-engaged posts from others ("Suggested post") that you haven't liked
+        // yet, aren't yours, and aren't already shown as a notification. Drawn from the feed's
+        // already-loaded cachedPosts, so it costs no extra reads.
+        const ACTIVITY_DAY_MS = 24 * 60 * 60 * 1000;
+        const ACTIVITY_SUGGESTION_LIMIT = 8;
+        function getActivitySuggestions(excludePostIds) {
+            const me = auth.currentUser ? auth.currentUser.uid : null;
+            if (!me) return [];
+            const now = Date.now();
+            const scored = [];
+            Object.entries(cachedPosts).forEach(([postId, p]) => {
+                if (!p || excludePostIds.has(postId)) return;
+                if (p.isAd || p.repostOf || p.uid === me || !p.uid) return;
+                const ts = Number(p.timestamp) || 0;
+                if (!ts || now - ts > 30 * ACTIVITY_DAY_MS) return;
+                if (cachedBlocked[p.uid] || !canViewPost(p)) return;
+                if (p.reactions && p.reactions[me]) return;
+                const hasMedia = !!activityThumbUrlFor(p);
+                if (!p.text && !hasMedia) return;
+                const followed = !!cachedContacts[p.uid];
+                const engagement = (p.likeCount || 0) + 2 * (p.commentCount || 0) + 3 * (p.repostCount || 0);
+                if (!followed && engagement < 1) return;
+                const ageHours = (now - ts) / 3600000;
+                const score = (engagement + (followed ? 6 : 0)) / (1 + ageHours / 36);
+                scored.push({ kind: 'suggested', postId, post: p, ts, followed, score });
+            });
+            scored.sort((a, b) => b.score - a.score);
+            return scored.slice(0, ACTIVITY_SUGGESTION_LIMIT);
+        }
+
+        function activitySubtitleFor(notif) {
+            switch (notif.type) {
+                case 'follow': return 'Started following you';
+                case 'like': return 'Liked your post';
+                case 'repost': return 'Reposted your post';
+                case 'comment': return 'Commented on your post';
+                case 'reply': return 'Replied to you';
+                case 'mention': return 'Mentioned you';
+                case 'job_application': return 'Applied to your job';
+                case 'verified': return 'Account update';
+                default: return 'Interacted with your post';
+            }
+        }
+
+        // One row, for either a real notification or a suggested post.
+        function buildActivityRow(entry) {
+            const isNotif = entry.kind === 'notif';
+            const notif = isNotif ? entry.notif : null;
+            const post = isNotif ? activityPostFor(notif.postId) : entry.post;
+            const postId = isNotif ? (notif.postId || '') : entry.postId;
+            const isSystem = isNotif && !notif.fromUid;
+            const uid = isNotif ? notif.fromUid : entry.post.uid;
+            const live = (uid && cachedUsers[uid]) || {};
+            const name = isSystem ? 'Haba' : (live.name || (isNotif ? notif.fromName : entry.post.name) || 'Someone');
+            const photoURL = live.photoURL || (isNotif ? notif.fromPhotoURL : entry.post.photoURL) || '';
+
+            let sub, text = '', showActions = false, followBack = false;
+            if (isNotif) {
+                sub = activitySubtitleFor(notif);
+                text = notif.text || (notif.type === 'verified' ? "You're verified! Your blue badge is live." : '');
+                showActions = !!notif.postId && ['like', 'repost', 'comment', 'reply', 'mention'].includes(notif.type);
+                followBack = notif.type === 'follow' && !!uid && !cachedContacts[uid];
+                if (notif.postId && !cachedPosts[notif.postId] && !(notif.postId in notifPostPreviewCache)) {
+                    ensureNotifPostPreview(notif.postId); // fire-and-forget; hydrates this row when it lands
+                }
+            } else {
+                sub = entry.followed ? 'Because you follow' : 'Suggested post';
+                text = entry.post.text || '';
+                showActions = true;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'activity-row' + (isNotif ? ' notif-item' : '');
+            if (isNotif) {
+                row.dataset.notifId = entry.id;
+                if (notifSelectionMode) row.classList.add('selection-mode');
+                if (selectedNotifIds.has(entry.id)) row.classList.add('selected');
+            } else {
+                row.dataset.suggestedPostId = postId;
+            }
+            if (postId) row.dataset.contentPostId = postId;
+
+            const avatarHtml = isSystem
+                ? `<div class="avatar activity-system-avatar">${ACTIVITY_ICONS.logo}</div>`
+                : feedAvatarHtml({ name, photoURL });
+            row.innerHTML = `
+                <div class="notif-item-checkbox"></div>
+                <div class="activity-avatar-wrap">
+                    ${avatarHtml}
+                    ${isNotif ? notifTypeBadgeHtml(notif.type) : ''}
+                </div>
+                <div class="activity-content">
+                    <div class="activity-main">
+                        <div class="activity-head">
+                            <span class="activity-name"></span>${isSystem ? '' : verifiedBadgeFor(uid, false)}
+                            <span class="activity-time">${activityTimeLabel(entry.ts)}</span>
+                        </div>
+                        <div class="activity-sub"></div>
+                        ${text ? '<div class="activity-text"></div>' : ''}
+                        ${followBack ? `<button type="button" class="activity-follow-btn" data-follow-uid="${uid}">Follow back</button>` : ''}
+                        ${showActions ? activityActionsHtml(post) : ''}
+                    </div>
+                    <div class="activity-thumb-col">${(showActions || isNotif) ? activityThumbHtml(post) : ''}</div>
+                </div>`;
+            row.querySelector('.activity-name').textContent = name;
+            row.querySelector('.activity-sub').textContent = sub;
+            const textEl = row.querySelector('.activity-text');
+            if (textEl) textEl.textContent = text;
+            return row;
+        }
+
+        let activityLastPostCount = -1;
         function renderNotificationsList() {
             const list = document.getElementById('notifications-list');
             const emptyEl = document.getElementById('notifications-empty');
+            const scroller = document.getElementById('notif-tab-scroll');
+            const prevScrollTop = scroller ? scroller.scrollTop : 0;
             list.innerHTML = '';
-            const entries = Object.entries(cachedNotifications)
-                .filter(([, notif]) => notifMatchesFilter(notif, notifActiveFilter))
-                .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
-            emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
+            const now = Date.now();
 
-            entries.forEach(([notifId, notif]) => {
-                const isSelected = selectedNotifIds.has(notifId);
-                const item = document.createElement('div');
-                item.className = 'notif-item' + (!notif.read ? ' unread' : '') + (notifSelectionMode ? ' selection-mode' : '') + (isSelected ? ' selected' : '');
-                item.dataset.notifId = notifId;
-                item.innerHTML = `
-                    <div class="notif-item-checkbox"></div>
-                    <div class="notif-item-avatar-wrap">
-                        ${feedAvatarHtml({ name: notif.fromName, photoURL: notif.fromPhotoURL })}
-                        ${notifTypeBadgeHtml(notif.type)}
-                    </div>
-                    <div class="notif-item-body">
-                        <div class="notif-item-text"></div>
-                        <div class="notif-item-time" data-rel-ts="${notif.timestamp}">${formatTime(notif.timestamp)}</div>
-                    </div>
-                    ${(!notif.read && !notifSelectionMode) ? '<div class="notif-item-dot"></div>' : ''}
-                    ${notifSelectionMode ? '' : notifPreviewWrapHtml(notif.postId)}
-                `;
-                item.querySelector('.notif-item-text').innerHTML = notifSentenceFor(notif);
-                list.appendChild(item);
+            const notifEntries = Object.entries(cachedNotifications)
+                .filter(([, notif]) => notifMatchesFilter(notif, notifActiveFilter))
+                .map(([id, notif]) => ({ kind: 'notif', id, notif, ts: Number(notif.timestamp) || 0 }));
+
+            // Suggested posts only show under "All", and not while picking notifications to delete.
+            const shownPostIds = new Set(notifEntries.map(e => e.notif.postId).filter(Boolean));
+            const suggestedEntries = (notifActiveFilter === 'all' && !notifSelectionMode) ? getActivitySuggestions(shownPostIds) : [];
+            activityLastPostCount = Object.keys(cachedPosts).length;
+
+            // "New" = unread notifications + suggested posts under a day old (the row's time is the
+            // post's age); "Last 30 days" = the rest; anything older than that falls to "Earlier".
+            const sections = { new: [], recent: [], earlier: [] };
+            notifEntries.forEach((e) => {
+                if (!e.notif.read) sections.new.push(e);
+                else if (now - e.ts <= 30 * ACTIVITY_DAY_MS) sections.recent.push(e);
+                else sections.earlier.push(e);
             });
+            suggestedEntries.forEach((e) => {
+                (now - e.ts < ACTIVITY_DAY_MS ? sections.new : sections.recent).push(e);
+            });
+            // Real activity first, then suggestions; newest first within each.
+            const order = (a, b) => (a.kind === b.kind ? 0 : (a.kind === 'notif' ? -1 : 1)) || (b.ts - a.ts);
+
+            let total = 0;
+            [['new', 'New'], ['recent', 'Last 30 days'], ['earlier', 'Earlier']].forEach(([key, title]) => {
+                const items = sections[key].sort(order);
+                if (!items.length) return;
+                total += items.length;
+                const heading = document.createElement('div');
+                heading.className = 'activity-section-title';
+                heading.textContent = title;
+                list.appendChild(heading);
+                items.forEach((entry) => list.appendChild(buildActivityRow(entry)));
+            });
+            emptyEl.style.display = total === 0 ? 'block' : 'none';
+            if (scroller && prevScrollTop) scroller.scrollTop = prevScrollTop;
+        }
+
+        // The feed's posts usually finish loading around the time this tab is first opened, so
+        // if the loaded-post count changes while Activity is showing, redraw once so the suggested
+        // posts appear without needing to leave and come back.
+        setInterval(() => {
+            const tab = document.getElementById('tab-notifications');
+            if (!tab || !tab.classList.contains('active-tab') || notifSelectionMode || document.hidden) return;
+            if (Object.keys(cachedPosts).length !== activityLastPostCount) renderNotificationsList();
+        }, 2500);
+
+        // Like from an Activity row. Posts in the feed window go through the normal reaction path
+        // (whose live listener then patches the row); an older post that was fetched only for its
+        // preview isn't in cachedPosts, so it's updated directly here.
+        async function activityToggleLike(postId) {
+            const user = auth.currentUser;
+            if (!user || !postId) return;
+            if (cachedPosts[postId]) { toggleLikePost(postId); return; }
+            const post = notifPostPreviewCache[postId];
+            if (!post) return;
+            const mine = !!(post.reactions && post.reactions[user.uid]);
+            try {
+                if (mine) {
+                    delete post.reactions[user.uid];
+                    post.likeCount = Math.max(0, (post.likeCount || 1) - 1);
+                    hydrateActivityRowsForPost(postId, post);
+                    await update(ref(database, `posts/${postId}`), { [`reactions/${user.uid}`]: null, likeCount: increment(-1) });
+                } else {
+                    post.reactions = post.reactions || {};
+                    post.reactions[user.uid] = DEFAULT_POST_REACTION;
+                    post.likeCount = (post.likeCount || 0) + 1;
+                    hydrateActivityRowsForPost(postId, post);
+                    await update(ref(database, `posts/${postId}`), { [`reactions/${user.uid}`]: DEFAULT_POST_REACTION, likeCount: increment(1) });
+                    createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
+                }
+            } catch (err) {
+                console.error('activityToggleLike failed', err);
+                notify('Could not update like', 'error');
+            }
+        }
+
+        function handleActivityAction(btn) {
+            const row = btn.closest('.activity-row');
+            const postId = row && row.dataset.contentPostId;
+            if (!postId) return;
+            switch (btn.dataset.act) {
+                case 'like': triggerHaptic(15); activityToggleLike(postId); break;
+                case 'comment': openNotificationPostView(postId); break;
+                case 'repost': onRepostButtonTap(postId, btn); break;
+                case 'share': openSharePostSheet(postId); break;
+            }
+        }
+
+        async function handleActivityFollowBack(btn) {
+            const uid = btn.dataset.followUid;
+            if (!uid) return;
+            btn.disabled = true;
+            btn.textContent = 'Following';
+            try {
+                await followUser(uid);
+            } catch (err) {
+                console.error('follow back failed', err);
+                btn.disabled = false;
+                btn.textContent = 'Follow back';
+                notify('Could not follow', 'error');
+            }
         }
 
         function updateNotifSelectionHeader() {
@@ -21102,6 +21417,7 @@
         // leftover selection; leaving is handled by handleHashChange.
         function openNotificationsSheet() { goToTab('tab-notifications'); }
         function onNotificationsTabEntered() {
+            updateActivityBellIcon();
             exitNotifSelectionMode(); // also re-renders the list from the latest cachedNotifications
         }
 
@@ -22668,15 +22984,32 @@
             });
         });
         notifListEl.addEventListener('click', (e) => {
-            const item = e.target.closest('.notif-item');
-            if (!item) return;
-            const notifId = item.dataset.notifId;
+            if (!notifSelectionMode) {
+                const followBtn = e.target.closest('.activity-follow-btn');
+                if (followBtn) { e.stopPropagation(); handleActivityFollowBack(followBtn); return; }
+                const actBtn = e.target.closest('.activity-act-btn');
+                if (actBtn) { e.stopPropagation(); handleActivityAction(actBtn); return; }
+            }
+            const row = e.target.closest('.activity-row');
+            if (!row) return;
+            // A suggested post (no notification behind it) just opens the post.
+            if (row.dataset.suggestedPostId) {
+                if (!notifSelectionMode) openNotificationPostView(row.dataset.suggestedPostId);
+                return;
+            }
+            const notifId = row.dataset.notifId;
             if (notifSelectionMode) {
                 toggleNotifSelected(notifId);
                 return;
             }
             const notif = cachedNotifications[notifId];
             if (notif) openNotificationTarget(notifId, notif);
+        });
+
+        document.getElementById('btn-activity-bell').addEventListener('click', () => {
+            if (!('Notification' in window)) { notify('Notifications are not supported on this device', 'error'); return; }
+            if (Notification.permission === 'granted') { notify('Notifications are on'); return; }
+            btnSettingsNotifications.click(); // same permission + push-setup flow as Settings; refreshes the bell when it resolves
         });
 
         document.getElementById('feed-composer-tag-btn').addEventListener('click', openTagPeopleSheet);

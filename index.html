@@ -7161,6 +7161,14 @@
                 <div style="width:38px; flex-shrink:0;"></div>
             </div>
             <div class="wa-section contact-card-list">
+                <div class="wa-list-row wa-row-clickable" id="contact-more-voice-call" style="display:none;">
+                    <div class="wa-row-icon chip-black"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Voice call</span></div>
+                </div>
+                <div class="wa-list-row wa-row-clickable" id="contact-more-video-call" style="display:none;">
+                    <div class="wa-row-icon chip-black"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Video call</span></div>
+                </div>
                 <div class="wa-list-row wa-row-clickable" id="contact-more-info">
                     <div class="wa-row-icon chip-black"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
                     <div class="wa-row-body"><span class="wa-row-title" id="contact-more-info-label">View contact</span></div>
@@ -13840,7 +13848,11 @@
                     ? `Disappearing messages: ${disappearingLabelFor(activeChatDisappearingSeconds)}`
                     : 'Disappearing messages',
                 showCompiler: !!(activeGroup && activeGroup.compilerEnabled),
-                showRide: !isGroup && !isAIChat
+                showRide: !isGroup && !isAIChat,
+                // The (CSS-hidden) header call buttons stay the source of truth for what's
+                // available; the open-chat code shows/hides them per chat type.
+                showVoiceCall: ['btn-call-voice', 'btn-group-call-voice'].some(id => { const b = document.getElementById(id); return !!(b && b.style.display !== 'none'); }),
+                showVideoCall: (() => { const b = document.getElementById('btn-call-video'); return !!(b && b.style.display !== 'none'); })()
             };
         }
 
@@ -13852,8 +13864,13 @@
 
             const closeMenu = () => dropdown.classList.remove('open');
 
+            // The three-dot button now opens the "More options" bottom sheet
+            // (#contact-card-more-sheet-overlay) instead of this anchored dropdown. The
+            // dropdown markup/handlers below are kept but no longer reachable.
             menuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                openContactCardMoreSheet();
+                return;
                 const state = computeChatViewMenuState();
 
                 document.getElementById('chat-view-menu-info-label').textContent = state.infoLabel;
@@ -30439,6 +30456,9 @@
         function openContactCardMoreSheet() {
             const state = computeChatViewMenuState();
 
+            document.getElementById('contact-more-voice-call').style.display = state.showVoiceCall ? 'flex' : 'none';
+            document.getElementById('contact-more-video-call').style.display = state.showVideoCall ? 'flex' : 'none';
+
             document.getElementById('contact-more-info-label').textContent = state.infoLabel;
             document.getElementById('contact-more-info').style.display = state.showInfo ? 'flex' : 'none';
 
@@ -30463,6 +30483,16 @@
             if (e.target === contactCardMoreSheet) contactCardMoreSheet.classList.remove('active');
         });
 
+        const fireMoreSheetCallBtn = (id) => document.getElementById(id).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        document.getElementById('contact-more-voice-call').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;
+            fireMoreSheetCallBtn(isGroup ? 'btn-group-call-voice' : 'btn-call-voice');
+        });
+        document.getElementById('contact-more-video-call').addEventListener('click', () => {
+            contactCardMoreSheet.classList.remove('active');
+            fireMoreSheetCallBtn('btn-call-video');
+        });
         document.getElementById('contact-more-info').addEventListener('click', () => {
             contactCardMoreSheet.classList.remove('active');
             const isGroup = typeof activeGroupId !== 'undefined' && activeGroupId;

@@ -4306,10 +4306,11 @@
            at its bottom-right corner, a waveform, and a meta row (elapsed time + a speed
            toggle that cycles 1X → 1.5X → 2X). */
         .msg-voice-card { display: flex; align-items: center; gap: 10px; min-width: 210px; padding: 2px 0; }
-        .msg-voice-avatar-wrap { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
+        .msg-voice-avatar-wrap { position: relative; width: 42px; height: 42px; flex-shrink: 0; }
         .msg-voice-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; background: var(--bg-hover); }
-        .msg-voice-play-btn { position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--msg-in-bg); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--primary-blue); color: #FFFFFF; padding: 0; }
-        .msg-voice-play-btn svg { width: 10px; height: 10px; }
+        .msg-voice-play-btn { position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--msg-in-bg); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--primary-blue); color: #FFFFFF; padding: 0; }
+        .msg-voice-play-btn::before { content: ''; position: absolute; inset: -8px; } /* larger invisible tap target than the visible badge */
+        .msg-voice-play-btn svg { width: 12px; height: 12px; }
         .msg-bubble.out .msg-voice-play-btn { border-color: var(--msg-out-bg); }
         .msg-voice-body { flex: 1; min-width: 0; }
         .msg-voice-track { position: relative; height: 4px; border-radius: 4px; background: rgba(var(--primary-rgb), 0.15); margin-bottom: 6px; overflow: hidden; }
@@ -39538,7 +39539,12 @@
                     if (progressLayer && duration) progressLayer.style.width = Math.min(100, (audioEl.currentTime / duration) * 100) + '%';
                     timeLabel.textContent = formatVoiceTimeRange(audioEl.currentTime, duration);
                 });
-                audioEl.addEventListener('pause', stopWaveAnim);
+                audioEl.addEventListener('pause', () => {
+                    // Fires both for a manual pause tap and when another voice note takes over
+                    // via pauseAllAppMedia() — either way, put this bubble's icon back to play.
+                    playBtn.innerHTML = playIconSvg();
+                    stopWaveAnim();
+                });
                 audioEl.addEventListener('ended', () => {
                     playBtn.innerHTML = playIconSvg();
                     stopWaveAnim();

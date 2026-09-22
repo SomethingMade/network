@@ -34630,6 +34630,19 @@
                 feedInitialLoadComplete = false;
                 removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
                 feedInitialSkeletonNodes = [];
+                // Reset the feed's cached state and wipe its DOM too — otherwise a
+                // re-login re-attaches the listeners (initFeedListeners guards on
+                // feedListenersAttached) but the old post cards are still sitting in
+                // #feed-posts-list. Firebase's initial-burst child_added events then
+                // see a card already present for each postId and skip re-inserting it,
+                // even though cachedPosts was just refreshed with current data — so any
+                // post edited, liked, or changed while logged out keeps showing its
+                // stale pre-logout version until something else forces a rebuild.
+                cachedPosts = {};
+                pendingNewPosts = {};
+                oldestLoadedPostTimestamp = Infinity;
+                const staleFeedList = document.getElementById('feed-posts-list');
+                if (staleFeedList) staleFeedList.innerHTML = '';
                 notifListenersAttached = false;
                 emptyOlderFetchCount = 0;
                 cachedNotifications = {};

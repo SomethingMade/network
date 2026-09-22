@@ -4697,6 +4697,7 @@
         #image-viewer-overlay.iv-chrome-hidden #image-viewer-bottom,
         #image-viewer-overlay.iv-chrome-hidden .image-viewer-counter,
         #image-viewer-overlay.iv-chrome-hidden .image-viewer-close,
+        #image-viewer-overlay.iv-chrome-hidden .media-viewer-chat-bar,
         #image-viewer-overlay.iv-chrome-hidden .image-viewer-save { opacity: 0; pointer-events: none; }
         .image-viewer-post-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; padding: 8px 12px; border-radius: 20px; transition: background 0.15s ease, color 0.15s ease; }
         .image-viewer-post-action-btn:hover { background: rgba(255,255,255,0.08); }
@@ -4706,6 +4707,24 @@
         .image-viewer-post-action-btn.saved { color: #fff; }
         .image-viewer-view-stat { cursor: default; }
         .image-viewer-view-stat:hover { background: none; }
+
+        /* ── Chat media action bar (Reply / Forward / Share / Save / Delete) — shown on the
+           image & video viewers only when the media being viewed was opened from a chat bubble
+           (iMessage/WhatsApp style). Shares one class between both overlays. */
+        .media-viewer-chat-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; display: none; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 22px 8px calc(10px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); background: linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0.55) 65%, rgba(0,0,0,0)); transition: opacity 0.2s ease; }
+        #image-viewer-overlay.has-chat-bar .media-viewer-chat-bar,
+        #video-viewer-overlay.has-chat-bar .media-viewer-chat-bar { display: flex; }
+        .media-viewer-chat-bar-btn { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; color: #fff; font-family: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; padding: 2px; -webkit-tap-highlight-color: transparent; }
+        .media-viewer-chat-bar-icon { width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.14); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; transition: background 0.15s ease, transform 0.1s ease; }
+        .media-viewer-chat-bar-btn:active .media-viewer-chat-bar-icon { transform: scale(0.9); background: rgba(255,255,255,0.24); }
+        .media-viewer-chat-bar-icon svg { width: 19px; height: 19px; }
+        .media-viewer-chat-bar-btn span { white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+        .media-viewer-chat-bar-btn.danger { color: #FF6961; }
+        .media-viewer-chat-bar-btn.danger .media-viewer-chat-bar-icon { background: rgba(255,69,58,0.2); }
+        /* Save lives inside this bar for chat media, so the older floating top-right save icon steps aside. */
+        #image-viewer-overlay.has-chat-bar .image-viewer-save,
+        #video-viewer-overlay.has-chat-bar .image-viewer-save { display: none !important; }
+        #image-viewer-overlay.iv-chrome-hidden .media-viewer-chat-bar { opacity: 0; pointer-events: none; }
 
         /* ── FULL VIDEO VIEWER (group media) ── */
         #video-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100006; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; }
@@ -4759,8 +4778,28 @@
         .video-viewer-play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; color: #fff; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; z-index: 2; }
         .video-viewer-play-hint.visible { opacity: 1; }
         .video-viewer-play-hint svg { width: 28px; height: 28px; }
-        .video-viewer-progress-track { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.25); z-index: 2; }
-        .video-viewer-progress-fill { height: 100%; width: 0%; background: #0A84FF; }
+        /* Top icon row: mute · popout · save · fullscreen · close, laid out as a flex row instead
+           of individually-offset absolute icons so adding/removing a button never needs re-tuning
+           magic `right` values. */
+        .video-viewer-top-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 30px; background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0)); transition: opacity 0.2s ease; }
+        .vv-top-icon { position: static; flex-shrink: 0; width: 20px; height: 20px; padding: 10px; box-sizing: content-box; background: rgba(0,0,0,0.45); border: none; border-radius: 50%; color: #fff; cursor: pointer; transition: opacity 0.2s ease, background 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        .vv-top-icon:hover, .vv-top-icon:active { background: rgba(0,0,0,0.65); }
+        .vv-top-icon svg { width: 100%; height: 100%; display: block; }
+        /* Scrub row: draggable seek bar with a live time readout either side, sitting just above
+           the chat action bar (or the very bottom, when there isn't one). */
+        .video-viewer-scrub-wrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 26px 14px 10px; background: linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0)); transition: opacity 0.2s ease, bottom 0.2s ease; }
+        #video-viewer-overlay.has-chat-bar .video-viewer-scrub-wrap { bottom: 78px; background: none; padding-bottom: 4px; }
+        .video-viewer-scrub-row { display: flex; align-items: center; gap: 8px; }
+        .video-viewer-time { flex-shrink: 0; color: #fff; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px rgba(0,0,0,0.5); min-width: 30px; text-align: center; }
+        .video-viewer-scrub-track { position: relative; flex: 1; height: 20px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+        .video-viewer-scrub-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; border-radius: 2px; background: rgba(255,255,255,0.28); }
+        .video-viewer-progress-fill { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 3px; border-radius: 2px; width: 0%; background: #0A84FF; pointer-events: none; }
+        .video-viewer-scrub-handle { position: absolute; top: 50%; left: 0%; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); transform: translate(-50%, -50%) scale(0.001); transition: transform 0.12s ease; pointer-events: none; }
+        .video-viewer-scrub-track:hover .video-viewer-scrub-handle,
+        .video-viewer-scrub-track.scrubbing .video-viewer-scrub-handle { transform: translate(-50%, -50%) scale(1); }
+        .video-viewer-scrub-track.scrubbing .video-viewer-progress-fill { transition: none; }
+        #video-viewer-overlay.iv-chrome-hidden .video-viewer-top-bar,
+        #video-viewer-overlay.iv-chrome-hidden .video-viewer-scrub-wrap { opacity: 0; pointer-events: none; }
 
         /* ── REEL VIEWER (full-screen vertical-swipe video feed, opened from a post's video) ── */
         #reel-viewer-overlay { position: fixed; inset: 0; background: #000; z-index: 100007; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; display: flex; flex-direction: column; }
@@ -10127,18 +10166,82 @@
             </button>
         </div>
         </div>
+        <!-- Chat media action bar — only shown when this photo was opened from a chat bubble (see
+             openImageViewer's chatCtx argument / updateImageViewerPostBarVisibility). -->
+        <div class="media-viewer-chat-bar" id="image-viewer-chat-bar">
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="reply">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg></span>
+                <span>Reply</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="forward">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg></span>
+                <span>Forward</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="share">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"></line><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line></svg></span>
+                <span>Share</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="save">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></span>
+                <span>Save</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn danger" data-mvcb-action="delete">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6 7l1 13h10l1-13"></path></svg></span>
+                <span>Delete</span>
+            </button>
+        </div>
     </div>
 
     <div id="video-viewer-overlay">
-        <svg class="image-viewer-save" id="video-viewer-popout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="right: 116px;" title="Play floating"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="11" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"></rect></svg>
-        <svg class="image-viewer-save" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        <svg class="image-viewer-close" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <div class="video-viewer-top-bar" id="video-viewer-top-bar">
+            <button type="button" class="vv-top-icon" id="video-viewer-mute-btn" aria-label="Mute">
+                <svg id="video-viewer-mute-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            </button>
+            <svg class="image-viewer-save vv-top-icon" id="video-viewer-popout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Play floating"><rect x="3" y="3" width="18" height="18" rx="2"></rect><rect x="11" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"></rect></svg>
+            <svg class="image-viewer-save vv-top-icon" id="video-viewer-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <button type="button" class="vv-top-icon" id="video-viewer-fullscreen-btn" aria-label="Fullscreen">
+                <svg id="video-viewer-fullscreen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+            </button>
+            <svg class="image-viewer-close vv-top-icon" id="video-viewer-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
         <video id="video-viewer-vid" src="" playsinline preload="metadata"></video>
         <div class="video-viewer-play-hint" id="video-viewer-play-hint">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
         </div>
-        <div class="video-viewer-progress-track">
-            <div class="video-viewer-progress-fill" id="video-viewer-progress-fill"></div>
+        <div class="video-viewer-scrub-wrap" id="video-viewer-scrub-wrap">
+            <div class="video-viewer-scrub-row">
+                <span class="video-viewer-time" id="video-viewer-time-current">0:00</span>
+                <div class="video-viewer-scrub-track" id="video-viewer-scrub-track">
+                    <div class="video-viewer-progress-fill" id="video-viewer-progress-fill"></div>
+                    <div class="video-viewer-scrub-handle" id="video-viewer-scrub-handle"></div>
+                </div>
+                <span class="video-viewer-time" id="video-viewer-time-duration">0:00</span>
+            </div>
+        </div>
+        <!-- Chat media action bar — every #video-viewer-overlay caller is a chat surface (DM/group
+             video message, quoted-message jump, contact media grid), so this is populated whenever
+             openVideoViewer is given a chatCtx; see updateVideoViewerChatBar. -->
+        <div class="media-viewer-chat-bar" id="video-viewer-chat-bar">
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="reply">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg></span>
+                <span>Reply</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="forward">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg></span>
+                <span>Forward</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="share">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"></line><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line></svg></span>
+                <span>Share</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn" data-mvcb-action="save">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></span>
+                <span>Save</span>
+            </button>
+            <button type="button" class="media-viewer-chat-bar-btn danger" data-mvcb-action="delete">
+                <span class="media-viewer-chat-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6 7l1 13h10l1-13"></path></svg></span>
+                <span>Delete</span>
+            </button>
         </div>
         <audio id="video-viewer-music-audio" preload="none" loop style="display:none;"></audio>
     </div>
@@ -10838,6 +10941,10 @@
         let currentViewerGalleryPostIds = null;
         let currentViewerIndex = 0;
         let currentViewerPostId = null;
+        // Set when the photo currently in the viewer came from a chat bubble — { msgData, isOwn,
+        // isGroup } — so the bottom bar can offer Reply/Forward/Share/Save/Delete wired to the
+        // same functions the chat's own long-press menu uses. See openImageViewer's chatCtx arg.
+        let currentViewerChatMsg = null;
         // `gallery` (optional) is the full array of image URLs for a multi-image post; `startIndex`
         // is which one was tapped. When provided (length > 1), prev/next arrows and a counter appear
         // and clicking them just swaps image-viewer-img's src, no need to reopen the viewer.
@@ -10845,7 +10952,9 @@
         // image area to make room for it, and syncs live counts from cachedPosts. `galleryPostIds`
         // (optional) is a parallel array to `gallery` for cases like the profile media grid, where
         // each image in the gallery belongs to a different post — stepping through updates the bar.
-        function openImageViewer(url, hideSave, gallery, startIndex, postId, galleryPostIds) {
+        // `chatCtx` (optional) is { msgData, isOwn, isGroup } — pass it when opening a chat photo so
+        // the bottom bar shows chat actions instead of the plain floating close/save icons.
+        function openImageViewer(url, hideSave, gallery, startIndex, postId, galleryPostIds, chatCtx) {
             if (!url) return;
             imageViewerCycleToken++;
             const isGallery = Array.isArray(gallery) && gallery.length > 1;
@@ -10853,6 +10962,7 @@
             currentViewerGalleryPostIds = (isGallery && Array.isArray(galleryPostIds)) ? galleryPostIds : null;
             currentViewerIndex = isGallery ? Math.max(0, gallery.indexOf(url) !== -1 ? gallery.indexOf(url) : (startIndex || 0)) : 0;
             currentViewerPostId = postId || null;
+            currentViewerChatMsg = (chatCtx && chatCtx.msgData) ? chatCtx : null;
             renderImageViewerFrame(isGallery ? gallery[currentViewerIndex] : url, hideSave);
             const overlay = document.getElementById('image-viewer-overlay');
             document.getElementById('image-viewer-prev').classList.toggle('visible', isGallery);
@@ -10867,13 +10977,18 @@
         let currentViewerHideSave = false;
         function updateImageViewerPostBarVisibility() {
             // Post images get the shared top bar (back · author · Follow · ⋯) and the caption/actions
-            // stack; everything else (chat photo, avatar…) keeps the plain floating close button.
-            document.getElementById('image-viewer-overlay').classList.toggle('has-post-bar', !!currentViewerPostId);
+            // stack; chat photos get the Reply/Forward/Share/Save/Delete bar; everything else
+            // (avatar preview, etc.) keeps the plain floating close button only.
+            const overlay = document.getElementById('image-viewer-overlay');
+            const hasChatBar = !currentViewerPostId && !!currentViewerChatMsg && !currentViewerHideSave;
+            overlay.classList.toggle('has-post-bar', !!currentViewerPostId);
+            overlay.classList.toggle('has-chat-bar', hasChatBar);
             document.getElementById('image-viewer-close').style.display = currentViewerPostId ? 'none' : '';
             document.getElementById('image-viewer-caption-wrap').style.display = currentViewerPostId ? '' : 'none';
             document.getElementById('image-viewer-post-actions').style.display = currentViewerPostId ? 'flex' : 'none';
             document.getElementById('image-viewer-post-menu-btn').style.display = currentViewerPostId ? '' : 'none';
             document.getElementById('image-viewer-author-bar-wrap').style.display = currentViewerPostId ? 'block' : 'none';
+            if (hasChatBar) updateChatActionBar(document.getElementById('image-viewer-chat-bar'), currentViewerChatMsg);
             if (currentViewerPostId) {
                 // Post images: download now lives inside the three-dot menu (see
                 // btn-post-download / openPostOptions) instead of this floating icon, so keep
@@ -10884,10 +10999,12 @@
                 trackImageViewerPostImpression();
             } else {
                 // Not a post (chat photo, avatar, etc.) — there's no three-dot menu shown here
-                // at all in that case, so this floating icon is still the only way to download;
-                // keep its original verified/hideSave gating.
+                // at all in that case, so this floating icon would be the only way to download,
+                // except chat photos now carry Save inside the chat bar instead (see the CSS rule
+                // hiding .image-viewer-save under .has-chat-bar); keep its original verified/
+                // hideSave gating for anything else (avatar preview, etc.).
                 const myUid = auth.currentUser && auth.currentUser.uid;
-                document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || !isVerifiedUid(myUid)) ? 'none' : '';
+                document.getElementById('image-viewer-save').style.display = (currentViewerHideSave || hasChatBar || !isVerifiedUid(myUid)) ? 'none' : '';
             }
         }
         // Fills the avatar/name/username/Follow row above the image (see
@@ -11303,31 +11420,53 @@
             e.stopPropagation();
             if (currentViewerImageUrl) downloadMediaFile(currentViewerImageUrl, 'image');
         });
+        document.getElementById('image-viewer-chat-bar').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-mvcb-action]');
+            if (!btn) return;
+            e.stopPropagation();
+            runChatActionBarAction(btn.dataset.mvcbAction, currentViewerChatMsg, currentViewerImageUrl, 'image', requestCloseImageViewer);
+        });
         document.getElementById('image-viewer-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'image-viewer-overlay') history.back();
         });
 
         let currentViewerVideoUrl = '';
-        function openVideoViewer(url, hideSave, musicUrl) {
+        // Set when the clip currently in the viewer came from a chat bubble — { msgData, isOwn,
+        // isGroup } — same idea as currentViewerChatMsg on the image viewer. Every caller of
+        // openVideoViewer today is a chat surface (DM/group video message, quoted-message jump,
+        // contact media grid), so in practice this is set whenever hideSave isn't forcing a
+        // view-once/no-chrome mode.
+        let currentVideoViewerChatMsg = null;
+        // `chatCtx` (optional) is { msgData, isOwn, isGroup } — pass it so the bottom bar shows
+        // Reply/Forward/Share/Save/Delete wired to the same functions the chat's long-press menu uses.
+        function openVideoViewer(url, hideSave, musicUrl, chatCtx) {
             if (!url) return;
             pauseAllAppMedia();
             currentViewerVideoUrl = url;
+            currentVideoViewerChatMsg = (chatCtx && chatCtx.msgData) ? chatCtx : null;
             const vid = document.getElementById('video-viewer-vid');
             const musicAudio = document.getElementById('video-viewer-music-audio');
             vid.src = url;
             vid.disablePictureInPicture = !!hideSave;
             vid.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
             const myUid = auth.currentUser && auth.currentUser.uid;
-            document.getElementById('video-viewer-save').style.display = (hideSave || !isVerifiedUid(myUid)) ? 'none' : '';
+            const hasChatBar = !hideSave && !!currentVideoViewerChatMsg;
+            document.getElementById('video-viewer-save').style.display = (hideSave || hasChatBar || !isVerifiedUid(myUid)) ? 'none' : '';
             const overlay = document.getElementById('video-viewer-overlay');
             overlay.classList.toggle('no-save', !!hideSave);
+            overlay.classList.toggle('has-chat-bar', hasChatBar);
             overlay.oncontextmenu = hideSave ? (e) => { e.preventDefault(); return false; } : null;
             overlay.classList.add('active');
+            if (hasChatBar) updateChatActionBar(document.getElementById('video-viewer-chat-bar'), currentVideoViewerChatMsg);
 
             const progressFill = document.getElementById('video-viewer-progress-fill');
+            const scrubHandle = document.getElementById('video-viewer-scrub-handle');
             const hint = document.getElementById('video-viewer-play-hint');
             progressFill.style.width = '0%';
+            scrubHandle.style.left = '0%';
             hint.classList.remove('visible');
+            document.getElementById('video-viewer-time-current').textContent = '0:00';
+            document.getElementById('video-viewer-time-duration').textContent = '0:00';
 
             if (musicUrl) {
                 // Same rule as the inline feed player: the clip's own sound stays muted and the
@@ -11340,13 +11479,22 @@
                 musicAudio.pause();
                 musicAudio.src = '';
             }
+            updateVideoViewerMuteIcon(vid.muted);
             // Same edge-to-edge, tap-to-play look as a post's video (Reel viewer): a fading play
-            // hint on pause and a thin progress line, instead of the browser's native controls bar.
+            // hint on pause and a scrubbable progress bar, instead of the browser's native controls bar.
             vid.onplay = () => { hint.classList.remove('visible'); if (musicUrl) { musicAudio.currentTime = vid.currentTime; musicAudio.play().catch(() => {}); } };
             vid.onpause = () => { hint.classList.add('visible'); if (musicUrl) musicAudio.pause(); };
             vid.onseeked = () => { if (musicUrl) musicAudio.currentTime = vid.currentTime; };
+            vid.onloadedmetadata = () => {
+                document.getElementById('video-viewer-time-duration').textContent = formatVoiceTime(vid.duration || 0);
+            };
             vid.ontimeupdate = () => {
-                if (vid.duration) progressFill.style.width = ((vid.currentTime / vid.duration) * 100) + '%';
+                if (vid.duration) {
+                    const pct = (vid.currentTime / vid.duration) * 100;
+                    progressFill.style.width = pct + '%';
+                    scrubHandle.style.left = pct + '%';
+                    document.getElementById('video-viewer-time-current').textContent = formatVoiceTime(vid.currentTime);
+                }
                 if (musicUrl && Math.abs(musicAudio.currentTime - vid.currentTime) > 0.3) musicAudio.currentTime = vid.currentTime;
             };
 
@@ -11362,8 +11510,12 @@
             musicAudio.src = '';
             document.getElementById('video-viewer-play-hint').classList.remove('visible');
             document.getElementById('video-viewer-progress-fill').style.width = '0%';
-            document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur', 'above-sheet');
+            document.getElementById('video-viewer-scrub-handle').style.left = '0%';
+            document.getElementById('video-viewer-overlay').classList.remove('active', 'privacy-blur', 'above-sheet', 'has-chat-bar');
             currentViewerVideoUrl = '';
+            currentVideoViewerChatMsg = null;
+            // Fullscreen doesn't auto-exit just because the overlay faded out.
+            if (document.fullscreenElement === vid) document.exitFullscreen().catch(() => {});
         }
         document.getElementById('video-viewer-vid').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -11375,6 +11527,84 @@
             e.stopPropagation();
             if (currentViewerVideoUrl) downloadMediaFile(currentViewerVideoUrl, 'video');
         });
+        document.getElementById('video-viewer-chat-bar').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-mvcb-action]');
+            if (!btn) return;
+            e.stopPropagation();
+            runChatActionBarAction(btn.dataset.mvcbAction, currentVideoViewerChatMsg, currentViewerVideoUrl, 'video', () => history.back());
+        });
+        // Mute toggle — mutes the music track instead of the clip when a song is attached, since
+        // the clip's own audio is already silenced in that case (see openVideoViewer above).
+        function updateVideoViewerMuteIcon(isMuted) {
+            const icon = document.getElementById('video-viewer-mute-icon');
+            if (!icon) return;
+            icon.innerHTML = isMuted
+                ? '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>'
+                : '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>';
+        }
+        document.getElementById('video-viewer-mute-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vid = document.getElementById('video-viewer-vid');
+            const musicAudio = document.getElementById('video-viewer-music-audio');
+            const target = musicAudio.src ? musicAudio : vid;
+            target.muted = !target.muted;
+            if (musicAudio.src) vid.muted = true; // clip audio always stays off when a song is attached
+            updateVideoViewerMuteIcon(target.muted);
+        });
+        // Fullscreen toggle — the browser's native fullscreen on the <video> element itself, since
+        // this viewer already supplies its own chrome (no native controls bar to fall back on).
+        document.getElementById('video-viewer-fullscreen-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const vid = document.getElementById('video-viewer-vid');
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            } else if (vid.requestFullscreen) {
+                vid.requestFullscreen().catch(() => {});
+            } else if (vid.webkitEnterFullscreen) {
+                vid.webkitEnterFullscreen(); // iOS Safari
+            }
+        });
+        // Scrub bar — click or drag anywhere on the track to seek. Dragging (mouse or touch) keeps
+        // following the pointer even if it leaves the track's narrow hitbox.
+        (function initVideoViewerScrub() {
+            const track = document.getElementById('video-viewer-scrub-track');
+            const vid = document.getElementById('video-viewer-vid');
+            let wasPlaying = false;
+            const pctFromEvent = (e) => {
+                const rect = track.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                return Math.min(1, Math.max(0, x / rect.width));
+            };
+            const seekTo = (pct) => {
+                if (!vid.duration) return;
+                vid.currentTime = pct * vid.duration;
+                document.getElementById('video-viewer-progress-fill').style.width = (pct * 100) + '%';
+                document.getElementById('video-viewer-scrub-handle').style.left = (pct * 100) + '%';
+                document.getElementById('video-viewer-time-current').textContent = formatVoiceTime(vid.currentTime);
+            };
+            const onMove = (e) => { e.preventDefault(); seekTo(pctFromEvent(e)); };
+            const onEnd = () => {
+                track.classList.remove('scrubbing');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+                if (wasPlaying) vid.play().catch(() => {});
+            };
+            const onStart = (e) => {
+                e.stopPropagation();
+                wasPlaying = !vid.paused;
+                vid.pause();
+                track.classList.add('scrubbing');
+                seekTo(pctFromEvent(e));
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onEnd);
+                document.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('touchend', onEnd);
+            };
+            track.addEventListener('mousedown', onStart);
+            track.addEventListener('touchstart', onStart, { passive: true });
+        })();
         document.getElementById('video-viewer-popout').addEventListener('click', (e) => {
             e.stopPropagation();
             const vid = document.getElementById('video-viewer-vid');
@@ -12240,6 +12470,88 @@
 
         function saveIconSvg() {
             return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+        }
+
+        // Shares a chat photo/video out of the app via the OS share sheet (used by the image/video
+        // viewer's chat action bar). Tries to attach the actual file first so it drops straight
+        // into Messages/WhatsApp/etc. as media rather than a bare link; falls back to sharing the
+        // URL, then to just copying it, for browsers that don't support file sharing.
+        async function shareMediaFile(url, kind = 'file') {
+            if (!url) return;
+            try {
+                if (navigator.share) {
+                    if (navigator.canShare) {
+                        try {
+                            const res = await fetch(url, { mode: 'cors' });
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const ext = kind === 'video' ? 'mp4' : 'jpg';
+                                const file = new File([blob], `haba-${kind}-${Date.now()}.${ext}`, {
+                                    type: blob.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg')
+                                });
+                                if (navigator.canShare({ files: [file] })) {
+                                    await navigator.share({ files: [file] });
+                                    return;
+                                }
+                            }
+                        } catch (err) { /* CORS-blocked or cancelled — fall through to a URL share */ }
+                    }
+                    try { await navigator.share({ url }); return; }
+                    catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+                }
+                await navigator.clipboard.writeText(url);
+                notify('Link copied to clipboard');
+            } catch (err) {
+                console.error('shareMediaFile error:', err);
+                notify('Could not share', 'error');
+            }
+        }
+
+        // ── Chat media action bar (Reply / Forward / Share / Save / Delete) shared by the image
+        // and video viewers whenever they're opened on a chat message — see openImageViewer's and
+        // openVideoViewer's `chatCtx` argument. Reuses the exact same functions/buttons the chat's
+        // own long-press menu uses (activateReplyMode, #btn-msg-forward, #btn-msg-delete,
+        // deleteDmMessageForMe) via the shared `activeContextMenuMsg` global, so behaviour stays in
+        // sync with the long-press menu everywhere else in the app.
+        function updateChatActionBar(barEl, ctx) {
+            if (!barEl) return;
+            const msgData = ctx && ctx.msgData;
+            const fwdBtn = barEl.querySelector('[data-mvcb-action="forward"]');
+            const delBtn = barEl.querySelector('[data-mvcb-action="delete"]');
+            const canForward = !!msgData && !msgData.viewOnce && msgData.mediaType !== 'call';
+            if (fwdBtn) fwdBtn.style.display = canForward ? '' : 'none';
+            // Own message → delete for everyone; someone else's message in a DM → delete for me;
+            // someone else's message in a group → no delete option here (matches the older group
+            // options sheet, which only ever shows Delete for the sender).
+            const canDelete = !!msgData && !!msgData.key && (ctx.isOwn || !ctx.isGroup);
+            if (delBtn) delBtn.style.display = canDelete ? '' : 'none';
+        }
+        function runChatActionBarAction(action, ctx, mediaUrl, kind, closeViewerFn) {
+            const msgData = ctx && ctx.msgData;
+            if (!msgData) return;
+            switch (action) {
+                case 'reply':
+                    closeViewerFn();
+                    activateReplyMode(msgData);
+                    break;
+                case 'forward':
+                    activeContextMenuMsg = msgData;
+                    closeViewerFn();
+                    document.getElementById('btn-msg-forward').click();
+                    break;
+                case 'share':
+                    shareMediaFile(mediaUrl, kind);
+                    break;
+                case 'save':
+                    downloadMediaFile(mediaUrl, kind);
+                    break;
+                case 'delete':
+                    activeContextMenuMsg = msgData;
+                    closeViewerFn();
+                    if (ctx.isOwn) document.getElementById('btn-msg-delete').click();
+                    else deleteDmMessageForMe(msgData);
+                    break;
+            }
         }
 
         // Single check = sent, not yet seen. Double check = seen (color flips via CSS 'seen' class).
@@ -31333,7 +31645,7 @@
                             img.className = 'msg-media-img';
                             img.src = msg.mediaPreview || msg.mediaURL;
                             img.alt = 'GIF';
-                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL, false, null, null, null, null, { msgData: msg, isOwn, isGroup: true }));
                             mediaWrap.appendChild(img);
                             bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'music') {
@@ -31349,7 +31661,7 @@
                             img.className = 'msg-media-img';
                             img.src = msg.mediaURL;
                             img.alt = 'Photo';
-                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL, false, null, null, null, null, { msgData: msg, isOwn, isGroup: true }));
                             mediaWrap.appendChild(img);
                             bubble.appendChild(mediaWrap);
                             if (msg.text) {
@@ -31368,13 +31680,13 @@
                             vid.preload = 'metadata';
                             vid.playsInline = true;
                             vid.muted = true;
-                            vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            vid.addEventListener('click', () => openVideoViewer(msg.mediaURL, false, null, { msgData: msg, isOwn, isGroup: true }));
                             mediaWrap.appendChild(vid);
                             primeVideoPosterFrame(vid);
                             const playHint = document.createElement('div');
                             playHint.className = 'msg-media-play-hint';
                             playHint.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
-                            playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                            playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL, false, null, { msgData: msg, isOwn, isGroup: true }));
                             mediaWrap.appendChild(playHint);
                             attachVideoLoadingOverlay(mediaWrap, vid, playHint);
                             bubble.appendChild(mediaWrap);
@@ -38135,7 +38447,7 @@
                             img.className = 'msg-media-img';
                             img.src = msg.mediaPreview || msg.mediaURL;
                             img.alt = 'GIF';
-                            img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                            img.addEventListener('click', () => openImageViewer(msg.mediaURL, false, null, null, null, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                             mediaWrap.appendChild(img);
                             bubble.appendChild(mediaWrap);
                         } else if (msg.mediaURL && msg.mediaType === 'music') {
@@ -38168,7 +38480,7 @@
                                     if (readyUrl) {
                                         img.decoding = 'sync';
                                         img.src = readyUrl;
-                                        img.addEventListener('click', () => openImageViewer(readyUrl));
+                                        img.addEventListener('click', () => openImageViewer(readyUrl, false, null, null, null, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                                         return;
                                     }
                                     mediaWrap.classList.add('media-decrypting');
@@ -38176,7 +38488,7 @@
                                         mediaWrap.classList.remove('media-decrypting');
                                         if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
                                         img.src = localUrl;
-                                        img.addEventListener('click', () => openImageViewer(localUrl));
+                                        img.addEventListener('click', () => openImageViewer(localUrl, false, null, null, null, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                                     });
                                 };
                                 mediaWrap.addEventListener('click', (e) => {
@@ -38185,7 +38497,7 @@
                                 attemptImageDecrypt(false);
                             } else {
                                 img.src = msg.mediaURL;
-                                img.addEventListener('click', () => openImageViewer(msg.mediaURL));
+                                img.addEventListener('click', () => openImageViewer(msg.mediaURL, false, null, null, null, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                             }
                             mediaWrap.appendChild(img);
                             bubble.appendChild(mediaWrap);
@@ -38225,8 +38537,8 @@
                                     if (readyUrl) {
                                         vid.src = readyUrl;
                                         primeVideoPosterFrame(vid);
-                                        vid.addEventListener('click', () => openVideoViewer(readyUrl));
-                                        playHint.addEventListener('click', () => openVideoViewer(readyUrl));
+                                        vid.addEventListener('click', () => openVideoViewer(readyUrl, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
+                                        playHint.addEventListener('click', () => openVideoViewer(readyUrl, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                                         return;
                                     }
                                     mediaWrap.classList.add('media-decrypting');
@@ -38235,8 +38547,8 @@
                                         if (!localUrl) { mediaWrap.classList.add('media-decrypt-failed'); return; }
                                         vid.src = localUrl;
                                         primeVideoPosterFrame(vid);
-                                        vid.addEventListener('click', () => openVideoViewer(localUrl));
-                                        playHint.addEventListener('click', () => openVideoViewer(localUrl));
+                                        vid.addEventListener('click', () => openVideoViewer(localUrl, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
+                                        playHint.addEventListener('click', () => openVideoViewer(localUrl, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                                     });
                                 };
                                 mediaWrap.addEventListener('click', (e) => {
@@ -38245,8 +38557,8 @@
                                 attemptVideoDecrypt(false);
                             } else {
                                 vid.src = msg.mediaURL;
-                                vid.addEventListener('click', () => openVideoViewer(msg.mediaURL));
-                                playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL));
+                                vid.addEventListener('click', () => openVideoViewer(msg.mediaURL, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
+                                playHint.addEventListener('click', () => openVideoViewer(msg.mediaURL, false, null, { msgData: msg, isOwn: msg.senderUid === user.uid, isGroup: false }));
                                 primeVideoPosterFrame(vid);
                             }
                             attachVideoLoadingOverlay(mediaWrap, vid, playHint);

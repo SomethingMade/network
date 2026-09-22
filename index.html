@@ -4302,18 +4302,27 @@
         .voice-record-label { color: var(--text-secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         @keyframes voicePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
         .voice-send-btn { background: linear-gradient(135deg, #34C759 0%, #0A84FF 100%); }
-        .msg-voice-card { display: flex; align-items: center; gap: 10px; min-width: 190px; padding: 2px 0; }
-        .msg-voice-play-btn { width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(var(--primary-rgb), 0.12); color: var(--primary-blue); }
-        .msg-bubble.out .msg-voice-play-btn { background: rgba(255,255,255,0.25); color: #FFFFFF; }
+        /* Telegram-style voice note: sender's circular avatar with a play/pause badge overlaid
+           at its bottom-right corner, a waveform, and a meta row (elapsed time + a speed
+           toggle that cycles 1X → 1.5X → 2X). */
+        .msg-voice-card { display: flex; align-items: center; gap: 10px; min-width: 210px; padding: 2px 0; }
+        .msg-voice-avatar-wrap { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
+        .msg-voice-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; background: var(--bg-hover); }
+        .msg-voice-play-btn { position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--msg-in-bg); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--primary-blue); color: #FFFFFF; padding: 0; }
+        .msg-voice-play-btn svg { width: 10px; height: 10px; }
+        .msg-bubble.out .msg-voice-play-btn { border-color: var(--msg-out-bg); }
         .msg-voice-body { flex: 1; min-width: 0; }
         .msg-voice-track { position: relative; height: 4px; border-radius: 4px; background: rgba(var(--primary-rgb), 0.15); margin-bottom: 6px; overflow: hidden; }
         .msg-bubble.out .msg-voice-track { background: rgba(255,255,255,0.3); }
         .msg-voice-progress { position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: var(--primary-blue); border-radius: 4px; }
         .msg-bubble.out .msg-voice-progress { background: #FFFFFF; }
-        .msg-voice-time { font-size: 11px; color: var(--text-secondary); }
+        .msg-voice-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .msg-voice-time { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
         .msg-bubble.out .msg-voice-time { color: rgba(255,255,255,0.75); }
-        .msg-voice-waveform { position: relative; height: 24px; width: 158px; max-width: 100%; margin-bottom: 6px; cursor: pointer; }
-        .msg-voice-waveform .wf-bars { position: absolute; top: 0; left: 0; height: 100%; width: 158px; display: flex; align-items: center; gap: 2px; pointer-events: none; }
+        .msg-voice-speed-btn { border: none; cursor: pointer; flex-shrink: 0; font-size: 10px; font-weight: 700; letter-spacing: 0.2px; padding: 2px 6px; border-radius: 999px; background: rgba(var(--primary-rgb), 0.12); color: var(--primary-blue); }
+        .msg-bubble.out .msg-voice-speed-btn { background: rgba(255,255,255,0.25); color: #FFFFFF; }
+        .msg-voice-waveform { position: relative; height: 24px; width: 138px; max-width: 100%; margin-bottom: 6px; cursor: pointer; }
+        .msg-voice-waveform .wf-bars { position: absolute; top: 0; left: 0; height: 100%; width: 138px; display: flex; align-items: center; gap: 2px; pointer-events: none; }
         .msg-voice-waveform .wf-bar { flex: 0 0 3px; width: 3px; border-radius: 2px; background: rgba(var(--primary-rgb), 0.22); transform-origin: center; transition: background-color 0.15s linear; }
         .msg-bubble.out .msg-voice-waveform .wf-bar { background: rgba(255,255,255,0.32); }
         .msg-voice-waveform .wf-progress { width: 0%; overflow: hidden; }
@@ -5449,7 +5458,6 @@
             /* Chat conversation view */
             .chat-view-back { width: 20px; height: 20px; }
             .chat-view-send, .chat-attach-btn { width: 36px; height: 36px; }
-            .msg-voice-play-btn { width: 30px; height: 30px; }
             .msg-media-save-btn { width: 28px; height: 28px; }
             .msg-media-save-btn svg { width: 14px; height: 14px; }
             .msg-media-play-hint { width: 38px; height: 38px; }
@@ -36575,8 +36583,13 @@
             } else if (item.kind === 'voice') {
                 const card = document.createElement('div');
                 card.className = 'msg-voice-card';
+                const pendingUser = auth.currentUser;
+                const pendingAvatarSrc = (pendingUser && (cachedUsers[pendingUser.uid]?.photoURL || pendingUser.photoURL)) || DEFAULT_AVATAR_URL;
                 card.innerHTML = `
-                    <div class="msg-voice-play-btn">${playIconSvg()}</div>
+                    <div class="msg-voice-avatar-wrap">
+                        <img class="msg-voice-avatar" src="${pendingAvatarSrc}" alt="">
+                        <div class="msg-voice-play-btn">${playIconSvg()}</div>
+                    </div>
                     <div class="msg-voice-body">
                         <div class="msg-voice-track"><div class="msg-voice-progress"></div></div>
                         <span class="msg-voice-time">Uploading...</span>
@@ -38248,17 +38261,26 @@
                             card.className = 'msg-voice-card';
                             bubble.dataset.duration = msg.duration || 0;
                             const barsHtml = generateWaveformBars(msg.mediaURL);
+                            const isMine = msg.senderUid === user.uid;
+                            const voiceAvatarSrc = (isMine ? (cachedUsers[user.uid]?.photoURL || user.photoURL) : otherAvatar) || DEFAULT_AVATAR_URL;
                             card.innerHTML = `
-                                <button type="button" class="msg-voice-play-btn">${playIconSvg()}</button>
+                                <div class="msg-voice-avatar-wrap">
+                                    <img class="msg-voice-avatar" src="${voiceAvatarSrc}" alt="">
+                                    <button type="button" class="msg-voice-play-btn">${playIconSvg()}</button>
+                                </div>
                                 <div class="msg-voice-body">
                                     <div class="msg-voice-waveform">
                                         <div class="wf-bars wf-base">${barsHtml}</div>
                                         <div class="wf-bars wf-progress">${barsHtml}</div>
                                     </div>
-                                    <span class="msg-voice-time">${formatVoiceTime(msg.duration || 0)}</span>
+                                    <div class="msg-voice-meta-row">
+                                        <span class="msg-voice-time">${formatVoiceTime(msg.duration || 0)}</span>
+                                        <button type="button" class="msg-voice-speed-btn" data-speed="1">1X</button>
+                                    </div>
                                 </div>`;
                             const playBtn = card.querySelector('.msg-voice-play-btn');
                             const waveformEl = card.querySelector('.msg-voice-waveform');
+                            const speedBtn = card.querySelector('.msg-voice-speed-btn');
                             // Encrypted voice notes are decrypted lazily, on first tap, rather
                             // than eagerly for every bubble in the thread — resolvePlaybackUrl
                             // caches the result so replaying/seeking afterwards is instant.
@@ -38274,6 +38296,16 @@
                                 const resolvedUrl = await resolvePlaybackUrl();
                                 if (!resolvedUrl) { notify("Couldn't decrypt voice note", 'error'); return; }
                                 seekVoicePlayback(e, waveformEl, bubble, resolvedUrl, playBtn);
+                            });
+                            // Cycles 1X → 1.5X → 2X and applies immediately to playback in progress.
+                            const VOICE_SPEED_STEPS = [1, 1.5, 2];
+                            speedBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const current = parseFloat(speedBtn.dataset.speed) || 1;
+                                const next = VOICE_SPEED_STEPS[(VOICE_SPEED_STEPS.indexOf(current) + 1) % VOICE_SPEED_STEPS.length];
+                                speedBtn.dataset.speed = next;
+                                speedBtn.textContent = `${next}X`;
+                                if (bubble._voiceAudioEl) bubble._voiceAudioEl.playbackRate = next;
                             });
                             bubble.appendChild(card);
                         } else if (msg.mediaType === 'call') {
@@ -39496,6 +39528,8 @@
             if (!audioEl) {
                 audioEl = new Audio(url);
                 bubble._voiceAudioEl = audioEl;
+                const speedBtn = bubble.querySelector('.msg-voice-speed-btn');
+                if (speedBtn) audioEl.playbackRate = parseFloat(speedBtn.dataset.speed) || 1;
                 audioEl.addEventListener('loadedmetadata', () => {
                     if (isFinite(audioEl.duration) && audioEl.duration > 0) bubble.dataset.duration = audioEl.duration;
                 });

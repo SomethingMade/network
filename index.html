@@ -7618,7 +7618,7 @@
                 </div>
             </div>
 
-            <div class="wa-section">
+            <div class="wa-section" id="settings-earnings-section">
                 <div class="wa-section-title">Earnings</div>
                 <div class="wa-list-row" id="open-payout-history-row" style="cursor:pointer;">
                     <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
@@ -8032,6 +8032,32 @@
                         <button type="button" class="wa-earnings-withdraw-btn" id="btn-open-withdraw">Withdraw</button>
                         <div class="wa-earnings-withdraw-status" id="insights-earnings-withdraw-status" style="display:none;"></div>
                     </div>
+                </div>
+
+                <!-- Business Insights — shown instead of Earnings for Business Accounts
+                     (isBusinessAccount), since business accounts don't earn from post views.
+                     See renderBusinessInsights. -->
+                <div class="wa-section" id="insights-business-section" style="display:none;">
+                    <div class="wa-section-title">Business Insights</div>
+                    <div class="wa-insights-grid">
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-biz-post-views">0</span>
+                            <span class="wa-insights-card-label">Post Views</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-biz-job-posts">0</span>
+                            <span class="wa-insights-card-label">Job Posts</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-biz-applicants">0</span>
+                            <span class="wa-insights-card-label">Applicants</span>
+                        </div>
+                        <div class="wa-insights-card">
+                            <span class="wa-insights-card-value" id="insights-biz-shop-items">0</span>
+                            <span class="wa-insights-card-label">Shop Items</span>
+                        </div>
+                    </div>
+                    <p class="wa-insights-note" style="margin:8px 16px 0;">Business Accounts don't earn from post views — these numbers reflect your reach and activity instead.</p>
                 </div>
 
                 <div class="wa-section">
@@ -24324,6 +24350,10 @@
                 const businessToggle = document.getElementById('business-account-toggle');
                 businessToggle.checked = !!myProfile.isBusinessAccount;
                 document.getElementById('business-account-pill').style.display = myProfile.isBusinessAccount ? 'inline-block' : 'none';
+                // Business accounts don't earn from post views (see EARNINGS_TIERS) — they get
+                // a Business Insights card in Account Insights instead — so hide the Earnings
+                // settings section (Payout row) for them.
+                document.getElementById('settings-earnings-section').style.display = myProfile.isBusinessAccount ? 'none' : '';
                 refreshTaggedBusinessSettingsRow(myProfile);
                 refreshBusinessWelcomeSettingsRow(myProfile);
 
@@ -26151,6 +26181,33 @@
             renderWithdrawButtonState();
         }
 
+        // Business Insights (Business Accounts only): reach + Jobs/Market activity, shown in
+        // place of the Earnings card since business accounts don't earn from post views.
+        // Job counts come from the already-live `cachedJobs` cache (see initJobsListener);
+        // shop item count is fetched on demand since only the currently-open shop's items are
+        // kept live in `cachedShopItems`.
+        async function renderBusinessInsights(uid, totalImpressions) {
+            document.getElementById('insights-biz-post-views').textContent = formatFeedCount(totalImpressions);
+
+            const myJobs = Object.values(cachedJobs).filter(job => job && job.uid === uid);
+            const totalApplicants = myJobs.reduce((sum, job) => sum + (job.applicantsCount || 0), 0);
+            document.getElementById('insights-biz-job-posts').textContent = myJobs.length;
+            document.getElementById('insights-biz-applicants').textContent = totalApplicants;
+
+            const shopItemsEl = document.getElementById('insights-biz-shop-items');
+            if (!myShopId) {
+                shopItemsEl.textContent = '0';
+                return;
+            }
+            try {
+                const snap = await get(ref(database, `shops/${myShopId}/items`));
+                shopItemsEl.textContent = snap.exists() ? Object.keys(snap.val()).length : '0';
+            } catch (err) {
+                console.error('renderBusinessInsights shop items fetch failed', err);
+                shopItemsEl.textContent = '0';
+            }
+        }
+
         // --- Withdraw earnings: banking details (users/$uid/bankingDetails) are required
         // before a withdrawal request can go out; the request itself is a record under
         // withdrawal_requests/$id for manual review, mirrored onto
@@ -26406,7 +26463,19 @@
             document.getElementById('insights-following-count').textContent = myProfile.followingCount || 0;
             document.getElementById('insights-groups-count').textContent = myGroupsCount;
             document.getElementById('insights-contacts-count').textContent = myContactsCount;
-            renderInsightsEarnings(myProfile.followersCount || 0, totalImpressions);
+            // Business Accounts don't earn from post views — show a Business Insights card
+            // (reach + job/shop activity) instead of the Earnings card.
+            const earningsSectionEl = document.getElementById('insights-earnings-section');
+            const businessSectionEl = document.getElementById('insights-business-section');
+            if (myProfile.isBusinessAccount) {
+                earningsSectionEl.style.display = 'none';
+                businessSectionEl.style.display = '';
+                renderBusinessInsights(user.uid, totalImpressions);
+            } else {
+                earningsSectionEl.style.display = '';
+                businessSectionEl.style.display = 'none';
+                renderInsightsEarnings(myProfile.followersCount || 0, totalImpressions);
+            }
 
             const creationTime = user.metadata && user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : null;
             document.getElementById('insights-member-since').textContent = creationTime ? formatJoinedDate(creationTime) : 'Unknown';

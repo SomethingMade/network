@@ -17431,7 +17431,17 @@
                     if (entry.isIntersecting) loadOlderPosts();
                 });
             }, {
-                root: list.closest('[data-scrollable]') || list.parentElement,
+                // Must be the actual scrolling/clipping ancestor (#discover-grid-scroll has
+                // overflow-y: auto; #feed-posts-list's direct parent, #feed-posts-container,
+                // does not) — same fix as ensureCommunityFeedSentinelAtEnd's hardcoded root.
+                // The old `list.closest('[data-scrollable]') || list.parentElement` fallback
+                // always hit the parentElement branch (no element in the app ever carries a
+                // data-scrollable attribute) and landed on that non-clipping wrapper, so the
+                // sentinel could read as permanently "intersecting" and loadOlderPosts() would
+                // fire repeatedly back-to-back on load instead of once per real scroll-near-
+                // bottom — pulling page after page until noMoreOlderPosts, i.e. "loads all
+                // posts" at once.
+                root: document.getElementById('discover-grid-scroll') || list.parentElement,
                 rootMargin: '0px 0px 400px 0px',
                 threshold: 0
             });

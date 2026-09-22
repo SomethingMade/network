@@ -2484,10 +2484,15 @@
            shows once the post is actually saved in that collection (.checked). The "+ Create new
            collection" row sits in its own group below the list so it never gets mistaken for one
            of the collections. */
-        #save-to-collection-list .collection-row { justify-content: space-between; }
         .collection-row-check { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--primary-blue); opacity: 0; transition: opacity 0.15s ease; }
         .collection-row.checked .collection-row-check { opacity: 1; }
         .collection-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Trash icon only ever renders on custom collections (never "Default", which can't be
+           deleted) — a real nested <button> so tapping it can stop the click from also bubbling
+           up into the row's own save/unsave toggle. See renderSaveToCollectionList. */
+        .collection-row-delete { background: none; border: none; padding: 6px; margin-left: 6px; cursor: pointer; flex-shrink: 0; display: flex; }
+        .collection-row-delete svg { width: 18px; height: 18px; stroke: var(--danger-red); opacity: 0.75; }
+        .collection-row-delete:hover svg { opacity: 1; }
         #create-collection-modal-overlay .custom-modal .pill-input { margin-top: 4px; }
 
         /* Settings Section in Profile */
@@ -20813,11 +20818,17 @@
             const postId = activeSaveToCollectionPostId;
             const list = document.getElementById('save-to-collection-list');
             if (!postId || !list) return;
+            // A real <div> (not <button>, like the other option rows) because the delete icon on
+            // custom collections is itself a nested real <button> — a button can't legally nest
+            // another button. The class name keeps it visually identical to the rest of the sheet.
             const rowHtml = (id) => `
-                <button class="msg-option-btn with-icon collection-row${isPostInCollection(postId, id) ? ' checked' : ''}" data-collection-id="${id}">
+                <div class="msg-option-btn with-icon collection-row${isPostInCollection(postId, id) ? ' checked' : ''}" data-collection-id="${id}">
                     <span class="collection-row-name"></span>
                     <svg class="collection-row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                </button>`;
+                    ${id === 'default' ? '' : `<button type="button" class="collection-row-delete" data-delete-collection-id="${id}" aria-label="Delete collection">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                    </button>`}
+                </div>`;
             const collectionIds = Object.keys(cachedBookmarkCollections)
                 .sort((a, b) => (cachedBookmarkCollections[a].createdAt || 0) - (cachedBookmarkCollections[b].createdAt || 0));
             list.innerHTML = rowHtml('default') + collectionIds.map(rowHtml).join('');
@@ -20831,12 +20842,47 @@
         }
 
         document.getElementById('save-to-collection-list').addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.collection-row-delete');
+            if (deleteBtn) {
+                deleteBookmarkCollection(deleteBtn.dataset.deleteCollectionId);
+                return;
+            }
             const row = e.target.closest('.collection-row');
             if (!row || !activeSaveToCollectionPostId) return;
             const collectionId = row.dataset.collectionId;
             row.classList.toggle('checked');
             toggleSavePostInCollection(activeSaveToCollectionPostId, collectionId);
         });
+
+        // Deletes a collection the user created — never called for "default", which can't be
+        // deleted (the delete icon isn't even rendered for it, see renderSaveToCollectionList).
+        // Also strips that collectionId out of saved_posts for every post that had it, using the
+        // local cache to find them, so no post is left pointing at a collection that no longer
+        // exists.
+        async function deleteBookmarkCollection(collectionId) {
+            const user = auth.currentUser;
+            if (!user || !collectionId || collectionId === 'default') return;
+            const name = (cachedBookmarkCollections[collectionId] && cachedBookmarkCollections[collectionId].name) || 'this collection';
+            const confirmed = await showCustomModal(
+                'Delete Collection?',
+                `"${name}" will be removed. Posts saved only in it will no longer be saved. This cannot be undone.`,
+                true
+            );
+            if (!confirmed) return;
+            const updates = { [`bookmark_collections/${user.uid}/${collectionId}`]: null };
+            Object.keys(cachedSavedPosts || {}).forEach(postId => {
+                const entry = cachedSavedPosts[postId];
+                if (entry && entry !== true && entry[collectionId]) {
+                    updates[`saved_posts/${user.uid}/${postId}/${collectionId}`] = null;
+                }
+            });
+            try {
+                await update(ref(database), updates);
+                notify('Collection deleted');
+            } catch (err) {
+                notify('Could not delete collection', 'error');
+            }
+        }
 
         document.getElementById('btn-create-bookmark-collection').addEventListener('click', () => {
             const user = auth.currentUser;

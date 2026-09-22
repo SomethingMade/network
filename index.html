@@ -2479,6 +2479,17 @@
         #post-options-sheet-overlay .bottom-sheet, #community-post-options-sheet-overlay .bottom-sheet { background: var(--bg-alt); }
         #post-options-sheet-overlay .sheet-handle, #community-post-options-sheet-overlay .sheet-handle { margin-bottom: 14px; }
 
+        /* "Save to..." collection picker (see openSaveToCollectionSheet) — each row is a
+           .msg-option-btn.with-icon widened to push a checkmark to the far right, which only
+           shows once the post is actually saved in that collection (.checked). The "+ Create new
+           collection" row sits in its own group below the list so it never gets mistaken for one
+           of the collections. */
+        #save-to-collection-list .collection-row { justify-content: space-between; }
+        .collection-row-check { width: 20px; height: 20px; flex-shrink: 0; stroke: var(--primary-blue); opacity: 0; transition: opacity 0.15s ease; }
+        .collection-row.checked .collection-row-check { opacity: 1; }
+        .collection-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #create-collection-modal-overlay .custom-modal .pill-input { margin-top: 4px; }
+
         /* Settings Section in Profile */
         .settings-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-color); text-align: left; }
         .settings-section h4 { font-size: 14px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px; margin-bottom: 12px; }
@@ -6250,6 +6261,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                     <span>Save Post</span>
                 </button>
+                <button class="msg-option-btn with-icon" id="btn-post-save-to-collection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span>Save to Collection...</span>
+                </button>
                 <button class="msg-option-btn with-icon" id="btn-post-share">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                     <span>Share Post</span>
@@ -6272,6 +6287,39 @@
         </div>
     </div>
 
+    <!-- "Save to..." collection picker — see openSaveToCollectionSheet/renderSaveToCollectionList.
+         Default is a fixed, always-present row (id "default", not stored in bookmark_collections);
+         everything else below it is loaded from bookmark_collections/{me}. "+ Create new
+         collection" is verified-only to create — non-verified taps route to the Get Verified
+         upsell instead (see btn-create-bookmark-collection listener). -->
+    <div id="save-to-collection-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <div class="options-sheet-group" id="save-to-collection-list">
+                <!-- rows injected by renderSaveToCollectionList -->
+            </div>
+            <div class="options-sheet-group">
+                <button class="msg-option-btn with-icon" id="btn-create-bookmark-collection">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Create New Collection</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Name-a-collection prompt, opened only for verified users (see
+         btn-create-bookmark-collection) — createBookmarkCollectionFlow does the actual write. -->
+    <div id="create-collection-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3>New Collection</h3>
+            <p>Give your collection a name.</p>
+            <input type="text" id="create-collection-name-input" class="pill-input" placeholder="Collection name" maxlength="30" autocomplete="off">
+            <div class="modal-actions">
+                <button type="button" id="create-collection-btn-cancel" class="btn-pill btn-outline">Cancel</button>
+                <button type="button" id="create-collection-btn-confirm" class="btn-pill btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
 
     <div id="why-ad-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="padding-bottom: 24px;">
@@ -15688,7 +15736,16 @@
         // --- FEED: POSTS + COMMENTS ---
         let feedListenersAttached = false;
         let cachedPosts = {};
-        let cachedSavedPosts = {}; // postId -> true, from saved_posts/{me} — private, mine only
+        // postId -> true (legacy flat save, treated as "in Default") or postId -> { collectionId:
+        // true, ... } (current shape), from saved_posts/{me} — private, mine only. Always read
+        // through isPostInCollection()/isPostSavedAnywhere() below rather than indexing this
+        // directly, so both shapes keep working.
+        let cachedSavedPosts = {};
+        // collectionId -> { name, createdAt }, from bookmark_collections/{me} — private, mine
+        // only. "Default" is NOT stored here; it's a fixed, always-available row (see
+        // renderSaveToCollectionList) since every account has it whether or not they've ever
+        // created a custom one.
+        let cachedBookmarkCollections = {};
         let feedComposerImages = []; // array of {previewUrl, url, uploading, promise, error}, max FEED_MAX_IMAGES, mutually exclusive with video. url is null until the background upload resolves; previewUrl (a local blob URL, or the same remote url for GIFs) is shown immediately either way.
         let feedComposerVideo = null; // {previewUrl, url, uploading, promise, thumbnailUrl, error} or null; mutually exclusive with images
         let feedComposerMusic = null; // { trackName, artistName, artworkUrl, previewUrl } or null; images or video
@@ -17393,6 +17450,16 @@
                 syncImageViewerBookmark();
                 const savedList = document.getElementById('my-profile-saved-list');
                 if (savedList && savedList.style.display !== 'none') buildProfileSavedList(savedList);
+                if (document.getElementById('save-to-collection-sheet-overlay').classList.contains('active')) {
+                    renderSaveToCollectionList();
+                }
+            });
+
+            onValue(ref(database, `bookmark_collections/${user.uid}`), (snap) => {
+                cachedBookmarkCollections = snap.exists() ? snap.val() : {};
+                if (document.getElementById('save-to-collection-sheet-overlay').classList.contains('active')) {
+                    renderSaveToCollectionList();
+                }
             });
 
             const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
@@ -17859,7 +17926,17 @@
             });
 
             const FEED_MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10MB
-            const FEED_MAX_VIDEO_BYTES = 50 * 1024 * 1024;  // 50MB
+            // Video cap is tiered by verified status: rules (below, in Storage) can't see
+            // Realtime Database's paidVerifiedAt/streakVerifiedAt without custom claims, so the
+            // 100MB ceiling is enforced there as a flat backstop and this per-tier check is what
+            // actually gates non-verified accounts down to 50MB, same as every other
+            // client-driven limit in this app.
+            const FEED_MAX_VIDEO_BYTES_VERIFIED = 100 * 1024 * 1024; // 100MB — verified accounts
+            const FEED_MAX_VIDEO_BYTES_STANDARD = 50 * 1024 * 1024;  // 50MB — everyone else
+            function currentFeedMaxVideoBytes() {
+                const uid = auth.currentUser ? auth.currentUser.uid : null;
+                return (uid && isVerifiedUid(uid)) ? FEED_MAX_VIDEO_BYTES_VERIFIED : FEED_MAX_VIDEO_BYTES_STANDARD;
+            }
             const FEED_MAX_IMAGES = 10;
 
             // Bridge for the shared GIF picker sheet (defined outside this closure) to hand a
@@ -17959,8 +18036,11 @@
                 if (videoFile) {
                     // A video was included — a post can only carry one video, so it takes over and
                     // any images already staged (or other files in this same selection) are dropped.
-                    if (videoFile.size > FEED_MAX_VIDEO_BYTES) {
-                        notify(`Videos must be under ${Math.round(FEED_MAX_VIDEO_BYTES / (1024 * 1024))}MB`, 'error');
+                    const maxVideoBytes = currentFeedMaxVideoBytes();
+                    if (videoFile.size > maxVideoBytes) {
+                        const limitMB = Math.round(maxVideoBytes / (1024 * 1024));
+                        const isVerified = auth.currentUser && isVerifiedUid(auth.currentUser.uid);
+                        notify(`Videos must be under ${limitMB}MB` + (isVerified ? '' : ' — get verified for up to 100MB'), 'error');
                         return;
                     }
                     feedComposerImages.forEach(revokeComposerImagePreview);
@@ -18436,6 +18516,11 @@
                 triggerHaptic(15);
                 toggleSavePost(activePostOptions.postId);
             });
+            document.getElementById('btn-post-save-to-collection').addEventListener('click', () => {
+                document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
+                if (!activePostOptions) return;
+                openSaveToCollectionSheet(activePostOptions.postId);
+            });
             document.getElementById('btn-post-download').addEventListener('click', () => {
                 document.getElementById('post-options-sheet-overlay').classList.remove('active', 'above-viewer');
                 if (!activePostOptions) return;
@@ -18644,10 +18729,7 @@
         // --- Dedicated "Get Verified" page (see verified-badge-page-overlay) ---
         const verifiedBadgePageOverlay = document.getElementById('verified-badge-page-overlay');
         document.getElementById('open-verified-badge-page-row').addEventListener('click', () => {
-            verifiedBadgePageOverlay.classList.add('active');
-            const user = auth.currentUser;
-            const myProfile = (user && cachedUsers[user.uid]) || {};
-            refreshVerifiedBadgePurchaseUI(myProfile);
+            openGetVerifiedUpsell();
         });
         document.getElementById('btn-close-verified-badge-page').addEventListener('click', () => {
             verifiedBadgePageOverlay.classList.remove('active');
@@ -20663,19 +20745,141 @@
             });
         }
 
-        // saved_posts/{me}/{postId} is private to the saver — a personal bookmark list, not a
-        // signal shown to the post's author (unlike likes/comments).
+        // saved_posts/{me}/{postId}/{collectionId} is private to the saver — a personal bookmark
+        // list, not a signal shown to the post's author (unlike likes/comments). A post can sit
+        // in more than one collection at once; "default" is the fixed collection every quick
+        // save/unsave (this button, the reel save button, the image viewer bookmark icon) reads
+        // and writes. Older accounts may still have a plain `true` at saved_posts/{me}/{postId}
+        // from before collections existed — isPostInCollection treats that as "in Default" so
+        // those saves keep working without a migration.
+        function isPostInCollection(postId, collectionId) {
+            const entry = cachedSavedPosts[postId];
+            if (!entry) return false;
+            if (entry === true) return collectionId === 'default';
+            return !!entry[collectionId];
+        }
+        function isPostSavedAnywhere(postId) {
+            return !!cachedSavedPosts[postId];
+        }
+
         async function toggleSavePost(postId) {
             const user = auth.currentUser;
             if (!user || !postId) return;
-            const alreadySaved = !!cachedSavedPosts[postId];
+            const alreadySaved = isPostInCollection(postId, 'default');
             try {
-                await update(ref(database), { [`saved_posts/${user.uid}/${postId}`]: alreadySaved ? null : true });
+                await update(ref(database), { [`saved_posts/${user.uid}/${postId}/default`]: alreadySaved ? null : true });
                 notify(alreadySaved ? 'Removed from saved' : 'Saved');
             } catch (err) {
                 notify('Could not update saved posts', 'error');
             }
         }
+
+        // Toggle membership in one specific collection from the "Save to..." sheet — unlike
+        // toggleSavePost above, this never touches any other collection the post might be in.
+        async function toggleSavePostInCollection(postId, collectionId) {
+            const user = auth.currentUser;
+            if (!user || !postId || !collectionId) return;
+            const alreadyIn = isPostInCollection(postId, collectionId);
+            try {
+                await update(ref(database), { [`saved_posts/${user.uid}/${postId}/${collectionId}`]: alreadyIn ? null : true });
+                triggerHaptic(15);
+            } catch (err) {
+                notify('Could not update collection', 'error');
+            }
+        }
+
+        // Opens the "Get Verified" page — factored out of its Settings row listener (below) so
+        // the "Save to..." sheet's locked "+ Create New Collection" row can reuse the exact same
+        // upsell instead of a second copy of this logic.
+        function openGetVerifiedUpsell() {
+            const overlay = document.getElementById('verified-badge-page-overlay');
+            overlay.classList.add('active');
+            const user = auth.currentUser;
+            const myProfile = (user && cachedUsers[user.uid]) || {};
+            refreshVerifiedBadgePurchaseUI(myProfile);
+        }
+
+        // postId this sheet-session is saving/unsaving into — set by openSaveToCollectionSheet,
+        // read by the delegated row-click handler and by createBookmarkCollectionFlow.
+        let activeSaveToCollectionPostId = null;
+
+        function openSaveToCollectionSheet(postId) {
+            activeSaveToCollectionPostId = postId;
+            renderSaveToCollectionList();
+            document.getElementById('save-to-collection-sheet-overlay').classList.add('active');
+        }
+
+        function renderSaveToCollectionList() {
+            const postId = activeSaveToCollectionPostId;
+            const list = document.getElementById('save-to-collection-list');
+            if (!postId || !list) return;
+            const rowHtml = (id) => `
+                <button class="msg-option-btn with-icon collection-row${isPostInCollection(postId, id) ? ' checked' : ''}" data-collection-id="${id}">
+                    <span class="collection-row-name"></span>
+                    <svg class="collection-row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>`;
+            const collectionIds = Object.keys(cachedBookmarkCollections)
+                .sort((a, b) => (cachedBookmarkCollections[a].createdAt || 0) - (cachedBookmarkCollections[b].createdAt || 0));
+            list.innerHTML = rowHtml('default') + collectionIds.map(rowHtml).join('');
+            // Name set via textContent, not interpolated into the template string above, so a
+            // collection name can never break out of the row as HTML.
+            list.querySelectorAll('.collection-row').forEach(row => {
+                const id = row.dataset.collectionId;
+                const name = id === 'default' ? 'Default' : ((cachedBookmarkCollections[id] && cachedBookmarkCollections[id].name) || 'Untitled');
+                row.querySelector('.collection-row-name').textContent = name;
+            });
+        }
+
+        document.getElementById('save-to-collection-list').addEventListener('click', (e) => {
+            const row = e.target.closest('.collection-row');
+            if (!row || !activeSaveToCollectionPostId) return;
+            const collectionId = row.dataset.collectionId;
+            row.classList.toggle('checked');
+            toggleSavePostInCollection(activeSaveToCollectionPostId, collectionId);
+        });
+
+        document.getElementById('btn-create-bookmark-collection').addEventListener('click', () => {
+            const user = auth.currentUser;
+            if (!user || !isVerifiedUid(user.uid)) {
+                document.getElementById('save-to-collection-sheet-overlay').classList.remove('active');
+                openGetVerifiedUpsell();
+                return;
+            }
+            document.getElementById('create-collection-name-input').value = '';
+            document.getElementById('create-collection-modal-overlay').classList.add('active');
+        });
+
+        document.getElementById('create-collection-btn-cancel').addEventListener('click', () => {
+            document.getElementById('create-collection-modal-overlay').classList.remove('active');
+        });
+
+        document.getElementById('create-collection-btn-confirm').addEventListener('click', createBookmarkCollectionFlow);
+        document.getElementById('create-collection-name-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') createBookmarkCollectionFlow();
+        });
+
+        async function createBookmarkCollectionFlow() {
+            const user = auth.currentUser;
+            const postId = activeSaveToCollectionPostId;
+            const name = document.getElementById('create-collection-name-input').value.trim();
+            if (!user || !postId) return;
+            if (!name) { notify('Give your collection a name', 'error'); return; }
+            try {
+                const newRef = push(ref(database, `bookmark_collections/${user.uid}`));
+                await set(newRef, { name, createdAt: serverTimestamp() });
+                await set(ref(database, `saved_posts/${user.uid}/${postId}/${newRef.key}`), true);
+                document.getElementById('create-collection-modal-overlay').classList.remove('active');
+                notify('Collection created');
+            } catch (err) {
+                notify('Could not create collection', 'error');
+            }
+        }
+
+        document.getElementById('save-to-collection-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'save-to-collection-sheet-overlay') {
+                document.getElementById('save-to-collection-sheet-overlay').classList.remove('active');
+            }
+        });
 
         // If the image/video viewer is currently open in its elevated .above-sheet tier
         // (100012 — see the tier comment above #image-viewer-overlay.active.above-sheet), a sheet
@@ -26482,6 +26686,7 @@
                 remove(ref(database, 'user_group_chats/' + uid)),
                 remove(ref(database, 'notifications/' + uid)),
                 remove(ref(database, 'saved_posts/' + uid)),
+                remove(ref(database, 'bookmark_collections/' + uid)),
                 remove(ref(database, 'userReplies/' + uid)),
                 remove(ref(database, 'call_log/' + uid)),
                 remove(ref(database, 'stories/' + uid)),

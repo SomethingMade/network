@@ -33625,9 +33625,7 @@
             let snippetHtml = "";
             let badgeHtml = "";
 
-            if (isAI) {
-                snippetHtml = `<p>Tap to start a voice call</p>`;
-            } else if (isChatPane && metaData && metaData.timestamp) {
+            if (isChatPane && metaData && metaData.timestamp) {
                 // Show a sent/seen tick next to the preview only when the last message in this chat was sent by me.
                 const isOwnLastMsg = !isAI && metaData.senderUid && auth.currentUser && metaData.senderUid === auth.currentUser.uid;
                 const ticksHtml = isOwnLastMsg ? `<span class="list-ticks">${ticksIconSvg(false)}</span>` : '';
@@ -34074,15 +34072,14 @@
                 } catch (err) { console.error('Username assignment failed', err); }
 
                 // Seed a Haba AI entry in the chat list the first time this user logs in, so
-                // there's something to tap — tapping it opens a live voice call (see
-                // openHabaAIVoiceOverlay), not a text thread. Checked-then-set so repeat logins
-                // don't clobber it, and so a user who deletes/archives the AI entry isn't
-                // forced back into it on their next login.
+                // there's something to tap — tapping it opens a text chat with Haba AI.
+                // Checked-then-set so repeat logins don't clobber it, and so a user who
+                // deletes/archives the AI entry isn't forced back into it on their next login.
                 try {
                     const aiChatSnap = await get(ref(database, `user_chats/${user.uid}/${AI_UID}`));
                     if (!aiChatSnap.exists()) {
                         await update(ref(database), {
-                            [`user_chats/${user.uid}/${AI_UID}`]: { text: 'Tap to start a voice call', timestamp: Date.now(), unreadCount: 0 }
+                            [`user_chats/${user.uid}/${AI_UID}`]: { text: 'Tap to start chatting', timestamp: Date.now(), unreadCount: 0 }
                         });
                     }
                 } catch (err) { console.error('Failed to seed Haba AI chat entry', err); }
@@ -37700,13 +37697,6 @@
         }
 
         function openChatView(otherUid, otherName, otherAvatar) {
-            // Haba AI no longer has a text-chat surface — every entry point that used to land
-            // here for AI_UID (feed subtab, the seeded row in the Chats list, etc.) now opens
-            // a live voice call instead, so route it there and never render the AI chat pane.
-            if (otherUid === AI_UID) {
-                openHabaAIVoiceOverlay();
-                return;
-            }
             const user = auth.currentUser;
             if (!user) return;
             activeChatUid = otherUid;

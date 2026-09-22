@@ -3824,13 +3824,54 @@
         }
         .chat-view-messages.wallpaper-custom { background-size: cover; background-position: center; background-repeat: no-repeat; }
 
-        .wallpaper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 8px; }
-        .wallpaper-swatch { position: relative; aspect-ratio: 1; border-radius: 16px; cursor: pointer; border: 2px solid var(--border-color); background-color: var(--bg-alt); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        /* ── Live preview frame at the top of the wallpaper sheet — mirrors the exact
+           wallpaper-* classes applied to #chat-view-messages so what you see here is
+           what the chat will actually look like, not a generic swatch thumbnail. ── */
+        .wallpaper-preview-frame {
+            position: relative;
+            height: 130px;
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: var(--bg-alt);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            border: 1px solid var(--border-color);
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 6px;
+            padding: 14px;
+        }
+        .wallpaper-preview-bubble {
+            max-width: 68%;
+            padding: 8px 12px;
+            border-radius: 14px;
+            font-size: 12.5px;
+            font-weight: 500;
+            box-shadow: var(--shadow-bubble);
+        }
+        .wallpaper-preview-bubble.in { align-self: flex-start; background: var(--msg-in-bg); color: var(--msg-in-text); border-bottom-left-radius: 4px; }
+        .wallpaper-preview-bubble.out { align-self: flex-end; background: var(--msg-out-bg); color: var(--msg-out-text); border-bottom-right-radius: 4px; box-shadow: var(--shadow-bubble-out); }
+
+        .wallpaper-section-label { font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 2px 10px; }
+
+        .wallpaper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+        .wallpaper-grid:last-of-type { margin-bottom: 8px; }
+        .wallpaper-swatch { position: relative; aspect-ratio: 1; border-radius: 16px; cursor: pointer; border: 2px solid var(--border-color); background-color: var(--bg-alt); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; overflow: hidden; transition: transform 0.15s var(--ease-smooth), border-color 0.15s; }
+        .wallpaper-swatch:active { transform: scale(0.94); }
         .wallpaper-swatch span { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
         .wallpaper-swatch.wallpaper-upload-swatch { flex-direction: column; gap: 4px; border-style: dashed; color: var(--primary-blue); }
         .wallpaper-swatch.wallpaper-upload-swatch svg { width: 20px; height: 20px; color: var(--primary-blue); }
-        .wallpaper-swatch.selected { border-color: var(--primary-blue); }
+        .wallpaper-swatch.selected { border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12); }
         .wallpaper-swatch.selected::after { content: ''; position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; background: var(--primary-blue) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>') center/12px no-repeat; }
+        /* Custom-photo swatch gets its own small trash button instead of the checkmark badge
+           crowding the corner, so removing a previously uploaded wallpaper doesn't require
+           digging into a separate menu. */
+        .wallpaper-remove-btn { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .wallpaper-remove-btn svg { width: 12px; height: 12px; }
+        .wallpaper-swatch.selected .wallpaper-remove-btn { background: var(--primary-blue); }
 
         .bubble-color-swatch span { color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
         .bubble-color-custom-swatch { position: relative; background: repeating-conic-gradient(#e0e0e0 0% 25%, #f5f5f5 0% 50%) 0 0/12px 12px; cursor: pointer; }
@@ -8592,13 +8633,28 @@
         <div class="bottom-sheet" style="padding-bottom: 28px;">
             <div class="sheet-handle"></div>
             <div class="sheet-title" style="margin-bottom: 4px;">Chat Wallpaper</div>
-            <p style="color:var(--text-secondary); font-size:13px; text-align:center; margin-bottom:20px;">This will apply to all of your chats</p>
+            <p style="color:var(--text-secondary); font-size:13px; text-align:center; margin-bottom:16px;">Applies to all of your chats</p>
+
+            <div class="wallpaper-preview-frame" id="wallpaper-preview-frame">
+                <div class="wallpaper-preview-bubble in">Hey 👋</div>
+                <div class="wallpaper-preview-bubble out">This is the new wallpaper</div>
+            </div>
+
+            <div class="wallpaper-section-label">Presets</div>
             <div class="wallpaper-grid" id="wallpaper-grid">
                 <div class="wallpaper-swatch" data-wallpaper="none"><span>None</span></div>
                 <div class="wallpaper-swatch wallpaper-default-1" data-wallpaper="default-1"></div>
                 <div class="wallpaper-swatch wallpaper-default-2" data-wallpaper="default-2"></div>
                 <div class="wallpaper-swatch wallpaper-default-3" data-wallpaper="default-3"></div>
-                <div class="wallpaper-swatch" id="wallpaper-custom-swatch" data-wallpaper="custom" style="display:none;"></div>
+            </div>
+
+            <div class="wallpaper-section-label">Your Photo</div>
+            <div class="wallpaper-grid" id="wallpaper-custom-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="wallpaper-swatch" id="wallpaper-custom-swatch" data-wallpaper="custom" style="display:none;">
+                    <button type="button" class="wallpaper-remove-btn" id="wallpaper-remove-btn" title="Remove this photo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
                 <div class="wallpaper-swatch wallpaper-upload-swatch" id="wallpaper-upload-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     <span>Upload</span>
@@ -10462,8 +10518,23 @@
             }
         }
 
+        // Mirrors applyChatWallpaperToDOM onto the sheet's own live preview frame, so the
+        // picker shows exactly what the chat will look like instead of a plain swatch.
+        function refreshWallpaperPreview(value) {
+            const frame = document.getElementById('wallpaper-preview-frame');
+            if (!frame) return;
+            frame.classList.remove(...WALLPAPER_CSS_CLASSES);
+            frame.style.backgroundImage = '';
+            if (value === 'default-1' || value === 'default-2' || value === 'default-3') {
+                frame.classList.add(`wallpaper-${value}`);
+            } else if (value && /^https?:\/\//.test(value)) {
+                frame.classList.add('wallpaper-custom');
+                frame.style.backgroundImage = `url('${value}')`;
+            }
+        }
+
         function refreshWallpaperGridSelection(value) {
-            document.querySelectorAll('#wallpaper-grid .wallpaper-swatch').forEach(el => {
+            document.querySelectorAll('#wallpaper-grid .wallpaper-swatch, #wallpaper-custom-grid .wallpaper-swatch').forEach(el => {
                 const key = el.dataset.wallpaper;
                 const isCustomMatch = key === 'custom' && value && /^https?:\/\//.test(value);
                 el.classList.toggle('selected', key === value || isCustomMatch);
@@ -10483,6 +10554,7 @@
             } else if (!customSwatch.dataset.url) {
                 customSwatch.style.display = 'none';
             }
+            refreshWallpaperPreview(value);
             refreshWallpaperGridSelection(value);
             document.getElementById('wallpaper-sheet-overlay').classList.add('active');
         }
@@ -10491,9 +10563,9 @@
             if (e.target.id === 'wallpaper-sheet-overlay') e.target.classList.remove('active');
         });
 
-        document.getElementById('wallpaper-grid').addEventListener('click', async (e) => {
-            const swatch = e.target.closest('.wallpaper-swatch');
-            if (!swatch || swatch.id === 'wallpaper-upload-btn') return;
+        // Applying a wallpaper: tapping any preset or the saved custom-photo swatch. Shared by
+        // both the presets grid and the "Your Photo" grid so there's one code path either way.
+        async function applyWallpaperFromSwatch(swatch) {
             const user = auth.currentUser;
             if (!user) return;
 
@@ -10508,10 +10580,45 @@
             try {
                 await update(ref(database, `users/${user.uid}`), { chatWallpaper: valueToSave });
                 applyChatWallpaperToDOM(valueToSave);
+                refreshWallpaperPreview(valueToSave);
                 refreshWallpaperGridSelection(valueToSave);
                 notify(valueToSave === 'none' ? 'Wallpaper reset to default' : 'Wallpaper updated');
             } catch (err) {
                 notify('Could not update wallpaper', 'error');
+            }
+        }
+
+        document.getElementById('wallpaper-grid').addEventListener('click', (e) => {
+            const swatch = e.target.closest('.wallpaper-swatch');
+            if (swatch) applyWallpaperFromSwatch(swatch);
+        });
+
+        document.getElementById('wallpaper-custom-grid').addEventListener('click', (e) => {
+            if (e.target.closest('#wallpaper-remove-btn')) return; // handled separately below
+            const swatch = e.target.closest('.wallpaper-swatch');
+            if (!swatch || swatch.id === 'wallpaper-upload-btn') return;
+            applyWallpaperFromSwatch(swatch);
+        });
+
+        // Removing the saved custom photo: resets to "None" and clears the swatch so it goes
+        // back to just the dashed Upload tile, instead of only being reachable by overwriting
+        // it with a new upload.
+        document.getElementById('wallpaper-remove-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const user = auth.currentUser;
+            if (!user) return;
+            try {
+                await update(ref(database, `users/${user.uid}`), { chatWallpaper: 'none' });
+                applyChatWallpaperToDOM('none');
+                refreshWallpaperPreview('none');
+                const customSwatch = document.getElementById('wallpaper-custom-swatch');
+                customSwatch.style.display = 'none';
+                customSwatch.style.backgroundImage = '';
+                delete customSwatch.dataset.url;
+                refreshWallpaperGridSelection('none');
+                notify('Wallpaper removed');
+            } catch (err) {
+                notify('Could not remove wallpaper', 'error');
             }
         });
 
@@ -10623,12 +10730,26 @@
             const user = auth.currentUser;
             if (!user) { e.target.value = ''; return; }
 
+            // Client-side mirror of the 10MB cap enforced in Storage rules (chat_wallpapers/{uid})
+            // — fail fast instead of letting the upload run and get rejected server-side.
+            if (file.size > 10 * 1024 * 1024) {
+                showCustomModal('Image Too Large', 'Please choose an image under 10MB.');
+                e.target.value = '';
+                return;
+            }
+
             const spinner = document.getElementById('wallpaper-upload-spinner');
             spinner.style.display = 'flex';
             try {
-                const { url } = await uploadToCloudinary(file);
+                // Wallpaper uploads now go through Firebase Storage (chat_wallpapers/{uid}/...)
+                // instead of Cloudinary — same helper/path convention already used for
+                // profile_photos, shop_covers, etc.
+                const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const path = `chat_wallpapers/${user.uid}/${Date.now()}_${safeName}`;
+                const url = await uploadToFirebaseStorage(file, path);
                 await update(ref(database, `users/${user.uid}`), { chatWallpaper: url });
                 applyChatWallpaperToDOM(url);
+                refreshWallpaperPreview(url);
 
                 const customSwatch = document.getElementById('wallpaper-custom-swatch');
                 customSwatch.style.display = 'flex';

@@ -3449,6 +3449,24 @@
         .hrs-cta:disabled { opacity: 0.5; }
         .hrs-btn-secondary { display: block; width: 100%; margin-top: 8px; padding: 14px; border: none; border-radius: 10px; background: var(--bg-alt); color: var(--text-primary); font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; }
         .hrs-btn-secondary:active { transform: scale(0.99); opacity: 0.85; }
+        /* ── Ride chat: driver-card button + badge, and the chat sheet itself ── */
+        .hrs-driver-chat-btn { position: relative; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--bg-alt); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s, background 0.15s; }
+        .hrs-driver-chat-btn:active { transform: scale(0.92); background: var(--border-color); }
+        .hrs-driver-chat-badge { position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #FF3B30; color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--bg-surface); }
+        .haba-ride-chat-sheet { overflow: hidden; }
+        .haba-ride-chat-header { display: flex; align-items: center; gap: 12px; padding: 16px 18px 14px; border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+        .haba-ride-chat-header-avatar { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-position: center; background-color: var(--bg-alt); flex-shrink: 0; }
+        .haba-ride-chat-header-info { flex: 1; min-width: 0; }
+        .haba-ride-chat-header-name { font-size: 15.5px; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .haba-ride-chat-header-sub { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+        .haba-ride-chat-close { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--bg-alt); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .haba-ride-chat-messages { flex: 1; min-height: 220px; max-height: 48vh; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-alt); }
+        .haba-ride-chat-empty { margin: auto; text-align: center; font-size: 13px; color: var(--text-secondary); padding: 24px 12px; }
+        .haba-ride-chat-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border-color); flex-shrink: 0; background: var(--bg-surface); }
+        .haba-ride-chat-input { flex: 1; border: none; background: var(--bg-alt); border-radius: 20px; padding: 10px 16px; font-size: 14.5px; color: var(--text-primary); outline: none; }
+        .haba-ride-chat-send { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--text-primary); color: var(--bg-surface); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+        .haba-ride-chat-send:active { transform: scale(0.92); }
+        .haba-ride-chat-send:disabled { opacity: 0.4; cursor: default; }
         .hrs-route { position: relative; padding-left: 26px; margin-bottom: 4px; }
         .hrs-route::before { content: ''; position: absolute; left: 4px; top: 22px; bottom: 22px; width: 2px; background: var(--text-primary); }
         .hrs-stop { position: relative; padding: 9px 0; min-width: 0; }
@@ -9428,6 +9446,10 @@
                                         <div class="haba-ride-driver-vehicle" id="haba-ride-driver-vehicle">--</div>
                                     </div>
                                     <div class="hrs-plate" id="haba-ride-driver-plate" style="display:none;"></div>
+                                    <button type="button" class="hrs-driver-chat-btn" id="btn-haba-ride-chat" aria-label="Message driver">
+                                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                        <span class="hrs-driver-chat-badge" id="haba-ride-chat-unread" style="display:none;"></span>
+                                    </button>
                                 </div>
                                 <div class="hrs-route">
                                     <div class="hrs-stop pickup"><div class="haba-ride-trip-label">Pickup</div><div class="haba-ride-trip-value" id="haba-ride-trip-pickup-value">Your location</div></div>
@@ -9455,8 +9477,33 @@
                     </div>
                 </div>
 
+                <!-- HABA RIDE CHAT: rider ↔ driver messaging, scoped to the current accepted ride only.
+                     Backed by ride_requests/{requestId}/messages — see the schema comment near
+                     watchHabaRideChat() / openHabaRideChatSheet() / sendHabaRideChatMessage(). Closes
+                     automatically (and the thread isn't reused) once the ride ends. -->
+                <div class="bottom-sheet-overlay" id="haba-ride-chat-sheet-overlay">
+                    <div class="bottom-sheet haba-ride-chat-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 0;">
+                        <div class="haba-ride-chat-header">
+                            <div class="haba-ride-chat-header-avatar" id="haba-ride-chat-header-avatar"></div>
+                            <div class="haba-ride-chat-header-info">
+                                <div class="haba-ride-chat-header-name" id="haba-ride-chat-header-name">Driver</div>
+                                <div class="haba-ride-chat-header-sub">Messages about this trip only</div>
+                            </div>
+                            <button type="button" class="haba-ride-chat-close" id="btn-haba-ride-chat-close" aria-label="Close">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                        <div class="haba-ride-chat-messages" id="haba-ride-chat-messages"></div>
+                        <div class="haba-ride-chat-input-row">
+                            <input type="text" id="haba-ride-chat-input" class="haba-ride-chat-input" placeholder="Message your driver…" maxlength="500" autocomplete="off">
+                            <button type="button" class="haba-ride-chat-send" id="btn-haba-ride-chat-send" aria-label="Send" disabled>
+                                <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                <div id="tab-calls" class="tab-content">
+
                     <div class="chat-header-area">
                         <div class="chat-header-top" id="calls-header-default">
                             <div class="chat-header-title-row">
@@ -27988,6 +28035,9 @@
         //   first (the flip is a compare-and-set on status) — moves it to 'requested', and from there it
         //   follows the normal flow. See "Scheduled rides" below.
         //   }
+        //   ride_requests/{requestId}/messages/{msgId}: { senderUid, senderRole: 'rider' | 'driver',
+        //     text, createdAt }  — in-trip chat between rider and driver, scoped to this one ride.
+        //     See "Ride chat" below (watchHabaRideChat / openHabaRideChatSheet / sendHabaRideChatMessage).
         //   driver_profiles/{uid}: { name, photoURL, vehicleModel, vehicleColor, plate, rating }
         // The drivers app claims a request by setting status:'accepted' + driverId, then moves
         // it through 'arriving' → 'in_progress' → 'completed' (or 'cancelled'). This app just
@@ -28008,6 +28058,7 @@
             if (habaSearchTimeoutHandle) { clearTimeout(habaSearchTimeoutHandle); habaSearchTimeoutHandle = null; }
             if (habaTripDriverMarker.marker) { habaTripDriverMarker.marker.setMap(null); habaTripDriverMarker.marker = null; }
             habaMatchedDriverId = null;
+            teardownHabaRideChat();
         }
 
         function habaRideStatusLabel(status) {
@@ -28060,6 +28111,8 @@
             try {
                 const snap = await get(ref(database, `driver_profiles/${driverId}`));
                 const p = snap.exists() ? snap.val() : {};
+                habaMatchedDriverName = p.name || 'Your driver';
+                habaMatchedDriverPhoto = p.photoURL || DEFAULT_AVATAR_URL;
                 document.getElementById('haba-ride-driver-avatar').style.backgroundImage = `url('${p.photoURL || DEFAULT_AVATAR_URL}')`;
                 document.getElementById('haba-ride-driver-name').textContent = p.name || 'Your driver';
                 const vehicleBits = [p.vehicleColor, p.vehicleModel].filter(Boolean).join(' ');
@@ -28068,8 +28121,11 @@
                 plateEl.textContent = p.plate || '';
                 plateEl.style.display = p.plate ? '' : 'none';
                 document.getElementById('haba-ride-driver-rating').textContent = typeof p.rating === 'number' ? `★ ${p.rating.toFixed(1)}` : '';
+                if (habaRideChatSheetOpen) renderHabaRideChatHeader();
             } catch (err) {
                 console.error('[haba-ride] failed to read driver profile', err);
+                habaMatchedDriverName = 'Your driver';
+                habaMatchedDriverPhoto = DEFAULT_AVATAR_URL;
                 document.getElementById('haba-ride-driver-avatar').style.backgroundImage = `url('${DEFAULT_AVATAR_URL}')`;
                 document.getElementById('haba-ride-driver-name').textContent = 'Your driver';
                 document.getElementById('haba-ride-driver-vehicle').textContent = 'Vehicle details unavailable';
@@ -28078,7 +28134,141 @@
             }
         }
 
-        // ── Ride PIN (Uber-style) ────────────────────────────────────────────────────
+        // ── Ride chat ────────────────────────────────────────────────────────────────
+        // A lightweight chat scoped to the current accepted ride only — not the regular Haba
+        // messenger — so a rider and driver can coordinate a pickup without needing a friend
+        // connection or a shared thread that outlives the trip. Messages live at
+        // ride_requests/{requestId}/messages/{msgId} (see the schema comment above). Watched for
+        // the whole life of an active trip (for the unread badge); the message list only renders
+        // while the sheet is open. Sending is disabled once the ride is no longer active because
+        // the trip panel — the only place the chat button lives — is hidden by then too.
+        let habaRideChatUnsub = null;
+        let habaRideChatWatchedRequestId = null;
+        let habaRideChatSheetOpen = false;
+        let habaRideChatLastReadAt = 0;
+        let habaMatchedDriverName = 'Your driver';
+        let habaMatchedDriverPhoto = DEFAULT_AVATAR_URL;
+
+        function habaRideChatMessagesRef(requestId) {
+            return ref(database, `ride_requests/${requestId}/messages`);
+        }
+
+        // Starts (or keeps) a live listener on the current ride's chat thread. Safe to call on
+        // every trip-panel update — it's a no-op once already watching this requestId.
+        function watchHabaRideChat(requestId) {
+            if (!requestId || habaRideChatWatchedRequestId === requestId) return;
+            if (habaRideChatUnsub) { habaRideChatUnsub(); habaRideChatUnsub = null; }
+            habaRideChatWatchedRequestId = requestId;
+            habaRideChatLastReadAt = 0;
+            const msgsRef = habaRideChatMessagesRef(requestId);
+            const handler = (snap) => {
+                const msgs = [];
+                snap.forEach(child => { msgs.push({ id: child.key, ...child.val() }); });
+                msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                if (habaRideChatSheetOpen && habaCurrentRideRequestId === requestId) {
+                    renderHabaRideChatMessages(msgs);
+                } else {
+                    const unread = msgs.filter(m => m.senderRole === 'driver' && (m.createdAt || 0) > habaRideChatLastReadAt).length;
+                    renderHabaRideChatUnreadBadge(unread);
+                }
+            };
+            onValue(msgsRef, handler);
+            habaRideChatUnsub = () => off(msgsRef, 'value', handler);
+        }
+
+        function teardownHabaRideChat() {
+            if (habaRideChatUnsub) { habaRideChatUnsub(); habaRideChatUnsub = null; }
+            habaRideChatWatchedRequestId = null;
+            habaRideChatLastReadAt = 0;
+            closeHabaRideChatSheet();
+            renderHabaRideChatUnreadBadge(0);
+        }
+
+        function renderHabaRideChatUnreadBadge(count) {
+            const badge = document.getElementById('haba-ride-chat-unread');
+            if (count > 0) { badge.textContent = count > 9 ? '9+' : String(count); badge.style.display = ''; }
+            else { badge.style.display = 'none'; }
+        }
+
+        function renderHabaRideChatHeader() {
+            document.getElementById('haba-ride-chat-header-avatar').style.backgroundImage = `url('${habaMatchedDriverPhoto}')`;
+            document.getElementById('haba-ride-chat-header-name').textContent = habaMatchedDriverName;
+        }
+
+        function renderHabaRideChatMessages(msgs) {
+            const wrap = document.getElementById('haba-ride-chat-messages');
+            const user = auth.currentUser;
+            if (!msgs.length) {
+                wrap.innerHTML = '<div class="haba-ride-chat-empty">Say hi to your driver — messages here are just for this trip.</div>';
+                return;
+            }
+            wrap.innerHTML = msgs.map(m => {
+                const out = user && m.senderUid === user.uid;
+                const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+                return `<div class="msg-bubble ${out ? 'out' : 'in'}">${escapeHtmlForPost(m.text || '')}<div class="msg-time">${time}</div></div>`;
+            }).join('');
+            wrap.scrollTop = wrap.scrollHeight;
+        }
+
+        function openHabaRideChatSheet() {
+            if (!habaCurrentRideRequestId) return;
+            habaRideChatSheetOpen = true;
+            habaRideChatLastReadAt = Date.now();
+            renderHabaRideChatUnreadBadge(0);
+            renderHabaRideChatHeader();
+            document.getElementById('haba-ride-chat-messages').innerHTML = '<div class="haba-ride-chat-empty">Loading…</div>';
+            document.getElementById('haba-ride-chat-sheet-overlay').classList.add('active');
+            get(habaRideChatMessagesRef(habaCurrentRideRequestId)).then(snap => {
+                const msgs = [];
+                snap.forEach(child => { msgs.push({ id: child.key, ...child.val() }); });
+                msgs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                if (habaRideChatSheetOpen) renderHabaRideChatMessages(msgs);
+            }).catch(err => console.error('[haba-ride] failed to load chat', err));
+            setTimeout(() => document.getElementById('haba-ride-chat-input').focus(), 150);
+        }
+
+        function closeHabaRideChatSheet() {
+            habaRideChatSheetOpen = false;
+            document.getElementById('haba-ride-chat-sheet-overlay').classList.remove('active');
+        }
+
+        async function sendHabaRideChatMessage() {
+            const input = document.getElementById('haba-ride-chat-input');
+            const text = input.value.trim();
+            const requestId = habaCurrentRideRequestId;
+            const user = auth.currentUser;
+            if (!text || !requestId || !user) return;
+            input.value = '';
+            document.getElementById('btn-haba-ride-chat-send').disabled = true;
+            try {
+                await push(habaRideChatMessagesRef(requestId), {
+                    senderUid: user.uid,
+                    senderRole: 'rider',
+                    text,
+                    createdAt: serverTimestamp()
+                });
+            } catch (err) {
+                console.error('[haba-ride] failed to send chat message', err);
+                notify("Message didn't send — try again.", 'error');
+                input.value = text;
+            }
+        }
+
+        document.getElementById('btn-haba-ride-chat').addEventListener('click', openHabaRideChatSheet);
+        document.getElementById('btn-haba-ride-chat-close').addEventListener('click', closeHabaRideChatSheet);
+        document.getElementById('haba-ride-chat-sheet-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'haba-ride-chat-sheet-overlay') closeHabaRideChatSheet();
+        });
+        document.getElementById('btn-haba-ride-chat-send').addEventListener('click', sendHabaRideChatMessage);
+        const habaRideChatInputEl = document.getElementById('haba-ride-chat-input');
+        habaRideChatInputEl.addEventListener('input', () => {
+            document.getElementById('btn-haba-ride-chat-send').disabled = !habaRideChatInputEl.value.trim();
+        });
+        habaRideChatInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendHabaRideChatMessage(); }
+        });
+
+
         // Every ride gets a random 4-digit PIN when it's requested. The rider sees it on the trip
         // panel while the driver is on the way and reads it out; the driver types it into the drivers
         // app, which only starts the trip if it matches. The raw PIN lives at ride_pins/{requestId}
@@ -28177,6 +28367,7 @@
                 loadMatchedDriverProfile(request.driverId);
                 watchMatchedDriverLocation(request.driverId, request);
             }
+            if (habaCurrentRideRequestId) watchHabaRideChat(habaCurrentRideRequestId);
         }
 
         // Central handler for every update to the live ride_requests/{id} node — reflects

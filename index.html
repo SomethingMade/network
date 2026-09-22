@@ -37173,7 +37173,20 @@
             clone.style.width = rect.width + 'px';
             clone.classList.remove('pending');
             clone.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
-            clone.querySelectorAll('video').forEach(v => { v.muted = true; v.autoplay = false; });
+            // A cloned <video> starts blank — it doesn't inherit the decoded frame the original
+            // was showing, only its attributes — so without a poster it falls back to the
+            // browser's generic "no frame yet" placeholder icon (what long-pressing a video
+            // used to show here). Snapshot the live original's current frame as a poster on the
+            // clone; this works even for encrypted/blob-sourced videos that have no Cloudinary
+            // poster URL, since primeVideoPosterFrame has already seeked those to a real frame.
+            const originalVideos = bubbleEl.querySelectorAll('video');
+            clone.querySelectorAll('video').forEach((v, i) => {
+                v.muted = true;
+                v.autoplay = false;
+                const orig = originalVideos[i];
+                const frame = orig && (captureVideoFrame(orig) || orig.poster);
+                if (frame) v.poster = frame;
+            });
             wrap.appendChild(clone);
 
             const menu = document.createElement('div');

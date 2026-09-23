@@ -3806,6 +3806,46 @@
            parent overlay closes). This sheet only ever opens from inside the Code Compiler
            (z-index 100065), so it gets a fixed tier one above that rather than a toggled class. */
         #compiler-lang-sheet-overlay { z-index: 100066; }
+
+        /* --- "Verified only" upsell sheet (X-style "Unlock … with Premium") ---
+           Shown by showVerifiedOnlySheet() whenever a non-verified user taps a verified-only
+           feature. Opens from inside viewers/sheets/composers, so it gets a fixed high tier
+           (above every .above-sheet/.above-viewer tier, below app lock) — same recurring
+           z-index fix as #compiler-lang-sheet-overlay. #verified-badge-page-overlay (where
+           its Upgrade button leads) is lifted one tier above so it isn't hidden behind the
+           viewer the user came from. Surface is explicitly opaque per theme because the
+           glass theme's translucent --bg-surface turns muddy over the dimmer. */
+        #verified-only-sheet-overlay { z-index: 100070; }
+        #verified-badge-page-overlay { z-index: 100071; }
+
+        /* --- Saved tab collection picker (X-style "Videos ▾" dropdown) ---
+           Bar sits between the profile sub-tabs and #my-profile-saved-list; its button opens a
+           small floating menu (All saved / Default / each custom collection, check on the
+           active one). Menu surface is explicitly opaque per theme (glass theme's --bg-surface
+           is translucent and would show the feed through it). */
+        .saved-filter-bar { position: relative; display: none; justify-content: flex-end; margin: 0 -20px; padding: 4px 16px; border-bottom: 1px solid var(--border-color); }
+        .saved-filter-btn { display: inline-flex; align-items: center; gap: 8px; max-width: 70%; padding: 10px 6px 10px 10px; background: none; border: none; color: var(--text-primary); font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .saved-filter-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .saved-filter-btn .saved-filter-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .saved-filter-btn .saved-filter-chevron { width: 16px; height: 16px; color: var(--text-secondary); transition: transform 0.2s ease; }
+        .saved-filter-bar.open .saved-filter-chevron { transform: rotate(180deg); }
+        .saved-filter-menu { --sf-bg: #FFFFFF; position: absolute; right: 12px; top: calc(100% - 2px); min-width: 220px; max-width: calc(100% - 24px); max-height: 50vh; overflow-y: auto; background: var(--sf-bg); border: 1px solid var(--border-color); border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.16); padding: 6px; z-index: 60; opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top right; transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s; }
+        body.dark-theme .saved-filter-menu { --sf-bg: #1C1C1E; }
+        .saved-filter-bar.open .saved-filter-menu { opacity: 1; visibility: visible; transform: none; }
+        .saved-filter-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 12px; background: none; border: none; border-radius: 12px; color: var(--text-primary); font-family: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; }
+        .saved-filter-option:hover, .saved-filter-option:active { background: var(--bg-hover); }
+        .saved-filter-option svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .saved-filter-option .saved-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .saved-filter-option .saved-filter-check { width: 20px; height: 20px; opacity: 0; }
+        .saved-filter-option.selected .saved-filter-check { opacity: 1; }
+        #verified-only-sheet-overlay .bottom-sheet.vo-sheet { --vo-bg: #FFFFFF; --vo-btn-bg: #0F1419; --vo-btn-fg: #FFFFFF; background: var(--vo-bg); backdrop-filter: none; -webkit-backdrop-filter: none; padding: 12px 24px calc(28px + env(safe-area-inset-bottom, 0px)); text-align: left; }
+        body.dark-theme #verified-only-sheet-overlay .bottom-sheet.vo-sheet { --vo-bg: #1C1C1E; --vo-btn-bg: #FFFFFF; --vo-btn-fg: #000000; }
+        .vo-sheet-title { font-size: 26px; line-height: 1.15; font-weight: 800; letter-spacing: -0.4px; color: var(--text-primary); margin: 18px 0 10px; }
+        .vo-sheet-text { font-size: 16px; line-height: 1.35; color: var(--text-secondary); margin: 0 0 26px; }
+        .vo-sheet-btn { display: block; width: 100%; padding: 15px; border-radius: 999px; font-size: 16px; font-weight: 700; cursor: pointer; text-align: center; transition: transform 0.15s ease, opacity 0.2s; -webkit-tap-highlight-color: transparent; }
+        .vo-sheet-btn:active { transform: scale(0.98); opacity: 0.9; }
+        .vo-sheet-btn.primary { background: var(--vo-btn-bg); color: var(--vo-btn-fg); border: 1px solid var(--vo-btn-bg); margin-bottom: 12px; }
+        .vo-sheet-btn.secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); }
         .chats-menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; background: none; border: none; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--text-primary); cursor: pointer; text-align: left; }
         .chats-menu-item:hover { background: var(--bg-hover); }
         .chats-menu-item svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-secondary); }
@@ -6427,6 +6467,19 @@
         </div>
     </div>
 
+    <!-- "Verified only" upsell sheet — see showVerifiedOnlySheet(). One shared sheet for every
+         verified-only feature; title/text are swapped per feature via textContent. Upgrade
+         leads to the Get Verified page (openGetVerifiedUpsell). -->
+    <div id="verified-only-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet vo-sheet">
+            <div class="sheet-handle"></div>
+            <h3 class="vo-sheet-title" id="vo-sheet-title">Unlock this with Verified</h3>
+            <p class="vo-sheet-text" id="vo-sheet-text">Only verified users have access to this feature. Get verified to continue.</p>
+            <button type="button" class="vo-sheet-btn primary" id="vo-sheet-upgrade">Upgrade</button>
+            <button type="button" class="vo-sheet-btn secondary" id="vo-sheet-later">Maybe later</button>
+        </div>
+    </div>
+
     <!-- Name-a-collection prompt, opened only for verified users (see
          btn-create-bookmark-collection) — createBookmarkCollectionFlow does the actual write. -->
     <div id="create-collection-modal-overlay" class="modal-overlay">
@@ -7187,6 +7240,16 @@
                     <div class="profile-posts-list" id="my-profile-posts-list"></div>
                     <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
+                    <!-- Collection picker for the Saved tab — shown/hidden with the tab itself (see
+                         initProfileSubtabs) and filled by renderSavedFilterBar. -->
+                    <div class="saved-filter-bar" id="my-profile-saved-list-filter">
+                        <button type="button" class="saved-filter-btn" id="saved-filter-btn" aria-haspopup="true" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                            <span class="saved-filter-label" id="saved-filter-label">All saved</span>
+                            <svg class="saved-filter-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="saved-filter-menu" id="saved-filter-menu" role="menu"></div>
+                    </div>
                     <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
                 </div>
             </div>
@@ -12816,7 +12879,7 @@
             if (kind === 'video') {
                 const myUid = auth.currentUser && auth.currentUser.uid;
                 if (!isVerifiedUid(myUid)) {
-                    notify('Only verified users can download videos', 'error');
+                    showVerifiedOnlySheet('videoDownload');
                     return;
                 }
             }
@@ -17899,6 +17962,9 @@
                 if (document.getElementById('save-to-collection-sheet-overlay').classList.contains('active')) {
                     renderSaveToCollectionList();
                 }
+                const savedListForCollections = document.getElementById('my-profile-saved-list');
+                if (savedListForCollections && savedListForCollections.style.display !== 'none') buildProfileSavedList(savedListForCollections);
+                else renderSavedFilterBar();
             });
 
             const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
@@ -18479,7 +18545,8 @@
                     if (videoFile.size > maxVideoBytes) {
                         const limitMB = Math.round(maxVideoBytes / (1024 * 1024));
                         const isVerified = auth.currentUser && isVerifiedUid(auth.currentUser.uid);
-                        notify(`Videos must be under ${limitMB}MB` + (isVerified ? '' : ' — get verified for up to 100MB'), 'error');
+                        if (isVerified) notify(`Videos must be under ${limitMB}MB`, 'error');
+                        else showVerifiedOnlySheet('longVideo');
                         return;
                     }
                     feedComposerImages.forEach(revokeComposerImagePreview);
@@ -21579,6 +21646,33 @@
             refreshVerifiedBadgePurchaseUI(myProfile);
         }
 
+        // Shared "Verified only" upsell sheet (X-style "Unlock … with Premium"). Call this from any
+        // verified-only feature's gate instead of a toast/modal. `feature` is a key of
+        // VERIFIED_ONLY_FEATURES below (unknown keys fall back to generic copy). Upgrade closes
+        // the sheet and opens the Get Verified page; "Maybe later"/backdrop just dismisses.
+        const VERIFIED_ONLY_FEATURES = {
+            bookmarkFolders: { title: 'Unlock bookmark folders with Verified', text: 'Only verified users can create bookmark folders. Upgrade to continue.' },
+            videoDownload:   { title: 'Unlock video downloads with Verified',  text: 'Only verified users can download videos. Upgrade to continue.' },
+            username:        { title: 'Unlock username changes with Verified', text: "You've used your one-time username change. Verified users can update their username anytime." },
+            longVideo:       { title: 'Unlock longer videos with Verified',    text: 'Videos are limited to 50MB. Verified users can upload up to 100MB.' },
+            generic:         { title: 'Unlock this with Verified',             text: 'Only verified users have access to this feature. Upgrade to continue.' }
+        };
+        function showVerifiedOnlySheet(feature) {
+            const copy = VERIFIED_ONLY_FEATURES[feature] || VERIFIED_ONLY_FEATURES.generic;
+            document.getElementById('vo-sheet-title').textContent = copy.title;
+            document.getElementById('vo-sheet-text').textContent = copy.text;
+            document.getElementById('verified-only-sheet-overlay').classList.add('active');
+        }
+        (function wireVerifiedOnlySheet() {
+            const overlay = document.getElementById('verified-only-sheet-overlay');
+            document.getElementById('vo-sheet-later').addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+            document.getElementById('vo-sheet-upgrade').addEventListener('click', () => {
+                overlay.classList.remove('active');
+                openGetVerifiedUpsell();
+            });
+        })();
+
         // postId this sheet-session is saving/unsaving into — set by openSaveToCollectionSheet,
         // read by the delegated row-click handler and by createBookmarkCollectionFlow.
         let activeSaveToCollectionPostId = null;
@@ -21662,8 +21756,7 @@
         document.getElementById('btn-create-bookmark-collection').addEventListener('click', () => {
             const user = auth.currentUser;
             if (!user || !isVerifiedUid(user.uid)) {
-                document.getElementById('save-to-collection-sheet-overlay').classList.remove('active');
-                openGetVerifiedUpsell();
+                showVerifiedOnlySheet('bookmarkFolders');
                 return;
             }
             document.getElementById('create-collection-name-input').value = '';
@@ -26131,7 +26224,7 @@
             }
 
             const myProfile = cachedUsers[user.uid] || {};
-            if (myProfile.usernameChanged && !isVerifiedUid(user.uid)) return showCustomModal("Already Set", "You've already used your one-time username change. Get verified or switch to a Business Account to change it again.");
+            if (myProfile.usernameChanged && !isVerifiedUid(user.uid)) return showVerifiedOnlySheet('username');
 
             const lower = cleaned.toLowerCase();
             const btn = document.getElementById('btn-set-username');
@@ -31808,6 +31901,11 @@
                     if (mediaGrid) mediaGrid.style.display = subtab === 'media' ? '' : 'none';
                     if (savedList) {
                         savedList.style.display = subtab === 'saved' ? '' : 'none';
+                        const savedFilterBar = document.getElementById(savedListId + '-filter');
+                        if (savedFilterBar) {
+                            savedFilterBar.style.display = subtab === 'saved' ? 'flex' : 'none';
+                            savedFilterBar.classList.remove('open');
+                        }
                         if (subtab === 'saved') buildProfileSavedList(savedList);
                     }
                     if (repliesList) {
@@ -31825,7 +31923,13 @@
         // saved_posts/{uid} plus the normal feed cache will fill in on the next rebuild.
         function buildProfileSavedList(listEl) {
             if (!listEl) return;
-            const savedIds = Object.keys(cachedSavedPosts || {}).filter(id => cachedSavedPosts[id]);
+            // A collection picked earlier may have been deleted since — fall back to everything.
+            if (activeSavedCollectionFilter !== 'all' && activeSavedCollectionFilter !== 'default' && !cachedBookmarkCollections[activeSavedCollectionFilter]) {
+                activeSavedCollectionFilter = 'all';
+            }
+            renderSavedFilterBar();
+            const filter = activeSavedCollectionFilter;
+            const savedIds = Object.keys(cachedSavedPosts || {}).filter(id => filter === 'all' ? !!cachedSavedPosts[id] : isPostInCollection(id, filter));
             const items = savedIds
                 .map(postId => [postId, cachedPosts[postId]])
                 .filter(([, post]) => !!post)
@@ -31833,11 +31937,70 @@
 
             listEl.innerHTML = '';
             if (!items.length) {
-                listEl.innerHTML = '<div class="profile-posts-empty">No saved posts yet.</div>';
+                const empty = document.createElement('div');
+                empty.className = 'profile-posts-empty';
+                empty.textContent = filter === 'all' ? 'No saved posts yet.' : `Nothing saved in “${savedCollectionName(filter)}” yet.`;
+                listEl.appendChild(empty);
                 return;
             }
             items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
         }
+
+        // Which bookmark collection the Saved tab is showing: 'all' (every saved post, the
+        // original behaviour), 'default', or a custom collection id. Session-only on purpose.
+        let activeSavedCollectionFilter = 'all';
+        function savedCollectionName(id) {
+            if (id === 'all') return 'All saved';
+            if (id === 'default') return 'Default';
+            return (cachedBookmarkCollections[id] && cachedBookmarkCollections[id].name) || 'Untitled';
+        }
+        // Rebuilds the picker button label + dropdown rows. Names go in via textContent so a
+        // collection name can never inject markup (same rule as renderSaveToCollectionList).
+        function renderSavedFilterBar() {
+            const label = document.getElementById('saved-filter-label');
+            const menu = document.getElementById('saved-filter-menu');
+            if (!label || !menu) return;
+            label.textContent = savedCollectionName(activeSavedCollectionFilter);
+            const customIds = Object.keys(cachedBookmarkCollections || {})
+                .sort((a, b) => (cachedBookmarkCollections[a].createdAt || 0) - (cachedBookmarkCollections[b].createdAt || 0));
+            const ids = ['all', 'default', ...customIds];
+            menu.innerHTML = ids.map(id => `
+                <button type="button" class="saved-filter-option${id === activeSavedCollectionFilter ? ' selected' : ''}" data-collection-id="${id}" role="menuitem">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${id === 'all'
+                        ? '<path d="M19 21l-7-5-7 5V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><path d="M9 8h6"></path>'
+                        : '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>'}</svg>
+                    <span class="saved-filter-name"></span>
+                    <svg class="saved-filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>`).join('');
+            menu.querySelectorAll('.saved-filter-option').forEach(opt => {
+                opt.querySelector('.saved-filter-name').textContent = savedCollectionName(opt.dataset.collectionId);
+            });
+        }
+        (function wireSavedFilterBar() {
+            const bar = document.getElementById('my-profile-saved-list-filter');
+            const btn = document.getElementById('saved-filter-btn');
+            const menu = document.getElementById('saved-filter-menu');
+            if (!bar || !btn || !menu) return;
+            const setOpen = (open) => {
+                bar.classList.toggle('open', open);
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setOpen(!bar.classList.contains('open'));
+            });
+            menu.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const opt = e.target.closest('.saved-filter-option');
+                if (!opt) return;
+                triggerHaptic(10);
+                activeSavedCollectionFilter = opt.dataset.collectionId;
+                setOpen(false);
+                buildProfileSavedList(document.getElementById('my-profile-saved-list'));
+            });
+            // Tap anywhere else closes it, like any dropdown.
+            document.addEventListener('click', () => { if (bar.classList.contains('open')) setOpen(false); });
+        })();
 
         // Renders the "Replies" tab of a profile (own or someone else's) — every comment this
         // user has left on a post, newest first, sourced from the userReplies/{uid} index that

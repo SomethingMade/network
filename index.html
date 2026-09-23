@@ -15955,10 +15955,18 @@
             const subBtn = document.getElementById('btn-user-info-subscribe');
             if (!subBtn) return;
             const price = profile && profile.creatorSubPrice;
-            if (isMe || !(price > 0)) { subBtn.style.display = 'none'; return; }
+            const isSubscribed = hasActiveSubscriptionTo(uid);
+            const isFollowing = !!cachedContacts[uid];
+            // Subscribing is framed as the next step after following, so it's hidden until you
+            // follow them — except if you're already subscribed (e.g. you unfollowed after
+            // subscribing), in which case it stays visible so you can still manage/end it.
+            if (isMe || !(price > 0) || (!isFollowing && !isSubscribed)) {
+                subBtn.style.display = 'none';
+                return;
+            }
             subBtn.style.display = 'flex';
             document.getElementById('btn-user-info-subscribe-text').textContent =
-                hasActiveSubscriptionTo(uid) ? 'Subscribed ✓' : `Subscribe · R${price}/mo`;
+                isSubscribed ? 'Subscribed ✓' : `Subscribe · R${price}/mo`;
         }
         document.getElementById('btn-user-info-subscribe').addEventListener('click', () => {
             if (userInfoSheetUid) openSubscribeModal(userInfoSheetUid);
@@ -32161,6 +32169,8 @@
                     notify("You're now following them!");
                 }
                 updateUserInfoFollowButton(uid);
+                const isMeNow = auth.currentUser && uid === auth.currentUser.uid;
+                updateUserInfoSubscribeButton(uid, isMeNow, cachedUsers[uid] || {});
                 const followersCountEl = document.getElementById('user-info-followers-count');
                 if (followersCountEl) {
                     const current = parseInt(followersCountEl.textContent, 10) || 0;

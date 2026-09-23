@@ -1921,6 +1921,40 @@
         .feed-post-edit-save { background: var(--gradient-brand); color: #fff; }
         .feed-post-body { margin-top: 6px; margin-left: 60px; width: calc(100% - 60px); }
         .feed-post-text { font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.35; margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
+
+        /* ── POST MARKUP (long-press a text-only feed post to draw/annotate over it) ── */
+        @media (pointer: coarse) { .feed-post-card.markup-enabled { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
+        .pm-overlay { position: fixed; inset: 0; z-index: 100020; display: none; flex-direction: column; background: #F2F2F7; color: #111111; }
+        .pm-overlay.open { display: flex; }
+        body.dark-theme .pm-overlay { background: #000000; color: #F2F2F7; }
+        .pm-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: max(env(safe-area-inset-top, 0px), 12px) 12px 8px; }
+        .pm-title { font-size: 16px; font-weight: 700; }
+        .pm-btn { background: none; border: none; color: inherit; font-size: 15px; font-weight: 600; padding: 8px 12px; border-radius: 50px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+        .pm-btn.pm-primary { background: #111111; color: #FFFFFF; }
+        body.dark-theme .pm-btn.pm-primary { background: #F2F2F7; color: #111111; }
+        .pm-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 8px 14px 16px; }
+        .pm-stage { position: relative; max-width: 560px; margin: 0 auto; border-radius: 18px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
+        .pm-paper { background: #FFFFFF; color: #111111; padding: 18px 18px 24px; min-height: 260px; }
+        body.dark-theme .pm-paper { background: #1C1C1E; color: #F2F2F7; }
+        .pm-head { display: flex; align-items: center; gap: 10px; }
+        .pm-avatar { width: 40px; height: 40px; border-radius: 50%; background: #111111; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; flex-shrink: 0; }
+        body.dark-theme .pm-avatar { background: #6E6E73; }
+        .pm-name { font-size: 15px; font-weight: 700; line-height: 1.25; }
+        .pm-user { font-size: 13px; font-weight: 500; opacity: 0.6; line-height: 1.25; }
+        .pm-text { margin-top: 14px; font-size: 20px; font-weight: 500; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+        .pm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+        .pm-canvas.pm-hand { pointer-events: none; }
+        .pm-tools { padding: 10px 12px max(env(safe-area-inset-bottom, 0px), 12px); background: #FFFFFF; border-top: 1px solid rgba(128,128,128,0.2); display: flex; flex-direction: column; gap: 10px; }
+        body.dark-theme .pm-tools { background: #1C1C1E; }
+        .pm-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .pm-modes { display: flex; gap: 6px; }
+        .pm-mode { background: rgba(128,128,128,0.14); color: inherit; border: none; border-radius: 50px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .pm-mode.active { background: #111111; color: #FFFFFF; }
+        body.dark-theme .pm-mode.active { background: #F2F2F7; color: #111111; }
+        .pm-swatches { display: flex; gap: 10px; align-items: center; justify-content: center; flex: 1; }
+        .pm-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(128,128,128,0.35); }
+        .pm-swatch.active { border-color: #1D9BF0; transform: scale(1.12); }
+        .pm-overlay.pm-arming { pointer-events: none; }
         .feed-text-more-btn, .feed-text-less-btn { background: none; border: none; padding: 0; margin-left: 2px; font: inherit; font-weight: 600; color: var(--primary-blue); cursor: pointer; }
         .x-media-grid { position: relative; margin-top: 10px; margin-left: 60px; width: calc(100% - 60px); }
         .x-media-grid[data-count="1"] { border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); }
@@ -20751,7 +20785,327 @@
                 });
             }
 
+            // Long-press a text-only post (no media, poll, quote embed or ad) to draw/annotate over it.
+            if (!opts.isPreview && !isCardAd && !isQuote && !isCommentQuote && post.text && post.text.trim()
+                && !postImages.length && !post.videoUrl && !post.poll) {
+                bindPostMarkupLongPress(card, post);
+            }
+
             return card;
+        }
+
+
+        // ── POST MARKUP ─────────────────────────────────────────────────────────────────
+        // Long-press a text-only feed post (no media/poll/quote/ad) to open a full-screen
+        // sheet with the post's text on a card and a canvas on top to draw/highlight over it.
+        // Nothing is stored — "Share" renders the annotated card to a PNG and hands it to the OS
+        // share sheet (or downloads it where sharing files isn't supported).
+        const PM_LONG_PRESS_MS = 500;
+        const PM_COLORS = ['ink', '#FF453A', '#FF9F0A', '#FFD60A', '#34C759', '#1D9BF0', '#AF52DE'];
+        const pmState = { strokes: [], cur: null, mode: 'pen', color: 'ink', dpr: 1, raf: 0, built: false };
+
+        function pmInkColor() { return document.body.classList.contains('dark-theme') ? '#F2F2F7' : '#111111'; }
+        function pmResolveColor(c) { return c === 'ink' ? pmInkColor() : c; }
+
+        function bindPostMarkupLongPress(card, post) {
+            card.classList.add('markup-enabled');
+            let timer = null, sx = 0, sy = 0;
+            const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+            card.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                if (e.target.closest('a, button, input, textarea, video, .feed-text-more-btn, .feed-text-less-btn')) return;
+                cancel();
+                sx = e.clientX; sy = e.clientY;
+                timer = setTimeout(() => {
+                    timer = null;
+                    card._markupSuppressClickUntil = Date.now() + 1200;
+                    try { window.getSelection().removeAllRanges(); } catch (err) { /* no-op */ }
+                    triggerHaptic(20);
+                    openPostMarkup(card, post);
+                }, PM_LONG_PRESS_MS);
+            });
+            card.addEventListener('pointermove', (e) => {
+                if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) cancel();
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => card.addEventListener(t, cancel));
+            // The finger lifting after a long press would otherwise also count as a tap and open
+            // the Post view underneath — swallow that one click (capture phase runs before the
+            // card's own click handler).
+            card.addEventListener('click', (e) => {
+                if (card._markupSuppressClickUntil && Date.now() < card._markupSuppressClickUntil) {
+                    card._markupSuppressClickUntil = 0;
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            }, true);
+        }
+
+        function pmBuild() {
+            if (pmState.built) return;
+            pmState.built = true;
+            const ov = document.createElement('div');
+            ov.id = 'post-markup-overlay';
+            ov.className = 'pm-overlay';
+            ov.innerHTML = `
+                <div class="pm-top">
+                    <button type="button" class="pm-btn" id="pm-close" aria-label="Close">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                    <span class="pm-title">Markup</span>
+                    <button type="button" class="pm-btn pm-primary" id="pm-share">Share</button>
+                </div>
+                <div class="pm-scroll" id="pm-scroll">
+                    <div class="pm-stage" id="pm-stage">
+                        <div class="pm-paper">
+                            <div class="pm-head">
+                                <div class="pm-avatar" id="pm-avatar"></div>
+                                <div><div class="pm-name" id="pm-name"></div><div class="pm-user" id="pm-user"></div></div>
+                            </div>
+                            <div class="pm-text" id="pm-text"></div>
+                        </div>
+                        <canvas class="pm-canvas" id="pm-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="pm-tools">
+                    <div class="pm-row">
+                        <div class="pm-modes">
+                            <button type="button" class="pm-mode active" data-pm-mode="pen">Pen</button>
+                            <button type="button" class="pm-mode" data-pm-mode="marker">Marker</button>
+                            <button type="button" class="pm-mode" data-pm-mode="hand">Scroll</button>
+                        </div>
+                        <div class="pm-modes">
+                            <button type="button" class="pm-mode" id="pm-undo">Undo</button>
+                            <button type="button" class="pm-mode" id="pm-clear">Clear</button>
+                        </div>
+                    </div>
+                    <div class="pm-row"><div class="pm-swatches" id="pm-swatches"></div></div>
+                </div>`;
+            document.body.appendChild(ov);
+
+            const sw = ov.querySelector('#pm-swatches');
+            PM_COLORS.forEach(c => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'pm-swatch' + (c === pmState.color ? ' active' : '');
+                b.dataset.pmColor = c;
+                b.style.background = c === 'ink' ? 'linear-gradient(90deg,#111 50%,#F2F2F7 50%)' : c;
+                b.setAttribute('aria-label', 'Color');
+                sw.appendChild(b);
+            });
+            sw.addEventListener('click', (e) => {
+                const b = e.target.closest('.pm-swatch');
+                if (!b) return;
+                pmState.color = b.dataset.pmColor;
+                sw.querySelectorAll('.pm-swatch').forEach(x => x.classList.toggle('active', x === b));
+                if (pmState.mode === 'hand') pmSetMode('pen');
+            });
+            ov.querySelectorAll('[data-pm-mode]').forEach(b => b.addEventListener('click', () => pmSetMode(b.dataset.pmMode)));
+            ov.querySelector('#pm-undo').addEventListener('click', () => { pmState.strokes.pop(); pmRedraw(); });
+            ov.querySelector('#pm-clear').addEventListener('click', () => { pmState.strokes = []; pmRedraw(); });
+            ov.querySelector('#pm-close').addEventListener('click', pmClose);
+            ov.querySelector('#pm-share').addEventListener('click', pmShare);
+
+            const cv = ov.querySelector('#pm-canvas');
+            const pt = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+            cv.addEventListener('pointerdown', (e) => {
+                if (pmState.mode === 'hand') return;
+                e.preventDefault();
+                try { cv.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
+                const marker = pmState.mode === 'marker';
+                pmState.cur = { color: pmState.color, width: marker ? 18 : 3.5, marker, pts: [pt(e)] };
+                pmState.strokes.push(pmState.cur);
+                pmRedraw();
+            });
+            cv.addEventListener('pointermove', (e) => {
+                const s = pmState.cur;
+                if (!s) return;
+                const p = pt(e), last = s.pts[s.pts.length - 1];
+                if (Math.hypot(p.x - last.x, p.y - last.y) < 1.5) return;
+                s.pts.push(p);
+                if (!pmState.raf) pmState.raf = requestAnimationFrame(() => { pmState.raf = 0; pmRedraw(); });
+            });
+            const end = () => { pmState.cur = null; };
+            cv.addEventListener('pointerup', end);
+            cv.addEventListener('pointercancel', end);
+            window.addEventListener('resize', () => { if (ov.classList.contains('open')) pmFitCanvas(); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ov.classList.contains('open')) pmClose(); });
+        }
+
+        function pmSetMode(mode) {
+            pmState.mode = mode;
+            const ov = document.getElementById('post-markup-overlay');
+            ov.querySelectorAll('[data-pm-mode]').forEach(b => b.classList.toggle('active', b.dataset.pmMode === mode));
+            ov.querySelector('#pm-canvas').classList.toggle('pm-hand', mode === 'hand');
+        }
+
+        function pmFitCanvas() {
+            const cv = document.getElementById('pm-canvas');
+            const stage = document.getElementById('pm-stage');
+            pmState.dpr = window.devicePixelRatio || 1;
+            cv.width = Math.round(stage.clientWidth * pmState.dpr);
+            cv.height = Math.round(stage.clientHeight * pmState.dpr);
+            pmRedraw();
+        }
+
+        function pmDrawStroke(ctx, s) {
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = s.width;
+            ctx.strokeStyle = ctx.fillStyle = pmResolveColor(s.color);
+            ctx.globalAlpha = s.marker ? 0.4 : 1;
+            const p = s.pts;
+            if (p.length === 1) {
+                ctx.beginPath();
+                ctx.arc(p[0].x, p[0].y, s.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < p.length - 1; i++) {
+                    ctx.quadraticCurveTo(p[i].x, p[i].y, (p[i].x + p[i + 1].x) / 2, (p[i].y + p[i + 1].y) / 2);
+                }
+                ctx.lineTo(p[p.length - 1].x, p[p.length - 1].y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function pmRedraw() {
+            const cv = document.getElementById('pm-canvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            ctx.setTransform(pmState.dpr, 0, 0, pmState.dpr, 0, 0);
+            pmState.strokes.forEach(s => pmDrawStroke(ctx, s));
+        }
+
+        function openPostMarkup(card, post) {
+            if (!post || !post.text) return;
+            pmBuild();
+            const ov = document.getElementById('post-markup-overlay');
+            const nameEl = card.querySelector('.x-post-headline .name');
+            const userEl = card.querySelector('.x-post-username-text');
+            const name = (nameEl && nameEl.textContent.trim()) || 'User';
+            document.getElementById('pm-name').textContent = name;
+            document.getElementById('pm-user').textContent = (userEl && userEl.textContent.trim()) || '';
+            document.getElementById('pm-avatar').textContent = name.charAt(0).toUpperCase();
+            document.getElementById('pm-text').textContent = post.text;
+            pmState.strokes = [];
+            pmState.cur = null;
+            pmSetMode('pen');
+            document.getElementById('pm-scroll').scrollTop = 0;
+            // The finger that triggered the long press is usually still down — ignore input for a
+            // moment so its release can't land on a button in the sheet.
+            ov.classList.add('pm-arming');
+            ov.classList.add('open');
+            setTimeout(() => ov.classList.remove('pm-arming'), 400);
+            pmFitCanvas();
+        }
+
+        function pmClose() {
+            const ov = document.getElementById('post-markup-overlay');
+            if (ov) ov.classList.remove('open');
+            pmState.strokes = [];
+            pmState.cur = null;
+        }
+
+        // Reads how the browser actually wrapped the post text (one entry per visual line) so the
+        // exported image puts every word exactly where it sat under the drawing.
+        function pmMeasureLines(el) {
+            const lines = [];
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            let node, cur = null;
+            while ((node = walker.nextNode())) {
+                const t = node.nodeValue;
+                for (let i = 0; i < t.length; i++) {
+                    if (t[i] === '\n') continue;
+                    const r = document.createRange();
+                    r.setStart(node, i);
+                    r.setEnd(node, i + 1);
+                    const rc = r.getClientRects()[0];
+                    if (!rc || !rc.width) continue;
+                    if (!cur || Math.abs(rc.top - cur.top) > rc.height / 2) {
+                        cur = { top: rc.top, height: rc.height, left: rc.left, text: '' };
+                        lines.push(cur);
+                    }
+                    cur.text += t[i];
+                }
+            }
+            return lines;
+        }
+
+        async function pmShare() {
+            const stage = document.getElementById('pm-stage');
+            const sr = stage.getBoundingClientRect();
+            const scale = Math.max(2, window.devicePixelRatio || 1);
+            const out = document.createElement('canvas');
+            out.width = Math.round(sr.width * scale);
+            out.height = Math.round(sr.height * scale);
+            const ctx = out.getContext('2d');
+            ctx.scale(scale, scale);
+            const paper = stage.querySelector('.pm-paper');
+            const cs = getComputedStyle(paper);
+            ctx.fillStyle = cs.backgroundColor;
+            ctx.fillRect(0, 0, sr.width, sr.height);
+
+            // Avatar circle + initial
+            const av = document.getElementById('pm-avatar');
+            const ar = av.getBoundingClientRect();
+            ctx.fillStyle = getComputedStyle(av).backgroundColor;
+            ctx.beginPath();
+            ctx.arc(ar.left - sr.left + ar.width / 2, ar.top - sr.top + ar.height / 2, ar.width / 2, 0, Math.PI * 2);
+            ctx.fill();
+            const drawText = (el, text, rect) => {
+                const c = getComputedStyle(el);
+                ctx.font = `${c.fontWeight} ${c.fontSize} ${c.fontFamily}`;
+                ctx.fillStyle = c.color;
+                ctx.globalAlpha = parseFloat(c.opacity) || 1;
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, rect.left - sr.left, rect.top - sr.top + rect.height / 2);
+                ctx.globalAlpha = 1;
+            };
+            const avc = getComputedStyle(av);
+            ctx.font = `${avc.fontWeight} ${avc.fontSize} ${avc.fontFamily}`;
+            ctx.fillStyle = avc.color;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(av.textContent, ar.left - sr.left + ar.width / 2, ar.top - sr.top + ar.height / 2 + 1);
+            ctx.textAlign = 'left';
+
+            const nameEl = document.getElementById('pm-name');
+            const userEl = document.getElementById('pm-user');
+            const nr = nameEl.getBoundingClientRect();
+            const ur = userEl.getBoundingClientRect();
+            drawText(nameEl, nameEl.textContent, nr);
+            if (userEl.textContent) drawText(userEl, userEl.textContent, ur);
+
+            const textEl = document.getElementById('pm-text');
+            pmMeasureLines(textEl).forEach(l => drawText(textEl, l.text.replace(/\s+$/, ''), l));
+
+            pmState.strokes.forEach(s => pmDrawStroke(ctx, s));
+
+            out.toBlob(async (blob) => {
+                if (!blob) { notify('Could not create the image', 'error'); return; }
+                const file = new File([blob], `haba-markup-${Date.now()}.png`, { type: 'image/png' });
+                try {
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file] });
+                        return;
+                    }
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
+                }
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+                notify('Image saved');
+            }, 'image/png');
         }
 
         const DEFAULT_POST_REACTION = '👍';

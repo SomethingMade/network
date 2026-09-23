@@ -13777,6 +13777,10 @@
         });
         window.addEventListener('popstate', () => {
             if (suppressNextPopstateClose) { suppressNextPopstateClose = false; return; }
+            // Post Markup (see openPostMarkup) owns this back press — it pushed its own history
+            // entry on top of whatever was open, so this pop only closes Markup and must not
+            // also close the sheet underneath it.
+            if (pmHistoryPushed) return;
             if (!sheetOpenStack.length) return;
             // If a hash-driven overlay (image/video/reel viewer, chat, story, etc. — see
             // HASH_OVERLAY_NAMES) is what's actually on top of the history stack right now,
@@ -20870,6 +20874,14 @@
         const PM_LONG_PRESS_MS = 500;
         const PM_COLORS = ['ink', '#FF453A', '#FF9F0A', '#FFD60A', '#34C759', '#1D9BF0', '#AF52DE'];
         const pmState = { strokes: [], cur: null, mode: 'pen', color: 'ink', dpr: 1, raf: 0, built: false };
+        // True while Markup has its own history entry pushed (so the device back button closes
+        // Markup instead of leaving the page/app). Read by the sheet back-button tracker.
+        let pmHistoryPushed = false;
+        window.addEventListener('popstate', () => {
+            if (!pmHistoryPushed) return;
+            pmHistoryPushed = false; // the browser already consumed our entry
+            pmClose();
+        });
 
         function pmInkColor() { return document.body.classList.contains('dark-theme') ? '#F2F2F7' : '#111111'; }
         function pmResolveColor(c) { return c === 'ink' ? pmInkColor() : c; }
@@ -21067,6 +21079,10 @@
             // moment so its release can't land on a button in the sheet.
             ov.classList.add('pm-arming');
             ov.classList.add('open');
+            if (!pmHistoryPushed) {
+                history.pushState({ pmOpen: true }, '', location.href);
+                pmHistoryPushed = true;
+            }
             setTimeout(() => ov.classList.remove('pm-arming'), 400);
             pmFitCanvas();
         }
@@ -21076,6 +21092,14 @@
             if (ov) ov.classList.remove('open');
             pmState.strokes = [];
             pmState.cur = null;
+            // Closed via the X / Escape (not the back button): consume the entry we pushed so
+            // history stays balanced. suppressNextPopstateClose stops the sheet tracker from
+            // mistaking this programmatic pop for a real back press.
+            if (pmHistoryPushed) {
+                pmHistoryPushed = false;
+                suppressNextPopstateClose = true;
+                history.back();
+            }
         }
 
         // Reads how the browser actually wrapped the post text (one entry per visual line) so the

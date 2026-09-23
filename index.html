@@ -31704,7 +31704,6 @@
                 followBtn.style.display = isMe ? 'none' : 'flex';
                 updateUserInfoFollowButton(uid);
             }
-            if (followBtnSticky) followBtnSticky.style.display = isMe ? 'none' : 'flex';
             updateUserInfoSubscribeButton(uid, isMe, profile);
             initProfileStickyHeader(userInfoSheet, 'user-info-sticky-header', '.tm-profile-actions');
             buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
@@ -32076,12 +32075,26 @@
         }
 
         // Reflects whether I currently follow `uid` onto the profile sheet's toggle button.
+        // If I already follow them AND they've set a subscription price, the Follow/Following
+        // button is replaced by Subscribe entirely (rather than showing both) — following someone
+        // is the free tier; once that's already true, subscribing is the next meaningful action.
         function updateUserInfoFollowButton(uid) {
             const followBtn = document.getElementById('btn-user-info-follow');
             const followBtnText = document.getElementById('btn-user-info-follow-text');
             const followBtnIcon = document.getElementById('btn-user-info-follow-icon');
+            const followBtnSticky = document.getElementById('btn-user-info-follow-sticky');
+            const followBtnStickyText = document.getElementById('btn-user-info-follow-sticky-text');
             if (!followBtn || !followBtnText) return;
+            const isMe = auth.currentUser && uid === auth.currentUser.uid;
+            if (isMe) {
+                followBtn.style.display = 'none';
+                if (followBtnSticky) followBtnSticky.style.display = 'none';
+                return;
+            }
             const following = !!cachedContacts[uid];
+            const hasSubPrice = (cachedUsers[uid] || {}).creatorSubPrice > 0;
+            const replaceWithSubscribe = following && hasSubPrice;
+            followBtn.style.display = replaceWithSubscribe ? 'none' : 'flex';
             followBtnText.textContent = following ? 'Following' : 'Follow';
             followBtn.classList.toggle('btn-primary', !following);
             followBtn.classList.toggle('btn-outline', following);
@@ -32092,9 +32105,8 @@
             }
             // Mirror onto the floating sticky-header Follow button too, so it never drifts out
             // of sync with the real one it's a compact stand-in for.
-            const followBtnSticky = document.getElementById('btn-user-info-follow-sticky');
-            const followBtnStickyText = document.getElementById('btn-user-info-follow-sticky-text');
             if (followBtnSticky && followBtnStickyText) {
+                followBtnSticky.style.display = replaceWithSubscribe ? 'none' : 'flex';
                 followBtnStickyText.textContent = following ? 'Following' : 'Follow';
                 followBtnSticky.classList.toggle('btn-primary', !following);
                 followBtnSticky.classList.toggle('btn-outline', following);

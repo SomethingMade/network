@@ -1527,6 +1527,34 @@
         .feed-composer-audience:hover { background: var(--bg-alt); }
         .feed-composer-audience svg { flex-shrink: 0; }
         .feed-composer-audience.followers-only { color: var(--primary-blue); background: rgba(var(--primary-rgb), 0.1); }
+
+        /* Creator-subscription paywall (X-style locked post teaser) */
+        .feed-post-card.feed-post-locked { position: relative; overflow: hidden; }
+        .feed-post-card.feed-post-locked .feed-post-body,
+        .feed-post-card.feed-post-locked .x-media-grid,
+        .feed-post-card.feed-post-locked .feed-post-video-wrap,
+        .feed-post-card.feed-post-locked .feed-link-preview,
+        .feed-post-card.feed-post-locked .quote-embed-card {
+            filter: blur(14px);
+            user-select: none;
+            pointer-events: none;
+        }
+        .feed-post-lock-overlay {
+            position: absolute; inset: 0; z-index: 3;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 6px; padding: 20px; text-align: center;
+            background: linear-gradient(180deg, rgba(var(--primary-rgb),0.02) 0%, var(--bg-surface) 55%);
+            color: var(--text-primary);
+        }
+        .feed-post-lock-overlay .feed-lock-title { font-size: 14.5px; font-weight: 700; margin: 4px 0 0; }
+        .feed-post-lock-overlay .feed-lock-sub { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 4px; max-width: 260px; }
+        .feed-post-lock-overlay .feed-lock-subscribe-btn { padding: 8px 22px; font-size: 13.5px; }
+        #subscribe-modal-overlay .custom-modal, #set-sub-price-modal-overlay .custom-modal { text-align: center; }
+        .sub-price-input-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 14px 0; }
+        .sub-price-input-row span { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+        .sub-price-input-row input { width: 110px; font-size: 22px; font-weight: 700; text-align: center; border: none; border-bottom: 2px solid var(--border-color); background: transparent; color: var(--text-primary); padding: 4px 0; }
+        .sub-price-input-row input:focus { outline: none; border-color: var(--primary-blue); }
+        #subscribe-modal-price { font-size: 26px; font-weight: 800; margin: 10px 0 2px; }
         .feed-composer-ad-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px 50px; padding: 10px 14px; border-radius: 14px; background: rgba(212, 160, 23, 0.08); border: 1px solid rgba(212, 160, 23, 0.3); }
         .feed-composer-ad-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #B8860B; }
         .feed-composer-ad-panel { margin: 8px 0 2px 50px; padding: 12px 14px; border-radius: 14px; background: var(--bg-input); display: flex; flex-direction: column; gap: 8px; }
@@ -5992,6 +6020,50 @@
         </div>
     </div>
 
+    <!-- Shown to a reader tapping "Subscribe" on a locked post or a creator's profile. Price is
+         filled in from creatorSubs/{uid}/price at open time (see openSubscribeModal). -->
+    <div id="subscribe-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3 id="subscribe-modal-heading">Subscribe to <span id="subscribe-modal-name">this creator</span></h3>
+            <p id="subscribe-modal-price">R0/mo</p>
+            <p id="subscribe-modal-desc" style="font-size:12.5px; color:var(--text-secondary); margin:0 0 4px;">Unlocks all of their subscribers-only posts. Billed monthly, cancel anytime.</p>
+            <div class="modal-actions">
+                <button type="button" id="subscribe-modal-cancel" class="btn-pill btn-outline">Close</button>
+                <button type="button" id="subscribe-modal-confirm" class="btn-pill btn-primary">Continue to payment</button>
+            </div>
+            <button type="button" id="subscribe-modal-unsubscribe" class="btn-pill btn-outline" style="display:none; margin-top:10px; width:100%; color:var(--danger-red); border-color:var(--danger-red);">Cancel subscription</button>
+        </div>
+    </div>
+
+    <!-- Lets a creator set/update the monthly price for their subscribers-only posts. Saving
+         calls the ensureStitchPlan Cloud Function, which creates (or updates) the matching
+         Stitch Subscription Plan server-side — see functions/index.js. -->
+    <div id="set-sub-price-modal-overlay" class="modal-overlay">
+        <div class="custom-modal">
+            <h3>Subscription Price</h3>
+            <p style="font-size:12.5px; color:var(--text-secondary); margin:0;">What readers pay per month to see your "Subscribers only" posts.</p>
+            <div class="sub-price-input-row">
+                <span>R</span>
+                <input type="number" id="set-sub-price-input" min="1" step="1" inputmode="decimal" placeholder="0">
+                <span>/mo</span>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="set-sub-price-cancel" class="btn-pill btn-outline">Cancel</button>
+                <button type="button" id="set-sub-price-save" class="btn-pill btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Creator's own subscriber list — reads creatorSubscribers/{myUid}, which security rules
+         restrict to the owner only. Rows reuse the .chat-item pattern from renderContactRow. -->
+    <div id="my-subscribers-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet">
+            <div class="sheet-handle"></div>
+            <div class="wa-header-title">Subscribers</div>
+            <div id="my-subscribers-list-container" style="overflow-y:auto; -webkit-overflow-scrolling:touch;"></div>
+        </div>
+    </div>
+
     <div class="post-composer-overlay" id="post-composer-overlay">
         <div class="post-composer-header">
             <button type="button" class="post-composer-close" id="post-composer-close" title="Close">
@@ -7058,6 +7130,8 @@
 
                 <div class="ig-profile-actions-row">
                     <button type="button" id="btn-edit-profile" class="btn-pill btn-primary">Edit Profile</button>
+                    <button type="button" id="btn-sub-price" class="btn-pill btn-outline" title="Set what subscribers pay to see your subscribers-only posts">Subscription Price</button>
+                    <button type="button" id="btn-my-subscribers" class="btn-pill btn-outline" style="display:none;">Subscribers · <span id="btn-my-subscribers-count">0</span></button>
                     <button type="button" id="btn-share-profile" class="btn-pill btn-outline">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
                         Share Profile
@@ -7255,6 +7329,10 @@
                     <button type="button" id="btn-user-info-message" class="btn-pill btn-outline">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                         <span>Message</span>
+                    </button>
+                    <button type="button" id="btn-user-info-subscribe" class="btn-pill btn-outline" style="display:none;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <span id="btn-user-info-subscribe-text">Subscribe</span>
                     </button>
                 </div>
 
@@ -15164,6 +15242,17 @@
         // stopHabaAIVoiceCall) — separate from habaAIChat, which powers the text-chat AI.
         const startHabaAIVoiceCallCallable = httpsCallable(functionsClient, 'startHabaAIVoiceCall');
         const stopHabaAIVoiceCallCallable = httpsCallable(functionsClient, 'stopHabaAIVoiceCall');
+        // Creator-subscription paywall, backed by Stitch (stitch.money) recurring collections.
+        // ensureStitchPlan: creator sets/changes their monthly price -> creates or updates their
+        // Stitch Subscription Plan and saves { price, stitchPlanId } to creatorSubs/{uid}.
+        // startStitchSubscription: a reader taps Subscribe -> creates a Stitch Subscription
+        // Collection against the creator's plan and returns the redirect_uri the reader
+        // completes payment at. Unlocking itself happens server-side in the Stitch webhook
+        // (stitchSubscriptionWebhook), which writes mySubscriptions/{reader}/{creator}.active =
+        // true once Stitch confirms the collection — see functions/index.js.
+        const ensureStitchPlanCallable = httpsCallable(functionsClient, 'ensureStitchPlan');
+        const startStitchSubscriptionCallable = httpsCallable(functionsClient, 'startStitchSubscription');
+        const cancelStitchSubscriptionCallable = httpsCallable(functionsClient, 'cancelStitchSubscription');
 
         // --- HABA AI ASSISTANT (xAI/Grok, via Haba's own habaAIChat Cloud Function) ---
         const AI_UID = "goza-ai-assistant";
@@ -15805,6 +15894,248 @@
             if (post.uid === user.uid) return true;
             return !!(post.uid && cachedContacts[post.uid]);
         }
+
+        // --- CREATOR SUBSCRIPTION PAYWALL ---
+        // mySubscriptions/{myUid}/{creatorUid} = { active: true, since, planId, collectionId } is
+        // written server-side only (by the stitchSubscriptionWebhook Cloud Function, once Stitch
+        // confirms a completed collection) — the client never sets this itself. See
+        // functions/index.js for the backend half of this feature.
+        let cachedMySubscriptions = {};
+        let cachedMySubscribers = {}; // creator-side: uids of people subscribed to ME
+        function hasActiveSubscriptionTo(creatorUid) {
+            const user = auth.currentUser;
+            if (!user || !creatorUid) return false;
+            if (creatorUid === user.uid) return true; // a creator always sees their own locked posts
+            const sub = cachedMySubscriptions[creatorUid];
+            return !!(sub && sub.active);
+        }
+        // A 'subscribers'-only post still appears in the feed (unlike a 'followers'-only post,
+        // which canViewPost hides outright) — it's rendered blurred with a "Subscribe to unlock"
+        // overlay, the same teaser pattern X uses, rather than being hidden entirely.
+        function isPaywalledForMe(post) {
+            if (!post || post.visibility !== 'subscribers') return false;
+            return !hasActiveSubscriptionTo(post.uid);
+        }
+        function applyPaywallLock(card, post) {
+            const existingOverlay = card.querySelector('.feed-post-lock-overlay');
+            if (existingOverlay) existingOverlay.remove();
+            card.classList.remove('feed-post-locked');
+            if (!isPaywalledForMe(post)) return;
+            card.classList.add('feed-post-locked');
+            const author = cachedUsers[post.uid] || {};
+            const overlay = document.createElement('div');
+            overlay.className = 'feed-post-lock-overlay';
+            overlay.innerHTML = `
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <p class="feed-lock-title">Subscribers only</p>
+                <p class="feed-lock-sub">Subscribe to ${escapeHtmlForPost(author.name || post.name || 'this creator')} to see this post</p>
+                <button type="button" class="btn-pill btn-primary feed-lock-subscribe-btn">Subscribe</button>
+            `;
+            overlay.querySelector('.feed-lock-subscribe-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openSubscribeModal(post.uid);
+            });
+            overlay.addEventListener('click', (e) => e.stopPropagation());
+            card.appendChild(overlay);
+        }
+        function updateUserInfoSubscribeButton(uid, isMe, profile) {
+            const subBtn = document.getElementById('btn-user-info-subscribe');
+            if (!subBtn) return;
+            const price = profile && profile.creatorSubPrice;
+            if (isMe || !(price > 0)) { subBtn.style.display = 'none'; return; }
+            subBtn.style.display = 'flex';
+            document.getElementById('btn-user-info-subscribe-text').textContent =
+                hasActiveSubscriptionTo(uid) ? 'Subscribed ✓' : `Subscribe · R${price}/mo`;
+        }
+        document.getElementById('btn-user-info-subscribe').addEventListener('click', () => {
+            if (userInfoSheetUid) openSubscribeModal(userInfoSheetUid);
+        });
+
+        // Called whenever cachedMySubscriptions changes (subscribe/unsubscribe confirmed) — walks
+        // currently-rendered cards rather than re-rendering the whole feed.
+        function refreshPaywallLocks() {
+            document.querySelectorAll('.feed-post-card[data-uid]').forEach(card => {
+                const post = cachedPosts[card.dataset.contentPostId || card.dataset.postId];
+                if (post) applyPaywallLock(card, post);
+            });
+            if (userInfoSheetUid) {
+                const isMe = auth.currentUser && userInfoSheetUid === auth.currentUser.uid;
+                updateUserInfoSubscribeButton(userInfoSheetUid, isMe, cachedUsers[userInfoSheetUid] || {});
+            }
+        }
+
+        let subscribeModalTargetUid = null;
+        async function openSubscribeModal(creatorUid) {
+            const user = auth.currentUser;
+            if (!user || !creatorUid || creatorUid === user.uid) return;
+            subscribeModalTargetUid = creatorUid;
+            const author = cachedUsers[creatorUid] || {};
+            const heading = document.getElementById('subscribe-modal-heading');
+            const priceEl = document.getElementById('subscribe-modal-price');
+            const descEl = document.getElementById('subscribe-modal-desc');
+            const confirmBtn = document.getElementById('subscribe-modal-confirm');
+            const unsubBtn = document.getElementById('subscribe-modal-unsubscribe');
+            document.getElementById('subscribe-modal-name').textContent = author.name || 'this creator';
+
+            if (hasActiveSubscriptionTo(creatorUid)) {
+                heading.firstChild.textContent = 'Subscribed to ';
+                priceEl.textContent = '✓ Active';
+                descEl.textContent = "You'll keep seeing their subscribers-only posts until you cancel.";
+                confirmBtn.style.display = 'none';
+                unsubBtn.style.display = 'block';
+                document.getElementById('subscribe-modal-overlay').classList.add('active');
+                return;
+            }
+            let priceInfo;
+            try {
+                const snap = await get(ref(database, `creatorSubs/${creatorUid}`));
+                priceInfo = snap.exists() ? snap.val() : null;
+            } catch (e) { priceInfo = null; }
+            if (!priceInfo || !(priceInfo.price > 0)) {
+                showCustomModal('Not available', "This creator hasn't set up subscriptions.");
+                return;
+            }
+            heading.firstChild.textContent = 'Subscribe to ';
+            priceEl.textContent = `R${priceInfo.price}/mo`;
+            descEl.textContent = 'Unlocks all of their subscribers-only posts. Billed monthly, cancel anytime.';
+            confirmBtn.style.display = 'block';
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Continue to payment';
+            unsubBtn.style.display = 'none';
+            document.getElementById('subscribe-modal-overlay').classList.add('active');
+        }
+        (function initSubscribeModal() {
+            const overlay = document.getElementById('subscribe-modal-overlay');
+            const confirmBtn = document.getElementById('subscribe-modal-confirm');
+            const unsubBtn = document.getElementById('subscribe-modal-unsubscribe');
+            document.getElementById('subscribe-modal-cancel').addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+            confirmBtn.addEventListener('click', async () => {
+                const creatorUid = subscribeModalTargetUid;
+                if (!creatorUid) return;
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Starting checkout…';
+                try {
+                    // Returns a Stitch-hosted payment URL (redirect_uri already appended, pointed
+                    // back at this app) — see startStitchSubscription in functions/index.js.
+                    const res = await startStitchSubscriptionCallable({ creatorUid });
+                    const redirectUrl = res?.data?.redirectUrl;
+                    if (!redirectUrl) throw new Error('No redirect URL returned');
+                    window.location.href = redirectUrl;
+                } catch (e) {
+                    notify(e?.message || 'Could not start checkout', 'error');
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Continue to payment';
+                }
+            });
+            unsubBtn.addEventListener('click', async () => {
+                const creatorUid = subscribeModalTargetUid;
+                if (!creatorUid) return;
+                const confirmed = await showCustomModal('Cancel subscription?', "You'll lose access to their subscribers-only posts.", true);
+                if (!confirmed) return;
+                unsubBtn.disabled = true;
+                unsubBtn.textContent = 'Cancelling…';
+                try {
+                    await cancelStitchSubscriptionCallable({ creatorUid });
+                    notify('Subscription cancelled');
+                    overlay.classList.remove('active');
+                } catch (e) {
+                    notify(e?.message || 'Could not cancel subscription', 'error');
+                } finally {
+                    unsubBtn.disabled = false;
+                    unsubBtn.textContent = 'Cancel subscription';
+                }
+            });
+        })();
+
+        (function initSetSubPriceModal() {
+            const overlay = document.getElementById('set-sub-price-modal-overlay');
+            const input = document.getElementById('set-sub-price-input');
+            const saveBtn = document.getElementById('set-sub-price-save');
+            const openBtn = document.getElementById('btn-sub-price');
+            if (openBtn) {
+                openBtn.addEventListener('click', async () => {
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    let existing = null;
+                    try {
+                        const snap = await get(ref(database, `creatorSubs/${user.uid}`));
+                        existing = snap.exists() ? snap.val() : null;
+                    } catch (e) { existing = null; }
+                    input.value = existing && existing.price ? existing.price : '';
+                    overlay.classList.add('active');
+                });
+            }
+            document.getElementById('set-sub-price-cancel').addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+            saveBtn.addEventListener('click', async () => {
+                const price = parseFloat(input.value);
+                if (!(price > 0)) { notify('Enter a price above $0', 'error'); return; }
+                saveBtn.disabled = true;
+                saveBtn.textContent = 'Saving…';
+                try {
+                    // Creates/updates the Stitch Subscription Plan for this price server-side and
+                    // saves { price, stitchPlanId } to creatorSubs/{uid} — see ensureStitchPlan in
+                    // functions/index.js.
+                    await ensureStitchPlanCallable({ price });
+                    const user = auth.currentUser;
+                    if (user && cachedUsers[user.uid]) cachedUsers[user.uid].creatorSubPrice = price;
+                    notify('Subscription price saved');
+                    overlay.classList.remove('active');
+                } catch (e) {
+                    notify(e?.message || 'Could not save price', 'error');
+                } finally {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save';
+                }
+            });
+        })();
+
+        async function renderMySubscribersList() {
+            const container = document.getElementById('my-subscribers-list-container');
+            const uids = Object.keys(cachedMySubscribers);
+            if (!uids.length) {
+                container.innerHTML = '<p class="empty-msg">No subscribers yet.</p>';
+                return;
+            }
+            container.innerHTML = '';
+            // Fetch any profiles not already cached (most will already be, from the feed).
+            const missing = uids.filter(uid => !cachedUsers[uid]);
+            if (missing.length) {
+                await Promise.all(missing.map(async (uid) => {
+                    try {
+                        const snap = await get(ref(database, `users/${uid}`));
+                        if (snap.exists()) cachedUsers[uid] = snap.val();
+                    } catch (e) { /* leave as Unknown User below */ }
+                }));
+            }
+            uids.forEach((uid) => {
+                const profile = cachedUsers[uid] || { name: 'Unknown User', photoURL: '' };
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                item.dataset.uid = uid;
+                item.innerHTML = `
+                    <div class="avatar" style="background-image: url('${profile.photoURL || DEFAULT_AVATAR_URL}'); border: none;"></div>
+                    <div class="chat-preview">
+                        <h3>${profile.name || 'Unknown User'}${verifiedBadgeFor(uid, false)}</h3>
+                        <p>Subscriber</p>
+                    </div>
+                `;
+                item.addEventListener('click', () => {
+                    document.getElementById('my-subscribers-sheet-overlay').classList.remove('active');
+                    openUserProfileSheet(uid);
+                });
+                container.appendChild(item);
+            });
+        }
+        (function initMySubscribersSheet() {
+            const overlay = document.getElementById('my-subscribers-sheet-overlay');
+            const openBtn = document.getElementById('btn-my-subscribers');
+            const handle = overlay.querySelector('.sheet-handle');
+            if (openBtn) openBtn.addEventListener('click', () => { renderMySubscribersList(); overlay.classList.add('active'); });
+            if (handle) handle.addEventListener('click', () => overlay.classList.remove('active'));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('active'); });
+        })();
         let composerTaggedUids = new Set(); // uids picked via the Tag People bottom sheet
         let activeCommentsPostId = null;
         // Tracks whether the currently-open post-comments sheet is showing the full X-style
@@ -18172,17 +18503,37 @@
 
             const AUDIENCE_ICONS = {
                 everyone: '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>',
-                followers: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>'
+                followers: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+                subscribers: '<rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
             };
+            const AUDIENCE_LABELS = { everyone: 'Everyone', followers: 'Followers', subscribers: 'Subscribers' };
+            const AUDIENCE_TITLES = {
+                everyone: 'Anyone can see this post',
+                followers: 'Only your followers can see this post',
+                subscribers: 'Only your paid subscribers can see this post'
+            };
+            const AUDIENCE_ORDER = ['everyone', 'followers', 'subscribers'];
             function updateComposerAudienceUI() {
-                const isFollowers = feedComposerVisibility === 'followers';
-                audienceIcon.innerHTML = AUDIENCE_ICONS[isFollowers ? 'followers' : 'everyone'];
-                audienceLabel.textContent = isFollowers ? 'Followers' : 'Everyone';
-                audienceBtn.classList.toggle('followers-only', isFollowers);
-                audienceBtn.title = isFollowers ? 'Only your followers can see this post' : 'Anyone can see this post';
+                const mode = AUDIENCE_ORDER.includes(feedComposerVisibility) ? feedComposerVisibility : 'everyone';
+                audienceIcon.innerHTML = AUDIENCE_ICONS[mode];
+                audienceLabel.textContent = AUDIENCE_LABELS[mode];
+                audienceBtn.classList.toggle('followers-only', mode !== 'everyone');
+                audienceBtn.title = AUDIENCE_TITLES[mode];
             }
             audienceBtn.addEventListener('click', () => {
-                feedComposerVisibility = feedComposerVisibility === 'followers' ? 'everyone' : 'followers';
+                const myProfile = cachedUsers[auth.currentUser?.uid] || {};
+                const nextIdx = (AUDIENCE_ORDER.indexOf(feedComposerVisibility) + 1) % AUDIENCE_ORDER.length;
+                const next = AUDIENCE_ORDER[nextIdx];
+                // Subscribers-only posts require a subscription price to already be set —
+                // otherwise there's nothing for a reader to pay to unlock. Send the poster to
+                // set one first instead of silently publishing an unlockable-for-no-one post.
+                if (next === 'subscribers' && !(myProfile.creatorSubPrice > 0)) {
+                    notify('Set a subscription price first (Profile → Subscription Price)', 'error');
+                    feedComposerVisibility = 'everyone';
+                    updateComposerAudienceUI();
+                    return;
+                }
+                feedComposerVisibility = next;
                 updateComposerAudienceUI();
             });
             updateComposerAudienceUI();
@@ -18313,7 +18664,7 @@
                         poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         linkPreview: linkPreview,
                         mentions: mentionedUids.size ? mentionsMap : null,
-                        visibility: pendingVisibility === 'followers' ? 'followers' : 'everyone',
+                        visibility: (pendingVisibility === 'followers' || pendingVisibility === 'subscribers') ? pendingVisibility : 'everyone',
                         isAd: pendingIsAd || null,
                         adCta: pendingIsAd ? pendingAdCta : null,
                         adUrl: pendingIsAd ? pendingAdUrl : null,
@@ -20168,6 +20519,7 @@
             if (isQuote) fillQuoteEmbed(card, originalId);
             if (isCommentQuote) fillCommentQuoteEmbed(card, wrapperPost.quotedCommentPostId, wrapperPost.quotedCommentId);
             getFeedImpressionObserver().observe(card);
+            applyPaywallLock(card, post);
             if (textHtml) setExpandableFeedText(card.querySelector('.feed-post-text'), post.text, FEED_CAPTION_TRUNCATE_LIMIT);
             const musicChipSpan = card.querySelector('.feed-post-music-chip span');
             if (musicChipSpan && post.music) {
@@ -31336,6 +31688,7 @@
                 updateUserInfoFollowButton(uid);
             }
             if (followBtnSticky) followBtnSticky.style.display = isMe ? 'none' : 'flex';
+            updateUserInfoSubscribeButton(uid, isMe, profile);
             initProfileStickyHeader(userInfoSheet, 'user-info-sticky-header', '.tm-profile-actions');
             buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
             buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
@@ -40920,6 +41273,29 @@
             onValue(ref(database, `not_interested/${user.uid}`), (snap) => {
                 cachedNotInterested = snap.exists() ? snap.val() : {};
                 removeHiddenAuthorCardsFromFeed();
+            });
+
+            // Who I'm actively subscribed to, keyed by creator uid. Written only by
+            // stitchSubscriptionWebhook (Cloud Function) once Stitch confirms payment — see the
+            // CREATOR SUBSCRIPTION PAYWALL section above for hasActiveSubscriptionTo/applyPaywallLock.
+            onValue(ref(database, `mySubscriptions/${user.uid}`), (snap) => {
+                cachedMySubscriptions = snap.exists() ? snap.val() : {};
+                refreshPaywallLocks();
+            });
+
+            // My own subscribers (readable only by me, per security rules). Just count + list —
+            // see initMySubscribersSheet for the sheet this feeds.
+            onValue(ref(database, `creatorSubscribers/${user.uid}`), (snap) => {
+                cachedMySubscribers = snap.exists() ? snap.val() : {};
+                const count = Object.keys(cachedMySubscribers).length;
+                const btn = document.getElementById('btn-my-subscribers');
+                if (btn) {
+                    btn.style.display = count > 0 ? 'inline-flex' : 'none';
+                    document.getElementById('btn-my-subscribers-count').textContent = count;
+                }
+                if (document.getElementById('my-subscribers-sheet-overlay').classList.contains('active')) {
+                    renderMySubscribersList();
+                }
             });
 
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {

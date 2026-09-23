@@ -6032,7 +6032,7 @@
                 <button type="button" id="subscribe-modal-cancel" class="btn-pill btn-outline">Close</button>
                 <button type="button" id="subscribe-modal-confirm" class="btn-pill btn-primary">Continue to payment</button>
             </div>
-            <button type="button" id="subscribe-modal-unsubscribe" class="btn-pill btn-outline" style="display:none; margin-top:10px; width:100%; color:var(--danger-red); border-color:var(--danger-red);">Cancel subscription</button>
+            <button type="button" id="subscribe-modal-unsubscribe" class="btn-pill btn-outline" style="display:none; margin-top:10px; width:100%; color:var(--danger-red); border-color:var(--danger-red);">End access now</button>
         </div>
     </div>
 
@@ -15914,7 +15914,13 @@
             if (!user || !creatorUid) return false;
             if (creatorUid === user.uid) return true; // a creator always sees their own locked posts
             const sub = cachedMySubscriptions[creatorUid];
-            return !!(sub && sub.active);
+            if (!sub || !sub.active) return false;
+            // One-off payments (see functions/index.js) don't auto-renew or get cancelled by
+            // Stitch — access just runs out after expiresAt. Treat a missing expiresAt (shouldn't
+            // happen post-webhook, but just in case) as still active rather than locking someone
+            // out incorrectly.
+            if (sub.expiresAt && sub.expiresAt < Date.now()) return false;
+            return true;
         }
         // A 'subscribers'-only post still appears in the feed (unlike a 'followers'-only post,
         // which canViewPost hides outright) — it's rendered blurred with a "Subscribe to unlock"
@@ -15987,7 +15993,11 @@
             if (hasActiveSubscriptionTo(creatorUid)) {
                 heading.firstChild.textContent = 'Subscribed to ';
                 priceEl.textContent = '✓ Active';
-                descEl.textContent = "You'll keep seeing their subscribers-only posts until you cancel.";
+                const sub = cachedMySubscriptions[creatorUid];
+                const expiryText = sub && sub.expiresAt
+                    ? ` It runs until ${new Date(sub.expiresAt).toLocaleDateString()} — this doesn't auto-renew, you'll need to subscribe again after that to keep access.`
+                    : '';
+                descEl.textContent = `You'll see their subscribers-only posts.${expiryText}`;
                 confirmBtn.style.display = 'none';
                 unsubBtn.style.display = 'block';
                 document.getElementById('subscribe-modal-overlay').classList.add('active');
@@ -16038,19 +16048,19 @@
             unsubBtn.addEventListener('click', async () => {
                 const creatorUid = subscribeModalTargetUid;
                 if (!creatorUid) return;
-                const confirmed = await showCustomModal('Cancel subscription?', "You'll lose access to their subscribers-only posts.", true);
+                const confirmed = await showCustomModal('End access now?', "You already paid for this period — this just locks their posts again early, it doesn't refund you.", true);
                 if (!confirmed) return;
                 unsubBtn.disabled = true;
                 unsubBtn.textContent = 'Cancelling…';
                 try {
                     await cancelStitchSubscriptionCallable({ creatorUid });
-                    notify('Subscription cancelled');
+                    notify('Access ended');
                     overlay.classList.remove('active');
                 } catch (e) {
                     notify(e?.message || 'Could not cancel subscription', 'error');
                 } finally {
                     unsubBtn.disabled = false;
-                    unsubBtn.textContent = 'Cancel subscription';
+                    unsubBtn.textContent = 'End access now';
                 }
             });
         })();

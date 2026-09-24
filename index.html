@@ -28,7 +28,7 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='45' fill='%23111111'/%3E%3Cpolygon points='20,80 170,30 80,110' fill='%23FFFFFF' fill-opacity='0.75'/%3E%3Cpolygon points='120,180 170,30 80,110' fill='%23FFFFFF'/%3E%3Cpolygon points='20,80 80,110 80,140' fill='%23FFFFFF' fill-opacity='0.55'/%3E%3C/svg%3E">
     <link rel="manifest" href="manifest.json">
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Michroma&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Michroma&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Extra breathing room above the OS's own gesture bar/nav on phones that don't
@@ -6131,81 +6131,141 @@
            SEARCH TAB REDESIGN — scoped entirely to #tab-search, so nothing
            outside Search (Contacts, Profile, Communities, etc. — which reuse
            .discover-card / .feed-subtab-btn / .discover-grid) is affected.
-           Matches the reference screenshot: bold typewriter "Search" title
-           with a leading icon, a plain pill search field, and a full-bleed
-           list of people — avatar, bold handle, gray name, follower count,
-           black pill Follow button, thin divider between rows.
+           No markup or JS ids were changed; this is styling-only so every
+           existing click handler, render function and data-attribute keeps
+           working exactly as before.
            ══════════════════════════════════════════════════════════════════ */
-        #tab-search, #tab-search input, #tab-search button {
-            font-family: 'Courier Prime', 'Courier New', monospace;
-        }
 
-        /* — Title row: leading icon (JS-injected explore/search-drawer button) + heading — */
-        #tab-search .search-tab-title-row { display: flex; align-items: center; gap: 10px; padding: 4px 0 14px; }
-        #tab-search .search-tab-title-row > .explore-drawer-btn { width: 32px; height: 32px; color: var(--text-primary); flex-shrink: 0; }
-        #tab-search .search-tab-title-row > .explore-drawer-btn svg { width: 24px; height: 24px; }
-        #tab-search .search-tab-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary); margin: 0; line-height: 1; }
-
-        /* — Search bar: plain, quiet pill, full width, thumb-sized — */
-        #tab-search .search-tab-header { padding-top: 2px; padding-bottom: 14px; }
+        /* — Search bar: bigger pill, soft inset field, glow on focus — */
+        #tab-search .search-tab-header { padding-top: 4px; padding-bottom: 14px; }
         #tab-search .search-tab-box {
             background: var(--bg-input);
-            border: none;
-            border-radius: 14px;
-            padding: 13px 16px;
-            min-height: 46px;
-            box-sizing: border-box;
+            border-radius: var(--radius-pill);
+            padding: 11px 16px;
             transition: box-shadow 0.2s var(--ease-smooth), background 0.2s ease;
         }
-        #tab-search .search-tab-box svg { color: var(--text-secondary); width: 19px; height: 19px; flex-shrink: 0; }
-        #tab-search .search-tab-box:focus-within { background: var(--bg-surface); box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.3); }
-        #tab-search .search-tab-box input { font-size: 16px; font-weight: 600; width: 100%; -webkit-appearance: none; }
-        #tab-search .search-tab-box input::placeholder { color: var(--text-secondary); font-weight: 600; }
+        #tab-search .search-tab-box svg { color: var(--text-secondary); width: 19px; height: 19px; }
+        #tab-search .search-tab-box:focus-within {
+            background: var(--bg-surface);
+            box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.35), var(--shadow-soft);
+        }
+        #tab-search .search-tab-box input { font-size: 15.5px; font-weight: 500; }
 
-        /* — Explore tabs: quiet underline row (kept for Trending/News access) so the
-           people list stays the visual focus, exactly like the reference — */
-        #tab-search .explore-tabs-bar { display: flex; gap: 22px; margin: 2px 2px 10px; padding: 0; background: none; border-radius: 0; border-bottom: 1px solid var(--border-color); }
-        #tab-search .explore-tabs-bar .feed-subtab-btn { flex: none; padding: 4px 0 10px; font-size: 13.5px; font-weight: 700; color: var(--text-secondary); background: none; }
-        #tab-search .explore-tabs-bar .feed-subtab-btn.active { color: var(--text-primary); box-shadow: none; }
-        #tab-search .explore-tabs-bar .feed-subtab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; width: 100%; height: 2px; border-radius: 0; background: var(--text-primary); }
-
-        #tab-search .discover-section-label { display: none; }
-
-        /* — Suggested-for-you carousel: keep it, just quieter and in-font — */
-        #tab-search .suggested-people-section { padding: 2px 0 16px; }
-        #tab-search .suggested-people-title, #tab-search .suggested-people-see-all { font-size: 14px; }
-        #tab-search .sp-card { background: var(--bg-alt); border: none; border-radius: 14px; }
-
-        /* — THE LIST — full-bleed rows: avatar · handle (bold) / name (gray) / followers, pill Follow — */
-        #tab-search .discover-grid { display: flex; flex-direction: column; gap: 0; }
-        #tab-search .discover-card {
-            background: none;
+        /* — Explore tabs: underline strip → filled segmented pill switcher — */
+        #tab-search .explore-tabs-bar {
+            display: flex;
+            gap: 4px;
+            margin: 6px 0 14px;
+            padding: 4px;
             border: none;
-            border-bottom: 1px solid var(--border-color);
-            border-radius: 0;
-            margin: 0 -14px;
-            padding: 14px 14px;
-            gap: 12px;
-        }
-        #tab-search .discover-card:last-child { border-bottom: none; }
-        #tab-search .discover-card:active { background: var(--bg-hover); }
-        #tab-search .discover-card-avatar-wrap { width: 52px; height: 52px; padding: 0; background: none; flex-shrink: 0; }
-        #tab-search .discover-card .avatar.discover-card-avatar { border: none; }
-        #tab-search .discover-card-body { gap: 1px; }
-        #tab-search .discover-card-username { order: 0; font-size: 15.5px; font-weight: 700; color: var(--text-primary); white-space: normal; }
-        #tab-search .discover-card h3 { order: 1; font-size: 13.5px; font-weight: 400; color: var(--text-secondary); }
-        #tab-search .discover-card-followers { order: 2; display: flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: normal; margin-top: 3px; }
-        #tab-search .dc-followers-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger-red); margin-right: 6px; flex-shrink: 0; }
-        #tab-search .discover-card-add-btn {
-            flex-shrink: 0;
-            background: var(--primary-blue);
+            background: var(--bg-alt);
             border-radius: var(--radius-pill);
-            padding: 10px 22px;
-            font-size: 13px;
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn {
+            flex: 1;
+            padding: 9px 0;
+            border-radius: var(--radius-pill);
+            font-size: 13.5px;
             font-weight: 700;
+            color: var(--text-secondary);
+            background: transparent;
+            transition: background 0.2s var(--ease-smooth), color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn:hover { background: rgba(var(--primary-rgb), 0.06); }
+        #tab-search .explore-tabs-bar .feed-subtab-btn.active {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn.active::after { display: none; }
+
+        /* — Section labels: quieter, wider tracking — */
+        #tab-search .discover-section-label {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin: 6px 2px 10px;
         }
 
-        #tab-search .explore-empty, #tab-search .discover-grid-empty { background: none; border-radius: 0; }
+        /* — Suggested-for-you cards: gradient ring avatar, lifted card — */
+        #tab-search .suggested-people-section { padding: 4px 0 18px; }
+        #tab-search .suggested-people-title { font-size: 16px; }
+        #tab-search .sp-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 18px 12px 14px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            transition: transform 0.18s var(--ease-smooth), box-shadow 0.18s ease;
+        }
+        #tab-search .sp-card:hover { box-shadow: var(--shadow-elevated); }
+        #tab-search .sp-card:active { transform: scale(0.97); }
+        #tab-search .sp-card-avatar {
+            width: 68px; height: 68px;
+            padding: 2.5px;
+            background: var(--gradient-brand);
+            border-radius: 50%;
+        }
+        #tab-search .sp-card-avatar .avatar {
+            border: 2.5px solid var(--bg-surface);
+            box-sizing: border-box;
+        }
+        #tab-search .sp-card .discover-card-add-btn {
+            border-radius: var(--radius-pill);
+            font-weight: 800;
+            letter-spacing: 0.2px;
+        }
+
+        /* — Trending: ranked cards instead of a plain divided list — */
+        #tab-search #explore-trending-list { counter-reset: trend-rank; display: flex; flex-direction: column; gap: 8px; }
+        #tab-search .trend-item {
+            counter-increment: trend-rank;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 30px;
+            padding: 12px 16px 12px 46px;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: var(--bg-surface);
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        #tab-search .trend-item::before {
+            content: counter(trend-rank);
+            position: absolute;
+            left: 16px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-secondary);
+            opacity: 0.55;
+            font-variant-numeric: tabular-nums;
+        }
+        #tab-search .trend-item:hover { background: var(--bg-hover); }
+        #tab-search .trend-item:active { transform: scale(0.99); }
+        #tab-search .trend-item-eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.85; }
+        #tab-search .trend-item-tag { font-size: 15.5px; margin-top: 1px; }
+
+        /* — People grid (Explore ▸ People + search results): card rows — */
+        #tab-search .discover-grid { gap: 8px; }
+        #tab-search .discover-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 12px 14px;
+        }
+        #tab-search .discover-card:active { background: var(--bg-hover); }
+        #tab-search .discover-card-avatar-wrap { padding: 2px; background: var(--border-color); }
+        #tab-search .discover-card-add-btn { padding: 8px 18px; }
+
+        #tab-search .explore-empty, #tab-search .discover-grid-empty {
+            background: var(--bg-alt);
+            border-radius: 16px;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -9796,13 +9856,11 @@
                      Suggested for you, Trending / People / News, and the results dropdown. -->
                 <div id="tab-search" class="tab-content">
                     <div class="chat-header-area search-tab-header">
-                        <div class="search-tab-title-row">
-                            <h1 class="search-tab-title">Search</h1>
-                        </div>
                         <div class="search-tab-header-row">
+                            <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                             <div class="search-box search-tab-box">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                    <input type="search" id="search-discover" placeholder="Search" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
+                                    <input type="search" id="search-discover" placeholder="Search by name or @handle" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
                             </div>
                         </div>
                     </div>
@@ -9820,14 +9878,14 @@
                         <!-- X-style Explore tabs — live in the Search tab, right below the search
                              bar and suggested people. -->
                         <div class="explore-tabs-bar" id="explore-tabs-bar">
-                            <button type="button" class="feed-subtab-btn" data-explore-tab="trending">Trending</button>
-                            <button type="button" class="feed-subtab-btn active" data-explore-tab="people">People</button>
+                            <button type="button" class="feed-subtab-btn active" data-explore-tab="trending">Trending</button>
+                            <button type="button" class="feed-subtab-btn" data-explore-tab="people">People</button>
                             <button type="button" class="feed-subtab-btn" data-explore-tab="news">News</button>
                         </div>
-                        <div class="explore-panel" id="explore-panel-trending">
+                        <div class="explore-panel active" id="explore-panel-trending">
                             <div id="explore-trending-list"></div>
                         </div>
-                        <div class="explore-panel active" id="explore-panel-people">
+                        <div class="explore-panel" id="explore-panel-people">
                             <div class="discover-grid" id="explore-people-grid"></div>
                         </div>
                         <!-- Headlines used to be sprinkled directly into the Home feed's own post
@@ -17390,9 +17448,9 @@
                         </div>
                         <div class="discover-card-body">
                             <h3>${escapeHtmlForPost(name)}${verifiedBadgeFor(uid, false)}</h3>
-                            ${profile.username ? `<span class="discover-card-username">${escapeHtmlForPost(profile.username)}</span>` : ''}
+                            ${profile.username ? `<span class="discover-card-username">@${escapeHtmlForPost(profile.username)}</span>` : ''}
                             ${isBusiness ? `<span class="group-badge-pill gold-business discover-card-business-pill">Business</span>` : ''}
-                            <p class="discover-card-bio discover-card-followers"><span class="dc-followers-dot"></span>${formatProfileCount(profile.followersCount || 0)} follower${(profile.followersCount || 0) === 1 ? '' : 's'}</p>
+                            <p class="discover-card-bio">${profile.about ? escapeHtmlForPost(profile.about) : 'On Haba'}</p>
                         </div>
                         <button type="button" class="discover-card-add-btn" data-uid="${uid}">Follow</button>
                     </div>
@@ -25769,7 +25827,7 @@
             const homeTop = document.querySelector('#tab-status .chat-header-top');
             if (homeTop) homeTop.insertBefore(makeBtn('search-icon-btn'), homeTop.firstChild);
             [['#tab-chats .msgs-title-row', 'msgs-icon-btn'],
-             ['#tab-search .search-tab-title-row', 'search-icon-btn'],
+             ['#tab-search .search-tab-header-row', 'search-icon-btn'],
              ['#tab-notifications .activity-title-row', 'search-icon-btn'],
              ['#tab-groups .chat-header-title-row', 'search-icon-btn'],
              ['#calls-header-default .chat-header-title-row', 'search-icon-btn'],

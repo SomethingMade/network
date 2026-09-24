@@ -6125,6 +6125,148 @@
         @keyframes applockShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
         .pin-shake { animation: applockShake 0.5s ease; }
     </style>
+
+    <style>
+        /* ══════════════════════════════════════════════════════════════════
+           SEARCH TAB REDESIGN — scoped entirely to #tab-search, so nothing
+           outside Search (Contacts, Profile, Communities, etc. — which reuse
+           .discover-card / .feed-subtab-btn / .discover-grid) is affected.
+           No markup or JS ids were changed; this is styling-only so every
+           existing click handler, render function and data-attribute keeps
+           working exactly as before.
+           ══════════════════════════════════════════════════════════════════ */
+
+        /* — Search bar: bigger pill, soft inset field, glow on focus — */
+        #tab-search .search-tab-header { padding-top: 4px; padding-bottom: 14px; }
+        #tab-search .search-tab-box {
+            background: var(--bg-input);
+            border-radius: var(--radius-pill);
+            padding: 11px 16px;
+            transition: box-shadow 0.2s var(--ease-smooth), background 0.2s ease;
+        }
+        #tab-search .search-tab-box svg { color: var(--text-secondary); width: 19px; height: 19px; }
+        #tab-search .search-tab-box:focus-within {
+            background: var(--bg-surface);
+            box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.35), var(--shadow-soft);
+        }
+        #tab-search .search-tab-box input { font-size: 15.5px; font-weight: 500; }
+
+        /* — Explore tabs: underline strip → filled segmented pill switcher — */
+        #tab-search .explore-tabs-bar {
+            display: flex;
+            gap: 4px;
+            margin: 6px 0 14px;
+            padding: 4px;
+            border: none;
+            background: var(--bg-alt);
+            border-radius: var(--radius-pill);
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn {
+            flex: 1;
+            padding: 9px 0;
+            border-radius: var(--radius-pill);
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            background: transparent;
+            transition: background 0.2s var(--ease-smooth), color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn:hover { background: rgba(var(--primary-rgb), 0.06); }
+        #tab-search .explore-tabs-bar .feed-subtab-btn.active {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        #tab-search .explore-tabs-bar .feed-subtab-btn.active::after { display: none; }
+
+        /* — Section labels: quieter, wider tracking — */
+        #tab-search .discover-section-label {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin: 6px 2px 10px;
+        }
+
+        /* — Suggested-for-you cards: gradient ring avatar, lifted card — */
+        #tab-search .suggested-people-section { padding: 4px 0 18px; }
+        #tab-search .suggested-people-title { font-size: 16px; }
+        #tab-search .sp-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 18px 12px 14px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            transition: transform 0.18s var(--ease-smooth), box-shadow 0.18s ease;
+        }
+        #tab-search .sp-card:hover { box-shadow: var(--shadow-elevated); }
+        #tab-search .sp-card:active { transform: scale(0.97); }
+        #tab-search .sp-card-avatar {
+            width: 68px; height: 68px;
+            padding: 2.5px;
+            background: var(--gradient-brand);
+            border-radius: 50%;
+        }
+        #tab-search .sp-card-avatar .avatar {
+            border: 2.5px solid var(--bg-surface);
+            box-sizing: border-box;
+        }
+        #tab-search .sp-card .discover-card-add-btn {
+            border-radius: var(--radius-pill);
+            font-weight: 800;
+            letter-spacing: 0.2px;
+        }
+
+        /* — Trending: ranked cards instead of a plain divided list — */
+        #tab-search #explore-trending-list { counter-reset: trend-rank; display: flex; flex-direction: column; gap: 8px; }
+        #tab-search .trend-item {
+            counter-increment: trend-rank;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 30px;
+            padding: 12px 16px 12px 46px;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: var(--bg-surface);
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        #tab-search .trend-item::before {
+            content: counter(trend-rank);
+            position: absolute;
+            left: 16px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-secondary);
+            opacity: 0.55;
+            font-variant-numeric: tabular-nums;
+        }
+        #tab-search .trend-item:hover { background: var(--bg-hover); }
+        #tab-search .trend-item:active { transform: scale(0.99); }
+        #tab-search .trend-item-eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.85; }
+        #tab-search .trend-item-tag { font-size: 15.5px; margin-top: 1px; }
+
+        /* — People grid (Explore ▸ People + search results): card rows — */
+        #tab-search .discover-grid { gap: 8px; }
+        #tab-search .discover-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 12px 14px;
+        }
+        #tab-search .discover-card:active { background: var(--bg-hover); }
+        #tab-search .discover-card-avatar-wrap { padding: 2px; background: var(--border-color); }
+        #tab-search .discover-card-add-btn { padding: 8px 18px; }
+
+        #tab-search .explore-empty, #tab-search .discover-grid-empty {
+            background: var(--bg-alt);
+            border-radius: 16px;
+            margin-top: 4px;
+        }
+    </style>
 </head>
 <body>
 

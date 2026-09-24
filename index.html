@@ -1641,6 +1641,14 @@
         .sub-price-input-row input { width: 110px; font-size: 22px; font-weight: 700; text-align: center; border: none; border-bottom: 2px solid var(--border-color); background: transparent; color: var(--text-primary); padding: 4px 0; }
         .sub-price-input-row input:focus { outline: none; border-color: var(--primary-blue); }
         #subscribe-modal-price { font-size: 26px; font-weight: 800; margin: 10px 0 2px; }
+        .feed-composer-exclusive-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 2px 50px; padding: 10px 14px; border-radius: 14px; background: var(--bg-input); border: 1px solid var(--border-color); }
+        .feed-composer-exclusive-row.on { border-color: var(--text-primary); }
+        .feed-composer-exclusive-label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .feed-composer-exclusive-label > svg { flex-shrink: 0; }
+        .feed-composer-exclusive-label b { display: block; font-size: 14px; font-weight: 700; }
+        .feed-composer-exclusive-label small { display: block; font-size: 12px; color: var(--text-secondary); line-height: 1.35; margin-top: 1px; }
+        .feed-exclusive-pill { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px 1px 6px; border-radius: 10px; border: 1px solid var(--border-color); font-size: 11px; font-weight: 700; color: var(--text-secondary); vertical-align: middle; }
+        .feed-exclusive-pill svg { width: 11px; height: 11px; }
         .feed-composer-ad-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0 2px 50px; padding: 10px 14px; border-radius: 14px; background: rgba(212, 160, 23, 0.08); border: 1px solid rgba(212, 160, 23, 0.3); }
         .feed-composer-ad-toggle-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #B8860B; }
         .feed-composer-ad-panel { margin: 8px 0 2px 50px; padding: 12px 14px; border-radius: 14px; background: var(--bg-input); display: flex; flex-direction: column; gap: 8px; }
@@ -6314,6 +6322,16 @@
                     <svg class="feed-composer-audience-icon" id="feed-composer-audience-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                     <span id="feed-composer-audience-label">Everyone</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+                <div class="feed-composer-exclusive-row" id="feed-composer-exclusive-row" style="display:none;">
+                    <div class="feed-composer-exclusive-label">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <div><b>Exclusive</b><small id="feed-composer-exclusive-desc">Only your paid subscribers can view this post.</small></div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="feed-composer-exclusive-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
                 <div class="feed-composer-ad-toggle-row" id="feed-composer-ad-toggle-row" style="display:none;">
                     <div class="feed-composer-ad-toggle-label">
@@ -16243,6 +16261,17 @@
             const existingOverlay = card.querySelector('.feed-post-lock-overlay');
             if (existingOverlay) existingOverlay.remove();
             card.classList.remove('feed-post-locked');
+            card.querySelectorAll('.feed-exclusive-pill').forEach((el) => el.remove());
+            if (post && post.visibility === 'subscribers' && !isPaywalledForMe(post)) {
+                // Visible to me (I'm the creator or a subscriber): tag it so exclusive posts read as such.
+                const timeEl = card.querySelector('.time');
+                if (timeEl && timeEl.parentElement) {
+                    const pill = document.createElement('span');
+                    pill.className = 'feed-exclusive-pill';
+                    pill.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Exclusive`;
+                    timeEl.insertAdjacentElement('afterend', pill);
+                }
+            }
             if (!isPaywalledForMe(post)) return;
             card.classList.add('feed-post-locked');
             const author = cachedUsers[post.uid] || {};
@@ -18858,7 +18887,31 @@
                 audienceLabel.textContent = AUDIENCE_LABELS[mode];
                 audienceBtn.classList.toggle('followers-only', mode !== 'everyone');
                 audienceBtn.title = AUDIENCE_TITLES[mode];
+                // Keep the "Exclusive" switch in step with the audience (subscribers == exclusive), and
+                // only offer it to creators who have set a subscription price.
+                const exRow = document.getElementById('feed-composer-exclusive-row');
+                const exToggle = document.getElementById('feed-composer-exclusive-toggle');
+                if (exRow && exToggle) {
+                    const me = cachedUsers[auth.currentUser?.uid] || {};
+                    const price = me.creatorSubPrice;
+                    exRow.style.display = price > 0 ? 'flex' : 'none';
+                    exToggle.checked = mode === 'subscribers';
+                    exRow.classList.toggle('on', mode === 'subscribers');
+                    const exDesc = document.getElementById('feed-composer-exclusive-desc');
+                    if (exDesc && price > 0) exDesc.textContent = `Only people subscribed to you (R${price}/mo) can view this post.`;
+                }
             }
+            window.updateComposerAudienceUI = updateComposerAudienceUI;
+            document.getElementById('feed-composer-exclusive-toggle').addEventListener('change', (e) => {
+                const me = cachedUsers[auth.currentUser?.uid] || {};
+                if (e.target.checked && !(me.creatorSubPrice > 0)) {
+                    e.target.checked = false;
+                    notify('Set a subscription price first (Profile → Subscription Price)', 'error');
+                    return;
+                }
+                feedComposerVisibility = e.target.checked ? 'subscribers' : 'everyone';
+                updateComposerAudienceUI();
+            });
             audienceBtn.addEventListener('click', () => {
                 const myProfile = cachedUsers[auth.currentUser?.uid] || {};
                 const nextIdx = (AUDIENCE_ORDER.indexOf(feedComposerVisibility) + 1) % AUDIENCE_ORDER.length;
@@ -28520,6 +28573,13 @@
                     if (adPanelEl) adPanelEl.style.display = 'none';
                     if (submitBtnEl) submitBtnEl.textContent = 'Post';
                 }
+            }
+            {
+                // Exclusive (subscribers-only) switch is for creators with a subscription price set.
+                const myUidEx = auth.currentUser && auth.currentUser.uid;
+                const hasPrice = !!(myUidEx && cachedUsers[myUidEx] && cachedUsers[myUidEx].creatorSubPrice > 0);
+                if (!hasPrice && feedComposerVisibility === 'subscribers') feedComposerVisibility = 'everyone';
+                if (typeof window.updateComposerAudienceUI === 'function') window.updateComposerAudienceUI();
             }
             const input = document.getElementById('feed-composer-input');
             if (input) setTimeout(() => input.focus(), 200);

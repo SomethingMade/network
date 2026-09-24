@@ -3907,6 +3907,11 @@
            Desktop keeps its X-style layout: everything below is hidden by default and only
            switched on inside the max-width:768px block. */
         .home-header-logo, .dhc-hint-mobile, #home-header-menu-settings { display: none; }
+        /* Feed refresh: the real cards step aside for shimmering skeletons until the fresh page is in,
+           then fade back in. Sentinel is hidden too so the infinite-scroll observer can't fire mid-refresh. */
+        #feed-posts-list.feed-refreshing > *:not(.feed-post-skeleton) { display: none !important; }
+        #feed-posts-list.feed-revealing > .feed-post-card { animation: feedRefreshReveal 0.4s ease-out both; }
+        @keyframes feedRefreshReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         /* Logo shimmer while the feed refreshes: a soft highlight sweeps across the mark. */
         .home-header-logo.refreshing { -webkit-mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: homeLogoShimmer 1s linear infinite; }
         @keyframes homeLogoShimmer { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0% 0; mask-position: 0% 0; } }
@@ -26847,16 +26852,26 @@
             if (homeFeedRefreshing) return;
             homeFeedRefreshing = true;
             const logo = document.querySelector('#home-header-title-row .home-header-logo');
+            const scroller = document.getElementById('discover-grid-scroll');
+            const list = document.getElementById('feed-posts-list');
             const startedAt = Date.now();
             if (logo) logo.classList.add('refreshing');
-            const scroller = document.getElementById('discover-grid-scroll');
-            if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+            // Jump to the top and swap the posts for shimmering placeholders while we re-fetch.
+            let skeletons = [];
+            if (list) {
+                list.classList.remove('feed-revealing');
+                list.classList.add('feed-refreshing');
+                for (let i = 0; i < FEED_SKELETON_COUNT; i++) {
+                    const sk = buildFeedPostSkeletonCard(i === 0);
+                    list.prepend(sk);
+                    skeletons.push(sk);
+                }
+            }
+            if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
             try {
-                applyPendingNewPosts();
-                if (auth.currentUser) {
+                if (auth.currentUser && list) {
                     const snap = await get(query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE)));
-                    const list = document.getElementById('feed-posts-list');
-                    if (snap.exists() && list) {
+                    if (snap.exists()) {
                         snap.forEach((child) => {
                             const postId = child.key;
                             const post = child.val();
@@ -26866,7 +26881,7 @@
                             if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) oldestLoadedPostTimestamp = post.timestamp;
                             const card = list.querySelector(`[data-post-id="${postId}"]`);
                             if (!card) {
-                                list.prepend(buildFeedPostCard(postId, post));
+                                list.appendChild(buildFeedPostCard(postId, post));
                             } else if (oldPost && card.querySelector('.feed-post-edit-box')) {
                                 return; // don't yank a card someone is editing
                             } else if (oldPost &&
@@ -26880,15 +26895,24 @@
                                 card.replaceWith(buildFeedPostCard(postId, post));
                             }
                         });
-                        reorderFeedCards();
-                        applyFeedSubtabFilter();
                     }
                 }
             } catch (err) {
                 console.warn('Feed refresh failed:', err);
             }
-            const remaining = 900 - (Date.now() - startedAt);
+            const remaining = 1100 - (Date.now() - startedAt);
             if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+            // Reveal: drop the placeholders, fold in anything queued, re-rank, and land at the top.
+            skeletons.forEach((sk) => sk.remove());
+            if (list) {
+                list.classList.remove('feed-refreshing');
+                list.classList.add('feed-revealing');
+                setTimeout(() => list.classList.remove('feed-revealing'), 600);
+            }
+            pendingNewPosts && applyPendingNewPosts();
+            reorderFeedCards();
+            applyFeedSubtabFilter();
+            if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
             if (logo) logo.classList.remove('refreshing');
             homeFeedRefreshing = false;
         }

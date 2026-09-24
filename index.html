@@ -991,7 +991,13 @@
         .explore-drawer-item-chev { width: 16px; height: 16px; stroke: var(--text-secondary); opacity: 0.6; flex-shrink: 0; }
         .explore-drawer-item .live-count-badge { margin-left: auto; }
         .explore-drawer-btn svg { width: 22px; height: 22px; }
-        .msgs-header-right { display: flex; align-items: center; gap: 2px; margin-right: -6px; flex-shrink: 0; }
+        /* Left-side header placement. Home is a 3-column grid on phones (empty | logo | icons), so the
+           button takes the formerly empty first column; on desktop the title gets margin-right:auto so
+           the button + title stay left and the icons stay right. */
+        #tab-status .chat-header-top > .explore-drawer-btn { margin-right: 6px; flex-shrink: 0; }
+        #tab-status .chat-header-top > .home-header-title-row { margin-right: auto; }
+        .search-tab-header-row > .explore-drawer-btn { flex-shrink: 0; }
+        .chat-header-title-row > .explore-drawer-btn, .msgs-title-row > .explore-drawer-btn, .activity-title-row > .explore-drawer-btn { flex-shrink: 0; margin-left: -4px; }
 
         /* --- LIVE (Agora broadcast + invited guests) --- */
         .live-hub-overlay { position: fixed; inset: 0; background: var(--bg-base); z-index: 100050; display: none; flex-direction: column; }
@@ -3901,6 +3907,10 @@
            Desktop keeps its X-style layout: everything below is hidden by default and only
            switched on inside the max-width:768px block. */
         .home-header-logo, .dhc-hint-mobile, #home-header-menu-settings { display: none; }
+        /* Logo shimmer while the feed refreshes: a soft highlight sweeps across the mark. */
+        .home-header-logo.refreshing { -webkit-mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: homeLogoShimmer 1s linear infinite; }
+        @keyframes homeLogoShimmer { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0% 0; mask-position: 0% 0; } }
+        @media (prefers-reduced-motion: reduce) { .home-header-logo.refreshing { animation: homeLogoPulse 1s ease-in-out infinite; -webkit-mask-image: none; mask-image: none; } @keyframes homeLogoPulse { 50% { opacity: 0.35; } } }
         @media (max-width: 768px) {
             /* Profile joins the bottom nav (after Messages). It's a desktop-only nav item by
                default; the id selector out-ranks .nav-desktop-only's !important hide. */
@@ -3910,7 +3920,9 @@
             /* Header: centered brand mark, streak pill + menu on the right, no divider. */
             #tab-status .chat-header-area { border-bottom: none; padding-bottom: 4px; }
             #tab-status .chat-header-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 0; }
-            #tab-status .chat-header-top::before { content: ''; }
+            #tab-status .chat-header-top::before { content: none; }
+            #tab-status .chat-header-top > .explore-drawer-btn { grid-column: 1; justify-self: start; margin-right: 0; }
+            #tab-status .chat-header-top > .home-header-title-row { margin-right: 0; }
             #tab-status .home-header-title-row { grid-column: 2; justify-self: center; display: flex; align-items: center; justify-content: center; }
             #tab-status .home-header-title-row h1,
             #tab-status .home-header-title-row .header-profile-btn { display: none; }
@@ -9548,7 +9560,7 @@
                 <div id="tab-status" class="tab-content active-tab">
                     <div class="chat-header-area">
                         <div class="chat-header-top">
-                            <div class="chat-header-title-row home-header-title-row" id="home-header-title-row" role="button" tabindex="0" aria-label="Scroll to top" title="Scroll to top">
+                            <div class="chat-header-title-row home-header-title-row" id="home-header-title-row" role="button" tabindex="0" aria-label="Refresh feed" title="Refresh feed">
                                 <div class="profile-btn header-profile-btn" data-profile-trigger title="View Profile"></div>
                                 <!-- Phones only (Threads-style): centered brand mark replaces the avatar + "Home"
                                      title; Profile lives in the bottom nav instead. Hidden on desktop. -->
@@ -25578,24 +25590,20 @@
                 b.addEventListener('click', openExploreDrawer);
                 return b;
             };
-            // Right side of each tab's header row. Messages has a single compose button there, so
-            // it gets a small wrapper to keep the two buttons together on the right.
-            ['#tab-status .chat-header-icons', '#tab-groups .chat-header-icons', '#tab-calls .chat-header-icons',
-             '#tab-contacts .chat-header-icons', '#tab-notifications .activity-header-actions'
-            ].forEach((sel) => {
+            // Left side of each tab's header: first child of the title/left group. Home puts it
+            // straight into its header row (the title row there is the centered logo on phones).
+            const homeTop = document.querySelector('#tab-status .chat-header-top');
+            if (homeTop) homeTop.insertBefore(makeBtn('search-icon-btn'), homeTop.firstChild);
+            [['#tab-chats .msgs-title-row', 'msgs-icon-btn'],
+             ['#tab-search .search-tab-header-row', 'search-icon-btn'],
+             ['#tab-notifications .activity-title-row', 'search-icon-btn'],
+             ['#tab-groups .chat-header-title-row', 'search-icon-btn'],
+             ['#calls-header-default .chat-header-title-row', 'search-icon-btn'],
+             ['#tab-contacts .chat-header-title-row', 'search-icon-btn']
+            ].forEach(([sel, cls]) => {
                 const host = document.querySelector(sel);
-                if (host) host.appendChild(makeBtn('search-icon-btn'));
+                if (host) host.insertBefore(makeBtn(cls), host.firstChild);
             });
-            const searchRow = document.querySelector('#tab-search .search-tab-header-row');
-            if (searchRow) searchRow.appendChild(makeBtn('search-icon-btn'));
-            const compose = document.getElementById('btn-msgs-compose');
-            if (compose && compose.parentNode) {
-                const wrap = document.createElement('div');
-                wrap.className = 'msgs-header-right';
-                compose.parentNode.insertBefore(wrap, compose);
-                wrap.appendChild(compose);
-                wrap.appendChild(makeBtn('msgs-icon-btn'));
-            }
         }
         initExploreDrawer();
 
@@ -26831,21 +26839,80 @@
         // with the settings gear; folded into the title row itself so the header has one
         // clean left-anchored tap target instead of overlapping absolutely-positioned pieces.
         const homeHeaderTitleRow = document.getElementById('home-header-title-row');
+        // Refreshes the Home feed: folds in any queued new posts, re-fetches the latest page so
+        // edits/likes/new posts missed while the connection was flaky show up, re-ranks, and
+        // scrolls to the top. The logo shimmers for at least a beat so the tap always reads.
+        let homeFeedRefreshing = false;
+        async function refreshHomeFeed() {
+            if (homeFeedRefreshing) return;
+            homeFeedRefreshing = true;
+            const logo = document.querySelector('#home-header-title-row .home-header-logo');
+            const startedAt = Date.now();
+            if (logo) logo.classList.add('refreshing');
+            const scroller = document.getElementById('discover-grid-scroll');
+            if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+            try {
+                applyPendingNewPosts();
+                if (auth.currentUser) {
+                    const snap = await get(query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE)));
+                    const list = document.getElementById('feed-posts-list');
+                    if (snap.exists() && list) {
+                        snap.forEach((child) => {
+                            const postId = child.key;
+                            const post = child.val();
+                            if (!post || !canViewPost(post)) return;
+                            const oldPost = cachedPosts[postId];
+                            cachedPosts[postId] = post;
+                            if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) oldestLoadedPostTimestamp = post.timestamp;
+                            const card = list.querySelector(`[data-post-id="${postId}"]`);
+                            if (!card) {
+                                list.prepend(buildFeedPostCard(postId, post));
+                            } else if (oldPost && card.querySelector('.feed-post-edit-box')) {
+                                return; // don't yank a card someone is editing
+                            } else if (oldPost &&
+                                oldPost.text === post.text &&
+                                oldPost.imageUrl === post.imageUrl &&
+                                JSON.stringify(oldPost.imageUrls || null) === JSON.stringify(post.imageUrls || null) &&
+                                oldPost.videoUrl === post.videoUrl &&
+                                oldPost.editedAt === post.editedAt) {
+                                patchFeedPostCounts(card, post);
+                            } else {
+                                card.replaceWith(buildFeedPostCard(postId, post));
+                            }
+                        });
+                        reorderFeedCards();
+                        applyFeedSubtabFilter();
+                    }
+                }
+            } catch (err) {
+                console.warn('Feed refresh failed:', err);
+            }
+            const remaining = 900 - (Date.now() - startedAt);
+            if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+            if (logo) logo.classList.remove('refreshing');
+            homeFeedRefreshing = false;
+        }
         if (homeHeaderTitleRow) {
             const scrollHomeFeedToTop = () => {
                 document.getElementById('discover-grid-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
             };
+            // On phones the brand mark is shown (avatar + "Home" text are hidden), and tapping it
+            // refreshes the feed; where it's hidden (desktop) the title keeps its scroll-to-top job.
+            const onTitleTap = () => {
+                const logo = homeHeaderTitleRow.querySelector('.home-header-logo');
+                if (logo && getComputedStyle(logo).display !== 'none') refreshHomeFeed();
+                else scrollHomeFeedToTop();
+            };
             homeHeaderTitleRow.addEventListener('click', (e) => {
-                // Let the avatar keep opening the profile sheet — only the title text itself
-                // should trigger the scroll-to-top shortcut.
+                // Let the avatar keep opening the profile sheet.
                 if (e.target.closest('[data-profile-trigger]')) return;
-                scrollHomeFeedToTop();
+                onTitleTap();
             });
             homeHeaderTitleRow.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
                 if (e.target.closest('[data-profile-trigger]')) return;
                 e.preventDefault();
-                scrollHomeFeedToTop();
+                onTitleTap();
             });
         }
 

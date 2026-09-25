@@ -3924,8 +3924,17 @@
            against its own siblings inside this wrap, not against the rest of the page — it's
            this wrap's z-index that decides how the whole thing stacks against everything else. */
         .chat-view-menu-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; isolation: isolate; z-index: 150; }
-        .chat-view-menu-dropdown { position: absolute; top: calc(100% + 12px); right: 0; min-width: 190px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: var(--shadow-elevated); padding: 6px; z-index: 200; opacity: 0; transform: translateY(-6px) scale(0.97); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease; }
-        .chat-view-menu-dropdown.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+        /* These 5 header "more options" menus (Home/Chats/Groups/Calls/Contacts tabs) render as
+           a bottom sheet — fixed to the viewport, sliding up from the bottom behind a shared dim
+           backdrop (#header-menu-sheet-backdrop) — rather than a small anchored popover, matching
+           the bottom-sheet pattern used everywhere else in the app (contact card "More options",
+           etc). Each tab keeps its own dropdown element/id (items differ per tab), just restyled
+           in place; no ancestor between here and <body> has a transform, so position:fixed still
+           anchors to the viewport correctly. */
+        .chat-view-menu-dropdown { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: 420px; margin: 0 auto; min-width: 0; background: var(--bg-surface); border: none; border-top: 1px solid var(--border-color); border-radius: 20px 20px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); padding: 10px 8px calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 200; opacity: 1; transform: translateY(100%); pointer-events: none; transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); max-height: 75vh; overflow-y: auto; }
+        .chat-view-menu-dropdown.open { transform: translateY(0); pointer-events: auto; }
+        .header-menu-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 199; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; pointer-events: none; }
+        .header-menu-sheet-backdrop.active { opacity: 1; visibility: visible; pointer-events: auto; }
         /* Belt-and-suspenders: while any of these header dropdowns is open, the scrollable
            list sitting underneath it is fully disabled for pointer interaction (see
            setupHeaderMenu's listSelector param), so a tap meant for a dropdown row can never
@@ -6392,6 +6401,11 @@
             }, START_DELAY);
         })();
     </script>
+
+    <!-- Shared dim backdrop behind the 5 header "more options" bottom sheets (Home/Chats/
+         Groups/Calls/Contacts) — see setupHeaderMenu in the main script below. One element
+         reused by all of them since only one can be open at a time. -->
+    <div id="header-menu-sheet-backdrop" class="header-menu-sheet-backdrop"></div>
 
     <div id="otp-success-overlay" aria-hidden="true">
         <div class="otp-success-ring-wrap">
@@ -9859,6 +9873,7 @@
                             <div class="chat-view-menu-wrap">
                                 <button type="button" class="msgs-chip msgs-chip-icon" id="btn-header-menu-chats" title="Filter &amp; more" aria-label="Filter &amp; more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="10" y1="17" x2="14" y2="17"></line></svg></button>
                                 <div class="chat-view-menu-dropdown" id="header-menu-dropdown-chats">
+                                    <div class="sheet-handle"></div>
                                     <div class="wa-filter-row" id="wa-filter-row">
                                         <button type="button" class="wa-chip active" data-filter="all">
                                             <span>All</span>
@@ -9937,6 +9952,7 @@
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="home-header-menu-dropdown">
+                                    <div class="sheet-handle"></div>
                                         <button type="button" class="chats-menu-item" id="home-header-menu-settings">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                                             <span>Settings</span>
@@ -10123,6 +10139,7 @@
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu-groups" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-groups">
+                                    <div class="sheet-handle"></div>
                                         <button type="button" class="chats-menu-item" id="header-menu-edit-profile-groups">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
@@ -10372,6 +10389,7 @@
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu-calls" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-calls">
+                                    <div class="sheet-handle"></div>
                                         <button type="button" class="chats-menu-item" id="header-menu-edit-profile-calls">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
@@ -10421,6 +10439,7 @@
                                 <div class="chat-view-menu-wrap">
                                     <svg id="btn-header-menu-contacts" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="More options"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                                     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-contacts">
+                                    <div class="sheet-handle"></div>
                                         <button type="button" class="chats-menu-item" id="header-menu-edit-profile-contacts">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
@@ -15501,6 +15520,9 @@
         // to know which specific list it corresponds to.
         function clearAllHeaderMenuLocks() {
             document.querySelectorAll('.header-menu-list-locked').forEach(el => el.classList.remove('header-menu-list-locked'));
+            document.querySelectorAll('.chat-view-menu-dropdown.open').forEach(el => el.classList.remove('open'));
+            const backdrop = document.getElementById('header-menu-sheet-backdrop');
+            if (backdrop) backdrop.classList.remove('active');
         }
         function setupHeaderMenu(btnId, dropdownId, refreshId, editProfileId, listSelector) {
             const menuBtn = document.getElementById(btnId);
@@ -15508,14 +15530,15 @@
             const refreshBtn = document.getElementById(refreshId);
             const editProfileBtn = editProfileId ? document.getElementById(editProfileId) : null;
             const listEl = listSelector ? document.querySelector(listSelector) : null;
+            const backdrop = document.getElementById('header-menu-sheet-backdrop');
             if (!menuBtn || !dropdown || !refreshBtn) return;
 
-            // While the dropdown is open, the list underneath it is locked out of pointer
+            // While the sheet is open, the list underneath it is locked out of pointer
             // interaction entirely (see .header-menu-list-locked) — this is on top of, not a
             // replacement for, the z-index fix on .chat-view-menu-dropdown, so a tap on a
-            // dropdown row can never land on a chat/contact/call card behind it instead.
-            const openMenu = () => { dropdown.classList.add('open'); if (listEl) listEl.classList.add('header-menu-list-locked'); };
-            const closeMenu = () => { dropdown.classList.remove('open'); if (listEl) listEl.classList.remove('header-menu-list-locked'); };
+            // sheet row can never land on a chat/contact/call card behind it instead.
+            const openMenu = () => { dropdown.classList.add('open'); if (backdrop) backdrop.classList.add('active'); if (listEl) listEl.classList.add('header-menu-list-locked'); };
+            const closeMenu = () => { dropdown.classList.remove('open'); if (backdrop) backdrop.classList.remove('active'); if (listEl) listEl.classList.remove('header-menu-list-locked'); };
 
             menuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();

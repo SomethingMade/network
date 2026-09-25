@@ -5749,25 +5749,25 @@
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
             }
 
-            /* ── Flat, full-width, icon-only bottom nav bar (X-style) ── */
+            /* ── Flat, full-width, icon-only bottom nav bar (Threads-style) ── */
             :root {
-                --nav-bar-total: 64px;
+                --nav-bar-total: 72px;
                 /* Actual on-screen height of the nav bar itself. Some phones don't report a
                    real env(safe-area-inset-bottom) even though they have their own gesture
                    bar/home-indicator strip overlapping the viewport, so this floors it at
                    --nav-bar-extra-bottom instead of trusting env() alone — that's also why
                    .side-nav below adds this to `height`, not just `padding-bottom`: with the
                    global box-sizing:border-box, padding-bottom alone would eat into the fixed
-                   52px content box and cram the icon row upward instead of growing the bar to
+                   60px content box and cram the icon row upward instead of growing the bar to
                    actually clear the device's own bottom navigation. */
                 --nav-bar-safe-bottom: max(env(safe-area-inset-bottom), var(--nav-bar-extra-bottom));
-                --nav-bar-height: calc(52px + var(--nav-bar-safe-bottom));
+                --nav-bar-height: calc(60px + var(--nav-bar-safe-bottom));
             }
             .side-nav {
                 display: flex; /* was grid(5) with only 4 visible items (Profile is desktop-only),
-                                   which left a lopsided empty track; flex + space-around centers
-                                   Home/Search/Notifications/Messages evenly like X's bar. */
-                justify-content: space-around;
+                                   which left a lopsided empty track; flex + space-evenly centers
+                                   Home/Search/Notifications/Messages evenly like Threads' bar. */
+                justify-content: space-evenly;
                 height: var(--nav-bar-height);
                 padding: 0;
                 padding-bottom: var(--nav-bar-safe-bottom);
@@ -5777,32 +5777,38 @@
                 bottom: 0;
                 width: 100%;
                 border-right: none;
-                border-top: 1px solid var(--border-color);
+                /* Threads has no hairline on its bottom bar — the white just blends into
+                   the white feed above it. */
+                border-top: none;
                 border-radius: 0;
                 align-items: center;
                 z-index: 100;
                 box-shadow: none;
-                /* Always solid white, like X's bottom bar — not the theme's --bg-surface,
-                   so it stays white even under the dark/glass/neumorphic themes. */
+                /* Always solid white, like Threads' bottom bar — not the theme's
+                   --bg-surface, so it stays white even under the dark/glass/neumorphic
+                   themes. */
                 background: #FFFFFF !important;
                 transition: transform 0.25s ease;
             }
             .side-nav.nav-scroll-hidden { transform: translateY(140%); }
             /* Default: leave the reserved nav-bar strip at the bottom uncovered so the
                bottom nav bar stays visible while viewing reels. Matches the bar's real
-               (possibly safe-area-grown) height, not just its base 52px. */
+               (possibly safe-area-grown) height, not just its base 60px. */
             #reel-viewer-overlay { bottom: var(--nav-bar-height); }
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-item { padding: 6px 8px; color: #111111; }
-            /* Bold, X-style icons: full opacity, thicker strokes, slightly larger boxes.
+            .nav-item { flex: 1; padding: 8px 4px; color: #000000; display: flex; align-items: center; justify-content: center; }
+            /* Threads-style icons: plain black, dimmed a touch when inactive, full black
+               and swapped to the filled shape (via .icon-fill, already wired below) when
+               active — no accent color change, just outline vs. solid weight. Larger,
+               evenly weighted stroke reads as "bold" without X's extra-thick strokes.
                .icon-line is the class on every path/polyline/circle inside these nav SVGs,
                so this beats their own inline stroke-width="1.8" attributes. */
-            .nav-item svg { stroke: #111111; opacity: 1; width: 26px; height: 26px; }
-            .nav-item svg .icon-line { stroke-width: 2.4; }
-            /* X's bottom nav is icon-only — labels stay screen-reader-only even for the
-               active tab (unlike the desktop sidebar, which reveals the active label).
+            .nav-item svg { stroke: #000000; opacity: 0.55; width: 27px; height: 27px; }
+            .nav-item svg .icon-line { stroke-width: 2.1; }
+            /* Threads' bottom nav is icon-only — labels stay screen-reader-only even for
+               the active tab (unlike the desktop sidebar, which reveals the active label).
                Needs its own .nav-item.active span override here: the base rule two lines
                up in the desktop styles is .nav-item.active span (two classes), which beats
                this plain .nav-item span on specificity alone regardless of media query, so
@@ -5810,14 +5816,12 @@
             .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
             .nav-item.active span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
             .nav-item.active svg { opacity: 1; }
-            .nav-item.active { color: var(--nav-active-green); }
-            .nav-item.active svg { stroke: var(--nav-active-green); }
+            .nav-item.active { color: #000000; }
+            .nav-item.active svg { stroke: #000000; }
             .nav-badge { opacity: 1; }
             .nav-indicator { display: none; }
             body.glass-theme .side-nav {
-                background: var(--bg-surface) !important;
-                backdrop-filter: blur(24px) saturate(160%) !important;
-                -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+                background: #FFFFFF !important;
                 border-top: none;
             }
             .chat-list-container { padding-bottom: calc(var(--nav-bar-total) + env(safe-area-inset-bottom)); }

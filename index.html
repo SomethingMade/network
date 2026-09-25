@@ -23,7 +23,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haba.</title>
 
-    <meta name="theme-color" content="#111111">
+    <meta name="theme-color" content="#FFFFFF">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='45' fill='%23111111'/%3E%3Cpolygon points='20,80 170,30 80,110' fill='%23FFFFFF' fill-opacity='0.75'/%3E%3Cpolygon points='120,180 170,30 80,110' fill='%23FFFFFF'/%3E%3Cpolygon points='20,80 80,110 80,140' fill='%23FFFFFF' fill-opacity='0.55'/%3E%3C/svg%3E">
     <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='45' fill='%23111111'/%3E%3Cpolygon points='20,80 170,30 80,110' fill='%23FFFFFF' fill-opacity='0.75'/%3E%3Cpolygon points='120,180 170,30 80,110' fill='%23FFFFFF'/%3E%3Cpolygon points='20,80 80,110 80,140' fill='%23FFFFFF' fill-opacity='0.55'/%3E%3C/svg%3E">
     <link rel="manifest" href="manifest.json">
@@ -11255,6 +11255,25 @@
 
         // --- THEME SETTINGS ---
         const themeSelect = document.getElementById('theme-select');
+        // Keeps the OS/PWA chrome color (status bar + Android's edge-to-edge nav-bar
+        // scrim) matching whatever surface color is actually on screen. This has to
+        // track the light/dark THEME, not the brand accent color — a stale dark value
+        // here is what was painting a dark plate behind the bottom nav bar even while
+        // the app itself was rendering its light-theme white nav bar.
+        function syncChromeColor() {
+            const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+            if (!metaThemeColor) return;
+            const body = document.body;
+            let color = '#FFFFFF'; // light theme's --bg-surface
+            if (body.classList.contains('glass-theme')) {
+                color = '#F5F5F5'; // glass theme's light aurora surface
+            } else if (body.classList.contains('dark-theme')) {
+                color = '#1C1C1E'; // dark theme's --bg-surface
+            } else if (body.classList.contains('neumorphic-theme')) {
+                color = '#E6EAF0'; // neumorphic theme's --bg-surface
+            }
+            metaThemeColor.setAttribute('content', color);
+        }
         function applyTheme(theme) {
             document.body.classList.remove('glass-theme');
             document.body.classList.remove('neumorphic-theme');
@@ -11275,6 +11294,7 @@
             } else {
                 document.body.classList.remove('dark-theme');
             }
+            syncChromeColor();
         }
         
         themeSelect.addEventListener('change', (e) => {
@@ -11292,14 +11312,13 @@
 
         // --- ACCENT COLOR SETTINGS ---
         // Swaps the brand green for black/graphite app-wide (see the .black-accent
-        // rules near the theme CSS) and keeps the browser/PWA chrome color in sync.
+        // rules near the theme CSS). Chrome/PWA color is handled separately by
+        // syncChromeColor(), which tracks the light/dark theme instead — accent is a
+        // button/icon color choice, not a signal about which surface color is on screen.
         const blackAccentToggle = document.getElementById('setting-black-accent-toggle');
-        const ACCENT_THEME_COLOR = { green: '#8BC53F', black: '#111111' };
 
         function applyAccentColor(color) {
             document.body.classList.toggle('black-accent', color === 'black');
-            const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-            if (metaThemeColor) metaThemeColor.setAttribute('content', ACCENT_THEME_COLOR[color] || ACCENT_THEME_COLOR.green);
         }
 
         blackAccentToggle.addEventListener('change', (e) => {

@@ -5764,9 +5764,10 @@
                 --nav-bar-height: calc(52px + var(--nav-bar-safe-bottom));
             }
             .side-nav {
-                display: grid;
-                grid-template-columns: repeat(5, 1fr); /* Home, Search, Notifications, Messages, Profile */
-                justify-items: center;
+                display: flex; /* was grid(5) with only 4 visible items (Profile is desktop-only),
+                                   which left a lopsided empty track; flex + space-around centers
+                                   Home/Search/Notifications/Messages evenly like X's bar. */
+                justify-content: space-around;
                 height: var(--nav-bar-height);
                 padding: 0;
                 padding-bottom: var(--nav-bar-safe-bottom);
@@ -5781,7 +5782,9 @@
                 align-items: center;
                 z-index: 100;
                 box-shadow: none;
-                background: var(--bg-surface) !important;
+                /* Always solid white, like X's bottom bar — not the theme's --bg-surface,
+                   so it stays white even under the dark/glass/neumorphic themes. */
+                background: #FFFFFF !important;
                 transition: transform 0.25s ease;
             }
             .side-nav.nav-scroll-hidden { transform: translateY(140%); }
@@ -5792,8 +5795,12 @@
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-item { padding: 6px 8px; color: var(--nav-active-black); }
-            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.75; }
+            .nav-item { padding: 6px 8px; color: #111111; }
+            /* Bold, X-style icons: full opacity, thicker strokes, slightly larger boxes.
+               .icon-line is the class on every path/polyline/circle inside these nav SVGs,
+               so this beats their own inline stroke-width="1.8" attributes. */
+            .nav-item svg { stroke: #111111; opacity: 1; width: 26px; height: 26px; }
+            .nav-item svg .icon-line { stroke-width: 2.4; }
             /* X's bottom nav is icon-only — labels stay screen-reader-only even for the
                active tab (unlike the desktop sidebar, which reveals the active label).
                Needs its own .nav-item.active span override here: the base rule two lines
@@ -5915,7 +5922,7 @@
 
             /* Header / nav / profile buttons */
             .profile-btn { width: 32px; height: 32px; font-size: 13px; }
-            .nav-item svg { width: 21px; height: 21px; }
+            .nav-item svg { width: 24px; height: 24px; }
             .nav-item { padding: 6px 4px; }
             .wa-header-icon-btn { width: 32px; height: 32px; }
             .wa-header-icon-btn svg { width: 16px; height: 16px; }

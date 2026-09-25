@@ -2647,6 +2647,10 @@
         .options-sheet-group .msg-option-btn.with-icon { justify-content: flex-start; }
         #post-options-sheet-overlay .bottom-sheet, #community-post-options-sheet-overlay .bottom-sheet { background: var(--bg-alt); }
         #post-options-sheet-overlay .sheet-handle, #community-post-options-sheet-overlay .sheet-handle { margin-bottom: 14px; }
+        /* Match the post-options sheet's grouped-card look: option rows sit in white
+           .options-sheet-group cards floating on this slightly darker alt background,
+           instead of one flat list of rows directly on --bg-surface. */
+        #home-header-menu-dropdown, #header-menu-dropdown-chats, #header-menu-dropdown-groups, #header-menu-dropdown-calls, #header-menu-dropdown-contacts { background: var(--bg-alt); }
 
         /* "Save to..." collection picker (see openSaveToCollectionSheet) — each row is a
            .msg-option-btn.with-icon widened to push a checkmark to the far right, which only
@@ -3931,9 +3935,10 @@
            etc). Each tab keeps its own dropdown element/id (items differ per tab), just restyled
            in place; no ancestor between here and <body> has a transform, so position:fixed still
            anchors to the viewport correctly. */
-        .chat-view-menu-dropdown { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: 420px; margin: 0 auto; min-width: 0; background: var(--bg-surface); border: none; border-top: 1px solid var(--border-color); border-radius: 20px 20px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); padding: 10px 8px calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 200; opacity: 1; transform: translateY(100%); pointer-events: none; transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1); max-height: 75vh; overflow-y: auto; }
+        .chat-view-menu-dropdown { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: 100%; max-width: 420px; margin: 0 auto; min-width: 0; background: var(--bg-surface); border: none; border-radius: 28px 28px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); padding: 12px 28px calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 200; opacity: 1; transform: translateY(100%); pointer-events: none; transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1); max-height: min(85vh, 100%); overflow-y: auto; overflow-x: hidden; color: var(--text-primary); }
+        .chat-view-menu-dropdown .sheet-handle { margin-bottom: 14px; }
         .chat-view-menu-dropdown.open { transform: translateY(0); pointer-events: auto; }
-        .header-menu-sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 199; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; pointer-events: none; }
+        .header-menu-sheet-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: var(--nav-bar-height, 0px); background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 199; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0.25s; pointer-events: none; }
         .header-menu-sheet-backdrop.active { opacity: 1; visibility: visible; pointer-events: auto; }
         /* Belt-and-suspenders: while any of these header dropdowns is open, the scrollable
            list sitting underneath it is fully disabled for pointer interaction (see
@@ -6416,78 +6421,90 @@
          all existing JS (setupHeaderMenu, etc.) keeps working without modification. -->
     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-chats">
                                     <div class="sheet-handle"></div>
-                                    <div class="wa-filter-row" id="wa-filter-row">
-                                        <button type="button" class="wa-chip active" data-filter="all">
-                                            <span>All</span>
+                                    <div class="options-sheet-group">
+                                        <div class="wa-filter-row" id="wa-filter-row">
+                                            <button type="button" class="wa-chip active" data-filter="all">
+                                                <span>All</span>
+                                            </button>
+                                            <button type="button" class="wa-chip" data-filter="unread">
+                                                <span>Unread</span>
+                                            </button>
+                                            <button type="button" class="wa-chip" data-filter="favourites">
+                                                <span>Favourites</span>
+                                            </button>
+                                        </div>
+                                        <div class="chats-menu-divider"></div>
+                                        <div class="wa-archived-row" id="wa-archived-row">
+                                            <svg class="wa-archived-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                                            <span>Archived</span>
+                                        </div>
+                                    </div>
+                                    <div class="options-sheet-group">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-edit-profile-chats">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                                            <span>Edit Profile</span>
                                         </button>
-                                        <button type="button" class="wa-chip" data-filter="unread">
-                                            <span>Unread</span>
-                                        </button>
-                                        <button type="button" class="wa-chip" data-filter="favourites">
-                                            <span>Favourites</span>
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-refresh-chats">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                            <span>Check Updates</span>
                                         </button>
                                     </div>
-                                    <div class="chats-menu-divider"></div>
-                                    <div class="wa-archived-row" id="wa-archived-row">
-                                        <svg class="wa-archived-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                                        <span>Archived</span>
-                                    </div>
-                                    <button type="button" class="chats-menu-item" id="header-menu-edit-profile-chats">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
-                                        <span>Edit Profile</span>
-                                    </button>
-                                    <button type="button" class="chats-menu-item" id="header-menu-refresh-chats">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                                        <span>Check Updates</span>
-                                    </button>
                                 </div>
     <div class="chat-view-menu-dropdown" id="home-header-menu-dropdown">
                                     <div class="sheet-handle"></div>
-                                        <button type="button" class="chats-menu-item" id="home-header-menu-settings">
+                                    <div class="options-sheet-group">
+                                        <button type="button" class="msg-option-btn with-icon" id="home-header-menu-settings">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                                             <span>Settings</span>
                                         </button>
-                                        <button type="button" class="chats-menu-item" id="home-header-menu-edit-profile">
+                                        <button type="button" class="msg-option-btn with-icon" id="home-header-menu-edit-profile">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
                                         </button>
-                                        <button type="button" class="chats-menu-item" id="home-header-menu-refresh">
+                                        <button type="button" class="msg-option-btn with-icon" id="home-header-menu-refresh">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                             <span>Check Updates</span>
                                         </button>
+                                    </div>
                                     </div>
     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-groups">
                                     <div class="sheet-handle"></div>
-                                        <button type="button" class="chats-menu-item" id="header-menu-edit-profile-groups">
+                                    <div class="options-sheet-group">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-edit-profile-groups">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
                                         </button>
-                                        <button type="button" class="chats-menu-item" id="header-menu-refresh-groups">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-refresh-groups">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                             <span>Check Updates</span>
                                         </button>
+                                    </div>
                                     </div>
     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-calls">
                                     <div class="sheet-handle"></div>
-                                        <button type="button" class="chats-menu-item" id="header-menu-edit-profile-calls">
+                                    <div class="options-sheet-group">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-edit-profile-calls">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
                                         </button>
-                                        <button type="button" class="chats-menu-item" id="header-menu-refresh-calls">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-refresh-calls">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                             <span>Check Updates</span>
                                         </button>
                                     </div>
+                                    </div>
     <div class="chat-view-menu-dropdown" id="header-menu-dropdown-contacts">
                                     <div class="sheet-handle"></div>
-                                        <button type="button" class="chats-menu-item" id="header-menu-edit-profile-contacts">
+                                    <div class="options-sheet-group">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-edit-profile-contacts">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
                                             <span>Edit Profile</span>
                                         </button>
-                                        <button type="button" class="chats-menu-item" id="header-menu-refresh-contacts">
+                                        <button type="button" class="msg-option-btn with-icon" id="header-menu-refresh-contacts">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                             <span>Check Updates</span>
                                         </button>
+                                    </div>
                                     </div>
 
     <div id="otp-success-overlay" aria-hidden="true">

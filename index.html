@@ -27420,9 +27420,13 @@
         const homeHeaderMenuSettings = document.getElementById('home-header-menu-settings');
         if (homeHeaderMenuSettings) {
             homeHeaderMenuSettings.addEventListener('click', () => {
-                document.getElementById('home-header-menu-dropdown').classList.remove('open');
-                const list = document.getElementById('discover-grid-scroll');
-                if (list) list.classList.remove('header-menu-list-locked');
+                // Was only closing the dropdown + unlocking the list, but never clearing
+                // #header-menu-sheet-backdrop's 'active' class. The backdrop sits at a lower
+                // z-index than the Settings sheet, so it stayed invisible (but still active)
+                // the whole time Settings was open — then reappeared as a stuck dark overlay
+                // over the feed the moment Settings was closed again. clearAllHeaderMenuLocks()
+                // clears the dropdown, the list lock, AND the backdrop together.
+                clearAllHeaderMenuLocks();
                 openSettingsSheet();
             });
         }

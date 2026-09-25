@@ -715,16 +715,18 @@
         .haba-mark { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; height: 240px; z-index: 1; }
         .haba-wordmark { font-family: var(--font-brand); font-size: 20px; font-weight: 400; letter-spacing: 4px; color: var(--text-primary); opacity: 0; animation: habaLogoIn 0.01s ease forwards 0.22s; display: inline-flex; align-items: center; }
 
-        /* Splash wordmark typing effect: the letters reveal one at a time (like being typed),
-           with a blinking caret trailing them, instead of the whole word just fading in at once. */
+        /* Splash wordmark typing effect: the letters reveal left-to-right (like being typed),
+           with a blinking caret trailing them. Uses JS to insert real characters one at a time
+           (see habaTypeWordmark below) rather than animating a CSS width/ch guess, because
+           ch-unit widths don't match this font's actual glyph widths and were clipping the
+           last letter. */
         .haba-typed {
-            display: inline-block; overflow: hidden; white-space: nowrap; width: 0; vertical-align: bottom;
+            display: inline-block; white-space: nowrap; vertical-align: bottom;
             border-right: 2px solid var(--text-primary);
-            animation: habaTypeText 0.55s steps(4, end) forwards 0.22s, habaCaretBlink 0.75s step-end infinite 0.22s;
+            animation: habaCaretBlink 0.75s step-end infinite 0.22s;
         }
-        @keyframes habaTypeText { from { width: 0; } to { width: 4ch; } }
         @keyframes habaCaretBlink { 0%, 100% { border-color: transparent; } 50% { border-color: var(--text-primary); } }
-        .haba-mark.splash-exit .haba-typed { animation: none; width: 4ch; border-color: transparent; }
+        .haba-mark.splash-exit .haba-typed { animation: none; border-color: transparent; }
 
         .haba-logo-img {
             position: relative; width: 150px; height: 150px; opacity: 0;
@@ -6362,7 +6364,7 @@
                     <polygon points="20,80 80,110 80,140" fill="var(--primary-blue)" fill-opacity="0.55" />
                 </svg>
             </div>
-            <span class="haba-wordmark"><span class="haba-typed">HABA</span></span>
+            <span class="haba-wordmark"><span class="haba-typed" id="haba-splash-typed" data-full-text="HABA"></span></span>
             <div class="haba-splash-dots" aria-hidden="true"><span></span><span></span><span></span></div>
         </div>
         <div class="haba-splash-from">
@@ -6370,6 +6372,26 @@
             <span class="haba-splash-from-name">Rare Grade</span>
         </div>
     </div>
+    <script>
+        // Types the splash wordmark's real characters in one at a time (real DOM text, not a
+        // CSS width/ch approximation), so the reveal always ends on the full, correct word
+        // regardless of the brand font's actual glyph widths. Runs immediately since this
+        // script sits right after the splash markup in the HTML source.
+        (function habaTypeWordmark() {
+            var el = document.getElementById('haba-splash-typed');
+            if (!el) return;
+            var text = el.dataset.fullText || el.textContent || '';
+            el.textContent = '';
+            var i = 0;
+            var START_DELAY = 220;   // ms, matches the logo/wordmark entrance timing
+            var STEP = 140;          // ms per character
+            setTimeout(function typeNext() {
+                el.textContent += text[i];
+                i++;
+                if (i < text.length) setTimeout(typeNext, STEP);
+            }, START_DELAY);
+        })();
+    </script>
 
     <div id="otp-success-overlay" aria-hidden="true">
         <div class="otp-success-ring-wrap">

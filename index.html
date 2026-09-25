@@ -3403,6 +3403,27 @@
         .sp-card-meta { font-size: 12px; margin-top: 2px; }
         .sp-card .discover-card-add-btn { width: 100%; margin-top: auto; padding: 8px 0; font-size: 13px; }
         .sp-card-follow-slot { width: 100%; margin-top: 10px; display: flex; }
+
+        /* Ads banner — auto-sliding carousel of promoted posts, replacing the old "Suggested for
+           you" row in the same slot right under the search bar. Cards are wide with a small peek
+           of the next one (like a Stories rail), snap-scroll, and advance themselves on a timer;
+           see renderAdsBannerRow / startAdsBannerAutoSlide. */
+        .ads-banner-section { display: none; }
+        #tab-search .ads-banner-section { display: block; padding: 10px 0 4px; }
+        .ads-banner-scroll { display: flex; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x mandatory; margin: 0 -14px; padding: 0 14px 2px; }
+        .ads-banner-scroll::-webkit-scrollbar { display: none; }
+        .ad-banner-card { position: relative; flex: 0 0 88%; scroll-snap-align: start; height: 168px; border-radius: 18px; overflow: hidden; cursor: pointer; background: linear-gradient(135deg, var(--primary-blue), var(--gradient-brand-end, var(--primary-blue))) center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 3px 14px rgba(0,0,0,0.12); }
+        .ad-banner-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.2) 55%, rgba(0,0,0,0.05) 100%); pointer-events: none; }
+        .ad-banner-sponsored-tag { position: absolute; top: 10px; left: 12px; z-index: 2; background: rgba(255,255,255,0.94); color: #111; font-size: 10px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; }
+        .ad-banner-body { position: relative; z-index: 1; padding: 12px 14px 14px; }
+        .ad-banner-brand { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+        .ad-banner-brand-avatar { width: 22px; height: 22px; border-radius: 50%; background-size: cover; background-position: center; background-color: rgba(255,255,255,0.35); flex-shrink: 0; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.65); }
+        .ad-banner-brand-name { font-size: 12.5px; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ad-banner-text { font-size: 13.5px; font-weight: 500; line-height: 1.32; max-height: 2.65em; overflow: hidden; text-shadow: 0 1px 4px rgba(0,0,0,0.45); margin: 0 0 10px; }
+        .ad-banner-cta { display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #111; font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 20px; }
+        .ads-banner-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+        .ads-banner-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border-color); transition: background 0.2s, width 0.2s; }
+        .ads-banner-dot.active { background: var(--text-primary); width: 16px; }
         .trend-item { padding: 10px 2px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
         .trend-item:last-child { border-bottom: none; }
         .trend-item:hover { background: var(--bg-hover); }
@@ -9893,15 +9914,14 @@
                         </div>
                     </div>
                     <div class="search-tab-scroll" id="search-tab-scroll">
-                        <!-- "Suggested for you": compact horizontally scrolling follow cards right under
-                             the search bar. Search tab only, filled by renderSuggestedPeopleRow() each
-                             time the tab is entered (see onSearchTabEntered). -->
-                        <div class="suggested-people-section" id="suggested-people-section" style="display:none;">
-                            <div class="suggested-people-header">
-                                <span class="suggested-people-title">Suggested for you</span>
-                                <button type="button" class="suggested-people-see-all" id="suggested-people-see-all">See all</button>
-                            </div>
-                            <div class="suggested-people-scroll" id="suggested-people-scroll"></div>
+                        <!-- Ads banner: auto-sliding carousel of promoted posts from Business
+                             Accounts ("Publish as an Ad" in the composer sets isAd on the post).
+                             Built from cachedPosts — the feed's realtime listener already keeps
+                             that in sync — so this needs no extra DB query. See
+                             renderAdsBannerRow / onSearchTabEntered. -->
+                        <div class="ads-banner-section" id="ads-banner-section" style="display:none;">
+                            <div class="ads-banner-scroll" id="ads-banner-scroll"></div>
+                            <div class="ads-banner-dots" id="ads-banner-dots"></div>
                         </div>
                         <!-- X-style Explore tabs — live in the Search tab, right below the search
                              bar and suggested people. -->
@@ -17364,6 +17384,9 @@
                 // Restore the suggested row only if it actually has cards (renderSuggestedPeopleRow
                 // hides it when there's no one left to suggest).
                 if (suggestedPeopleSection) suggestedPeopleSection.style.display = (suggestedPeopleScroll && suggestedPeopleScroll.children.length) ? '' : 'none';
+                const adsBannerSection = document.getElementById('ads-banner-section');
+                const adsBannerScroll = document.getElementById('ads-banner-scroll');
+                if (adsBannerSection) adsBannerSection.style.display = (adsBannerScroll && adsBannerScroll.children.length) ? '' : 'none';
                 sprinkleSuggestedPeople();
                 return;
             }
@@ -17379,6 +17402,8 @@
             if (exploreTabsBar) exploreTabsBar.style.display = 'none';
             explorePanels.forEach(p => p.style.display = 'none');
             if (suggestedPeopleSection) suggestedPeopleSection.style.display = 'none';
+            const adsBannerSectionHide = document.getElementById('ads-banner-section');
+            if (adsBannerSectionHide) adsBannerSectionHide.style.display = 'none';
         }
 
         function renderDiscoverGridIfActive() {
@@ -17397,6 +17422,8 @@
             if (onSearch) {
                 const spScroll = document.getElementById('suggested-people-scroll');
                 if (spScroll && !spScroll.children.length) renderSuggestedPeopleRow();
+                const adsScroll = document.getElementById('ads-banner-scroll');
+                if (adsScroll && !adsScroll.children.length) renderAdsBannerRow();
             }
         }
 
@@ -17407,7 +17434,7 @@
         function onSearchTabEntered() {
             renderExploreTrending();
             renderExplorePeople();
-            renderSuggestedPeopleRow();
+            renderAdsBannerRow();
         }
         function onSearchTabLeft() {
             const input = document.getElementById('search-discover');
@@ -17415,6 +17442,7 @@
             const dd = document.getElementById('discover-search-dropdown');
             if (dd) dd.classList.remove('active');
             renderDiscoverGrid('');
+            stopAdsBannerAutoSlide();
         }
         // While the results dropdown is up it becomes the page (body steps aside) — mirror its
         // .active class onto the tab so CSS can hide the body.
@@ -17596,6 +17624,110 @@
             // Keep the People tab ("See all") in the same order as this row.
             renderExplorePeople();
         }
+
+        // Ads banner — auto-sliding carousel of promoted posts (isAd === true, set by "Publish
+        // as an Ad" in the composer, business accounts only). Reads straight from cachedPosts,
+        // which the feed's realtime listener already keeps in sync, so this needs no separate
+        // DB query/index. Lives in the same under-the-search-bar slot the old "Suggested for
+        // you" row used to occupy.
+        let adsBannerTimer = null;
+        let adsBannerIndex = 0;
+        let adsBannerResumeTimeout = null;
+        function adBannerCardHtml(post) {
+            const media = post.imageUrl || (post.imageUrls && post.imageUrls[0]) || post.videoThumbnail || '';
+            const bg = media ? `background-image:url('${escapeHtmlForPost(media)}');` : '';
+            return `
+                <div class="ad-banner-card" data-ad-url="${escapeHtmlForPost(post.adUrl || '')}" style="${bg}">
+                    <span class="ad-banner-sponsored-tag">Sponsored</span>
+                    <div class="ad-banner-body">
+                        <div class="ad-banner-brand">
+                            <span class="ad-banner-brand-avatar" style="background-image:url('${escapeHtmlForPost(post.photoURL || '')}')"></span>
+                            <span class="ad-banner-brand-name">${escapeHtmlForPost(post.name || 'Business')}</span>
+                        </div>
+                        ${post.text ? `<p class="ad-banner-text">${escapeHtmlForPost(post.text)}</p>` : ''}
+                        <span class="ad-banner-cta">
+                            <span>${escapeHtmlForPost(post.adCta || 'Learn More')}</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </span>
+                    </div>
+                </div>`;
+        }
+        function renderAdsBannerRow() {
+            const section = document.getElementById('ads-banner-section');
+            const scroll = document.getElementById('ads-banner-scroll');
+            const dots = document.getElementById('ads-banner-dots');
+            if (!section || !scroll || !dots) return;
+            const ads = Object.values(cachedPosts)
+                .filter(p => p && p.isAd && p.adUrl)
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+                .slice(0, 10);
+            stopAdsBannerAutoSlide();
+            if (!ads.length) {
+                scroll.innerHTML = '';
+                dots.innerHTML = '';
+                section.style.display = 'none';
+                return;
+            }
+            scroll.innerHTML = ads.map(adBannerCardHtml).join('');
+            dots.innerHTML = ads.map((_, i) => `<span class="ads-banner-dot${i === 0 ? ' active' : ''}"></span>`).join('');
+            scroll.scrollLeft = 0;
+            adsBannerIndex = 0;
+            const searchEl = document.getElementById('search-discover');
+            section.style.display = (searchEl && searchEl.value.trim()) ? 'none' : '';
+            if (ads.length > 1) startAdsBannerAutoSlide();
+        }
+        function startAdsBannerAutoSlide() {
+            stopAdsBannerAutoSlide();
+            adsBannerTimer = setInterval(() => {
+                const scroll = document.getElementById('ads-banner-scroll');
+                if (!scroll || !scroll.children.length) return;
+                adsBannerIndex = (adsBannerIndex + 1) % scroll.children.length;
+                const card = scroll.children[adsBannerIndex];
+                scroll.scrollTo({ left: card.offsetLeft - 14, behavior: 'smooth' });
+                updateAdsBannerDots(adsBannerIndex);
+            }, 4200);
+        }
+        function stopAdsBannerAutoSlide() {
+            if (adsBannerTimer) { clearInterval(adsBannerTimer); adsBannerTimer = null; }
+            if (adsBannerResumeTimeout) { clearTimeout(adsBannerResumeTimeout); adsBannerResumeTimeout = null; }
+        }
+        function updateAdsBannerDots(index) {
+            const dots = document.getElementById('ads-banner-dots');
+            if (!dots) return;
+            dots.querySelectorAll('.ads-banner-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+        }
+        // A manual swipe pauses the auto-slide for a bit rather than fighting it, and keeps the
+        // dots synced to whatever card is actually in view.
+        (function initAdsBannerInteraction() {
+            const scroll = document.getElementById('ads-banner-scroll');
+            if (!scroll) return;
+            let scrollRAF = null;
+            scroll.addEventListener('scroll', () => {
+                if (scrollRAF) return;
+                scrollRAF = requestAnimationFrame(() => {
+                    scrollRAF = null;
+                    const cards = scroll.children;
+                    if (!cards.length) return;
+                    let nearest = 0, best = Infinity;
+                    for (let i = 0; i < cards.length; i++) {
+                        const d = Math.abs(cards[i].offsetLeft - 14 - scroll.scrollLeft);
+                        if (d < best) { best = d; nearest = i; }
+                    }
+                    adsBannerIndex = nearest;
+                    updateAdsBannerDots(nearest);
+                });
+            });
+            scroll.addEventListener('pointerdown', () => {
+                stopAdsBannerAutoSlide();
+                adsBannerResumeTimeout = setTimeout(startAdsBannerAutoSlide, 5000);
+            });
+            scroll.addEventListener('click', (e) => {
+                const card = e.target.closest('.ad-banner-card');
+                if (!card) return;
+                const url = card.dataset.adUrl;
+                if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            });
+        })();
 
         // Renders the shared news batch (see fetchNewsHeadlines — same sharedNewsCache/latest
         // batch every user reads, not a per-device fetch) as its own tab in Search/Explore,

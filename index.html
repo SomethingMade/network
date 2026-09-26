@@ -1262,6 +1262,8 @@
         .tm-profile-icon-btn:hover { background: var(--bg-hover); }
         .tm-profile-icon-btn:active { transform: scale(0.92); }
         .tm-profile-icon-btn svg { width: 20px; height: 20px; }
+        #btn-user-info-notify.is-on { color: var(--primary-blue); }
+        #btn-user-info-notify.is-on svg { fill: currentColor; }
 
 
         /* ── Content sits in a "floating card" that overlaps the bottom of the plain
@@ -1446,10 +1448,15 @@
         .tm-profile-username { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--text-primary); margin: 0; }
         .ig-profile-avatar, .ig-profile-avatar.avatar-circle { width: 86px; height: 86px; border: none; box-shadow: none; }
         .tm-profile-bio { font-size: 15px; line-height: 1.45; margin: 10px 0 12px; }
-        .ig-profile-stats-grid { margin: 4px 0 16px; }
-        .ig-profile-stat-num, .ig-profile-stat-label { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+        .ig-profile-stats-grid { margin: 4px 0 16px; gap: 22px; }
+        .ig-profile-stat, .ig-profile-stats-grid .tm-profile-stat-link { flex-direction: column; align-items: flex-start; gap: 1px; }
+        .ig-profile-stat + .ig-profile-stat::before,
+        .ig-profile-stat + .tm-profile-stat-link::before,
+        .ig-profile-stats-grid .tm-profile-stat-link + .ig-profile-stat::before { content: none; }
+        .ig-profile-stat-num { font-size: 17px; font-weight: 800; color: var(--text-primary); }
+        .ig-profile-stat-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
         .tm-profile-actions, .ig-profile-actions-row { gap: 10px; margin: 6px 0 4px; }
-        .tm-profile-actions .btn-pill, .ig-profile-actions-row .btn-pill { border-radius: 14px; padding: 13px 14px; font-size: 15px; font-weight: 700; }
+        .tm-profile-actions .btn-pill, .ig-profile-actions-row .btn-pill { border-radius: 999px; padding: 13px 14px; font-size: 15px; font-weight: 700; }
         .ig-profile-actions-row #btn-edit-profile, .ig-profile-actions-row #btn-share-profile { border-radius: 50px; }
         .tm-profile-actions .btn-pill svg { display: none; }
         .tm-profile-media-section { border-top: none; padding-top: 0; margin-top: 14px; }
@@ -2097,6 +2104,43 @@
         .profile-media-grid-item .profile-media-play-badge { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item .profile-media-pin-badge { position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none; }
         .profile-media-grid-item:active { opacity: 0.85; }
+
+        /* ── Posts grid tiles (TikTok-profile-style) ──
+           Uniform 3-col square tiles (no mosaic — every tile is the same size), each with
+           an optional caption overlay near the top, a "multiple photos" stack badge, and a
+           repost-icon + relative-time footer bottom-left, all scrimmed for legibility over
+           any thumbnail. Text-only posts (no image/video) render as a solid card with the
+           caption centered instead of an empty tile. */
+        .profile-posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+        .profile-post-tile::after {
+            content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; z-index: 1;
+            background: linear-gradient(to top, rgba(0,0,0,0.55), transparent); pointer-events: none;
+        }
+        .profile-post-tile-caption {
+            position: absolute; top: 8px; left: 8px; right: 8px; z-index: 2;
+            font-size: 11.5px; font-weight: 700; line-height: 1.3; color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.75), 0 0 8px rgba(0,0,0,0.4);
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            pointer-events: none;
+        }
+        .profile-post-tile-textcard {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            padding: 12px; background: var(--gradient-brand);
+        }
+        .profile-post-tile-textcard .profile-post-tile-caption {
+            position: static; text-align: center; -webkit-line-clamp: 6; text-shadow: none;
+        }
+        .profile-post-tile-stack {
+            position: absolute; top: 6px; right: 6px; z-index: 2; width: 15px; height: 15px; color: #fff;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); pointer-events: none;
+        }
+        .profile-post-tile-footer {
+            position: absolute; left: 6px; bottom: 6px; z-index: 2;
+            display: flex; align-items: center; gap: 4px;
+            color: #fff; font-size: 11px; font-weight: 700;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        .profile-post-tile-footer svg { width: 12px; height: 12px; flex-shrink: 0; }
         /* Encrypted DM media cell, still being fetched + decrypted client-side (see
            btn-contact-card-media above). Pulses gently so an empty cell doesn't read as
            broken while it waits on decryptMediaUrlForPeer. */
@@ -7792,7 +7836,7 @@
                         <button type="button" class="profile-subtab-btn" data-subtab="media"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Media</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="saved"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 21l-7-5-7 5V3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1z"></path></svg>Saved</button>
                     </div>
-                    <div class="profile-posts-list" id="my-profile-posts-list"></div>
+                    <div class="profile-posts-list profile-posts-grid" id="my-profile-posts-list"></div>
                     <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
                     <!-- Collection picker for the Saved tab — shown/hidden with the tab itself (see
@@ -7924,6 +7968,14 @@
                 <button type="button" id="btn-close-user-info" class="tm-profile-back-btn" aria-label="Back">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
+                <div class="tm-profile-header-actions">
+                    <button type="button" id="btn-user-info-notify" class="tm-profile-icon-btn" aria-label="Notifications">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    </button>
+                    <button type="button" id="btn-user-info-share" class="tm-profile-icon-btn" aria-label="Share Profile">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                    </button>
+                </div>
             </div>
 
             <div class="tm-profile-content">
@@ -7994,7 +8046,7 @@
                         <button type="button" class="profile-subtab-btn" data-subtab="replies"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>Replies</button>
                         <button type="button" class="profile-subtab-btn" data-subtab="media"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Media</button>
                     </div>
-                    <div class="profile-posts-list" id="user-info-posts-list"></div>
+                    <div class="profile-posts-list profile-posts-grid" id="user-info-posts-list"></div>
                     <div class="profile-posts-list" id="user-info-replies-list" style="display:none;"></div>
                     <div class="profile-media-grid" id="user-info-media-grid" style="display:none;"></div>
                 </div>
@@ -28964,6 +29016,34 @@
             document.getElementById('user-info-media-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
+        // Post-notifications bell: a lightweight per-viewer toggle (no backend push
+        // subscription yet) so the icon fills in and gives feedback, matching the
+        // filled/outline bell pattern used elsewhere in the nav.
+        document.getElementById('btn-user-info-notify').addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            const nowOn = !btn.classList.contains('is-on');
+            btn.classList.toggle('is-on', nowOn);
+            const name = (cachedUsers[userInfoSheetUid] && cachedUsers[userInfoSheetUid].name) || 'this person';
+            notify(nowOn ? `You'll be notified when ${name} posts` : `Turned off post notifications for ${name}`);
+        });
+
+        document.getElementById('btn-user-info-share').addEventListener('click', async () => {
+            const uid = userInfoSheetUid;
+            const targetUser = cachedUsers[uid] || {};
+            const usernameLabel = document.getElementById('user-info-username').textContent;
+            const hasUsername = usernameLabel && usernameLabel !== '@—';
+            const slug = hasUsername ? usernameLabel.replace('@', '') : uid;
+            const profileUrl = PROFILE_WEB_BASE_URL + slug;
+            const shareText = `Check out ${targetUser.name || 'this profile'} on Haba! ${hasUsername ? usernameLabel : ''}`.trim();
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Haba', text: shareText, url: profileUrl }); }
+                catch (err) { /* user cancelled share, ignore */ }
+            } else if (navigator.clipboard) {
+                try { await navigator.clipboard.writeText(profileUrl); notify('Profile link copied'); }
+                catch (err) { notify('Could not copy link', 'error'); }
+            }
+        });
+
         const shareProfileSheetOverlay = document.getElementById('share-profile-sheet-overlay');
         document.getElementById('btn-share-profile').addEventListener('click', () => {
             renderShareProfileQr();
@@ -33082,7 +33162,29 @@
                 listEl.innerHTML = '<div class="profile-posts-empty">No posts yet.</div>';
                 return;
             }
-            items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
+
+            listEl.innerHTML = items.map(([postId, post]) => {
+                const isVideo = !!post.videoUrl;
+                const imgs = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+                const coverUrl = isVideo ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : imgs[0];
+                const hasMedia = !!coverUrl;
+                const caption = post.text ? escapeHtmlForPost(post.text) : '';
+                const captionHtml = caption ? `<div class="profile-post-tile-caption">${caption}</div>` : '';
+                const playBadge = isVideo ? '<svg class="profile-media-play-badge" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>' : '';
+                const pinBadge = (postId === pinnedId) ? '<svg class="profile-media-pin-badge" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path></svg>' : '';
+                const stackBadge = (!isVideo && imgs.length > 1) ? '<svg class="profile-post-tile-stack" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="14" height="14" rx="2"></rect><path d="M4 17V5a2 2 0 0 1 2-2h12"></path></svg>' : '';
+                const timeLabel = formatTime(post.timestamp).replace(' ago', '');
+                const mediaTag = hasMedia
+                    ? `<img src="${coverUrl}" alt="" loading="lazy">${captionHtml}`
+                    : `<div class="profile-post-tile-textcard">${captionHtml}</div>`;
+                return `<div class="profile-media-grid-item profile-post-tile" data-post-id="${postId}" data-is-video="${isVideo ? '1' : '0'}">${mediaTag}${stackBadge}${playBadge}${pinBadge}<div class="profile-post-tile-footer">${repostArrowsSvg()}<span>${timeLabel}</span></div></div>`;
+            }).join('');
+
+            listEl.querySelectorAll('.profile-post-tile').forEach(item => {
+                item.addEventListener('click', () => {
+                    openPostComments(item.dataset.postId, { fullView: true });
+                });
+            });
         }
 
         function buildProfileMediaGrid(gridEl, uid) {

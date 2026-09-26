@@ -2153,6 +2153,12 @@
             opacity: 0.6;
         }
         .profile-media-empty { grid-column: 1 / -1; text-align: center; font-size: 13.5px; color: var(--text-secondary); padding: 22px 0; }
+        /* Centered illustration + message shown when a profile tab (Posts/Replies/Media/
+           Saved) has nothing in it, instead of a bare line of text. grid-column:1/-1 so it
+           still spans full width when the parent is one of the 3-col grids. */
+        .profile-empty-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 56px 24px; }
+        .profile-empty-state svg { width: 60px; height: 60px; color: var(--text-secondary); opacity: 0.45; }
+        .profile-empty-state p { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
         /* ── PROFILE SUBTABS (Posts / Media switcher above the section) ── */
         /* Same flat tab row as .feed-subtabs (bottom-border indicator under the active
            label, no pill fill) for a consistent tab design across the app. Class names/JS
@@ -33007,10 +33013,8 @@
 
             listEl.innerHTML = '';
             if (!items.length) {
-                const empty = document.createElement('div');
-                empty.className = 'profile-posts-empty';
-                empty.textContent = filter === 'all' ? 'No saved posts yet.' : `Nothing saved in “${savedCollectionName(filter)}” yet.`;
-                listEl.appendChild(empty);
+                const message = filter === 'all' ? 'No saved posts yet.' : `Nothing saved in “${escapeHtmlForPost(savedCollectionName(filter))}” yet.`;
+                listEl.innerHTML = profileEmptyStateHtml(message);
                 return;
             }
             items.forEach(([postId, post]) => listEl.appendChild(buildFeedPostCard(postId, post)));
@@ -33088,7 +33092,7 @@
                 const snap = await get(ref(database, `userReplies/${uid}`));
                 if (snap.exists()) repliesObj = snap.val();
             } catch (e) {
-                listEl.innerHTML = '<div class="profile-posts-empty">No replies yet.</div>';
+                listEl.innerHTML = profileEmptyStateHtml('No replies yet.');
                 return;
             }
 
@@ -33099,7 +33103,7 @@
 
             listEl.innerHTML = '';
             if (!items.length) {
-                listEl.innerHTML = '<div class="profile-posts-empty">No replies yet.</div>';
+                listEl.innerHTML = profileEmptyStateHtml('No replies yet.');
                 return;
             }
             items.forEach(([commentId, reply]) => listEl.appendChild(buildProfileReplyCard(commentId, reply, uid)));
@@ -33143,6 +33147,21 @@
         // Renders the full "Posts" tab of a profile — every post by this user (text-only posts
         // included, unlike the media-only grid), using the same interactive card as the main
         // feed. Pinned post leads, everything else newest-first.
+        // Shared "nothing here" illustration for the Posts/Replies/Media/Saved tabs — a
+        // simple line-art empty tray, in the same monochrome/rounded-stroke style as the
+        // rest of the app's icons, so an empty tab reads as a friendly placeholder instead
+        // of a bare line of gray text.
+        function profileEmptyStateIllustration() {
+            return `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="8" y="16" width="48" height="36" rx="7"></rect>
+                <circle cx="22" cy="28" r="4"></circle>
+                <path d="M8 44l13-13 9 9 11-11 15 15"></path>
+            </svg>`;
+        }
+        function profileEmptyStateHtml(message) {
+            return `<div class="profile-empty-state">${profileEmptyStateIllustration()}<p>${message}</p></div>`;
+        }
+
         function buildProfilePostsList(listEl, uid) {
             if (!listEl) return;
             if (!uid) { listEl.innerHTML = ''; return; }
@@ -33159,7 +33178,7 @@
 
             listEl.innerHTML = '';
             if (!items.length) {
-                listEl.innerHTML = '<div class="profile-posts-empty">No posts yet.</div>';
+                listEl.innerHTML = profileEmptyStateHtml('No posts yet.');
                 return;
             }
 
@@ -33205,7 +33224,7 @@
                 });
 
             if (!posts.length) {
-                gridEl.innerHTML = '<div class="profile-media-empty">No media uploaded yet.</div>';
+                gridEl.innerHTML = profileEmptyStateHtml('No media uploaded yet.');
                 return;
             }
 

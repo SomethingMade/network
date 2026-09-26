@@ -5813,14 +5813,15 @@
                    --nav-bar-extra-bottom instead of trusting env() alone. */
                 --nav-bar-safe-bottom: max(env(safe-area-inset-bottom), var(--nav-bar-extra-bottom));
                 --nav-bar-height: calc(74px + var(--nav-island-gap) + var(--nav-bar-safe-bottom));
-                /* Bar palette follows the active theme: --bg-surface and --nav-active-black
-                   already flip per theme (light/dark/glass/neumorphic all redefine them),
-                   so the bar automatically matches whichever theme is on. Inactive icons/
-                   labels reuse the same active color at reduced opacity (set at the usage
-                   sites below) rather than a separate hardcoded color, so they always have
-                   the right contrast against --bg-surface in every theme. */
-                --bottomnav-bg: var(--bg-surface);
-                --bottomnav-active: var(--nav-active-black);
+                /* NOTE: intentionally no --bottomnav-bg/--bottomnav-active indirection here.
+                   A custom property's var() references are substituted once, at the element
+                   where it's declared, and the *already-substituted* result is what inherits
+                   to descendants — it does not re-evaluate per element. Since this block only
+                   runs at :root, a --bottomnav-bg: var(--bg-surface) declared here would
+                   freeze at :root's (light) --bg-surface and never pick up body.dark-theme's
+                   override, even though --bg-surface itself resolves correctly everywhere.
+                   So every rule below references --bg-surface / --nav-active-black directly
+                   instead, which re-reads correctly at each themed ancestor. */
             }
             .side-nav {
                 display: flex; /* was grid(5) with only 4 visible items (Profile is desktop-only),
@@ -5850,7 +5851,7 @@
                 box-shadow: 0 -6px 24px rgba(0,0,0,0.24);
                 /* Fixed dark bar regardless of the active theme (light/dark/glass/neumorphic),
                    matching the reference design rather than following --bg-surface. */
-                background: var(--bottomnav-bg) !important;
+                background: var(--bg-surface) !important;
                 transition: transform 0.25s ease, background 0.2s ease;
             }
             /* Decorative home-indicator handle, like the gesture bar in the reference image.
@@ -5866,7 +5867,7 @@
                 width: 100px;
                 height: 4px;
                 border-radius: 999px;
-                background: var(--bottomnav-active);
+                background: var(--nav-active-black);
                 opacity: 0.25;
                 pointer-events: none;
             }
@@ -5878,27 +5879,27 @@
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-item { flex: 1; padding: 4px; margin: 0 1px; color: var(--bottomnav-active); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; position: relative; border-radius: 14px; transition: color 0.2s ease; }
+            .nav-item { flex: 1; padding: 4px; margin: 0 1px; color: var(--nav-active-black); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; position: relative; border-radius: 14px; transition: color 0.2s ease; }
             /* Icons: same theme color as the active state but dimmed via opacity when
                inactive, full opacity and swapped to the filled shape (via .icon-fill,
                already wired below) when active — matching the reference's bold "Home" icon
                among dimmed siblings, while staying correct in every theme's own color. */
-            .nav-item svg { stroke: var(--bottomnav-active); opacity: 0.45; width: 23px; height: 23px; position: relative; z-index: 1; }
+            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.45; width: 23px; height: 23px; position: relative; z-index: 1; }
             .nav-item svg .icon-line { stroke-width: 2.1; }
             /* Labels are always visible now (icon + label, like the reference), not
                screen-reader-only. Needs its own .nav-item.active span override here: the
                base rule two lines up in the desktop styles is .nav-item.active span (two
                classes), which beats this plain .nav-item span on specificity alone
                regardless of media query, so without this the label style wouldn't apply. */
-            .nav-item span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--bottomnav-active); opacity: 0.45; }
-            .nav-item.active span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--bottomnav-active); opacity: 1; }
+            .nav-item span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--nav-active-black); opacity: 0.45; }
+            .nav-item.active span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--nav-active-black); opacity: 1; }
             .nav-item.active svg { opacity: 1; }
-            .nav-item.active { color: var(--bottomnav-active); background: none; }
-            .nav-item.active svg { stroke: var(--bottomnav-active); }
+            .nav-item.active { color: var(--nav-active-black); background: none; }
+            .nav-item.active svg { stroke: var(--nav-active-black); }
             .nav-badge { opacity: 1; }
             .nav-indicator { display: none; }
             body.glass-theme .side-nav {
-                background: var(--bottomnav-bg) !important;
+                background: var(--bg-surface) !important;
                 backdrop-filter: blur(24px) saturate(160%) !important;
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
                 border-top: none;

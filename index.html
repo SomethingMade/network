@@ -5799,89 +5799,106 @@
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
             }
 
-            /* ── Floating pill/island bottom nav bar (Instagram-style) ── */
+            /* ── Dark full-width bottom nav bar (icon + always-visible label) ── */
             :root {
-                /* Was flush against the screen edge; now the island floats --nav-island-gap
-                   above the bottom edge, so anything padding-bottom to clear the bar needs
-                   that gap added on top of the bar's own height. */
-                --nav-island-gap: 14px;
-                --nav-bar-total: calc(58px + var(--nav-island-gap) + 22px);
+                /* Bar now sits flush at the bottom edge instead of floating as an inset
+                   island, so the old "island gap" is 0 — kept as a variable (rather than
+                   deleted) purely so the calc() formulas below and elsewhere that reference
+                   it don't need to change shape. */
+                --nav-island-gap: 0px;
+                --nav-bar-total: calc(74px + var(--nav-island-gap) + 22px);
                 /* Actual on-screen height of the nav bar itself. Some phones don't report a
                    real env(safe-area-inset-bottom) even though they have their own gesture
                    bar/home-indicator strip overlapping the viewport, so this floors it at
                    --nav-bar-extra-bottom instead of trusting env() alone. */
                 --nav-bar-safe-bottom: max(env(safe-area-inset-bottom), var(--nav-bar-extra-bottom));
-                --nav-bar-height: calc(58px + var(--nav-island-gap) + var(--nav-bar-safe-bottom));
+                --nav-bar-height: calc(74px + var(--nav-island-gap) + var(--nav-bar-safe-bottom));
+                /* Bar palette follows the active theme: --bg-surface and --nav-active-black
+                   already flip per theme (light/dark/glass/neumorphic all redefine them),
+                   so the bar automatically matches whichever theme is on. Inactive icons/
+                   labels reuse the same active color at reduced opacity (set at the usage
+                   sites below) rather than a separate hardcoded color, so they always have
+                   the right contrast against --bg-surface in every theme. */
+                --bottomnav-bg: var(--bg-surface);
+                --bottomnav-active: var(--nav-active-black);
             }
             .side-nav {
                 display: flex; /* was grid(5) with only 4 visible items (Profile is desktop-only),
                                    which left a lopsided empty track; flex + space-evenly centers
-                                   Home/Search/Notifications/Messages evenly inside the island. */
+                                   Home/Search/Notifications/Messages evenly inside the bar. */
                 /* The base desktop .side-nav rule sets flex-direction: column (it's a vertical
                    sidebar there) — without overriding it here the tabs inherit "column" and
                    stack on top of each other instead of sitting in one horizontal row. */
                 flex-direction: row;
                 justify-content: space-evenly;
-                height: 58px;
-                padding: 0 8px;
+                height: calc(74px + var(--nav-bar-safe-bottom));
+                padding: 10px 8px calc(10px + var(--nav-bar-safe-bottom));
                 position: fixed;
-                /* Floating island: inset from both edges and lifted off the bottom edge,
-                   rather than spanning full-width and sitting flush at bottom:0 like the
-                   old flat bar. */
-                left: 16px;
-                right: 16px;
-                bottom: calc(var(--nav-island-gap) + var(--nav-bar-safe-bottom));
-                width: auto;
-                max-width: 380px;
-                margin: 0 auto;
+                /* Full-width dark bar, flush with the bottom edge, rounded top corners only —
+                   replaces the old inset floating pill/island. */
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                max-width: none;
+                margin: 0;
                 border-right: none;
                 border-top: none;
-                border-radius: 999px;
+                border-radius: 22px 22px 0 0;
                 align-items: center;
                 z-index: 100;
-                /* Real elevation now that the bar floats above the feed instead of blending
-                   into it — this is what makes it read as a lifted island. */
-                box-shadow: 0 12px 28px rgba(17,17,17,0.16), 0 2px 8px rgba(17,17,17,0.08);
-                /* Follows the active theme (light/dark/glass/neumorphic) via --bg-surface,
-                   instead of being pinned to white, so the bar always matches the rest of
-                   the app's current theme. */
-                background: var(--bg-surface) !important;
-                transition: transform 0.25s ease;
+                box-shadow: 0 -6px 24px rgba(0,0,0,0.24);
+                /* Fixed dark bar regardless of the active theme (light/dark/glass/neumorphic),
+                   matching the reference design rather than following --bg-surface. */
+                background: var(--bottomnav-bg) !important;
+                transition: transform 0.25s ease, background 0.2s ease;
             }
-            .side-nav.nav-scroll-hidden { transform: translateY(140%) translateY(calc(-1 * var(--nav-island-gap))); }
+            /* Decorative home-indicator handle, like the gesture bar in the reference image.
+               Uses the theme's own active color at low opacity so it stays a subtle neutral
+               mark against --bg-surface in every theme (dark handle on light themes, light
+               handle on dark themes). */
+            .side-nav::after {
+                content: '';
+                position: absolute;
+                left: 50%;
+                bottom: calc(8px + var(--nav-bar-safe-bottom));
+                transform: translateX(-50%);
+                width: 100px;
+                height: 4px;
+                border-radius: 999px;
+                background: var(--bottomnav-active);
+                opacity: 0.25;
+                pointer-events: none;
+            }
+            .side-nav.nav-scroll-hidden { transform: translateY(140%); }
             /* Default: leave the reserved nav-bar strip at the bottom uncovered so the
                bottom nav bar stays visible while viewing reels. Matches the bar's real
-               (possibly safe-area-grown) height, not just its base 58px. */
+               (possibly safe-area-grown) height, not just its base 74px. */
             #reel-viewer-overlay { bottom: var(--nav-bar-height); }
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-item { flex: 1; padding: 10px; margin: 0 1px; color: var(--nav-active-black); display: flex; align-items: center; justify-content: center; position: relative; border-radius: 999px; transition: background 0.2s ease; }
-            /* Icons: dimmed a touch when inactive, full opacity and swapped to the filled
-               shape (via .icon-fill, already wired below) when active. Active tab also gets
-               a soft pill highlight behind the icon (see .nav-item.active below) instead of
-               just an opacity change, so the island reads as having a "current" slot.
-               --nav-active-black flips to a light color under body.dark-theme so icons stay
-               visible instead of going black-on-black.
-               .icon-line is the class on every path/polyline/circle inside these nav SVGs,
-               so this beats their own inline stroke-width="1.8" attributes. */
-            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.5; width: 24px; height: 24px; position: relative; z-index: 1; }
+            .nav-item { flex: 1; padding: 4px; margin: 0 1px; color: var(--bottomnav-active); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; position: relative; border-radius: 14px; transition: color 0.2s ease; }
+            /* Icons: same theme color as the active state but dimmed via opacity when
+               inactive, full opacity and swapped to the filled shape (via .icon-fill,
+               already wired below) when active — matching the reference's bold "Home" icon
+               among dimmed siblings, while staying correct in every theme's own color. */
+            .nav-item svg { stroke: var(--bottomnav-active); opacity: 0.45; width: 23px; height: 23px; position: relative; z-index: 1; }
             .nav-item svg .icon-line { stroke-width: 2.1; }
-            /* Icon-only — labels stay screen-reader-only even for the active tab (unlike the
-               desktop sidebar, which reveals the active label). Needs its own
-               .nav-item.active span override here: the base rule two lines up in the desktop
-               styles is .nav-item.active span (two classes), which beats this plain
-               .nav-item span on specificity alone regardless of media query, so without this
-               the active tab's label was still leaking through on mobile. */
-            .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-            .nav-item.active span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+            /* Labels are always visible now (icon + label, like the reference), not
+               screen-reader-only. Needs its own .nav-item.active span override here: the
+               base rule two lines up in the desktop styles is .nav-item.active span (two
+               classes), which beats this plain .nav-item span on specificity alone
+               regardless of media query, so without this the label style wouldn't apply. */
+            .nav-item span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--bottomnav-active); opacity: 0.45; }
+            .nav-item.active span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--bottomnav-active); opacity: 1; }
             .nav-item.active svg { opacity: 1; }
-            .nav-item.active { color: var(--nav-active-black); background: var(--bg-alt); }
-            .nav-item.active svg { stroke: var(--nav-active-black); }
+            .nav-item.active { color: var(--bottomnav-active); background: none; }
+            .nav-item.active svg { stroke: var(--bottomnav-active); }
             .nav-badge { opacity: 1; }
             .nav-indicator { display: none; }
             body.glass-theme .side-nav {
-                background: var(--bg-surface) !important;
+                background: var(--bottomnav-bg) !important;
                 backdrop-filter: blur(24px) saturate(160%) !important;
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
                 border-top: none;

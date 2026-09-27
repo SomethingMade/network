@@ -6480,9 +6480,10 @@
         .feed-post-card-ig .feed-post-ad-card-footer,
         .feed-post-card-ig > .feed-post-ad-cta { margin-left: 16px; margin-right: 16px; }
 
-        /* — Actions row: icon-only, heart/comment/repost/share on the left,
-           save pinned to the far right, views only shown on video posts — */
-        .feed-post-card-ig .feed-post-reactors { display: none !important; }
+        /* — Actions row: icon-only, heart/comment/repost/share on the left, save pinned
+           to the far right. Views always shown. Reactors summary sits below, truncated. — */
+        .feed-post-card-ig .feed-post-reactors { margin-top: 4px; margin-left: 0; padding: 0 16px; }
+        .feed-post-card-ig .feed-post-reactors-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
         .feed-post-card-ig .feed-post-actions { padding: 4px 12px 0; margin-top: 8px; margin-left: 0; width: 100%; max-width: 100%; }
         .feed-post-card-ig .feed-post-actions-left { justify-content: flex-start; gap: 2px; }
         .feed-post-card-ig .feed-post-action-btn { padding: 8px; gap: 0; }
@@ -21026,9 +21027,12 @@
             row.style.display = 'flex';
             const shown = reactorUids.slice(0, 3);
             avatarsEl.innerHTML = shown.map(uid => feedAvatarHtml(cachedUsers[uid] || {})).join('');
+            const names = shown.map(uid => (cachedUsers[uid] && cachedUsers[uid].name) || 'Someone');
             const total = post.likeCount || reactorUids.length;
             const remaining = total - shown.length;
-            labelEl.textContent = remaining > 0 ? `+${formatFeedCount(remaining)}` : '';
+            let label = names.join(', ');
+            if (remaining > 0) label += (names.length ? ' and ' : '') + `${formatFeedCount(remaining)} other${remaining === 1 ? '' : 's'}`;
+            labelEl.textContent = label ? `Liked by ${label}` : '';
         }
 
         // A repost-wrapper card renders another post's content, so more than one card in the
@@ -21569,10 +21573,6 @@
                 ${imageHtml}
                 ${videoHtml}
                 ${adCtaHtml}
-                <div class="feed-post-reactors" style="display:none;">
-                    <div class="feed-post-reactors-avatars"></div>
-                    <span class="feed-post-reactors-label"></span>
-                </div>
                 <div class="feed-post-actions">
                     <div class="feed-post-actions-left">
                         <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}" data-reaction="${myReactionEmoji || ''}">
@@ -21598,6 +21598,10 @@
                             <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                         </button>
                     </div>
+                </div>
+                <div class="feed-post-reactors" style="display:none;">
+                    <div class="feed-post-reactors-avatars"></div>
+                    <span class="feed-post-reactors-label"></span>
                 </div>
                 <div class="ig-view-comments"${(post.commentCount || 0) > 0 ? '' : ' style="display:none;"'}>View comments</div>
             `;

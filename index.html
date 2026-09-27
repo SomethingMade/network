@@ -1967,7 +1967,6 @@
             border-radius: 0;
             border: none;
         }
-        #post-comments-post-preview .feed-post-video-music-chip { margin-left: 0; max-width: 100%; }
         /* Same "full view width" treatment for a text-only post: the caption/poll/link-preview
            block and the like/comment/repost row are normally indented under the avatar column
            (see .feed-post-body / .feed-post-actions above) to match the regular feed's compact
@@ -2254,11 +2253,18 @@
         .feed-composer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .feed-composer-thumb.active { border-color: var(--primary-blue); opacity: 1; }
         .feed-composer-thumb-remove { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.65); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; cursor: pointer; }
-        .feed-post-music-chip { margin-top: 8px; display: flex; align-items: center; gap: 8px; background: var(--bg-alt); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; max-width: 100%; }
-        .feed-post-video-music-chip { margin-left: 60px; max-width: calc(100% - 76px); cursor: default; }
-        .feed-post-music-chip img { width: 26px; height: 26px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-        .feed-post-music-chip span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
-        .feed-post-music-chip svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--primary-blue); }
+        /* Instagram-style song credit: a small note icon + track/artist line under the username
+           row (see .x-post-username above), with a scrolling "marquee" for names too long to fit.
+           The only interactive control is the small round mute/play button overlaid on the media
+           itself (bottom-right, .feed-post-music-toggle-btn) — the line itself is just a label. */
+        .feed-post-music-line { display: flex; align-items: center; gap: 5px; margin-top: 2px; max-width: 100%; overflow: hidden; }
+        .feed-post-music-line svg { width: 13px; height: 13px; flex-shrink: 0; color: var(--text-secondary); }
+        .feed-post-music-track { flex: 1; min-width: 0; overflow: hidden; }
+        .feed-post-music-track span { display: inline-block; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+        .feed-post-music-track.marquee span { animation: feedMusicMarquee linear infinite; animation-duration: var(--marquee-dur, 9s); }
+        @keyframes feedMusicMarquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .feed-post-music-toggle-btn { position: absolute; bottom: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; z-index: 2; }
+        .feed-post-music-toggle-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
         .feed-post-tagged-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; font-size: 13px; color: var(--text-secondary); }
         .feed-post-tagged-label { font-size: 12px; color: var(--text-secondary); }
         .feed-post-tagged-chip { background: rgba(var(--primary-rgb), 0.1); color: var(--primary-blue); font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 50px; cursor: pointer; transition: background 0.15s ease; }
@@ -6006,7 +6012,6 @@
             .feed-video-popout-btn { right: 48px; }
             .feed-composer-thumb-remove { width: 15px; height: 15px; font-size: 10px; }
             .feed-composer-preview-remove { width: 24px; height: 24px; }
-            .feed-post-music-chip img { width: 22px; height: 22px; }
             .floating-video-btn { width: 22px; height: 22px; }
             .floating-video-center-play { width: 30px; height: 30px; }
 
@@ -20936,7 +20941,7 @@
         // Wires up the music chip on an image post (if it has music attached). Playback is
         // automatic based on viewport visibility, but the chip can also be tapped to toggle manually.
         function initFeedPostMusic(card) {
-            const chip = card.querySelector('.feed-post-music-chip');
+            const chip = card.querySelector('.feed-post-music-toggle-btn');
             const audio = card.querySelector('.feed-post-music-audio');
             if (!chip || !audio) return;
             const playIcon = chip.querySelector('.feed-music-play-icon');
@@ -21446,13 +21451,15 @@
             const liveAuthor = cachedUsers[post.uid] || {};
             const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || post.name, photoURL: liveAuthor.photoURL || post.photoURL });
             const postImages = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
-            const musicChipHtml = (postImages.length && post.music) ? `
-                <div class="feed-post-music-chip">
-                    <img src="${post.music.artworkUrl || ''}" alt="">
-                    <span></span>
-                    <svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
-                </div>
-                <audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : '';
+            // Instagram-style song credit: a note-icon + track/artist line sits under the
+            // username (see musicHeaderHtml below, wired into card.innerHTML near .x-post-username),
+            // and the only on-media control is a small round play/pause button in the bottom-right
+            // corner of the image, matching IG's mute-icon placement (see initFeedPostMusic).
+            const musicHeaderHtml = post.music ? `
+                <div class="feed-post-music-line">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                    <div class="feed-post-music-track"><span></span></div>
+                </div>` : '';
             const isCardAd = !!(post.isAd && post.adUrl);
             const imageHtml = postImages.length ? `
                 <div class="x-media-grid${isCardAd ? ' has-ad-cta' : ''}" data-count="${postImages.length}">
@@ -21461,12 +21468,8 @@
                     </div>
                     ${postImages.length > 1 ? `<span class="x-media-carousel-counter">1/${postImages.length}</span>
                     <div class="x-media-carousel-dots">${postImages.map((_, idx) => `<span class="dot${idx === 0 ? ' active' : ''}"></span>`).join('')}</div>` : ''}
-                </div>${musicChipHtml}` : '';
-            const videoMusicChipHtml = (post.videoUrl && post.music) ? `
-                <div class="feed-post-music-chip feed-post-video-music-chip">
-                    <img src="${post.music.artworkUrl || ''}" alt="">
-                    <span></span>
-                </div>` : '';
+                    ${post.music ? `<button type="button" class="feed-post-music-toggle-btn" aria-label="Play sound"><svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>` : ''}
+                </div>${post.music ? `<audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}` : '';
             const videoHtml = post.videoUrl ? `
                 <div class="feed-post-video-wrap${isCardAd ? ' has-ad-cta' : ''}" data-has-music="${post.music ? '1' : '0'}">
                     <video class="feed-post-video" src="${post.videoUrl}" ${(() => { const t = post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
@@ -21496,7 +21499,7 @@
                             <svg class="icon-muted" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12l3-3-1-1-3 3-3-3-1 1 3 3-3 3 1 1 3-3 3 3 1-1z"></path></svg>
                         </button>
                     </div>
-                </div>${videoMusicChipHtml}` : '';
+                </div>` : '';
             const textHtml = post.text ? `<p class="feed-post-text"></p>` : '';
             const linkPreviewHtml = (post.linkPreview && post.linkPreview.image) ? `
                 <a class="feed-link-preview" href="${escapeHtmlForPost(post.linkPreview.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
@@ -21560,6 +21563,7 @@
                             <span class="x-post-username-text"></span>
                             ${post.location ? `<span class="feed-post-location" data-lat="${post.location.lat}" data-lng="${post.location.lng}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span></span></span>` : ''}
                         </div>
+                        ${musicHeaderHtml}
                     </div>
                 </div>
                 <div class="feed-post-body">
@@ -21614,9 +21618,23 @@
             getFeedImpressionObserver().observe(card);
             applyPaywallLock(card, post);
             if (textHtml) setExpandableFeedText(card.querySelector('.feed-post-text'), post.text, FEED_CAPTION_TRUNCATE_LIMIT);
-            const musicChipSpan = card.querySelector('.feed-post-music-chip span');
-            if (musicChipSpan && post.music) {
-                musicChipSpan.textContent = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+            const musicTrackEl = card.querySelector('.feed-post-music-track');
+            const musicTrackSpan = musicTrackEl ? musicTrackEl.querySelector('span') : null;
+            if (musicTrackSpan && post.music) {
+                const musicLabel = `${post.music.trackName}${post.music.artistName ? ' — ' + post.music.artistName : ''}`;
+                musicTrackSpan.textContent = musicLabel;
+                // Only scroll (marquee) if the label is actually wider than its line — most
+                // track/artist names fit fine and should just sit still, IG-style.
+                requestAnimationFrame(() => {
+                    if (musicTrackSpan.scrollWidth > musicTrackEl.clientWidth) {
+                        // Repeat "label + gap" twice, then loop by exactly one repeat's width
+                        // (translateX(-50%) in CSS) so the scroll reads as seamless, IG-style.
+                        const repeatUnit = musicLabel + '\u00A0\u00A0\u00A0\u00A0\u00A0•\u00A0\u00A0\u00A0\u00A0\u00A0';
+                        musicTrackSpan.textContent = repeatUnit + repeatUnit;
+                        musicTrackEl.style.setProperty('--marquee-dur', Math.max(6, musicLabel.length * 0.22) + 's');
+                        musicTrackEl.classList.add('marquee');
+                    }
+                });
             }
             const locationEl = card.querySelector('.feed-post-location');
             if (locationEl && post.location) {

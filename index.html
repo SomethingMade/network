@@ -16102,22 +16102,30 @@
         const HABA_UPDATES_UID = "haba-updates-channel";
         const HABA_UPDATES_NAME = "Haba";
         const HABA_MARK_SVG = '<svg width="20" height="20" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><polygon points="20,80 170,30 80,110" fill="#fff" fill-opacity="0.75"/><polygon points="120,180 170,30 80,110" fill="#fff"/><polygon points="20,80 80,110 80,140" fill="#fff" fill-opacity="0.55"/></svg>';
+        // Each entry carries a real epoch `ts` (in addition to the display-only dateLabel/time
+        // strings) so the card's position in the Messages list can be sorted by actual recency
+        // like every other chat, instead of being force-pinned to the top. Bump the last
+        // entry's `ts` (and add a new entry) whenever a feature ships, so the card resurfaces
+        // near the top of the list the way a real new message would.
         const HABA_UPDATES_FEED = [
             {
                 dateLabel: 'This week',
                 time: '09:00',
+                ts: new Date('2026-06-01T09:00:00Z').getTime(),
                 text: "Welcome to Haba! 👋\n\nThis is where we'll drop news about new features, so you're always first to know what's changed.",
                 cta: null
             },
             {
                 dateLabel: null,
                 time: '09:02',
+                ts: new Date('2026-07-10T09:02:00Z').getTime(),
                 text: "New: Reels 🎬\n\nShare short vertical videos to your profile and discover what everyone else is posting, right from the Home tab.",
                 cta: 'Get started'
             },
             {
                 dateLabel: null,
                 time: '09:04',
+                ts: new Date('2026-08-15T09:04:00Z').getTime(),
                 text: "New: Voice messages 🎤\n\nHold the mic button in any chat to record and send a voice note instead of typing.",
                 cta: 'Get started'
             }
@@ -36699,13 +36707,18 @@
             return (isOwn ? '<span class="chat-you-prefix">You: </span>' : '') + out;
         }
 
-        // Pinned "Haba Updates" card — always the first row in the Messages tab, for every
-        // user, independent of their real chats. Built by hand (not via renderChatItem) since
-        // it has no dataset.uid: the existing click/long-press delegation on #chat-list-container
-        // keys off card.dataset.uid / card.dataset.groupId, so leaving both unset makes this
-        // card a safe no-op for that generic handler (including the delete/favourite long-press
-        // menu, which bails out early with no uid) while still picking up the .chat-item hover/
-        // layout styling. Its own click listener (attached here) opens the read-only overlay.
+        // "Haba Updates" card — rendered like any other row in the Messages tab, for every
+        // user, independent of their real chats. Its position in the list is decided by
+        // HABA_UPDATES_FEED's last entry's `ts` (see renderChatListFromCache, which sorts it
+        // into combinedEntries alongside real chats/groups by timestamp) — it is NOT
+        // force-pinned to the top, so a real conversation with more recent activity will
+        // rank above it, same as WhatsApp's own "WhatsApp" official account row. Built by
+        // hand (not via renderChatItem) since it has no dataset.uid: the existing click/
+        // long-press delegation on #chat-list-container keys off card.dataset.uid /
+        // card.dataset.groupId, so leaving both unset makes this card a safe no-op for that
+        // generic handler (including the delete/favourite long-press menu, which bails out
+        // early with no uid) while still picking up the .chat-item hover/layout styling.
+        // Its own click listener (attached here) opens the read-only overlay.
         function renderHabaUpdatesCard(container) {
             const latest = HABA_UPDATES_FEED[HABA_UPDATES_FEED.length - 1];
             const previewText = latest.text.split('\n')[0];
@@ -43235,7 +43248,6 @@
                 chatListReadReceiptUnsubscribers = {};
 
                 chatList.innerHTML = '';
-                renderHabaUpdatesCard(chatList);
                 let totalUnread = 0;
 
                 const chats = cachedUserChatsData;
@@ -43253,6 +43265,10 @@
                 // and sorted together by most recent activity — same as the Groups tab list,
                 // but interleaved here so nothing has to be hunted down in a separate tab.
                 const combinedEntries = [];
+                // Haba Updates joins the same timestamp sort as real chats/groups below —
+                // its "activity time" is the last feed entry's ts, so it lands wherever a
+                // real chat with that recency would land instead of always being first.
+                combinedEntries.push({ type: 'haba', id: HABA_UPDATES_UID, timestamp: HABA_UPDATES_FEED[HABA_UPDATES_FEED.length - 1].ts || 0 });
                 Object.keys(chats || {}).forEach(chatUid => {
                     if (chats[chatUid].archived) return;
                     combinedEntries.push({ type: 'dm', id: chatUid, timestamp: chats[chatUid].timestamp || 0 });
@@ -43268,6 +43284,11 @@
 
                 if (hasChats) {
                     combinedEntries.forEach(entry => {
+                        if (entry.type === 'haba') {
+                            renderHabaUpdatesCard(chatList);
+                            return;
+                        }
+
                         if (entry.type === 'group') {
                             const groupMeta = cachedGroupChatsMeta[entry.id];
                             renderMyGroupItem(entry.id, cachedCommunities[entry.id], chatList, groupMeta);

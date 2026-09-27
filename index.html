@@ -10770,6 +10770,28 @@
     </div>
     </div>
 
+    <!-- Haba Updates: a read-only, self-contained overlay for the app's own official-account
+         thread (feature announcements — see the WhatsApp "WhatsApp" account reference this was
+         modeled on). Deliberately NOT wired into the real chat system (openChatView, Firebase
+         threads, activeChatUid, etc.) since there is no real backend account behind it and no
+         replying is possible — it reuses the same .chat-view-header/.msg-bubble classes as the
+         real chat view purely for matching visuals, with its own tiny open/close controller. -->
+    <div id="haba-updates-overlay" class="chat-view-overlay">
+        <div class="chat-view-header">
+            <svg class="chat-view-back" id="haba-updates-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="20" y1="12" x2="4.5" y2="12"></line><polyline points="11 19 4 12 11 5"></polyline></svg>
+            <div class="chat-view-avatar avatar ai-avatar-black" style="display:flex; align-items:center; justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><polygon points="20,80 170,30 80,110" fill="#fff" fill-opacity="0.75"/><polygon points="120,180 170,30 80,110" fill="#fff"/><polygon points="20,80 80,110 80,140" fill="#fff" fill-opacity="0.55"/></svg>
+            </div>
+            <div class="chat-view-info">
+                <h4 id="haba-updates-header-name">Haba</h4>
+                <p>Official Haba Account</p>
+            </div>
+        </div>
+        <div class="chat-view-messages-wrap">
+            <div class="chat-view-messages" id="haba-updates-messages"></div>
+        </div>
+    </div>
+
     <div id="call-overlay">
         <div class="call-video-remote" id="call-video-remote"></div>
         <div class="call-video-local-pip" id="call-video-local-pip"></div>
@@ -16065,6 +16087,37 @@
             '<circle cx="200" cy="200" r="150" fill="none" stroke="#fff" stroke-width="6"/>' +
             '</svg>'
         );
+
+        // --- HABA UPDATES (official app-announcements thread, pinned to the top of the
+        // Messages tab for every user — modeled on WhatsApp's own "WhatsApp" official account
+        // that broadcasts feature news; see the reference screenshot this was built from).
+        // This is intentionally static/local, not a real backend-driven broadcast: there's no
+        // admin panel here to push new messages from, so "all users" is satisfied by every
+        // client rendering the same fixed HABA_UPDATES_FEED below rather than by a shared
+        // conversation record. Add a new entry to the array whenever a feature ships.
+        const HABA_UPDATES_UID = "haba-updates-channel";
+        const HABA_UPDATES_NAME = "Haba";
+        const HABA_MARK_SVG = '<svg width="20" height="20" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><polygon points="20,80 170,30 80,110" fill="#fff" fill-opacity="0.75"/><polygon points="120,180 170,30 80,110" fill="#fff"/><polygon points="20,80 80,110 80,140" fill="#fff" fill-opacity="0.55"/></svg>';
+        const HABA_UPDATES_FEED = [
+            {
+                dateLabel: 'This week',
+                time: '09:00',
+                text: "Welcome to Haba! 👋\n\nThis is where we'll drop news about new features, so you're always first to know what's changed.",
+                cta: null
+            },
+            {
+                dateLabel: null,
+                time: '09:02',
+                text: "New: Reels 🎬\n\nShare short vertical videos to your profile and discover what everyone else is posting, right from the Home tab.",
+                cta: 'Get started'
+            },
+            {
+                dateLabel: null,
+                time: '09:04',
+                text: "New: Voice messages 🎤\n\nHold the mic button in any chat to record and send a voice note instead of typing.",
+                cta: 'Get started'
+            }
+        ];
 
         // Fallback profile picture used whenever a user hasn't uploaded their own — a plain
         // person silhouette on a neutral circle, inlined as a data URI so it never depends on
@@ -36642,6 +36695,56 @@
             return (isOwn ? '<span class="chat-you-prefix">You: </span>' : '') + out;
         }
 
+        // Pinned "Haba Updates" card — always the first row in the Messages tab, for every
+        // user, independent of their real chats. Built by hand (not via renderChatItem) since
+        // it has no dataset.uid: the existing click/long-press delegation on #chat-list-container
+        // keys off card.dataset.uid / card.dataset.groupId, so leaving both unset makes this
+        // card a safe no-op for that generic handler (including the delete/favourite long-press
+        // menu, which bails out early with no uid) while still picking up the .chat-item hover/
+        // layout styling. Its own click listener (attached here) opens the read-only overlay.
+        function renderHabaUpdatesCard(container) {
+            const latest = HABA_UPDATES_FEED[HABA_UPDATES_FEED.length - 1];
+            const previewText = latest.text.split('\n')[0];
+            const item = document.createElement('div');
+            item.className = 'chat-item haba-updates-item';
+            item.innerHTML = `
+                <div class="avatar ai-avatar-black" style="border: none; display:flex; align-items:center; justify-content:center;">${HABA_MARK_SVG}</div>
+                <div class="chat-preview">
+                    <div class="chat-row-top"><h3><span class="chat-name-text">${HABA_UPDATES_NAME}</span>${verifiedBadgeFor(HABA_UPDATES_UID, true)}</h3><span class="chat-time-top">${latest.time}</span></div>
+                    <div class="chat-preview-line"><p>${escapeHtmlForPost(previewText)}</p></div>
+                </div>
+            `;
+            item.addEventListener('click', openHabaUpdatesOverlay);
+            container.appendChild(item);
+        }
+
+        // Renders HABA_UPDATES_FEED into the overlay once (content is static, so there's
+        // nothing to re-render on subsequent opens).
+        function renderHabaUpdatesMessages() {
+            const wrap = document.getElementById('haba-updates-messages');
+            if (!wrap || wrap.dataset.rendered) return;
+            let html = '';
+            HABA_UPDATES_FEED.forEach(msg => {
+                if (msg.dateLabel) html += `<div class="date-separator"><span>${msg.dateLabel}</span></div>`;
+                const bodyHtml = msg.text.split('\n').map(line => escapeHtmlForPost(line)).join('<br>');
+                const ctaHtml = msg.cta
+                    ? `<div style="margin:10px -15px -10px; padding:9px 15px 0; border-top:1px solid var(--border-color); text-align:center;"><span style="color:var(--link-color); font-weight:700; font-size:14.5px;">${escapeHtmlForPost(msg.cta)}</span></div>`
+                    : '';
+                html += `<div class="msg-bubble in">${bodyHtml}${ctaHtml}<div class="msg-time">${msg.time}</div></div>`;
+            });
+            wrap.innerHTML = html;
+            wrap.dataset.rendered = 'true';
+        }
+
+        function openHabaUpdatesOverlay() {
+            renderHabaUpdatesMessages();
+            document.getElementById('haba-updates-overlay').classList.add('active');
+        }
+        function closeHabaUpdatesOverlay() {
+            document.getElementById('haba-updates-overlay').classList.remove('active');
+        }
+        document.getElementById('haba-updates-back').addEventListener('click', closeHabaUpdatesOverlay);
+
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const isAI = uid === AI_UID;
             const profile = isAI ? { name: AI_NAME, photoURL: '' } : (cachedUsers[uid] || { name: 'Unknown User', photoURL: DEFAULT_AVATAR_URL });
@@ -43119,6 +43222,7 @@
                 chatListReadReceiptUnsubscribers = {};
 
                 chatList.innerHTML = '';
+                renderHabaUpdatesCard(chatList);
                 let totalUnread = 0;
 
                 const chats = cachedUserChatsData;
@@ -43203,7 +43307,10 @@
                         }
                     });
                 } else {
-                    chatList.innerHTML = '<p class="empty-msg">No recent messages yet.</p>';
+                    const emptyMsg = document.createElement('p');
+                    emptyMsg.className = 'empty-msg';
+                    emptyMsg.textContent = 'No recent messages yet.';
+                    chatList.appendChild(emptyMsg);
                 }
                 
                 // Favourites strip above the list: favourited (non-archived) DMs as a horizontal row of

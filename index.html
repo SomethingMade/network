@@ -6419,6 +6419,103 @@
             margin-top: 4px;
         }
     </style>
+
+    <style>
+        /* The single-post preview view (#post-comments-post-preview) bleeds its media out with
+           a -16px margin to cancel the card's own 16px side padding (see that rule higher up).
+           The redesigned IG card below has no side padding of its own anymore — media is
+           already flush with the card's edges — so re-zero that old bleed here or it double-
+           subtracts and the image overflows past the card by an extra 16px each side. */
+        #post-comments-post-preview .feed-post-card-ig > .x-media-grid,
+        #post-comments-post-preview .feed-post-card-ig > .feed-post-video-wrap {
+            margin-left: 0;
+            margin-right: 0;
+            width: 100%;
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           POST CARD REDESIGN — Instagram-style, scoped entirely to
+           .feed-post-card-ig (a marker class added only in buildFeedPostCard,
+           alongside the existing .feed-post-card class). News cards, search
+           result cards, and community post cards keep their original X-style
+           look untouched since they never carry this marker class. No ids or
+           click-handler classes were removed — everything the original
+           template wired up (.feed-like-btn, .feed-comment-btn,
+           .feed-repost-btn, .feed-save-btn, .feed-share-btn, .feed-like-count,
+           .feed-comment-count, .x-media-grid, etc.) still exists and still
+           works; this block only repositions/restyles them and adds a few
+           new small elements (.ig-likes-line, .ig-caption, .ig-view-comments,
+           .ig-timestamp) that buildFeedPostCard now also renders.
+           ══════════════════════════════════════════════════════════════════ */
+
+        /* Card shell: no more horizontal padding at the card level — media
+           bleeds edge-to-edge, and every other row re-adds its own 16px
+           side inset below. */
+        .feed-post-card-ig { padding: 14px 0 12px; }
+        .feed-post-card-ig .feed-thread-connector { display: none !important; }
+
+        /* — Header: small round avatar, bold name, "…" menu on the right — */
+        .feed-post-card-ig .x-post-row { padding: 0 16px; align-items: center; gap: 10px; }
+        .feed-post-card-ig .x-post-avatar-col .avatar { width: 34px; height: 34px; font-size: 13px; }
+        .feed-post-card-ig .x-post-headline .name { font-size: 14px; font-weight: 600; }
+        .feed-post-card-ig .x-post-headline-main .time { display: none; }
+        .feed-post-card-ig .x-post-username-text { display: none; }
+        .feed-post-card-ig .x-post-username { min-height: 0; }
+        .feed-post-card-ig .feed-post-location { background: none; padding: 0; margin-left: 0; color: var(--text-secondary); font-weight: 500; }
+        .feed-post-card-ig .feed-post-location:hover { background: none; opacity: 0.75; }
+
+        /* — Media: full-bleed, no rounding, no border, single-slide carousel — */
+        .feed-post-card-ig > .x-media-grid,
+        .feed-post-card-ig > .feed-post-video-wrap {
+            margin-left: 0; margin-right: 0; width: 100%; margin-top: 12px;
+        }
+        .feed-post-card-ig > .x-media-grid[data-count="1"],
+        .feed-post-card-ig .x-media-grid-item,
+        .feed-post-card-ig .x-media-grid[data-count="1"] .x-media-grid-item {
+            border-radius: 0; border: none;
+        }
+        .feed-post-card-ig .x-media-grid:not([data-count="1"]) .x-media-grid-item {
+            flex: 0 0 100%; border: none;
+        }
+        .feed-post-card-ig .feed-post-ad-card-footer,
+        .feed-post-card-ig > .feed-post-ad-cta { margin-left: 16px; margin-right: 16px; }
+
+        /* — Actions row: icon-only, heart/comment/repost/share on the left,
+           save pinned to the far right, views only shown on video posts — */
+        .feed-post-card-ig .feed-post-reactors { display: none !important; }
+        .feed-post-card-ig .feed-post-actions { padding: 4px 12px 0; margin-top: 8px; margin-left: 0; width: 100%; max-width: 100%; }
+        .feed-post-card-ig .feed-post-actions-left { justify-content: flex-start; gap: 2px; }
+        .feed-post-card-ig .feed-post-action-btn { padding: 8px; gap: 0; }
+        .feed-post-card-ig .feed-post-action-btn svg { width: 24px; height: 24px; }
+        .feed-post-card-ig .feed-comment-btn:hover,
+        .feed-post-card-ig .feed-like-btn:hover,
+        .feed-post-card-ig .feed-repost-btn:hover,
+        .feed-post-card-ig .feed-save-btn:hover,
+        .feed-post-card-ig .feed-share-btn:hover { background: none; }
+        .feed-post-card-ig .feed-post-action-btn:active svg { transform: scale(0.86); }
+        .feed-post-card-ig .feed-like-btn.liked { color: var(--danger-red); }
+        .feed-post-card-ig .feed-like-btn.liked svg { fill: var(--danger-red); stroke: var(--danger-red); }
+        .feed-post-card-ig .feed-like-btn { order: 1; }
+        .feed-post-card-ig .feed-comment-btn { order: 2; }
+        .feed-post-card-ig .feed-repost-btn { order: 3; display: flex; align-items: center; }
+        .feed-post-card-ig .feed-repost-count { font-size: 12px; font-weight: 600; margin-left: 2px; }
+        .feed-post-card-ig .feed-share-btn { order: 4; }
+        .feed-post-card-ig .feed-post-view-stat { order: 5; display: none; margin-left: 4px; }
+        .feed-post-card-ig:has(.feed-post-video-wrap) .feed-post-view-stat { display: flex; }
+        .feed-post-card-ig .feed-save-btn { order: 6; margin-left: auto; }
+
+        /* — Likes count, caption ("username" + text inline), view-comments
+           link, and a small caps timestamp — the classic IG stack below the
+           action row. — */
+        .feed-post-card-ig .ig-likes-line { padding: 2px 16px 0; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .feed-post-card-ig .feed-post-body { margin: 4px 0 0; padding: 0 16px; width: 100%; }
+        .feed-post-card-ig .ig-caption { display: flex; flex-wrap: wrap; column-gap: 6px; align-items: baseline; }
+        .feed-post-card-ig .ig-caption-name { font-weight: 600; font-size: 14px; color: var(--text-primary); flex-shrink: 0; }
+        .feed-post-card-ig .ig-caption .feed-post-text { display: inline; font-weight: 400; font-size: 14px; margin: 0; }
+        .feed-post-card-ig .ig-view-comments { padding: 4px 16px 0; font-size: 13.5px; color: var(--text-secondary); cursor: pointer; }
+        .feed-post-card-ig .ig-view-comments:hover { color: var(--text-primary); }
+        .feed-post-card-ig .ig-timestamp { padding: 5px 16px 0; font-size: 10.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+    </style>
 </head>
 <body>
 
@@ -17057,6 +17154,8 @@
             if (adFooterNameEl) adFooterNameEl.textContent = displayName;
             const usernameEl = card.querySelector('.x-post-username-text');
             if (usernameEl) usernameEl.textContent = profile.username ? '@' + profile.username : '';
+            const captionNameEl = card.querySelector('.ig-caption-name');
+            if (captionNameEl) captionNameEl.textContent = displayName;
             const companyTagEl = card.querySelector('.feed-post-company-tag');
             if (companyTagEl) {
                 const taggedBusiness = getTaggedBusiness(profile);
@@ -20896,7 +20995,11 @@
             }
             if (likeIconEl) likeIconEl.setAttribute('fill', likedByMe ? 'currentColor' : 'none');
             if (likeCountEl) likeCountEl.textContent = post.likeCount || 0;
-            if (commentCountEl) commentCountEl.textContent = post.commentCount || 0;
+            if (commentCountEl) {
+                commentCountEl.textContent = post.commentCount || 0;
+                const viewCommentsEl = card.querySelector('.ig-view-comments');
+                if (viewCommentsEl) viewCommentsEl.style.display = (post.commentCount || 0) > 0 ? '' : 'none';
+            }
             if (viewCountEl) viewCountEl.textContent = formatFeedCount(post.impressionCount || 0);
 
             const repostBtn = card.querySelector('.feed-repost-btn');
@@ -21314,7 +21417,7 @@
             const targetId = (isRepost && !isQuote) ? originalId : postId;
 
             const card = document.createElement('div');
-            card.className = 'feed-post-card';
+            card.className = 'feed-post-card feed-post-card-ig';
             card.dataset.postId = postId;
             card.dataset.contentPostId = targetId;
 
@@ -21456,14 +21559,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="feed-post-body">
-                    ${textHtml}
-                    ${taggedHtml}
-                    ${pollHtml}
-                    ${linkPreviewHtml}
-                    ${isQuote ? `<div class="quote-embed-card" data-quote-original-id="${originalId}"></div>` : ''}
-                    ${isCommentQuote ? `<div class="quote-embed-card" data-quote-comment-post-id="${wrapperPost.quotedCommentPostId}" data-quote-comment-id="${wrapperPost.quotedCommentId}"></div>` : ''}
-                </div>
                 ${imageHtml}
                 ${videoHtml}
                 ${adCtaHtml}
@@ -21473,18 +21568,19 @@
                 </div>
                 <div class="feed-post-actions">
                     <div class="feed-post-actions-left">
+                        <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}" data-reaction="${myReactionEmoji || ''}">
+                            <svg class="feed-like-icon-default" viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
+                        </button>
                         <button type="button" class="feed-post-action-btn feed-comment-btn">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                            <span class="feed-comment-count">${post.commentCount || 0}</span>
                         </button>
                         <button type="button" class="feed-post-action-btn feed-repost-btn ${repostedByMe ? 'reposted' : ''}" title="Repost">
                             ${repostArrowsSvg()}
                             <span class="feed-repost-count">${formatFeedCount(post.repostCount || 0)}</span>
                         </button>
-                        <button type="button" class="feed-post-action-btn feed-like-btn ${likedByMe ? 'liked' : ''}" data-reaction="${myReactionEmoji || ''}">
-                            <svg class="feed-like-icon-default" viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
-                            <span class="feed-like-count">${post.likeCount || 0}</span>
-                        </button>
+                        ${post.isAd ? '' : `<button type="button" class="feed-post-action-btn feed-share-btn" title="Share" aria-label="Share">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                        </button>`}
                         <div class="feed-post-action-btn feed-post-view-stat" title="Views">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
                             <span class="feed-view-count">${formatFeedCount(post.impressionCount || 0)}</span>
@@ -21492,11 +21588,19 @@
                         <button type="button" class="feed-post-action-btn feed-save-btn ${savedByMe ? 'saved' : ''}" title="Save">
                             <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                         </button>
-                        ${post.isAd ? '' : `<button type="button" class="feed-post-action-btn feed-share-btn" title="Share" aria-label="Share">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
-                        </button>`}
                     </div>
                 </div>
+                <div class="ig-likes-line"><span class="feed-like-count">${post.likeCount || 0}</span> likes</div>
+                <div class="feed-post-body">
+                    ${textHtml ? `<div class="ig-caption"><span class="ig-caption-name"></span>${textHtml}</div>` : ''}
+                    ${taggedHtml}
+                    ${pollHtml}
+                    ${linkPreviewHtml}
+                    ${isQuote ? `<div class="quote-embed-card" data-quote-original-id="${originalId}"></div>` : ''}
+                    ${isCommentQuote ? `<div class="quote-embed-card" data-quote-comment-post-id="${wrapperPost.quotedCommentPostId}" data-quote-comment-id="${wrapperPost.quotedCommentId}"></div>` : ''}
+                </div>
+                <div class="ig-view-comments"${(post.commentCount || 0) > 0 ? '' : ' style="display:none;"'}>View all <span class="feed-comment-count">${post.commentCount || 0}</span> comments</div>
+                <div class="ig-timestamp"><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span></div>
             `;
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);
@@ -21567,6 +21671,8 @@
 
             bindPostLikeButtonPress(card.querySelector('.feed-like-btn'), targetId);
             card.querySelector('.feed-comment-btn').addEventListener('click', (e) => { e.stopPropagation(); openPostComments(targetId, { fullView: true }); });
+            const viewCommentsEl = card.querySelector('.ig-view-comments');
+            if (viewCommentsEl) viewCommentsEl.addEventListener('click', (e) => { e.stopPropagation(); openPostComments(targetId, { fullView: true }); });
             const shareBtn = card.querySelector('.feed-share-btn');
             if (shareBtn) shareBtn.addEventListener('click', (e) => {
                 e.stopPropagation();

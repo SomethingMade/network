@@ -14190,7 +14190,7 @@
         // hash-driven overlay (image/video/reel viewer, chat, story, etc.)" from "this back
         // press is closing an ordinary bottom-sheet" — see the comment at that listener.
         let lastKnownHash = window.location.hash.replace('#', '') || 'tab-status';
-        const HASH_OVERLAY_NAMES = ['image-viewer', 'video-viewer', 'reel-viewer', 'view-once-audio', 'user-info', 'chat', 'story', 'post-composer'];
+        const HASH_OVERLAY_NAMES = ['image-viewer', 'video-viewer', 'reel-viewer', 'view-once-audio', 'user-info', 'chat', 'story', 'post-composer', 'haba-updates'];
 
         // Which system currently owns the entry sitting on TOP of the browser history stack:
         // a hash-driven overlay (HASH_OVERLAY_NAMES) or one of the generic tracked bottom
@@ -14231,6 +14231,7 @@
             const viewOnceAudioActive = document.getElementById('view-once-audio-overlay').classList.contains('active');
             const userInfoActive = document.getElementById('user-info-sheet-overlay').classList.contains('active');
             const postComposerActive = document.getElementById('post-composer-overlay').classList.contains('active');
+            const habaUpdatesActive = document.getElementById('haba-updates-overlay').classList.contains('active');
 
             // The image/video/audio viewers can be opened from on top of the Contact Info sheet
             // (e.g. tapping a thumbnail in its Media grid) — landing on one of those hashes is
@@ -14251,6 +14252,9 @@
             }
             if (hash !== 'post-composer' && postComposerActive) {
                 closePostComposer();
+            }
+            if (hash !== 'haba-updates' && habaUpdatesActive) {
+                closeHabaUpdatesOverlay();
             }
             if (hash !== 'user-info' && userInfoActive && !isMediaViewerHash) {
                 closeUserInfoSheet();
@@ -36738,12 +36742,21 @@
 
         function openHabaUpdatesOverlay() {
             renderHabaUpdatesMessages();
+            // Pushes a history entry (same pattern openChatView/openPostComposer/etc. use via
+            // HASH_OVERLAY_NAMES) so the device/browser back button closes just this overlay —
+            // via the hashchange handler above — instead of leaving the app or a stale hash.
+            window.location.hash = 'haba-updates';
             document.getElementById('haba-updates-overlay').classList.add('active');
         }
+        // Only hides the overlay — does not touch history. Called both from the hashchange
+        // handler (device back button already consumed the entry) and, below, from the
+        // on-screen back arrow (which instead calls history.back() so the two close paths
+        // always agree on how many history entries are left, avoiding a stray extra step
+        // back the next time the device back button is pressed).
         function closeHabaUpdatesOverlay() {
             document.getElementById('haba-updates-overlay').classList.remove('active');
         }
-        document.getElementById('haba-updates-back').addEventListener('click', closeHabaUpdatesOverlay);
+        document.getElementById('haba-updates-back').addEventListener('click', () => history.back());
 
         function renderChatItem(uid, metaData, container, isChatPane = false) {
             const isAI = uid === AI_UID;

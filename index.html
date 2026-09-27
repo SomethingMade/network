@@ -5799,44 +5799,27 @@
                 -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
             }
 
-            /* ── Dark full-width bottom nav bar (icon + always-visible label) ── */
+            /* ── Instagram-style bottom nav bar: flat surface, thin top hairline instead of a
+               shadow/rounded island, icon-only rows (no labels), no accent color on the active
+               tab — active vs inactive is communicated purely by outline→filled icon shape and
+               full vs dimmed opacity, exactly like Instagram's own bottom bar. ── */
             :root {
-                /* Bar now sits flush at the bottom edge instead of floating as an inset
-                   island, so the old "island gap" is 0 — kept as a variable (rather than
-                   deleted) purely so the calc() formulas below and elsewhere that reference
-                   it don't need to change shape. */
                 --nav-island-gap: 0px;
-                --nav-bar-total: calc(74px + var(--nav-island-gap) + 22px);
-                /* Actual on-screen height of the nav bar itself. Some phones don't report a
-                   real env(safe-area-inset-bottom) even though they have their own gesture
-                   bar/home-indicator strip overlapping the viewport, so this floors it at
-                   --nav-bar-extra-bottom instead of trusting env() alone. */
+                /* Compact icon-only bar height (no label row) instead of the old icon+label
+                   sizing — Instagram's bar is a slim ~50px strip plus the safe-area inset. */
+                --nav-bar-total: calc(50px + var(--nav-island-gap) + 14px);
                 --nav-bar-safe-bottom: max(env(safe-area-inset-bottom), var(--nav-bar-extra-bottom));
-                --nav-bar-height: calc(74px + var(--nav-island-gap) + var(--nav-bar-safe-bottom));
-                /* NOTE: intentionally no --bottomnav-bg/--bottomnav-active indirection here.
-                   A custom property's var() references are substituted once, at the element
-                   where it's declared, and the *already-substituted* result is what inherits
-                   to descendants — it does not re-evaluate per element. Since this block only
-                   runs at :root, a --bottomnav-bg: var(--bg-surface) declared here would
-                   freeze at :root's (light) --bg-surface and never pick up body.dark-theme's
-                   override, even though --bg-surface itself resolves correctly everywhere.
-                   So every rule below references --bg-surface / --nav-active-black directly
-                   instead, which re-reads correctly at each themed ancestor. */
+                --nav-bar-height: calc(50px + var(--nav-island-gap) + var(--nav-bar-safe-bottom));
             }
             .side-nav {
-                display: flex; /* was grid(5) with only 4 visible items (Profile is desktop-only),
-                                   which left a lopsided empty track; flex + space-evenly centers
-                                   Home/Search/Notifications/Messages evenly inside the bar. */
-                /* The base desktop .side-nav rule sets flex-direction: column (it's a vertical
-                   sidebar there) — without overriding it here the tabs inherit "column" and
-                   stack on top of each other instead of sitting in one horizontal row. */
+                display: flex;
                 flex-direction: row;
                 justify-content: space-evenly;
-                height: calc(74px + var(--nav-bar-safe-bottom));
-                padding: 10px 8px calc(10px + var(--nav-bar-safe-bottom));
+                height: calc(50px + var(--nav-bar-safe-bottom));
+                padding: 8px 6px calc(8px + var(--nav-bar-safe-bottom));
                 position: fixed;
-                /* Full-width dark bar, flush with the bottom edge, rounded top corners only —
-                   replaces the old inset floating pill/island. */
+                /* Flat, edge-to-edge bar flush with the screen — no rounded top corners and no
+                   drop shadow, just a hairline border, matching Instagram's own bottom bar. */
                 left: 0;
                 right: 0;
                 bottom: 0;
@@ -5844,33 +5827,17 @@
                 max-width: none;
                 margin: 0;
                 border-right: none;
-                border-top: none;
-                border-radius: 22px 22px 0 0;
+                border-top: 1px solid var(--border-color);
+                border-radius: 0;
                 align-items: center;
                 z-index: 100;
-                box-shadow: 0 -6px 24px rgba(0,0,0,0.24);
-                /* Fixed dark bar regardless of the active theme (light/dark/glass/neumorphic),
-                   matching the reference design rather than following --bg-surface. */
-                background: var(--bg-surface) !important;
+                box-shadow: none;
+                /* Follows the active theme's own surface color (white in light mode, near-
+                   black in dark mode) instead of being forced to one fixed color. */
+                background: var(--bg-surface);
                 transition: transform 0.25s ease, background 0.2s ease;
             }
-            /* Decorative home-indicator handle, like the gesture bar in the reference image.
-               Uses the theme's own active color at low opacity so it stays a subtle neutral
-               mark against --bg-surface in every theme (dark handle on light themes, light
-               handle on dark themes). */
-            .side-nav::after {
-                content: '';
-                position: absolute;
-                left: 50%;
-                bottom: calc(8px + var(--nav-bar-safe-bottom));
-                transform: translateX(-50%);
-                width: 100px;
-                height: 4px;
-                border-radius: 999px;
-                background: var(--nav-active-black);
-                opacity: 0.25;
-                pointer-events: none;
-            }
+            .side-nav::after { content: none; }
             .side-nav.nav-scroll-hidden { transform: translateY(140%); }
             /* Default: leave the reserved nav-bar strip at the bottom uncovered so the
                bottom nav bar stays visible while viewing reels. Matches the bar's real
@@ -5879,20 +5846,18 @@
             /* Opt-in override (openReelViewer opts.fullscreen) for callers that want the
                reel viewer to cover the whole screen instead. */
             #reel-viewer-overlay.reel-viewer-fullscreen { bottom: 0; }
-            .nav-item { flex: 1; padding: 4px; margin: 0 1px; color: var(--nav-active-black); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; position: relative; border-radius: 14px; transition: color 0.2s ease; }
+            .nav-item { flex: 1; padding: 4px; margin: 0; color: var(--nav-active-black); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; position: relative; border-radius: 0; transition: color 0.2s ease; }
             /* Icons: same theme color as the active state but dimmed via opacity when
                inactive, full opacity and swapped to the filled shape (via .icon-fill,
-               already wired below) when active — matching the reference's bold "Home" icon
-               among dimmed siblings, while staying correct in every theme's own color. */
-            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.45; width: 23px; height: 23px; position: relative; z-index: 1; }
-            .nav-item svg .icon-line { stroke-width: 2.1; }
-            /* Labels are always visible now (icon + label, like the reference), not
-               screen-reader-only. Needs its own .nav-item.active span override here: the
-               base rule two lines up in the desktop styles is .nav-item.active span (two
-               classes), which beats this plain .nav-item span on specificity alone
-               regardless of media query, so without this the label style wouldn't apply. */
-            .nav-item span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--nav-active-black); opacity: 0.45; }
-            .nav-item.active span { position: static; width: auto; height: auto; padding: 0; margin: 0; overflow: visible; clip: auto; white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--nav-active-black); opacity: 1; }
+               already wired below) when active — no accent color shift, exactly Instagram's
+               outline-vs-filled-only active state. */
+            .nav-item svg { stroke: var(--nav-active-black); opacity: 0.45; width: 26px; height: 26px; position: relative; z-index: 1; }
+            .nav-item svg .icon-line { stroke-width: 1.5; }
+            /* Instagram's bottom bar is icon-only — no visible labels. Kept screen-reader-only
+               (visually hidden) instead of removed from the DOM so the tab names are still
+               announced by assistive tech. */
+            .nav-item span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+            .nav-item.active span { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
             .nav-item.active svg { opacity: 1; }
             .nav-item.active { color: var(--nav-active-black); background: none; }
             .nav-item.active svg { stroke: var(--nav-active-black); }

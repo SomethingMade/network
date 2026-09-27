@@ -10075,6 +10075,7 @@
                                 
                             </div>
                             <button type="button" class="msgs-chip active" data-msgs-view="inbox">Inbox</button>
+                            <button type="button" class="msgs-chip" data-msgs-view="updates">Updates</button>
                             <button type="button" class="msgs-chip" data-msgs-view="requests">Requests<span class="msgs-chip-count" id="msgs-requests-count" style="display:none;"></span></button>
                         </div>
                         <svg width="0" height="0" style="position:absolute;">
@@ -10091,6 +10092,7 @@
                     <div class="chat-request-banner" id="chat-requests-container" style="display:none;"></div>
                     <div class="msgs-fav-strip" id="msgs-fav-strip"><div class="msgs-fav-strip-title">Favourites</div><div class="msgs-fav-strip-scroll" id="msgs-fav-strip-scroll"></div></div>
                     <div class="chat-list-container" id="chat-list-container"></div>
+                    <div class="chat-list-container" id="chat-updates-container" style="display:none;"></div>
                 </div>
 
                 <div id="tab-status" class="tab-content active-tab">
@@ -36529,20 +36531,25 @@
         let userChatsInitialized = false;
         let chatListenersAttached = false;
 
-        // Inbox / Requests chips on the Messages tab: Inbox is the normal conversation list,
-        // Requests shows people you don't follow who have messaged you.
+        // Inbox / Updates / Requests chips on the Messages tab: Inbox is the normal conversation
+        // list, Updates is the read-only channel-style feed for official app announcements
+        // (Haba Updates), Requests shows people you don't follow who have messaged you.
         let chatsInboxView = 'inbox';
         function applyChatsInboxView() {
             const isRequests = chatsInboxView === 'requests';
+            const isUpdates = chatsInboxView === 'updates';
             const listEl = document.getElementById('chat-list-container');
             const reqEl = document.getElementById('chat-requests-container');
-            if (listEl) listEl.style.display = isRequests ? 'none' : '';
+            const updatesEl = document.getElementById('chat-updates-container');
+            if (listEl) listEl.style.display = (isRequests || isUpdates) ? 'none' : '';
             const favStripEl = document.getElementById('msgs-fav-strip');
-            if (favStripEl) favStripEl.style.visibility = isRequests ? 'hidden' : '';
-            if (favStripEl) favStripEl.style.height = isRequests ? '0' : '';
-            if (favStripEl) favStripEl.style.padding = isRequests ? '0' : '';
-            if (favStripEl) favStripEl.style.overflow = isRequests ? 'hidden' : '';
+            if (favStripEl) favStripEl.style.visibility = (isRequests || isUpdates) ? 'hidden' : '';
+            if (favStripEl) favStripEl.style.height = (isRequests || isUpdates) ? '0' : '';
+            if (favStripEl) favStripEl.style.padding = (isRequests || isUpdates) ? '0' : '';
+            if (favStripEl) favStripEl.style.overflow = (isRequests || isUpdates) ? 'hidden' : '';
             if (reqEl) reqEl.style.display = isRequests ? 'flex' : 'none';
+            if (updatesEl) updatesEl.style.display = isUpdates ? '' : 'none';
+            if (isUpdates) renderChatUpdatesList();
             document.querySelectorAll('.msgs-chip[data-msgs-view]').forEach(chip => {
                 chip.classList.toggle('active', chip.dataset.msgsView === chatsInboxView);
             });
@@ -36551,7 +36558,8 @@
             chip.addEventListener('click', () => {
                 chatsInboxView = chip.dataset.msgsView;
                 applyChatsInboxView();
-                const scroller = document.getElementById(chatsInboxView === 'requests' ? 'chat-requests-container' : 'chat-list-container');
+                const scrollerId = chatsInboxView === 'requests' ? 'chat-requests-container' : (chatsInboxView === 'updates' ? 'chat-updates-container' : 'chat-list-container');
+                const scroller = document.getElementById(scrollerId);
                 if (scroller) scroller.scrollTop = 0;
             });
         });
@@ -36733,6 +36741,16 @@
             `;
             item.addEventListener('click', openHabaUpdatesOverlay);
             container.appendChild(item);
+        }
+
+        // Populates the Updates subtab (chat-updates-container) with every official update
+        // channel — currently just Haba's own — as its own scrollable list, separate from the
+        // Inbox. Static content, so it's cheap to just clear and re-render on every tab switch.
+        function renderChatUpdatesList() {
+            const container = document.getElementById('chat-updates-container');
+            if (!container) return;
+            container.innerHTML = '';
+            renderHabaUpdatesCard(container);
         }
 
         // Renders HABA_UPDATES_FEED into the overlay once (content is static, so there's
@@ -43265,10 +43283,6 @@
                 // and sorted together by most recent activity — same as the Groups tab list,
                 // but interleaved here so nothing has to be hunted down in a separate tab.
                 const combinedEntries = [];
-                // Haba Updates joins the same timestamp sort as real chats/groups below —
-                // its "activity time" is the last feed entry's ts, so it lands wherever a
-                // real chat with that recency would land instead of always being first.
-                combinedEntries.push({ type: 'haba', id: HABA_UPDATES_UID, timestamp: HABA_UPDATES_FEED[HABA_UPDATES_FEED.length - 1].ts || 0 });
                 Object.keys(chats || {}).forEach(chatUid => {
                     if (chats[chatUid].archived) return;
                     combinedEntries.push({ type: 'dm', id: chatUid, timestamp: chats[chatUid].timestamp || 0 });
@@ -43284,11 +43298,6 @@
 
                 if (hasChats) {
                     combinedEntries.forEach(entry => {
-                        if (entry.type === 'haba') {
-                            renderHabaUpdatesCard(chatList);
-                            return;
-                        }
-
                         if (entry.type === 'group') {
                             const groupMeta = cachedGroupChatsMeta[entry.id];
                             renderMyGroupItem(entry.id, cachedCommunities[entry.id], chatList, groupMeta);

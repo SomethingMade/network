@@ -5095,6 +5095,33 @@
         .discover-card-add-btn:disabled { opacity: 0.6; cursor: default; }
         .discover-card-add-btn.added { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
 
+        /* ── Followers / Following list redesign (scoped to the sheet; Discover cards are untouched) ── */
+        #follow-list-sheet-overlay .search-fullscreen-header { border-bottom: none; padding: 12px 14px 4px; gap: 6px; }
+        #follow-list-sheet-overlay .follow-list-name { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+        #follow-list-sheet-overlay .feed-subtabs { margin: 8px 16px 10px; padding: 4px; gap: 4px; border: none; border-radius: 14px; background: var(--bg-alt); position: static; }
+        #follow-list-sheet-overlay .feed-subtab-btn { padding: 9px 0; border-radius: 10px; font-size: 14px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 6px; transition: background .2s ease, color .2s ease; }
+        #follow-list-sheet-overlay .feed-subtab-btn:hover { background: transparent; }
+        #follow-list-sheet-overlay .feed-subtab-btn.active { background: var(--text-primary); color: var(--bg-base); }
+        #follow-list-sheet-overlay .feed-subtab-btn.active::after { display: none; }
+        #follow-list-sheet-overlay .fl-count { font-size: 12px; font-weight: 700; opacity: 0.6; }
+        #follow-list-sheet-overlay .fl-count:empty { display: none; }
+        .fl-search { display: flex; align-items: center; gap: 8px; margin: 0 16px 6px; padding: 10px 14px; border-radius: 12px; background: var(--bg-alt); color: var(--text-secondary); flex-shrink: 0; }
+        .fl-search svg { width: 17px; height: 17px; flex-shrink: 0; }
+        .fl-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--text-primary); font-size: 15px; font-family: inherit; }
+        .fl-nomatch { text-align: center; padding: 40px 0; color: var(--text-secondary); font-size: 14px; }
+        #follow-list-sheet-overlay .discover-grid { gap: 0; }
+        #follow-list-sheet-overlay .discover-card { background: transparent; border-bottom: none; padding: 10px 16px; gap: 14px; }
+        #follow-list-sheet-overlay .discover-card:active { background: var(--bg-hover); }
+        #follow-list-sheet-overlay .discover-card-avatar-wrap { width: 52px; height: 52px; padding: 0; background: transparent; }
+        #follow-list-sheet-overlay .discover-card-avatar-wrap.is-business { padding: 2px; }
+        #follow-list-sheet-overlay .discover-card .avatar.discover-card-avatar { border: none; }
+        #follow-list-sheet-overlay .discover-card-avatar-wrap.is-business .avatar.discover-card-avatar { border: 2px solid var(--bg-base); }
+        #follow-list-sheet-overlay .discover-card h3 { font-size: 15.5px; font-weight: 700; }
+        #follow-list-sheet-overlay .discover-card-username { font-size: 13px; margin-bottom: 2px; }
+        #follow-list-sheet-overlay .discover-card p.discover-card-bio { font-size: 13px; opacity: 0.85; }
+        #follow-list-sheet-overlay .discover-card-add-btn { min-width: 92px; padding: 8px 14px; font-size: 13.5px; background: var(--text-primary); color: var(--bg-base); border: 1px solid transparent; }
+        #follow-list-sheet-overlay .discover-card-add-btn.added { background: transparent; color: var(--text-primary); border-color: var(--border-color); font-weight: 600; }
+
         /* "Who to follow"-style widget sprinkled between posts in the Discover feed, X-style */
         .discover-suggest-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; margin: 4px 0 14px; overflow: hidden; }
         .discover-suggest-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 14px 2px; }
@@ -7982,11 +8009,16 @@ img,video{-webkit-user-drag:none}
                 <span id="follow-list-name" class="follow-list-name"></span>
             </div>
             <div class="feed-subtabs" id="follow-list-tabs">
-                <button type="button" class="feed-subtab-btn active" data-follow-list-tab="followers">Followers</button>
-                <button type="button" class="feed-subtab-btn" data-follow-list-tab="following">Following</button>
+                <button type="button" class="feed-subtab-btn active" data-follow-list-tab="followers">Followers<span class="fl-count" id="fl-count-followers"></span></button>
+                <button type="button" class="feed-subtab-btn" data-follow-list-tab="following">Following<span class="fl-count" id="fl-count-following"></span></button>
             </div>
-            <div class="discover-grid-scroll" style="flex:1; padding: 0 14px 24px;">
+            <div class="fl-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+                <input type="text" id="follow-list-search" placeholder="Search" autocomplete="off">
+            </div>
+            <div class="discover-grid-scroll" style="flex:1; padding: 0 0 24px;">
                 <div class="discover-grid" id="follow-list-grid"></div>
+                <div class="fl-nomatch" id="follow-list-nomatch" style="display:none;">No matches</div>
                 <div class="discover-grid-empty" id="follow-list-empty" style="display:none;">
                     <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="4"></circle><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
                     <p id="follow-list-empty-title">Nobody here yet</p>
@@ -33793,6 +33825,9 @@ img,video{-webkit-user-drag:none}
             grid.innerHTML = '';
             emptyState.style.display = 'none';
             spinner.style.display = 'block';
+            document.getElementById('follow-list-search').value = '';
+            document.getElementById('follow-list-nomatch').style.display = 'none';
+            if (uid !== (auth.currentUser && auth.currentUser.uid)) { ['followers','following'].forEach(t => { const c = document.getElementById('fl-count-' + t); if (c && t !== tab) c.textContent = ''; }); }
 
             let uids = [];
             let loadFailed = false;
@@ -33819,7 +33854,30 @@ img,video{-webkit-user-drag:none}
                 return;
             }
             grid.innerHTML = uids.map(followListRowHtml).join('');
+            updateFollowListCounts(uids.length);
         }
+
+        function updateFollowListCounts(activeCount) {
+            const set = (t, n) => { const el = document.getElementById('fl-count-' + t); if (el) el.textContent = n > 0 ? n : ''; };
+            set(followListActiveTab, activeCount);
+            const myUid = auth.currentUser && auth.currentUser.uid;
+            if (followListTargetUid === myUid) {
+                const other = followListActiveTab === 'followers' ? 'following' : 'followers';
+                const src = other === 'followers' ? cachedFollowers : cachedContacts;
+                set(other, Object.keys(src).filter(u => u !== AI_UID && !cachedBlocked[u]).length);
+            }
+        }
+
+        document.getElementById('follow-list-search').addEventListener('input', (e) => {
+            const q = e.target.value.trim().toLowerCase();
+            let shown = 0;
+            document.querySelectorAll('#follow-list-grid .discover-card').forEach(card => {
+                const hit = !q || card.textContent.toLowerCase().includes(q);
+                card.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+            });
+            document.getElementById('follow-list-nomatch').style.display = (q && !shown) ? 'block' : 'none';
+        });
 
         function openFollowListSheet(uid, tab) {
             if (!uid) return;

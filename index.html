@@ -6142,11 +6142,13 @@ img,video{-webkit-user-drag:none}
 .home-header-wordmark, .home-header-dm-btn, .nav-mobile-only { display: none; }
 @media (max-width: 768px) {
     #tab-status .chat-header-area { background: var(--bg-base); padding: calc(10px + min(env(safe-area-inset-top), 20px)) 16px 6px; }
-    #tab-status .chat-header-top { display: flex; justify-content: space-between; align-items: center; }
-    #tab-status .chat-header-top > .home-header-title-row { grid-column: auto; justify-self: auto; margin-right: auto; justify-content: flex-start; }
+    #tab-status .chat-header-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+    #tab-status .chat-header-top > .home-header-title-row { grid-column: 2; justify-self: center; margin-right: 0; justify-content: center; }
     #tab-status .home-header-logo { display: none; }
     #tab-status .home-header-wordmark { display: block; font-family: var(--font-brand); font-size: 24px; font-weight: 400; letter-spacing: -0.5px; color: var(--text-primary); line-height: 1; padding: 6px 0; }
-    #tab-status .chat-header-icons { display: flex; align-items: center; gap: 18px; }
+    #tab-status .chat-header-icons { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 18px; }
+    #tab-status .home-header-wordmark.refreshing { -webkit-mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); mask-image: linear-gradient(110deg, rgba(0,0,0,0.3) 35%, #000 50%, rgba(0,0,0,0.3) 65%); -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: homeLogoShimmer 1s linear infinite; }
+    #tab-status .home-header-title-row { cursor: pointer; }
     #tab-status .home-header-dm-btn { display: flex; position: relative; background: none; border: none; padding: 0; color: var(--text-primary); cursor: pointer; }
     #tab-status .home-header-dm-btn svg { width: 26px; height: 26px; }
     #tab-status .home-header-dm-btn.has-unread .home-header-dm-dot { display: block; }
@@ -27374,7 +27376,7 @@ img,video{-webkit-user-drag:none}
         async function refreshHomeFeed() {
             if (homeFeedRefreshing) return;
             homeFeedRefreshing = true;
-            const logo = document.querySelector('#home-header-title-row .home-header-logo');
+            const logo = [...document.querySelectorAll('#home-header-title-row .home-header-logo, #home-header-title-row .home-header-wordmark')].find(el => getComputedStyle(el).display !== 'none');
             const scroller = document.getElementById('discover-grid-scroll');
             const list = document.getElementById('feed-posts-list');
             const startedAt = Date.now();
@@ -27446,8 +27448,8 @@ img,video{-webkit-user-drag:none}
             // On phones the brand mark is shown (avatar + "Home" text are hidden), and tapping it
             // refreshes the feed; where it's hidden (desktop) the title keeps its scroll-to-top job.
             const onTitleTap = () => {
-                const logo = homeHeaderTitleRow.querySelector('.home-header-logo');
-                if (logo && getComputedStyle(logo).display !== 'none') refreshHomeFeed();
+                const mark = [...homeHeaderTitleRow.querySelectorAll('.home-header-logo, .home-header-wordmark')].find(el => getComputedStyle(el).display !== 'none');
+                if (mark) refreshHomeFeed();
                 else scrollHomeFeedToTop();
             };
             homeHeaderTitleRow.addEventListener('click', (e) => {

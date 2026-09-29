@@ -1412,6 +1412,7 @@
         .notif-type-badge.type-repost { background: var(--success-green); }
         .notif-type-badge.type-job_application { background: #F59E0B; }
         .notif-type-badge.type-verified { background: #1D9BF0; }
+        .notif-type-badge.type-milestone_post, .notif-type-badge.type-milestone_like { background: #F59E0B; }
 
         /* The bottom divider lives on the content column (not the row) so it starts at the text's
            left edge, inset past the avatar, and runs under the thumbnail to the screen edge. */
@@ -19428,6 +19429,7 @@ img,video{-webkit-user-drag:none}
                     mentionedUids.forEach((uid) => {
                         createNotification(uid, { type: 'mention', postId: newPostRef.key, text });
                     });
+                    awardFirstMilestone('firstPost');
                     // Success feedback: the composer already closed/reset optimistically above
                     // (posting happens behind the thin progress bar), so this custom alert is
                     // what actually confirms to the person that their post made it up, rather
@@ -21872,6 +21874,7 @@ img,video{-webkit-user-drag:none}
             if (!myCurrentEmoji) updates.likeCount = increment(1);
             await update(ref(database, `posts/${postId}`), updates);
             createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
+            if (post.uid !== user.uid) awardFirstMilestone('firstLike');
         }
 
         // Tap on the like button: toggles the like on/off.
@@ -22932,6 +22935,7 @@ img,video{-webkit-user-drag:none}
                     await remove(myReactionRef);
                 } else {
                     await set(myReactionRef, COMMENT_LIKE_EMOJI);
+                    awardFirstMilestone('firstLike');
                 }
             } catch (err) {
                 notify('Could not react to comment', 'error');
@@ -23533,6 +23537,27 @@ img,video{-webkit-user-drag:none}
             }
         }
 
+        // One-time "first move" encouragement. Each milestone is claimed with a transaction on
+        // users/{uid}/milestones/{key}, so it fires exactly once per account even if two taps or
+        // two devices race. Only the winner of the transaction sends the notification.
+        const MILESTONE_MESSAGES = {
+            firstPost: { type: 'milestone_post', text: "🎉 You just shared your first post! Welcome to Haba — every great voice starts with one. Keep posting, your community is listening." },
+            firstLike: { type: 'milestone_like', text: "💛 You gave your first like! Small gestures build a community. Keep discovering and cheering on others — and try leaving a comment next." }
+        };
+        async function awardFirstMilestone(key) {
+            const user = auth.currentUser;
+            const msg = MILESTONE_MESSAGES[key];
+            if (!user || !msg) return;
+            try {
+                const result = await runTransaction(ref(database, `users/${user.uid}/milestones/${key}`), (current) => {
+                    return current ? undefined : Date.now();
+                });
+                if (result.committed) await createSystemNotification(user.uid, msg);
+            } catch (err) {
+                console.error('awardFirstMilestone failed', err);
+            }
+        }
+
         function initNotificationsListener() {
             const user = auth.currentUser;
             if (!user || notifListenersAttached) return;
@@ -23570,6 +23595,8 @@ img,video{-webkit-user-drag:none}
                 follow: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M19 8v6M16 11h6"/></svg>',
                 repost: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
                 job_application: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+                milestone_post: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
+                milestone_like: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
                 verified: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 2.2 3.2-.6.9 3.1 3.1.9-.6 3.2L23 12l-2.2 2.4.6 3.2-3.1.9-.9 3.1-3.2-.6L12 23l-2.4-2.2-3.2.6-.9-3.1-3.1-.9.6-3.2L1 12l2.2-2.4-.6-3.2 3.1-.9.9-3.1 3.2.6z"/><path d="M9 12.5l2 2 4-4.5" stroke="#1D9BF0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
             };
             const icon = icons[type];
@@ -23587,6 +23614,7 @@ img,video{-webkit-user-drag:none}
             if (notif.type === 'mention') return `<b>${name}</b> tagged you: ${notif.text || ''}`;
             if (notif.type === 'job_application') return `<b>${name}</b> applied to your job: ${notif.text || ''}`;
             if (notif.type === 'verified') return notif.text || "You're verified! Your blue badge is live.";
+            if (notif.type === 'milestone_post' || notif.type === 'milestone_like') return notif.text || 'Nice first step!';
             return `<b>${name}</b> interacted with your post`;
         }
 
@@ -23771,6 +23799,8 @@ img,video{-webkit-user-drag:none}
                 case 'mention': return 'Mentioned you';
                 case 'job_application': return 'Applied to your job';
                 case 'verified': return 'Account update';
+                case 'milestone_post': return 'Your first post 🎉';
+                case 'milestone_like': return 'Your first like 💛';
                 default: return 'Interacted with your post';
             }
         }
@@ -23921,6 +23951,7 @@ img,video{-webkit-user-drag:none}
                     hydrateActivityRowsForPost(postId, post);
                     await update(ref(database, `posts/${postId}`), { [`reactions/${user.uid}`]: DEFAULT_POST_REACTION, likeCount: increment(1) });
                     createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
+                    if (post.uid !== user.uid) awardFirstMilestone('firstLike');
                 }
             } catch (err) {
                 console.error('activityToggleLike failed', err);

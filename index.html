@@ -2931,6 +2931,31 @@
         .notif-tab-header-action svg:active { opacity: 0.6; }
         .notif-tab-selection-header { margin-bottom: 14px; min-height: 36px; }
         #tab-notifications #notif-filter-row { padding: 0; margin: 0; }
+
+        /* ── PROFILE AS A TAB ── (was a full-screen sheet) */
+        #tab-profile { background: var(--bg-base); }
+        .profile-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding: 0 0 max(16px, env(safe-area-inset-bottom)); }
+        @media (max-width: 768px) {
+            .profile-tab-scroll { padding-bottom: calc(var(--nav-bar-total, 90px) + 24px + env(safe-area-inset-bottom)); }
+            #tab-profile .tm-profile-header { padding-top: calc(14px + min(env(safe-area-inset-top), 20px)); }
+            #tab-profile .tm-profile-sticky-header { padding-top: calc(10px + min(env(safe-area-inset-top), 20px)); }
+        }
+        @media (min-width: 769px) {
+            .profile-tab-scroll { padding-left: 20px; padding-right: 20px; }
+            body.profile-open .workspace-pane { display: none; }
+            body.profile-open .chat-pane { max-width: none; border-right: none; }
+            body.profile-open #tab-profile .profile-tab-scroll { max-width: 640px; width: 100%; margin: 0 auto; }
+            body.profile-open #tab-profile .tm-profile-header { padding-left: 10px; padding-right: 10px; }
+        }
+        @media (min-width: 769px) and (max-width: 1024px) { body.profile-open .app-grid { grid-template-columns: 190px 1fr; } }
+        @media (min-width: 1025px) { body.profile-open .app-grid { grid-template-columns: 240px 1fr; } }
+        @media (min-width: 1100px) {
+            body.profile-open .app-grid { grid-template-columns: 240px minmax(0, 600px) minmax(290px, 350px); justify-content: center; }
+            body.profile-open .side-nav { border-right: none; }
+            body.profile-open .chat-pane { max-width: none; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+            body.profile-open .right-rail { display: block; height: 100%; box-sizing: border-box; overflow-y: auto; padding: 0 16px 24px 24px; scrollbar-width: none; }
+            body.profile-open .rr-search { display: none; }
+        }
         .notif-tab-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 max(16px, env(safe-area-inset-bottom)); }
 
         .search-tab-header { padding-bottom: 12px; }
@@ -7633,118 +7658,6 @@ img,video{-webkit-user-drag:none}
         </div>
     </div>
 
-    <div id="profile-bottom-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet wa-profile-sheet">
-            <div class="sheet-handle"></div>
-
-            <!-- Same floating sticky header pattern as #user-info-sticky-header, but for the
-                 read-only view of your OWN profile: Share (icon) + Edit Profile (pill) instead
-                 of Message + Follow. See initProfileStickyHeader(). -->
-            <div class="tm-profile-sticky-header" id="my-profile-sticky-header">
-                <button type="button" class="tm-profile-back-btn" id="btn-close-profile-sticky" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <div class="tm-profile-sticky-id">
-                    <span class="tm-profile-sticky-name" id="my-profile-sticky-name">Name</span>
-                    <span class="tm-profile-sticky-count" id="my-profile-sticky-count">0 posts</span>
-                </div>
-                <div class="tm-profile-sticky-actions">
-                    <button type="button" class="tm-profile-sticky-msg-btn" id="btn-share-profile-sticky" aria-label="Share Profile">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                    </button>
-                    <button type="button" id="btn-edit-profile-sticky" class="btn-pill btn-primary tm-profile-sticky-follow-btn">Edit Profile</button>
-                </div>
-            </div>
-
-            <div class="tm-profile-header">
-                <button type="button" id="btn-close-profile" class="tm-profile-back-btn" aria-label="Close">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <div class="tm-profile-header-actions">
-                    <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    </button>
-                    <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    </button>
-                </div>
-            </div>
-
-            <div class="tm-profile-content">
-                <div class="ig-profile-toprow">
-                    <div class="tm-profile-id">
-                        <h1 id="my-profile-name-display" class="tm-profile-name">Name</h1>
-                        <p id="my-profile-username-display" class="tm-profile-username">@username</p>
-                    </div>
-                    <div class="avatar-circle tm-profile-avatar ig-profile-avatar" id="my-profile-avatar-display"></div>
-                </div>
-
-                <p id="my-profile-about-display" class="tm-profile-bio">—</p>
-
-                <div class="profile-community-pills" id="my-profile-community-pills" style="display:none;"></div>
-
-                <div class="tm-profile-meta-row">
-                    <a href="#" id="my-profile-website-display" class="tm-profile-link" target="_blank" rel="noopener noreferrer" style="display:none;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                        <span id="my-profile-website-display-text"></span>
-                    </a>
-                </div>
-
-                <div class="ig-profile-stats-grid">
-                    <button type="button" class="ig-profile-stat" id="btn-my-profile-posts-stat" aria-label="Posts">
-                        <span class="ig-profile-stat-num" id="my-profile-posts-count">0</span>
-                        <span class="ig-profile-stat-label">posts</span>
-                    </button>
-                    <button type="button" class="ig-profile-stat tm-profile-stat-link" data-follow-tab="followers">
-                        <span class="ig-profile-stat-num" id="my-profile-followers-count">0</span>
-                        <span class="ig-profile-stat-label">followers</span>
-                    </button>
-                    <button type="button" class="ig-profile-stat tm-profile-stat-link" data-follow-tab="following">
-                        <span class="ig-profile-stat-num" id="my-profile-following-count">0</span>
-                        <span class="ig-profile-stat-label">following</span>
-                    </button>
-                </div>
-
-                <div class="ig-profile-actions-row">
-                    <button type="button" id="btn-edit-profile" class="btn-pill btn-primary">Edit Profile</button>
-                    <button type="button" id="btn-my-subscribers" class="btn-pill btn-outline" style="display:none;">Subscribers · <span id="btn-my-subscribers-count">0</span></button>
-                    <button type="button" id="btn-share-profile" class="btn-pill btn-outline">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                        Share Profile
-                    </button>
-                </div>
-
-                <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
-                    <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
-                    <div class="profile-suggested-scroll" id="profile-suggested-scroll"></div>
-                </div>
-
-                <div class="wa-profile-media-section tm-profile-media-section" id="my-profile-media-section">
-                    <div class="profile-subtabs" id="my-profile-subtabs">
-                        <button type="button" class="profile-subtab-btn active" data-subtab="posts"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>Posts</button>
-                        <button type="button" class="profile-subtab-btn" data-subtab="replies"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>Replies</button>
-                        <button type="button" class="profile-subtab-btn" data-subtab="media"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Media</button>
-                        <button type="button" class="profile-subtab-btn" data-subtab="saved"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 21l-7-5-7 5V3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1z"></path></svg>Saved</button>
-                    </div>
-                    <div class="profile-posts-list profile-posts-grid" id="my-profile-posts-list"></div>
-                    <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
-                    <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
-                    <!-- Collection picker for the Saved tab — shown/hidden with the tab itself (see
-                         initProfileSubtabs) and filled by renderSavedFilterBar. -->
-                    <div class="saved-filter-bar" id="my-profile-saved-list-filter">
-                        <button type="button" class="saved-filter-btn" id="saved-filter-btn" aria-haspopup="true" aria-expanded="false">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                            <span class="saved-filter-label" id="saved-filter-label">All saved</span>
-                            <svg class="saved-filter-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                        </button>
-                        <div class="saved-filter-menu" id="saved-filter-menu" role="menu"></div>
-                    </div>
-                    <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Edit Profile — a separate sheet stacked on top of the (read-only) profile view
          above, Threads/Instagram-style, opened by tapping "Edit Profile" there. Holds
          all the actually-editable fields: avatar, name, bio, website. Save writes
@@ -9907,7 +9820,7 @@ img,video{-webkit-user-drag:none}
                     <span>Messages</span>
                 </div>
                 <!-- Desktop/tablet only (hidden on phones): X-style Profile, More and Post. -->
-                <div class="nav-item nav-desktop-only" id="nav-profile-btn" role="button" tabindex="0">
+                <div class="nav-item nav-desktop-only" data-tab="tab-profile" id="nav-profile-btn" role="button" tabindex="0">
                     <div class="nav-avatar js-my-avatar"></div>
                     <span>Profile</span>
                 </div>
@@ -10146,6 +10059,110 @@ img,video{-webkit-user-drag:none}
                     <div class="notif-tab-scroll" id="notif-tab-scroll">
                         <div id="notifications-list"></div>
                         <div id="notifications-empty" class="notif-empty-state" style="display:none;">Nothing here yet. Likes, replies, follows and mentions will show up in Activity.</div>
+                    </div>
+                </div>
+
+                <div id="tab-profile" class="tab-content">
+                    <div class="profile-tab-scroll" id="profile-tab-scroll">
+            <!-- Same floating sticky header pattern as #user-info-sticky-header, but for the
+                 read-only view of your OWN profile: Share (icon) + Edit Profile (pill) instead
+                 of Message + Follow. See initProfileStickyHeader(). -->
+            <div class="tm-profile-sticky-header" id="my-profile-sticky-header">
+                <div class="tm-profile-sticky-id">
+                    <span class="tm-profile-sticky-name" id="my-profile-sticky-name">Name</span>
+                    <span class="tm-profile-sticky-count" id="my-profile-sticky-count">0 posts</span>
+                </div>
+                <div class="tm-profile-sticky-actions">
+                    <button type="button" class="tm-profile-sticky-msg-btn" id="btn-share-profile-sticky" aria-label="Share Profile">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                    </button>
+                    <button type="button" id="btn-edit-profile-sticky" class="btn-pill btn-primary tm-profile-sticky-follow-btn">Edit Profile</button>
+                </div>
+            </div>
+
+            <div class="tm-profile-header" style="justify-content:flex-end;">
+                <div class="tm-profile-header-actions">
+                    <button type="button" id="btn-open-insights" class="tm-profile-icon-btn" aria-label="Insights">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    </button>
+                    <button type="button" id="btn-open-settings" class="tm-profile-icon-btn" aria-label="Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="tm-profile-content">
+                <div class="ig-profile-toprow">
+                    <div class="tm-profile-id">
+                        <h1 id="my-profile-name-display" class="tm-profile-name">Name</h1>
+                        <p id="my-profile-username-display" class="tm-profile-username">@username</p>
+                    </div>
+                    <div class="avatar-circle tm-profile-avatar ig-profile-avatar" id="my-profile-avatar-display"></div>
+                </div>
+
+                <p id="my-profile-about-display" class="tm-profile-bio">—</p>
+
+                <div class="profile-community-pills" id="my-profile-community-pills" style="display:none;"></div>
+
+                <div class="tm-profile-meta-row">
+                    <a href="#" id="my-profile-website-display" class="tm-profile-link" target="_blank" rel="noopener noreferrer" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                        <span id="my-profile-website-display-text"></span>
+                    </a>
+                </div>
+
+                <div class="ig-profile-stats-grid">
+                    <button type="button" class="ig-profile-stat" id="btn-my-profile-posts-stat" aria-label="Posts">
+                        <span class="ig-profile-stat-num" id="my-profile-posts-count">0</span>
+                        <span class="ig-profile-stat-label">posts</span>
+                    </button>
+                    <button type="button" class="ig-profile-stat tm-profile-stat-link" data-follow-tab="followers">
+                        <span class="ig-profile-stat-num" id="my-profile-followers-count">0</span>
+                        <span class="ig-profile-stat-label">followers</span>
+                    </button>
+                    <button type="button" class="ig-profile-stat tm-profile-stat-link" data-follow-tab="following">
+                        <span class="ig-profile-stat-num" id="my-profile-following-count">0</span>
+                        <span class="ig-profile-stat-label">following</span>
+                    </button>
+                </div>
+
+                <div class="ig-profile-actions-row">
+                    <button type="button" id="btn-edit-profile" class="btn-pill btn-primary">Edit Profile</button>
+                    <button type="button" id="btn-my-subscribers" class="btn-pill btn-outline" style="display:none;">Subscribers · <span id="btn-my-subscribers-count">0</span></button>
+                    <button type="button" id="btn-share-profile" class="btn-pill btn-outline">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                        Share Profile
+                    </button>
+                </div>
+
+                <div class="wa-suggested-section" id="profile-suggested-section" style="display:none;">
+                    <div class="wa-section-title" style="margin-bottom:10px;">Suggested Friends</div>
+                    <div class="profile-suggested-scroll" id="profile-suggested-scroll"></div>
+                </div>
+
+                <div class="wa-profile-media-section tm-profile-media-section" id="my-profile-media-section">
+                    <div class="profile-subtabs" id="my-profile-subtabs">
+                        <button type="button" class="profile-subtab-btn active" data-subtab="posts"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>Posts</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="replies"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>Replies</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="media"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>Media</button>
+                        <button type="button" class="profile-subtab-btn" data-subtab="saved"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 21l-7-5-7 5V3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1z"></path></svg>Saved</button>
+                    </div>
+                    <div class="profile-posts-list profile-posts-grid" id="my-profile-posts-list"></div>
+                    <div class="profile-posts-list" id="my-profile-replies-list" style="display:none;"></div>
+                    <div class="profile-media-grid" id="my-profile-media-grid" style="display:none;"></div>
+                    <!-- Collection picker for the Saved tab — shown/hidden with the tab itself (see
+                         initProfileSubtabs) and filled by renderSavedFilterBar. -->
+                    <div class="saved-filter-bar" id="my-profile-saved-list-filter">
+                        <button type="button" class="saved-filter-btn" id="saved-filter-btn" aria-haspopup="true" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                            <span class="saved-filter-label" id="saved-filter-label">All saved</span>
+                            <svg class="saved-filter-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="saved-filter-menu" id="saved-filter-menu" role="menu"></div>
+                    </div>
+                    <div class="profile-posts-list" id="my-profile-saved-list" style="display:none;"></div>
+                </div>
+            </div>
                     </div>
                 </div>
 
@@ -14065,7 +14082,7 @@ img,video{-webkit-user-drag:none}
 
         // Shared by handleHashChange (to animate the right direction) and the swipe gesture below
         // (to know what "next" and "previous" mean) — left-to-right, matching the nav bar order.
-        const TAB_ORDER = ['tab-status', 'tab-search', 'tab-notifications', 'tab-chats', 'tab-groups', 'tab-contacts'];
+        const TAB_ORDER = ['tab-status', 'tab-search', 'tab-notifications', 'tab-chats', 'tab-groups', 'tab-contacts', 'tab-profile'];
         let previousActiveTabHash = null;
 
         // Tracks whatever the hash was immediately before the CURRENT handleHashChange call
@@ -14262,6 +14279,8 @@ img,video{-webkit-user-drag:none}
                 document.body.classList.toggle('feed-open', hash === 'tab-status');
                 document.body.classList.toggle('search-open', hash === 'tab-search');
                 document.body.classList.toggle('notif-open', hash === 'tab-notifications');
+                document.body.classList.toggle('profile-open', hash === 'tab-profile');
+                if (hash === 'tab-profile' && tabBeforeThisChange !== 'tab-profile') onProfileTabEntered();
                 if (hash === 'tab-notifications' && tabBeforeThisChange !== 'tab-notifications') onNotificationsTabEntered();
                 if (tabBeforeThisChange === 'tab-notifications' && hash !== 'tab-notifications') exitNotifSelectionMode();
                 if (hash === 'tab-search' && tabBeforeThisChange !== 'tab-search') onSearchTabEntered();
@@ -15088,7 +15107,6 @@ img,video{-webkit-user-drag:none}
         document.getElementById('setting-blocked-contacts').addEventListener('click', () => {
             document.getElementById('privacy-sheet-overlay').classList.remove('active');
             settingsSheetOverlay.classList.remove('active');
-            profileSheetOverlay.classList.remove('active');
             goToTab('tab-contacts');
             const blockedSubtabBtn = document.querySelector('#contacts-sub-tabs button[data-subtab="blocked"]');
             if (blockedSubtabBtn) blockedSubtabBtn.click();
@@ -22639,8 +22657,7 @@ img,video{-webkit-user-drag:none}
             const videoViewer = document.getElementById('video-viewer-overlay');
             const viewerElevated = imageViewer.classList.contains('active') && imageViewer.classList.contains('above-sheet')
                 || videoViewer.classList.contains('active') && videoViewer.classList.contains('above-sheet');
-            const profileSheetOpen = document.getElementById('profile-bottom-sheet-overlay').classList.contains('active')
-                || document.getElementById('user-info-sheet-overlay').classList.contains('active');
+            const profileSheetOpen = document.getElementById('user-info-sheet-overlay').classList.contains('active');
             // The full-page Post view (post-comments-sheet-overlay opened with fullView — see
             // openPostComments) now covers the whole screen like a profile page. It sits later in
             // the DOM than Post Options/Repost Options/Community Post Options, so on the shared
@@ -25961,7 +25978,7 @@ img,video{-webkit-user-drag:none}
         });
         document.getElementById('choose-business-remove-row').addEventListener('click', () => setTaggedBusiness(null));
 
-        const profileSheetOverlay = document.getElementById('profile-bottom-sheet-overlay');
+        const profileTabEl = document.getElementById('tab-profile');
         const editProfileSheetOverlay = document.getElementById('edit-profile-sheet-overlay');
         const btnProfileNavEls = document.querySelectorAll('[data-profile-trigger]');
         let pendingPhotoURL = null;
@@ -26030,9 +26047,21 @@ img,video{-webkit-user-drag:none}
             }
         });
 
+        // Profile is a real tab now (#tab-profile). Everything that used to "open the profile
+        // sheet" still calls this; it just navigates to the tab. The tab fills itself in via
+        // onProfileTabEntered() -> renderMyProfileTab() when it becomes active.
         function openProfileSheet(e) {
-            e.preventDefault();
-            pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
+            if (e && e.preventDefault) e.preventDefault();
+            if (!auth.currentUser) return;
+            if ((window.location.hash.replace('#', '') || 'tab-status') === 'tab-profile' && profileTabEl.classList.contains('active-tab')) {
+                renderMyProfileTab(); // already here (e.g. jumping to the Saved subtab) — just refresh
+            } else {
+                goToTab('tab-profile');
+            }
+        }
+        function onProfileTabEntered() { renderMyProfileTab(); }
+
+        function renderMyProfileTab() {
             const user = auth.currentUser;
             if (user) {
                 const myProfile = cachedUsers[user.uid] || {};
@@ -26063,7 +26092,7 @@ img,video{-webkit-user-drag:none}
                 document.getElementById('my-profile-posts-count').textContent = myPostsCount;
                 document.getElementById('my-profile-sticky-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
                 document.getElementById('my-profile-sticky-count').textContent = `${myPostsCount} posts`;
-                initProfileStickyHeader(profileSheetOverlay, 'my-profile-sticky-header', '.ig-profile-actions-row');
+                initProfileStickyHeader(profileTabEl, 'my-profile-sticky-header', '.ig-profile-actions-row');
                 renderProfileCommunityPills('my-profile-community-pills', user.uid);
                 const usernameLocked = myProfile.usernameChanged && !isVerifiedUid(user.uid);
                 document.getElementById('username-edit-section').style.display = usernameLocked ? 'none' : 'block';
@@ -26091,7 +26120,6 @@ img,video{-webkit-user-drag:none}
                 const myProfileSubtabsEl = document.getElementById('my-profile-subtabs');
                 if (myProfileSubtabsEl) myProfileSubtabsEl.dataset.uid = user.uid;
                 initProfileSubtabs('my-profile-subtabs', 'my-profile-posts-list', 'my-profile-media-grid', 'my-profile-saved-list', 'my-profile-replies-list');
-                profileSheetOverlay.classList.add('active');
             }
         }
 
@@ -27418,16 +27446,6 @@ img,video{-webkit-user-drag:none}
             }
         });
 
-        profileSheetOverlay.addEventListener('click', (e) => {
-            if (e.target === profileSheetOverlay) profileSheetOverlay.classList.remove('active');
-        });
-        document.getElementById('btn-close-profile').addEventListener('click', (e) => {
-            e.preventDefault();
-            profileSheetOverlay.classList.remove('active');
-        });
-        document.getElementById('btn-close-profile-sticky').addEventListener('click', (e) => {
-            document.getElementById('btn-close-profile').click();
-        });
 
         // --- Settings sheet (moved out of Profile: Content & Copyright through Sign Out) ---
         const settingsSheetOverlay = document.getElementById('settings-bottom-sheet-overlay');
@@ -28595,7 +28613,7 @@ img,video{-webkit-user-drag:none}
             e.preventDefault();
             const confirmOut = await showCustomModal("Sign Out", "Are you sure you want to log out of the messenger?", true);
             if(confirmOut) {
-                profileSheetOverlay.classList.remove('active');
+                if (window.location.hash === '#tab-profile') goToTab('tab-status');
                 settingsSheetOverlay.classList.remove('active');
                 insightsSheetOverlay.classList.remove('active');
                 showLoading();
@@ -28741,7 +28759,7 @@ img,video{-webkit-user-drag:none}
                 await deleteUser(user);
                 clearAppLockState();
                 deleteAccountSheetOverlay.classList.remove('active');
-                profileSheetOverlay.classList.remove('active');
+                if (window.location.hash === '#tab-profile') goToTab('tab-status');
                 settingsSheetOverlay.classList.remove('active');
                 insightsSheetOverlay.classList.remove('active');
                 resetDeleteAccountSheet();
@@ -29304,7 +29322,7 @@ img,video{-webkit-user-drag:none}
             const nav = document.querySelector('.side-nav');
             const askBar = document.getElementById('ask-anything-bar');
             if (!nav) return;
-            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'search-tab-scroll', 'notif-tab-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
+            const scrollIds = ['chat-list-container', 'discover-grid-scroll', 'search-tab-scroll', 'notif-tab-scroll', 'profile-tab-scroll', 'calls-list-container', 'contacts-list-container', 'communities-feed-container'];
             const THRESHOLD = 6; // ignore tiny scroll jitter
             scrollIds.forEach(id => {
                 const scrollEl = document.getElementById(id);
@@ -33804,7 +33822,7 @@ img,video{-webkit-user-drag:none}
         // length, pinned posts, community pills, etc. shifting where the actions row sits.
         const profileStickyHeaderState = new WeakMap();
         function initProfileStickyHeader(sheetOverlayEl, stickyHeaderId, actionsRowSelector) {
-            const sheet = sheetOverlayEl.querySelector('.bottom-sheet');
+            const sheet = sheetOverlayEl.querySelector('.bottom-sheet') || sheetOverlayEl.querySelector('.profile-tab-scroll');
             const stickyHeader = document.getElementById(stickyHeaderId);
             if (!sheet || !stickyHeader) return;
             sheet.scrollTop = 0;
@@ -43462,9 +43480,8 @@ img,video{-webkit-user-drag:none}
             on('nav-logo-btn', 'click', goHome);
             activateOnKey('nav-logo-btn', goHome);
 
-            const openProfile = () => openProfileSheetOnSubtab('posts');
-            on('nav-profile-btn', 'click', openProfile);
-            activateOnKey('nav-profile-btn', openProfile);
+            // Profile is a data-tab nav item now (click handled by initTabs); keep Enter/Space.
+            activateOnKey('nav-profile-btn', () => goToTab('tab-profile'));
 
             const openMore = () => openSidebarDrawer();
             on('nav-more-btn', 'click', openMore);

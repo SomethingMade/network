@@ -16931,6 +16931,16 @@ img,video{-webkit-user-drag:none}
         let noMoreOlderPosts = false;
         let isLoadingMorePosts = false;
         let emptyOlderFetchCount = 0;
+        let feedSentinelIO = null;          // IntersectionObserver driving loadOlderPosts
+        let feedObservedSentinel = null;    // the sentinel node currently being observed
+        let feedAutoFillStreak = 0;         // consecutive batches that added nothing visible
+        const FEED_AUTOFILL_MAX_STREAK = 6;
+        // Profile post totals. cachedPosts only holds the feed's loaded window (+ pages
+        // fetched via infinite scroll), so counting it undercounts anyone with older posts.
+        // These hold the full set of a user's post ids from a uid-indexed query.
+        const profilePostIdsByUid = {};
+        const profilePostsFetchedAt = {};
+        const profilePostsInflight = {};
         let pendingNewPosts = {}; // postId -> post, queued live arrivals not yet shown (see "New posts" pill)
         // True while the initial page of posts is still streaming in from Firebase on first
         // load. reorderFeedCards() checks this to skip its scroll-preserving adjustment during
@@ -18478,8 +18488,7 @@ img,video{-webkit-user-drag:none}
                 return computeFeedScore(postIdB, postB) - computeFeedScore(postIdA, postA);
             });
             cards.forEach(card => list.appendChild(card));
-            const sentinel = document.getElementById('feed-load-more-sentinel');
-            if (sentinel) list.appendChild(sentinel);
+            ensureFeedSentinel();
 
             // Skip the "keep the anchor card visually still" compensation while the initial
             // page is still streaming in. At that point nobody has scrolled anywhere to
@@ -18604,6 +18613,47 @@ img,video{-webkit-user-drag:none}
             (nodes || []).forEach(node => node.remove());
         }
 
+        // Keeps ONE load-more sentinel as the last child of #feed-posts-list and makes sure the
+        // IntersectionObserver is watching that exact node. The sentinel used to be created once
+        // and never again — but the logout reset wipes #feed-posts-list (innerHTML = ''), which
+        // destroys it, and initFeedScrollListener never re-runs after that (ioBound guard), so
+        // after a re-login the observer was watching a detached node and nothing ever loaded
+        // more. Called from reorderFeedCards and after every batch so it self-heals.
+        function ensureFeedSentinel() {
+            const list = document.getElementById('feed-posts-list');
+            if (!list) return null;
+            let sentinel = document.getElementById('feed-load-more-sentinel');
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'feed-load-more-sentinel';
+                sentinel.style.height = '1px';
+            }
+            if (list.lastElementChild !== sentinel) list.appendChild(sentinel);
+            if (feedSentinelIO && feedObservedSentinel !== sentinel) {
+                if (feedObservedSentinel) feedSentinelIO.unobserve(feedObservedSentinel);
+                feedSentinelIO.observe(sentinel);
+                feedObservedSentinel = sentinel;
+            }
+            return sentinel;
+        }
+
+        // IntersectionObserver only reports when the sentinel *crosses* into view. If a batch
+        // lands and the sentinel is still within range (every card in it filtered out by the
+        // subtab / canViewPost / already on screen, or a short list on a tall screen) no new
+        // event ever fires and loading just stops. So also check position directly — on scroll,
+        // and after each batch settles.
+        function maybeLoadMoreFeed(fromScroll) {
+            if (isLoadingMorePosts || noMoreOlderPosts) return;
+            const list = document.getElementById('feed-posts-list');
+            const container = document.getElementById('discover-grid-scroll');
+            if (!list || !container || list.offsetParent === null) return; // feed hidden
+            const sentinel = ensureFeedSentinel();
+            if (!sentinel) return;
+            if (fromScroll === true) feedAutoFillStreak = 0;
+            const reach = container.getBoundingClientRect().bottom + 600;
+            if (sentinel.getBoundingClientRect().top <= reach) loadOlderPosts();
+        }
+
         // Fetches an older page of posts (one-time read, not a live listener) and appends them.
         // These older cards still get folded into cachedPosts and reorderFeedCards(), so ranking
         // stays consistent with the live window; they just won't patch in place on new likes/
@@ -18613,6 +18663,7 @@ img,video{-webkit-user-drag:none}
             if (!isFinite(oldestLoadedPostTimestamp)) return;
             isLoadingMorePosts = true;
             const skeletonNodes = showFeedLoadingSkeletons();
+            let addedVisible = 0;
 
             try {
                 const olderQuery = query(
@@ -18630,19 +18681,29 @@ img,video{-webkit-user-drag:none}
                     const entries = [];
                     snap.forEach((child) => { entries.push([child.key, child.val()]); return false; });
                     fetchedCount = entries.length;
+                    const newCards = [];
                     entries.forEach(([postId, post]) => {
                         if (post.timestamp && post.timestamp < oldestLoadedPostTimestamp) {
                             oldestLoadedPostTimestamp = post.timestamp;
                         }
                         if (!canViewPost(post)) return;
-                        if (cachedPosts[postId]) return;
-                        cachedPosts[postId] = post;
-                        if (list) list.appendChild(buildFeedPostCard(postId, post));
+                        // De-dupe on the DOM, not cachedPosts: a profile view can put a post in
+                        // cachedPosts without it ever having a card in the feed, and that post
+                        // must still be rendered here.
+                        const alreadyHasCard = list && list.querySelector(`[data-post-id="${postId}"]`);
+                        if (!cachedPosts[postId]) cachedPosts[postId] = post;
+                        if (alreadyHasCard) return;
+                        if (list) {
+                            const card = buildFeedPostCard(postId, post);
+                            list.appendChild(card);
+                            newCards.push(card);
+                        }
                     });
                     reorderFeedCards();
                     applyFeedSubtabFilter();
                     const searchInput = document.getElementById('search-feed-posts');
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
+                    addedVisible = newCards.filter(c => c.isConnected && c.style.display !== 'none').length;
                 }
 
                 if (fetchedCount === 0) {
@@ -18657,9 +18718,18 @@ img,video{-webkit-user-drag:none}
                 // scroll tick, and log for our own debugging.
                 console.warn('loadOlderPosts failed:', e);
                 removeFeedLoadingSkeletons(skeletonNodes);
+                feedAutoFillStreak = FEED_AUTOFILL_MAX_STREAK; // don't auto-retry in a tight loop
                 // Don't flip noMoreOlderPosts on a transient error
             } finally {
                 isLoadingMorePosts = false;
+                ensureFeedSentinel();
+                feedAutoFillStreak = addedVisible > 0 ? 0 : feedAutoFillStreak + 1;
+                // Let layout settle, then keep going only if the sentinel is still in range
+                // (batch added nothing visible). Capped so a subtab that matches nothing can't
+                // chain-load the whole database.
+                if (feedAutoFillStreak < FEED_AUTOFILL_MAX_STREAK) {
+                    requestAnimationFrame(() => requestAnimationFrame(() => maybeLoadMoreFeed(false)));
+                }
             }
         }
 
@@ -18668,35 +18738,28 @@ img,video{-webkit-user-drag:none}
             if (!list || list.dataset.ioBound) return;
             list.dataset.ioBound = 'true';
 
-            // Create a sentinel if it doesn't exist
-            let sentinel = document.getElementById('feed-load-more-sentinel');
-            if (!sentinel) {
-                sentinel = document.createElement('div');
-                sentinel.id = 'feed-load-more-sentinel';
-                sentinel.style.height = '1px';
-                list.appendChild(sentinel);
-            }
-
-            const io = new IntersectionObserver((entries) => {
+            // Root must be the actual scrolling ancestor (#discover-grid-scroll has
+            // overflow-y: auto; #feed-posts-container does not). With the wrong root the sentinel
+            // reads as permanently intersecting and loadOlderPosts() fires back-to-back.
+            const scroller = document.getElementById('discover-grid-scroll') || list.parentElement;
+            feedSentinelIO = new IntersectionObserver((entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) loadOlderPosts();
+                    if (entry.isIntersecting) { feedAutoFillStreak = 0; loadOlderPosts(); }
                 });
             }, {
-                // Must be the actual scrolling/clipping ancestor (#discover-grid-scroll has
-                // overflow-y: auto; #feed-posts-list's direct parent, #feed-posts-container,
-                // does not) — same fix as ensureCommunityFeedSentinelAtEnd's hardcoded root.
-                // The old `list.closest('[data-scrollable]') || list.parentElement` fallback
-                // always hit the parentElement branch (no element in the app ever carries a
-                // data-scrollable attribute) and landed on that non-clipping wrapper, so the
-                // sentinel could read as permanently "intersecting" and loadOlderPosts() would
-                // fire repeatedly back-to-back on load instead of once per real scroll-near-
-                // bottom — pulling page after page until noMoreOlderPosts, i.e. "loads all
-                // posts" at once.
-                root: document.getElementById('discover-grid-scroll') || list.parentElement,
+                root: scroller,
                 rootMargin: '0px 0px 400px 0px',
                 threshold: 0
             });
-            io.observe(sentinel);
+            ensureFeedSentinel();
+
+            // Position-based fallback so reaching the last post of a batch always loads the next.
+            let scrollTick = false;
+            scroller.addEventListener('scroll', () => {
+                if (scrollTick) return;
+                scrollTick = true;
+                requestAnimationFrame(() => { scrollTick = false; maybeLoadMoreFeed(true); });
+            }, { passive: true });
         }
 
         async function initFeedListeners() {
@@ -18892,6 +18955,7 @@ img,video{-webkit-user-drag:none}
                 }
 
                 delete cachedPosts[postId];
+                forgetDeletedPostForProfiles(postId);
                 // A genuinely deleted post can be showing in more than one place at once — the
                 // main feed, and/or a profile's Posts tab (yours or the author's) — so clean up
                 // every card for it, not just whichever one lives in the main feed list.
@@ -20311,6 +20375,7 @@ img,video{-webkit-user-drag:none}
             updateFeedEmptyState();
 
             try {
+                forgetDeletedPostForProfiles(postId);
                 await remove(ref(database, `posts/${postId}`));
                 await remove(ref(database, `postComments/${postId}`));
                 if (deletedPost && deletedPost.repostOf) {
@@ -26088,8 +26153,9 @@ img,video{-webkit-user-drag:none}
                 document.getElementById('new-username-input').value = '';
                 document.getElementById('my-profile-following-count').textContent = myProfile.followingCount || 0;
                 document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
-                const myPostsCount = Object.values(cachedPosts).filter(post => post && post.uid === user.uid).length;
+                const myPostsCount = profilePostCountFor(user.uid);
                 document.getElementById('my-profile-posts-count').textContent = myPostsCount;
+                loadFullProfilePosts(user.uid);
                 document.getElementById('my-profile-sticky-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
                 document.getElementById('my-profile-sticky-count').textContent = `${myPostsCount} posts`;
                 initProfileStickyHeader(profileTabEl, 'my-profile-sticky-header', '.ig-profile-actions-row');
@@ -33219,6 +33285,95 @@ img,video{-webkit-user-drag:none}
             return `<div class="profile-empty-state">${profileEmptyStateIllustration()}<p>${message}</p></div>`;
         }
 
+        // --- Profile post totals ---
+        // The profile Posts tab / counters used to be derived from cachedPosts alone, i.e. only
+        // the ~50 live-window posts plus whatever infinite scroll had pulled in, so anyone with
+        // older posts showed a too-low count (and a too-short Posts tab). This does one
+        // uid-indexed read for the full set, merges it into cachedPosts, and keeps the id set so
+        // the displayed total = everything the server returned + anything created locally since.
+        function profileViewablePost(post) {
+            // Same visibility rule as canViewPost, minus "Not Interested" (that only hides someone
+            // from my feed, not from their own profile).
+            if (!post) return false;
+            if (post.visibility !== 'followers') return true;
+            const user = auth.currentUser;
+            if (!user) return false;
+            if (post.uid === user.uid) return true;
+            return !!(post.uid && cachedContacts[post.uid]);
+        }
+
+        function profilePostCountFor(uid) {
+            const ids = new Set(profilePostIdsByUid[uid] || []);
+            Object.keys(cachedPosts).forEach(id => {
+                const p = cachedPosts[id];
+                if (p && p.uid === uid && profileViewablePost(p)) ids.add(id);
+            });
+            return ids.size;
+        }
+
+        function forgetDeletedPostForProfiles(postId) {
+            Object.values(profilePostIdsByUid).forEach(set => set.delete(postId));
+        }
+
+        function updateProfilePostCountUI(uid) {
+            const count = profilePostCountFor(uid);
+            const me = auth.currentUser;
+            if (me && uid === me.uid) {
+                const numEl = document.getElementById('my-profile-posts-count');
+                if (numEl) numEl.textContent = count;
+                const stickyEl = document.getElementById('my-profile-sticky-count');
+                if (stickyEl) stickyEl.textContent = `${count} posts`;
+            }
+            if (userInfoSheetUid === uid) {
+                const numEl = document.getElementById('user-info-posts-count');
+                if (numEl) numEl.textContent = formatProfileCount(count);
+                const stickyEl = document.getElementById('user-info-sticky-count');
+                if (stickyEl) stickyEl.textContent = `${formatProfileCount(count)} posts`;
+            }
+        }
+
+        async function loadFullProfilePosts(uid, force) {
+            if (!uid || uid === AI_UID) return;
+            if (profilePostsInflight[uid]) return profilePostsInflight[uid];
+            if (!force && profilePostsFetchedAt[uid] && Date.now() - profilePostsFetchedAt[uid] < 20000) return;
+            profilePostsInflight[uid] = (async () => {
+                try {
+                    const snap = await get(query(ref(database, 'posts'), orderByChild('uid'), equalTo(uid)));
+                    const ids = new Set();
+                    let mergedNew = false;
+                    if (snap.exists()) {
+                        snap.forEach((child) => {
+                            const post = child.val();
+                            if (!profileViewablePost(post)) return false;
+                            ids.add(child.key);
+                            if (!cachedPosts[child.key]) { cachedPosts[child.key] = post; mergedNew = true; }
+                            return false;
+                        });
+                    }
+                    profilePostIdsByUid[uid] = ids;
+                    profilePostsFetchedAt[uid] = Date.now();
+                    updateProfilePostCountUI(uid);
+                    // Older posts only just arrived — rebuild whichever profile is showing this user.
+                    if (mergedNew) {
+                        const me = auth.currentUser;
+                        if (me && uid === me.uid) {
+                            buildProfilePostsList(document.getElementById('my-profile-posts-list'), uid);
+                            buildProfileMediaGrid(document.getElementById('my-profile-media-grid'), uid);
+                        }
+                        if (userInfoSheetUid === uid) {
+                            buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
+                            buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('loadFullProfilePosts failed:', e);
+                } finally {
+                    delete profilePostsInflight[uid];
+                }
+            })();
+            return profilePostsInflight[uid];
+        }
+
         function buildProfilePostsList(listEl, uid) {
             if (!listEl) return;
             if (!uid) { listEl.innerHTML = ''; return; }
@@ -33380,8 +33535,9 @@ img,video{-webkit-user-drag:none}
             }
             document.getElementById('user-info-following-count').textContent = formatProfileCount(profile.followingCount);
             document.getElementById('user-info-followers-count').textContent = formatProfileCount(profile.followersCount);
-            const postsCount = Object.values(cachedPosts).filter(post => post && post.uid === uid).length;
+            const postsCount = profilePostCountFor(uid);
             document.getElementById('user-info-posts-count').textContent = formatProfileCount(postsCount);
+            loadFullProfilePosts(uid);
             document.getElementById('user-info-sticky-name').textContent = profile.name || 'Unknown User';
             document.getElementById('user-info-sticky-count').textContent = `${formatProfileCount(postsCount)} posts`;
             renderFollowedByRow(uid);
@@ -37356,6 +37512,11 @@ img,video{-webkit-user-drag:none}
                 oldestLoadedPostTimestamp = Infinity;
                 const staleFeedList = document.getElementById('feed-posts-list');
                 if (staleFeedList) staleFeedList.innerHTML = '';
+                feedObservedSentinel = null; // the sentinel went with the innerHTML wipe; ensureFeedSentinel() rebuilds + re-observes it
+                noMoreOlderPosts = false;
+                feedAutoFillStreak = 0;
+                Object.keys(profilePostIdsByUid).forEach(k => delete profilePostIdsByUid[k]);
+                Object.keys(profilePostsFetchedAt).forEach(k => delete profilePostsFetchedAt[k]);
                 notifListenersAttached = false;
                 emptyOlderFetchCount = 0;
                 cachedNotifications = {};

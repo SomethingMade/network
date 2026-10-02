@@ -6476,6 +6476,7 @@ body.dark-theme .feed-post-card.feed-post-card-ig .feed-post-action-btn.liked{ba
 <style id="fb-wordmark-font">
 /* Instagram-style script wordmark (Grand Hotel is the closest free match to Instagram's Billabong logo) */
 #tab-status .home-header-wordmark{font-family:'Grand Hotel','Billabong','Brush Script MT',cursive!important;font-size:36px!important;font-weight:400!important;letter-spacing:0!important;line-height:1!important;padding-top:2px}
+#tab-status .home-header-wordmark{color:var(--text-primary)!important}
 </style>
 </head>
 <body>
@@ -43816,6 +43817,64 @@ body.dark-theme .feed-post-card.feed-post-card-ig .feed-post-action-btn.liked{ba
   tap('fb-hdr-search',function(){try{triggerHaptic(12)}catch(e){}goToTab('tab-search');});
   var dm=$('home-header-dm-btn');
   if(dm){var old=dm.querySelector('svg');if(old)old.outerHTML='<svg viewBox="0 0 24 24"><path d="M12 2C6.4 2 2 6.2 2 11.6c0 2.9 1.3 5.4 3.4 7.1V22l3.1-1.7c1.1.3 2.3.5 3.5.5 5.6 0 10-4.2 10-9.6S17.6 2 12 2zm1 12.9-2.5-2.7-4.9 2.7 5.4-5.7 2.6 2.7 4.8-2.7-5.4 5.7z"/></svg>';}
+})();
+</script>
+<script>
+(function mainTabSwipe(){
+  var ORDER=['tab-status','tab-search','tab-notifications','tab-profile'];
+  var EXEMPT='.feed-video-progress-track, input, textarea, select, [contenteditable="true"], #communities-map-view, .reel-viewer-overlay, #reel-viewer-overlay';
+  var BARS='.feed-subtabs, .profile-subtabs, .segmented-control';
+  var sx=0,sy=0,st=null,track=false,horiz=null;
+  function mobile(){return window.matchMedia('(max-width: 768px)').matches;}
+  function hScroller(el){
+    for(var n=el;n&&n!==document.body;n=n.parentElement){
+      if(n.scrollWidth>n.clientWidth+1){var o=getComputedStyle(n).overflowX;if(o==='auto'||o==='scroll')return true;}
+    }
+    return false;
+  }
+  function currentTab(){
+    var a=document.querySelector('.side-nav .nav-item[data-tab].active');
+    return a?a.getAttribute('data-tab'):null;
+  }
+  // true when the screen's own subtab row can still move in this direction (the existing subtab swipe handles that)
+  function subtabCanMove(target,dir){
+    var screen=target.closest('.tab-content');if(!screen)return false;
+    var bars=screen.querySelectorAll(BARS),bar=null;
+    for(var i=0;i<bars.length;i++){if(bars[i].offsetParent!==null){bar=bars[i];break;}}
+    if(!bar)return false;
+    var btns=Array.prototype.slice.call(bar.querySelectorAll(':scope > button'));
+    var idx=btns.findIndex(function(b){return b.classList.contains('active');});
+    if(idx===-1)return false;
+    var next=dir<0?idx+1:idx-1;
+    return next>=0&&next<btns.length;
+  }
+  document.addEventListener('touchstart',function(e){
+    track=false;
+    if(!mobile()||e.touches.length!==1)return;
+    var t=e.target;
+    if(!t.closest('.tab-content')||t.closest(EXEMPT)||hScroller(t))return;
+    if(document.querySelector('.bottom-sheet-overlay.active, .modal-overlay.active, #reel-viewer-overlay.active'))return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;st=t;track=true;horiz=null;
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!track)return;
+    var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
+    if(horiz===null&&(Math.abs(dx)>10||Math.abs(dy)>10)){horiz=Math.abs(dx)>Math.abs(dy)*1.5;if(!horiz)track=false;}
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(!track||!horiz){track=false;return;}
+    track=false;
+    var dx=e.changedTouches[0].clientX-sx;
+    if(Math.abs(dx)<70)return;
+    var dir=dx<0?-1:1; // swipe left => next tab, right => previous
+    if(subtabCanMove(st,dir<0?-1:1))return;
+    var cur=currentTab(),i=ORDER.indexOf(cur);
+    if(i===-1)return;
+    var next=ORDER[i+(dir<0?1:-1)];
+    if(!next)return;
+    try{triggerHaptic(12)}catch(_){}
+    goToTab(next);
+  });
 })();
 </script>
 </body>

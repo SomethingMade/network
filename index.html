@@ -1666,6 +1666,19 @@
            error/load listeners in JS; if the image later loads (e.g. a retry), the class comes off. */
         .x-media-grid-item img.media-failed { visibility: hidden; }
         .x-media-grid[data-count="1"] .x-media-grid-item:has(> img.media-failed) { aspect-ratio: 4 / 3; }
+        /* Multi-image posts: Facebook-style collage instead of a swipe carousel.
+           2 -> side by side, 3 -> one wide on top + two below, 4 -> 2x2,
+           5+ -> two on top + three below, with a "+N" overlay on the 5th tile for the rest.
+           Tapping any tile opens the image viewer at that image (data-idx). A 6-column grid
+           lets every layout share one rule set. !important is used on the item properties
+           because the carousel rules above (and the .feed-post-card-ig overrides further down)
+           have higher specificity and set flex-basis/border/radius for carousel slides. */
+        .x-media-collage { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-surface); }
+        .x-media-collage .x-media-grid-item { grid-column: span 3; aspect-ratio: 1 / 1 !important; max-height: none !important; flex: none !important; border: none !important; border-radius: 0 !important; min-width: 0; }
+        .x-media-collage[data-n="3"] .x-media-grid-item:first-child { grid-column: span 6; aspect-ratio: 2 / 1 !important; }
+        .x-media-collage[data-n="5"] .x-media-grid-item:nth-child(n+3) { grid-column: span 2; }
+        .x-media-collage-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); color: #fff; font-size: 28px; font-weight: 600; pointer-events: none; z-index: 2; }
+        .feed-post-card-ig .x-media-collage, #post-comments-post-preview .x-media-collage { border-radius: 0; border: none; }
         .x-media-carousel-counter { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 12px; pointer-events: none; z-index: 2; }
         .x-media-carousel-dots { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 5px; pointer-events: none; z-index: 2; }
         .x-media-carousel-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); transition: width .2s var(--ease-smooth), background .2s var(--ease-smooth), opacity .2s var(--ease-smooth); }
@@ -5113,6 +5126,64 @@
         @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
             .image-viewer-post-action-btn, .reel-item-action-btn { background: rgba(60,60,60,0.75); }
         }
+        /* ── ACTION DOCK (image viewer + video/Reel viewer) ──
+           Replaces the four separate glass pills with ONE frosted capsule that holds all the
+           actions: flat icon + count buttons inside, a hairline divider before Save, a red
+           heart with a small pop when liked, green repost, amber save. Declared after the
+           liquid-glass pill rules above so it overrides them; markup/JS are unchanged. */
+        .image-viewer-post-actions,
+        .reel-item-actions {
+            align-items: center; gap: 2px; padding: 5px;
+            background: rgba(18,18,20,0.46);
+            -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+        .image-viewer-post-actions .image-viewer-post-action-btn,
+        .reel-item-actions .reel-item-action-btn {
+            flex: 1 1 0; justify-content: center; margin: 0; min-width: 0;
+            padding: 8px 10px; gap: 6px; border-radius: 999px;
+            background: transparent; border: none; box-shadow: none;
+            -webkit-backdrop-filter: none; backdrop-filter: none;
+            font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+            text-shadow: none; -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s ease, color 0.15s ease, transform 0.15s var(--ease-spring);
+        }
+        .image-viewer-post-actions .image-viewer-post-action-btn::before,
+        .reel-item-actions .reel-item-action-btn::before { display: none; }
+        .image-viewer-post-actions .image-viewer-post-action-btn:hover,
+        .reel-item-actions .reel-item-action-btn:hover { background: rgba(255,255,255,0.08); }
+        .image-viewer-post-actions .image-viewer-post-action-btn:active,
+        .reel-item-actions .reel-item-action-btn:active { background: rgba(255,255,255,0.16); transform: scale(0.94); }
+        .image-viewer-post-actions .image-viewer-post-action-btn svg,
+        .reel-item-actions .reel-item-action-btn svg { width: 22px; height: 22px; filter: none; transition: transform 0.18s var(--ease-spring); }
+        /* Save sits apart on the right, behind a hairline divider. */
+        .image-viewer-post-actions #image-viewer-bookmark-btn,
+        .reel-item-actions .reel-save-btn { flex: 0 0 auto; margin-left: 6px; padding: 8px 14px; }
+        .image-viewer-post-actions #image-viewer-bookmark-btn::before,
+        .reel-item-actions .reel-save-btn::before {
+            display: block; content: ''; position: absolute; inset: 24% auto 24% -4px; width: 1px;
+            background: rgba(255,255,255,0.2); border-radius: 0; opacity: 1; z-index: auto;
+        }
+        /* States */
+        .image-viewer-post-actions .image-viewer-post-action-btn.liked,
+        .reel-item-actions .reel-item-action-btn.liked { color: #ff4d6d; background: rgba(255,77,109,0.14); border: none; }
+        .image-viewer-post-actions .image-viewer-post-action-btn.liked svg,
+        .reel-item-actions .reel-item-action-btn.liked svg { color: #ff4d6d; animation: actionDockPop 0.32s var(--ease-spring); }
+        .image-viewer-post-actions .image-viewer-post-action-btn.reposted,
+        .reel-item-actions .reel-item-action-btn.reposted { color: var(--success-green, #34C759); background: rgba(52,199,89,0.14); border: none; box-shadow: none; }
+        .image-viewer-post-actions .image-viewer-post-action-btn.saved,
+        .reel-item-actions .reel-item-action-btn.saved { color: #ffd166; }
+        .image-viewer-post-actions .image-viewer-post-action-btn.saved svg,
+        .reel-item-actions .reel-item-action-btn.saved svg { color: #ffd166; }
+        @keyframes actionDockPop { 0% { transform: scale(0.7); } 60% { transform: scale(1.22); } 100% { transform: scale(1); } }
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            .image-viewer-post-actions, .reel-item-actions { background: rgba(30,30,32,0.88); }
+        }
+        /* The dock is a bit taller than the old pills, so lift the seek bar and caption by the
+           difference to keep the same breathing room above it. */
+        #reel-viewer-overlay .reel-item-progress-track { bottom: calc(max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom)) + 74px); }
+        #reel-viewer-overlay .reel-item-info { bottom: calc(114px + max(env(safe-area-inset-bottom, 0px), var(--nav-bar-extra-bottom))); }
         .reel-item-view-stat { display: flex; align-items: center; gap: 5px; margin-top: 6px; font-size: 12.5px; font-weight: 700; opacity: 1; text-shadow: 0 1px 6px rgba(0,0,0,0.55); cursor: default; }
         .reel-item-view-stat svg { width: 16px; height: 16px; flex-shrink: 0; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.5)); }
         /* Thin TikTok/Reels-style playback progress line pinned to the very bottom edge of
@@ -21522,11 +21593,17 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const isCardAd = !!(post.isAd && post.adUrl);
             const imageHtml = postImages.length ? `
                 <div class="x-media-grid${isCardAd ? ' has-ad-cta' : ''}" data-count="${postImages.length}">
-                    <div class="x-media-carousel-track">
+                    ${postImages.length > 1 ? (() => {
+                        // Facebook-style collage (see .x-media-collage): show at most 5 tiles, and
+                        // put a "+N" overlay on the last one when there are more images than that.
+                        const shown = postImages.slice(0, 5);
+                        const extra = postImages.length - shown.length;
+                        return `<div class="x-media-collage" data-n="${shown.length}">
+                            ${shown.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt="">${(extra > 0 && idx === shown.length - 1) ? `<span class="x-media-collage-more">+${extra}</span>` : ''}</div>`).join('')}
+                        </div>`;
+                    })() : `<div class="x-media-carousel-track">
                         ${postImages.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
-                    </div>
-                    ${postImages.length > 1 ? `<span class="x-media-carousel-counter">1/${postImages.length}</span>
-                    <div class="x-media-carousel-dots">${postImages.map((_, idx) => `<span class="dot${idx === 0 ? ' active' : ''}"></span>`).join('')}</div>` : ''}
+                    </div>`}
                     ${post.music ? `<button type="button" class="feed-post-music-toggle-btn" aria-label="Play sound"><svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>` : ''}
                 </div>${post.music ? `<audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}` : '';
             const videoHtml = post.videoUrl ? `

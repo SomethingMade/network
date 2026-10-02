@@ -1799,7 +1799,30 @@
         @keyframes feedLiveDotPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
         /* Live tab panel reuses the drawer's live-list-grid/card styles but sits inline in the
            feed body instead of a full-screen overlay, so it just needs its own top padding. */
-        #feed-live-panel { padding: 14px 2px 20px; }
+        #feed-movies-panel { padding: 12px 2px 20px; }
+        .movies-chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 2px 12px; scrollbar-width: none; }
+        .movies-chips::-webkit-scrollbar { display: none; }
+        .movies-chip { flex-shrink: 0; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+        .movies-chip.active { background: var(--text-primary); color: var(--bg-base); border-color: var(--text-primary); }
+        .movies-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        @media (min-width: 700px) { .movies-grid { grid-template-columns: repeat(4, 1fr); } }
+        .movie-card { position: relative; cursor: pointer; border-radius: 12px; overflow: hidden; background: var(--bg-surface); border: 1px solid var(--border-color); }
+        .movie-card-poster { width: 100%; aspect-ratio: 2 / 3; background: var(--border-color) center / cover no-repeat; position: relative; }
+        .movie-card-play { position: absolute; right: 8px; bottom: 8px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; }
+        .movie-card-play svg { width: 14px; height: 14px; fill: #fff; margin-left: 2px; }
+        .movie-card-rating { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,0.72); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 6px; }
+        .movie-card-info { padding: 8px 10px 10px; }
+        .movie-card-title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .movie-card-date { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+        .movie-trailer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 100070; display: none; align-items: center; justify-content: center; padding: 16px; }
+        .movie-trailer-overlay.active { display: flex; }
+        .movie-trailer-box { width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto; position: relative; }
+        .movie-trailer-close { position: absolute; right: 0; top: -4px; background: none; border: none; color: #fff; font-size: 32px; line-height: 1; cursor: pointer; padding: 4px 8px; z-index: 2; }
+        .movie-trailer-title { color: #fff; font-size: 17px; font-weight: 700; padding: 6px 44px 12px 0; }
+        .movie-trailer-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 12px; overflow: hidden; }
+        .movie-trailer-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .movie-trailer-frame .movie-trailer-none { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 14px; text-align: center; padding: 20px; }
+        .movie-trailer-overview { color: #ccc; font-size: 13.5px; line-height: 1.5; margin: 12px 0 0; }
         /* Profile posts sit inside .tm-profile-content, which has 20px of side padding for the
            rest of the profile (bio, stats, etc). Feed cards, by contrast, live in a zero-padding
            container and get their edge-to-edge look purely from .feed-post-card's own 12px/16px
@@ -8858,6 +8881,15 @@ img,video{-webkit-user-drag:none}
 
     <!-- LIVE ROOM: shared by host + guests + viewers. Video grid (host tile always first,
          approved guest tiles appended), live chat, and host-only guest-request management. -->
+    <div id="movie-trailer-overlay" class="movie-trailer-overlay">
+        <div class="movie-trailer-box">
+            <button type="button" class="movie-trailer-close" id="movie-trailer-close" aria-label="Close">&times;</button>
+            <div class="movie-trailer-title" id="movie-trailer-title"></div>
+            <div class="movie-trailer-frame" id="movie-trailer-frame"></div>
+            <p class="movie-trailer-overview" id="movie-trailer-overview"></p>
+        </div>
+    </div>
+
     <div id="live-room-overlay" class="live-room-overlay">
 
         <div class="live-room-stage" id="live-room-stage"></div>
@@ -9823,7 +9855,7 @@ img,video{-webkit-user-drag:none}
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"></path></svg>For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>Following</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="stories"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.2"></circle></svg>Stories<span class="live-count-badge" id="feed-subtab-stories-count" style="display:none;">0</span></button>
-                                <button type="button" class="feed-subtab-btn feed-subtab-live" data-feed-subtab="live"><svg class="feed-subtab-live-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>Live<span class="live-count-badge" id="feed-subtab-live-count" style="display:none;">0</span></button>
+                                <button type="button" class="feed-subtab-btn" data-feed-subtab="movies"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"></rect><path d="M7 3v18M17 3v18M2 9h5M2 15h5M17 9h5M17 15h5"></path></svg>Movies</button>
                             </div>
                         </div>
                         <div id="feed-posts-container">
@@ -9834,22 +9866,16 @@ img,video{-webkit-user-drag:none}
                                 <p>No posts yet. Be the first to share something!</p>
                             </div>
                         </div>
-                        <!-- Live tab panel: same "browse/join a live broadcast" surface as the
-                             sidebar drawer's live hub (#live-hub-overlay), just rendered inline
-                             here instead of as a full-screen overlay. Hidden unless the Live
-                             subtab above is active (see feed-subtabs click handler). -->
-                        <div id="feed-live-panel" style="display:none;">
-                            <div class="live-golive-card" id="btn-start-live-feed">
-                                <div class="live-golive-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                                </div>
-                                <div class="live-golive-text">
-                                    <h4>Go Live</h4>
-                                    <p>Start broadcasting — invite viewers up as co-hosts anytime</p>
-                                </div>
+                        <!-- Movies subtab panel: trailers from TMDB (see TMDB_API_KEY). Hidden unless the
+                             Movies subtab is active (see feed-subtabs click handler). -->
+                        <div id="feed-movies-panel" style="display:none;">
+                            <div class="movies-chips" id="movies-chips">
+                                <button type="button" class="movies-chip active" data-movies-cat="now_playing">Now Playing</button>
+                                <button type="button" class="movies-chip" data-movies-cat="upcoming">Upcoming</button>
+                                <button type="button" class="movies-chip" data-movies-cat="trending">Trending</button>
                             </div>
-                            <div class="live-list-grid" id="feed-live-list"></div>
-                            <p class="live-hub-empty" id="feed-live-empty" style="display:none;">No one's live right now. Be the first!</p>
+                            <div class="movies-grid" id="movies-grid"></div>
+                            <p class="live-hub-empty" id="movies-empty" style="display:none;"></p>
                         </div>
                         <!-- Feed tab's "Stories" subtab panel: same status/story cards as the
                              Discover tab's story-card-scroll (#stories-scroll-discover), just
@@ -17240,7 +17266,7 @@ img,video{-webkit-user-drag:none}
                 // closing a story — so closing a story while on the Feed's Stories subtab
                 // was silently swapping the visible panel back to feed posts underneath the
                 // still-highlighted "Stories" button.
-                if (feedContainer && feedActiveSubtab !== 'stories' && feedActiveSubtab !== 'live') {
+                if (feedContainer && feedActiveSubtab !== 'stories' && feedActiveSubtab !== 'movies') {
                     feedContainer.style.display = '';
                 }
                 if (exploreTabsBar) exploreTabsBar.style.display = '';
@@ -20009,33 +20035,106 @@ img,video{-webkit-user-drag:none}
             updateFeedEmptyState();
         }
 
-        // --- Feed "Live" subtab: an inline version of the sidebar drawer's live hub (browse
-        // people currently broadcasting, tap one to join, or start your own). Reuses the same
-        // `lives` DB node and buildLiveHubCard renderer as #live-hub-overlay — this just points
-        // them at a grid living in the feed body instead of the full-screen overlay, so the two
-        // surfaces always show the same broadcasts without duplicating any logic.
-        let feedLiveListUnsub = null;
-        function showFeedLivePanel() {
+        // --- Feed "Movies" subtab: trailers from TMDB (themoviedb.org). Live now lives only in the
+        // sidebar/explore drawers. Paste a free TMDB v3 API key below (themoviedb.org > Settings > API).
+        const TMDB_API_KEY = 'YOUR_TMDB_API_KEY';
+        const TMDB_IMG = 'https://image.tmdb.org/t/p/w342';
+        let moviesActiveCat = 'now_playing';
+        const moviesCache = {};
+        async function tmdbFetch(path) {
+            const sep = path.includes('?') ? '&' : '?';
+            const res = await fetch(`https://api.themoviedb.org/3${path}${sep}api_key=${TMDB_API_KEY}&language=en-US`);
+            if (!res.ok) throw new Error('TMDB ' + res.status);
+            return res.json();
+        }
+        async function loadMovies(cat) {
+            const grid = document.getElementById('movies-grid');
+            const empty = document.getElementById('movies-empty');
+            if (!grid || !empty) return;
+            grid.innerHTML = '';
+            if (!TMDB_API_KEY || TMDB_API_KEY === 'YOUR_TMDB_API_KEY') {
+                empty.textContent = 'Movies isn\'t set up yet — add a TMDB API key (TMDB_API_KEY) first.';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.textContent = 'Loading…';
+            empty.style.display = 'block';
+            try {
+                if (!moviesCache[cat]) {
+                    const path = cat === 'trending' ? '/trending/movie/week' : `/movie/${cat}`;
+                    moviesCache[cat] = (await tmdbFetch(path)).results || [];
+                }
+                if (cat !== moviesActiveCat) return; // user switched chips while loading
+                const list = moviesCache[cat].filter(m => m.poster_path);
+                empty.style.display = list.length ? 'none' : 'block';
+                if (!list.length) empty.textContent = 'No movies found.';
+                list.forEach(m => grid.appendChild(buildMovieCard(m)));
+            } catch (err) {
+                console.error('Movies load failed:', err);
+                empty.textContent = 'Couldn\'t load movies. Check your connection and try again.';
+                empty.style.display = 'block';
+            }
+        }
+        function buildMovieCard(m) {
+            const card = document.createElement('div');
+            card.className = 'movie-card';
+            const year = m.release_date ? new Date(m.release_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBA';
+            card.innerHTML = `
+                <div class="movie-card-poster" style="background-image:url('${TMDB_IMG}${m.poster_path}')">
+                    ${m.vote_average ? `<span class="movie-card-rating">★ ${m.vote_average.toFixed(1)}</span>` : ''}
+                    <span class="movie-card-play"><svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"></path></svg></span>
+                </div>
+                <div class="movie-card-info">
+                    <div class="movie-card-title">${escapeHtmlForPost(m.title || '')}</div>
+                    <div class="movie-card-date">${year}</div>
+                </div>`;
+            card.addEventListener('click', () => openMovieTrailer(m));
+            return card;
+        }
+        async function openMovieTrailer(m) {
+            triggerHaptic(10);
+            const overlay = document.getElementById('movie-trailer-overlay');
+            const frame = document.getElementById('movie-trailer-frame');
+            document.getElementById('movie-trailer-title').textContent = m.title || '';
+            document.getElementById('movie-trailer-overview').textContent = m.overview || '';
+            frame.innerHTML = '<div class="movie-trailer-none">Loading trailer…</div>';
+            overlay.classList.add('active');
+            try {
+                const data = await tmdbFetch(`/movie/${m.id}/videos`);
+                const vids = (data.results || []).filter(v => v.site === 'YouTube');
+                const pick = vids.find(v => v.type === 'Trailer' && v.official) || vids.find(v => v.type === 'Trailer') || vids.find(v => v.type === 'Teaser') || vids[0];
+                if (!overlay.classList.contains('active')) return; // closed while loading
+                if (!pick) { frame.innerHTML = '<div class="movie-trailer-none">No trailer available for this movie yet.</div>'; return; }
+                frame.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(pick.key)}?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+            } catch (err) {
+                console.error('Trailer load failed:', err);
+                frame.innerHTML = '<div class="movie-trailer-none">Couldn\'t load the trailer.</div>';
+            }
+        }
+        function closeMovieTrailer() {
+            document.getElementById('movie-trailer-overlay').classList.remove('active');
+            document.getElementById('movie-trailer-frame').innerHTML = ''; // stops playback
+        }
+        document.getElementById('movie-trailer-close')?.addEventListener('click', closeMovieTrailer);
+        document.getElementById('movie-trailer-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'movie-trailer-overlay') closeMovieTrailer(); });
+        document.getElementById('movies-chips')?.addEventListener('click', (e) => {
+            const chip = e.target.closest('.movies-chip');
+            if (!chip || chip.classList.contains('active')) return;
+            triggerHaptic(8);
+            document.querySelectorAll('#movies-chips .movies-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            moviesActiveCat = chip.dataset.moviesCat;
+            loadMovies(moviesActiveCat);
+        });
+        function showFeedMoviesPanel() {
             document.getElementById('feed-posts-container').style.display = 'none';
             document.getElementById('feed-empty-state').style.display = 'none';
-            document.getElementById('feed-live-panel').style.display = 'block';
-            if (feedLiveListUnsub) return; // already subscribed
-            const livesRef = ref(database, 'lives');
-            feedLiveListUnsub = onValue(livesRef, (snap) => {
-                const grid = document.getElementById('feed-live-list');
-                const empty = document.getElementById('feed-live-empty');
-                if (!grid || !empty) return;
-                grid.innerHTML = '';
-                const all = snap.val() || {};
-                const activeEntries = Object.entries(all).filter(([, v]) => v && v.status === 'live');
-                empty.style.display = activeEntries.length ? 'none' : 'block';
-                activeEntries.forEach(([liveId, data]) => grid.appendChild(buildLiveHubCard(liveId, data)));
-            });
+            document.getElementById('feed-movies-panel').style.display = 'block';
+            loadMovies(moviesActiveCat);
         }
-        function hideFeedLivePanel() {
-            document.getElementById('feed-live-panel').style.display = 'none';
+        function hideFeedMoviesPanel() {
+            document.getElementById('feed-movies-panel').style.display = 'none';
             document.getElementById('feed-posts-container').style.display = '';
-            if (feedLiveListUnsub) { feedLiveListUnsub(); feedLiveListUnsub = null; }
         }
 
         // --- Feed "Stories" subtab: reuses the same cachedUsers/cachedStories kept live by the
@@ -20061,10 +20160,10 @@ img,video{-webkit-user-drag:none}
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
-            hideFeedLivePanel();
+            hideFeedMoviesPanel();
             hideFeedStoriesPanel();
-            if (feedActiveSubtab === 'live') {
-                showFeedLivePanel();
+            if (feedActiveSubtab === 'movies') {
+                showFeedMoviesPanel();
             } else if (feedActiveSubtab === 'stories') {
                 showFeedStoriesPanel();
             } else {
@@ -20072,7 +20171,6 @@ img,video{-webkit-user-drag:none}
                 sprinkleSuggestedPeople();
             }
         });
-        document.getElementById('btn-start-live-feed')?.addEventListener('click', () => openGoLiveSheet());
 
         function updateFeedEmptyState() {
             const emptyState = document.getElementById('feed-empty-state');
@@ -42829,7 +42927,6 @@ img,video{-webkit-user-drag:none}
                 refreshPostLiveRings();
                 updateLiveCountBadge('sidebar-drawer-live-count', count);
                 updateLiveCountBadge('explore-drawer-live-count', count);
-                updateLiveCountBadge('feed-subtab-live-count', count);
             });
 
             // ONE-TIME CLEANUP — communities now live under the "communities" node (see the

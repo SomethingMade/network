@@ -1825,8 +1825,8 @@
         .movie-trailer-overview { color: #ccc; font-size: 13.5px; line-height: 1.5; margin: 12px 0 0; }
         /* Custom trailer player: YouTube's own UI is hidden (controls=0) and replaced by .mp-* controls. */
         .movie-trailer-frame .mp-host, .movie-trailer-frame .mp-host iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-        .movie-trailer-frame:fullscreen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; }
-        .movie-trailer-frame:-webkit-full-screen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; }
+        .movie-trailer-frame:fullscreen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; background: #000; }
+        .movie-trailer-frame:-webkit-full-screen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; background: #000; }
         .mp-tap { position: absolute; inset: 0; z-index: 2; background: transparent; transition: background .2s; -webkit-tap-highlight-color: transparent; }
         .movie-trailer-frame.mp-paused .mp-tap { background: rgba(0,0,0,0.72); }
         .movie-trailer-frame.mp-ended .mp-tap { background: #000; }
@@ -1835,13 +1835,30 @@
         .mp-ui.show .mp-center, .mp-ui.show .mp-bar { pointer-events: auto; }
         .mp-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
         .mp-center svg { width: 26px; height: 26px; fill: #fff; }
-        .mp-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px 10px; }
+        .mp-bar { display: flex; align-items: center; gap: 10px; padding: 8px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
         .mp-time { color: #fff; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .mp-seek { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; margin: 0; cursor: pointer; background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,0.3) var(--p, 0%)); }
         .mp-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: none; }
         .mp-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: none; }
         .mp-btn { background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .mp-btn svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        /* Netflix-style landscape: the player goes fullscreen + landscape-locked on open (where the browser allows it).
+           Back/title bar only shows in fullscreen or a landscape phone; portrait inline keeps the overlay's own close button. */
+        .mp-top { position: absolute; left: 0; right: 0; top: 0; display: none; align-items: center; gap: 10px; padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); pointer-events: none; }
+        .mp-title { color: #fff; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mp-back { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: rgba(0,0,0,0.55); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; pointer-events: none; }
+        .mp-ui.show .mp-back { pointer-events: auto; }
+        .mp-back svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .mp-back-solo { display: none; position: absolute; z-index: 4; pointer-events: auto; left: max(12px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); }
+        .movie-trailer-frame.mp-fsmode .mp-top, .movie-trailer-frame.mp-fsmode .mp-back-solo { display: flex; }
+        .movie-trailer-frame.mp-fsmode #mp-fs { display: none; }
+        @media (orientation: landscape) and (max-height: 500px) {
+            .movie-trailer-overlay { padding: 0; }
+            .movie-trailer-box { max-width: none; height: 100%; max-height: none; overflow: hidden; }
+            .movie-trailer-title, .movie-trailer-overview, .movie-trailer-close { display: none; }
+            .movie-trailer-frame { height: 100%; aspect-ratio: auto; border-radius: 0; }
+            .movie-trailer-frame .mp-top, .movie-trailer-frame .mp-back-solo { display: flex; }
+        }
         /* Profile posts sit inside .tm-profile-content, which has 20px of side padding for the
            rest of the profile (bio, stats, etc). Feed cards, by contrast, live in a zero-padding
            container and get their edge-to-edge look purely from .feed-post-card's own 12px/16px
@@ -20128,16 +20145,33 @@ img,video{-webkit-user-drag:none}
             });
             return ytApiPromise;
         }
-        let moviePlayer = null, moviePlayerTimer = null, movieUiTimer = null, movieTrailerToken = 0, movieSeeking = false;
+        let moviePlayer = null, moviePlayerTimer = null, movieUiTimer = null, movieTrailerToken = 0, movieSeeking = false, movieWasFs = false;
         const MP_ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"></path></svg>';
         const MP_ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>';
         const MP_ICON_REPLAY = '<svg viewBox="0 0 24 24"><path d="M12 5V1L6 6l6 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"></path></svg>';
         const MP_ICON_VOL = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg>';
         const MP_ICON_MUTE = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4z"></path><path d="M22 9l-6 6M16 9l6 6"></path></svg>';
+        const MP_ICON_BACK = '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"></path></svg>';
         const MP_ICON_FS = '<svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>';
         function mpFmt(sec) {
             sec = Math.max(0, Math.floor(sec || 0));
             return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+        }
+        function setMovieFrameMessage(frame, text) {
+            frame.classList.remove('mp-paused', 'mp-ended');
+            frame.innerHTML = `<div class="movie-trailer-none"></div><button type="button" class="mp-back mp-back-solo" aria-label="Back">${MP_ICON_BACK}</button>`;
+            frame.querySelector('.movie-trailer-none').textContent = text;
+            frame.querySelector('.mp-back-solo').addEventListener('click', closeMovieTrailer);
+        }
+        // Fullscreen + landscape lock, requested straight from the tap on the movie card (needs the user gesture).
+        // Android Chrome honours both; iOS Safari has neither for page elements, so the landscape CSS fallback applies
+        // as soon as the phone is turned sideways.
+        async function enterMovieFullscreen(el, token) {
+            const req = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (!req) return;
+            try { const r = req.call(el); if (r && r.then) await r; } catch (e) { return; }
+            if (token !== movieTrailerToken) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} return; }
+            try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch (e) { /* not supported here */ }
         }
         function destroyMoviePlayer() {
             clearInterval(moviePlayerTimer); moviePlayerTimer = null;
@@ -20152,6 +20186,7 @@ img,video{-webkit-user-drag:none}
                 <div class="mp-host"><div id="mp-yt"></div></div>
                 <div class="mp-tap" id="mp-tap"></div>
                 <div class="mp-ui show" id="mp-ui">
+                    <div class="mp-top"><button type="button" class="mp-back" id="mp-back" aria-label="Back">${MP_ICON_BACK}</button><span class="mp-title" id="mp-title"></span></div>
                     <button type="button" class="mp-center" id="mp-center" aria-label="Play or pause">${MP_ICON_PAUSE}</button>
                     <div class="mp-bar">
                         <span class="mp-time" id="mp-cur">0:00</span>
@@ -20167,6 +20202,8 @@ img,video{-webkit-user-drag:none}
             const curEl = frame.querySelector('#mp-cur');
             const durEl = frame.querySelector('#mp-dur');
             const muteBtn = frame.querySelector('#mp-mute');
+            frame.querySelector('#mp-title').textContent = document.getElementById('movie-trailer-title').textContent;
+            frame.querySelector('#mp-back').addEventListener('click', closeMovieTrailer);
             let state = -1;
 
             const showUi = (autoHide) => {
@@ -20247,7 +20284,7 @@ img,video{-webkit-user-drag:none}
                         if (token !== movieTrailerToken) return;
                         destroyMoviePlayer();
                         frame.classList.remove('mp-paused', 'mp-ended');
-                        frame.innerHTML = '<div class="movie-trailer-none">This trailer can\'t be played here.</div>';
+                        setMovieFrameMessage(frame, 'This trailer can\'t be played here.');
                     }
                 }
             });
@@ -20262,14 +20299,15 @@ img,video{-webkit-user-drag:none}
             frame.classList.remove('mp-paused', 'mp-ended');
             document.getElementById('movie-trailer-title').textContent = m.title || '';
             document.getElementById('movie-trailer-overview').textContent = m.overview || '';
-            frame.innerHTML = '<div class="movie-trailer-none">Loading trailer…</div>';
+            setMovieFrameMessage(frame, 'Loading trailer…');
             overlay.classList.add('active');
+            enterMovieFullscreen(frame, token);
             try {
                 const data = await tmdbFetch(`/movie/${m.id}/videos`);
                 const vids = (data.results || []).filter(v => v.site === 'YouTube');
                 const pick = vids.find(v => v.type === 'Trailer' && v.official) || vids.find(v => v.type === 'Trailer') || vids.find(v => v.type === 'Teaser') || vids[0];
                 if (token !== movieTrailerToken || !overlay.classList.contains('active')) return; // closed/switched while loading
-                if (!pick) { frame.innerHTML = '<div class="movie-trailer-none">No trailer available for this movie yet.</div>'; return; }
+                if (!pick) { setMovieFrameMessage(frame, 'No trailer available for this movie yet.'); return; }
                 try {
                     await loadYouTubeApi();
                     if (token !== movieTrailerToken || !overlay.classList.contains('active')) return;
@@ -20282,19 +20320,33 @@ img,video{-webkit-user-drag:none}
                 }
             } catch (err) {
                 console.error('Trailer load failed:', err);
-                if (token === movieTrailerToken) frame.innerHTML = '<div class="movie-trailer-none">Couldn\'t load the trailer.</div>';
+                if (token === movieTrailerToken) setMovieFrameMessage(frame, 'Couldn\'t load the trailer.');
             }
         }
         function closeMovieTrailer() {
             movieTrailerToken++;
+            movieWasFs = false;
+            try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
             const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
             if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
             destroyMoviePlayer();
             document.getElementById('movie-trailer-overlay').classList.remove('active');
             const frame = document.getElementById('movie-trailer-frame');
-            frame.classList.remove('mp-paused', 'mp-ended');
+            frame.classList.remove('mp-paused', 'mp-ended', 'mp-fsmode');
             frame.innerHTML = ''; // stops playback
         }
+        // Leaving fullscreen (system back gesture, Esc, swipe down) leaves the player, like Netflix.
+        function onMovieFsChange() {
+            const frame = document.getElementById('movie-trailer-frame');
+            const overlay = document.getElementById('movie-trailer-overlay');
+            if (!frame || !overlay) return;
+            const inFs = (document.fullscreenElement || document.webkitFullscreenElement) === frame;
+            frame.classList.toggle('mp-fsmode', inFs);
+            if (!inFs && movieWasFs && overlay.classList.contains('active')) closeMovieTrailer();
+            movieWasFs = inFs;
+        }
+        document.addEventListener('fullscreenchange', onMovieFsChange);
+        document.addEventListener('webkitfullscreenchange', onMovieFsChange);
         document.getElementById('movie-trailer-close')?.addEventListener('click', closeMovieTrailer);
         document.getElementById('movie-trailer-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'movie-trailer-overlay') closeMovieTrailer(); });
         document.getElementById('movies-chips')?.addEventListener('click', (e) => {

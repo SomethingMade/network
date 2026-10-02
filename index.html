@@ -655,6 +655,15 @@
         .live-room-stage { flex: 1; position: relative; z-index: 1; display: grid; grid-template-columns: 1fr; grid-auto-rows: 1fr; gap: 0; overflow: hidden; }
         .live-room-stage:empty::after { content: 'Connecting…'; place-self: center; color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600; letter-spacing: 0.02em; animation: lrPulse 1.4s ease-in-out infinite; }
         @keyframes lrPulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+        /* Post avatars of people who are live right now: blinking red ring + LIVE tag. */
+        @keyframes liveRingBlink { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 45, 85, 0.55); } 50% { opacity: 0.35; box-shadow: 0 0 0 4px rgba(255, 45, 85, 0); } }
+        .x-post-avatar-col.is-live { position: relative; }
+        .x-post-avatar-col.is-live::before { content: ''; position: absolute; top: -3px; left: -3px; right: -3px; bottom: -3px; border: 2.5px solid #FF2D55; border-radius: 50%; pointer-events: none; z-index: 2; animation: liveRingBlink 1.2s ease-in-out infinite; }
+        .x-post-avatar-col.is-live::after { content: 'LIVE'; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); background: #FF2D55; color: #fff; font-size: 8px; font-weight: 800; letter-spacing: 0.4px; line-height: 1; padding: 2px 5px; border-radius: 4px; border: 1.5px solid var(--bg-primary, #fff); pointer-events: none; z-index: 3; }
+        #user-info-avatar.is-live { position: relative; overflow: visible; cursor: pointer; }
+        #user-info-avatar.is-live::before { content: ''; position: absolute; top: -6px; left: -6px; right: -6px; bottom: -6px; border: 3px solid #FF2D55; border-radius: 50%; pointer-events: none; z-index: 2; animation: liveRingBlink 1.2s ease-in-out infinite; }
+        #user-info-avatar.is-live::after { content: 'LIVE'; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); background: #FF2D55; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; line-height: 1; padding: 3px 7px; border-radius: 5px; border: 2px solid var(--bg-surface, #fff); pointer-events: none; z-index: 3; }
+        @media (prefers-reduced-motion: reduce) { .x-post-avatar-col.is-live::before, #user-info-avatar.is-live::before { animation: none; } }
         .live-room-stage.has-guests { gap: 8px; padding: calc(env(safe-area-inset-top) + 104px) 8px calc(env(safe-area-inset-bottom) + 76px); }
         .live-room-stage.has-guests[data-count="2"] { grid-template-columns: 1fr; }
         .live-room-stage.has-guests:not([data-count="2"]) { grid-template-columns: repeat(2, 1fr); }
@@ -21158,9 +21167,17 @@ img,video{-webkit-user-drag:none}
                 avatarCol.addEventListener('click', (e) => {
                     e.stopPropagation();
                     pauseAllFeedMedia();
-                    openUserProfileSheet(card.dataset.uid);
+                    // Author is live right now (red ring) -> tapping their avatar joins the broadcast.
+                    const hostUid = card.dataset.uid;
+                    const myUidNow = auth.currentUser && auth.currentUser.uid;
+                    if (hostUid && hostUid !== myUidNow && liveHostMap[hostUid]) {
+                        joinLiveChannel(liveHostMap[hostUid], 'audience');
+                        return;
+                    }
+                    openUserProfileSheet(hostUid);
                 });
             }
+            applyLiveRingToCard(card);
 
             card.querySelectorAll('.feed-hashtag').forEach(tagEl => {
                 tagEl.addEventListener('click', (e) => {
@@ -33091,6 +33108,7 @@ img,video{-webkit-user-drag:none}
             avatarEl.style.backgroundColor = '';
             avatarEl.textContent = '';
             avatarEl.setAttribute('data-full', profile.photoURL || DEFAULT_AVATAR_URL);
+            applyLiveRingToProfileAvatar();
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User');
             document.getElementById('user-info-username').innerHTML = escapeHtmlForPost(profile.username ? '@' + profile.username : '@—') + verifiedBadgeFor(uid, false);
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
@@ -33834,6 +33852,12 @@ img,video{-webkit-user-drag:none}
         });
         document.getElementById('user-info-avatar').addEventListener('click', (e) => {
             e.stopPropagation();
+            // Red ring showing -> tapping the avatar joins their broadcast (same as post avatars).
+            const myUidNow = auth.currentUser && auth.currentUser.uid;
+            if (userInfoSheetUid && userInfoSheetUid !== myUidNow && liveHostMap[userInfoSheetUid]) {
+                joinLiveChannel(liveHostMap[userInfoSheetUid], 'audience');
+                return;
+            }
             const full = e.currentTarget.getAttribute('data-full');
             if (!full) return;
             // Contact Info sits at z-index 100010; without this the viewer (100008 by
@@ -34495,6 +34519,26 @@ img,video{-webkit-user-drag:none}
         const STORY_TTL = 24 * 60 * 60 * 1000; 
         let cachedUsers = {};
         let cachedStories = {};
+        // hostUid -> liveId for broadcasts that are live right now; drives the red ring on post avatars.
+        let liveHostMap = {};
+        function applyLiveRingToCard(card) {
+            const col = card && card.querySelector('.x-post-avatar-col');
+            if (!col) return;
+            const uid = card.dataset.uid;
+            col.classList.toggle('is-live', !!(uid && liveHostMap[uid]));
+        }
+        function applyLiveRingToProfileAvatar() {
+            const el = document.getElementById('user-info-avatar');
+            if (!el) return;
+            el.classList.toggle('is-live', !!(userInfoSheetUid && liveHostMap[userInfoSheetUid]));
+        }
+        function refreshPostLiveRings() {
+            applyLiveRingToProfileAvatar();
+            document.querySelectorAll('.x-post-avatar-col').forEach(col => {
+                const card = col.closest('[data-uid]');
+                if (card) applyLiveRingToCard(card);
+            });
+        }
 
         // Upload progress shown as a ring + percentage over the "Add Story" avatar (both the
         // Home strip and feed strip copies — see is-add-story below). null = not uploading.
@@ -42780,6 +42824,9 @@ img,video{-webkit-user-drag:none}
             onValue(ref(database, "lives"), (snap) => {
                 const all = snap.val() || {};
                 const count = Object.values(all).filter(v => v && v.status === 'live').length;
+                liveHostMap = {};
+                Object.entries(all).forEach(([id, v]) => { if (v && v.status === 'live' && v.hostUid) liveHostMap[v.hostUid] = id; });
+                refreshPostLiveRings();
                 updateLiveCountBadge('sidebar-drawer-live-count', count);
                 updateLiveCountBadge('explore-drawer-live-count', count);
                 updateLiveCountBadge('feed-subtab-live-count', count);

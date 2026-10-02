@@ -1823,6 +1823,25 @@
         .movie-trailer-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
         .movie-trailer-frame .movie-trailer-none { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 14px; text-align: center; padding: 20px; }
         .movie-trailer-overview { color: #ccc; font-size: 13.5px; line-height: 1.5; margin: 12px 0 0; }
+        /* Custom trailer player: YouTube's own UI is hidden (controls=0) and replaced by .mp-* controls. */
+        .movie-trailer-frame .mp-host, .movie-trailer-frame .mp-host iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .movie-trailer-frame:fullscreen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; }
+        .movie-trailer-frame:-webkit-full-screen { border-radius: 0; aspect-ratio: auto; width: 100vw; height: 100vh; }
+        .mp-tap { position: absolute; inset: 0; z-index: 2; background: transparent; transition: background .2s; -webkit-tap-highlight-color: transparent; }
+        .movie-trailer-frame.mp-paused .mp-tap { background: rgba(0,0,0,0.72); }
+        .movie-trailer-frame.mp-ended .mp-tap { background: #000; }
+        .mp-ui { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; justify-content: flex-end; pointer-events: none; opacity: 0; transition: opacity .2s; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent 38%, transparent 62%, rgba(0,0,0,0.3)); }
+        .mp-ui.show { opacity: 1; }
+        .mp-ui.show .mp-center, .mp-ui.show .mp-bar { pointer-events: auto; }
+        .mp-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .mp-center svg { width: 26px; height: 26px; fill: #fff; }
+        .mp-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px 10px; }
+        .mp-time { color: #fff; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .mp-seek { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; margin: 0; cursor: pointer; background: linear-gradient(to right, #fff var(--p, 0%), rgba(255,255,255,0.3) var(--p, 0%)); }
+        .mp-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: none; }
+        .mp-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: none; }
+        .mp-btn { background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .mp-btn svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
         /* Profile posts sit inside .tm-profile-content, which has 20px of side padding for the
            rest of the profile (bio, stats, etc). Feed cards, by contrast, live in a zero-padding
            container and get their edge-to-edge look purely from .feed-post-card's own 12px/16px
@@ -20091,10 +20110,156 @@ img,video{-webkit-user-drag:none}
             card.addEventListener('click', () => openMovieTrailer(m));
             return card;
         }
+        // --- Custom trailer player. TMDB only provides YouTube video IDs, so playback still streams
+        // from YouTube, but via the IFrame Player API with YouTube's own UI turned off (controls=0)
+        // and Haba's controls drawn on top. A transparent .mp-tap layer sits over the iframe so taps
+        // never reach YouTube's UI (pause overlay / suggested videos); it is darkened while paused/ended.
+        let ytApiPromise = null;
+        function loadYouTubeApi() {
+            if (window.YT && window.YT.Player) return Promise.resolve();
+            if (ytApiPromise) return ytApiPromise;
+            ytApiPromise = new Promise((resolve, reject) => {
+                const prev = window.onYouTubeIframeAPIReady;
+                window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); resolve(); };
+                const tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                tag.onerror = () => { ytApiPromise = null; reject(new Error('YouTube API failed to load')); };
+                document.head.appendChild(tag);
+            });
+            return ytApiPromise;
+        }
+        let moviePlayer = null, moviePlayerTimer = null, movieUiTimer = null, movieTrailerToken = 0, movieSeeking = false;
+        const MP_ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"></path></svg>';
+        const MP_ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"></path></svg>';
+        const MP_ICON_REPLAY = '<svg viewBox="0 0 24 24"><path d="M12 5V1L6 6l6 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"></path></svg>';
+        const MP_ICON_VOL = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg>';
+        const MP_ICON_MUTE = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4z"></path><path d="M22 9l-6 6M16 9l6 6"></path></svg>';
+        const MP_ICON_FS = '<svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>';
+        function mpFmt(sec) {
+            sec = Math.max(0, Math.floor(sec || 0));
+            return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+        }
+        function destroyMoviePlayer() {
+            clearInterval(moviePlayerTimer); moviePlayerTimer = null;
+            clearTimeout(movieUiTimer); movieUiTimer = null;
+            movieSeeking = false;
+            if (moviePlayer) { try { moviePlayer.destroy(); } catch (e) {} moviePlayer = null; }
+        }
+        function mountMoviePlayer(frame, videoKey, token) {
+            const fsOk = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+            frame.classList.remove('mp-paused', 'mp-ended');
+            frame.innerHTML = `
+                <div class="mp-host"><div id="mp-yt"></div></div>
+                <div class="mp-tap" id="mp-tap"></div>
+                <div class="mp-ui show" id="mp-ui">
+                    <button type="button" class="mp-center" id="mp-center" aria-label="Play or pause">${MP_ICON_PAUSE}</button>
+                    <div class="mp-bar">
+                        <span class="mp-time" id="mp-cur">0:00</span>
+                        <input type="range" class="mp-seek" id="mp-seek" min="0" max="1000" value="0" aria-label="Seek">
+                        <span class="mp-time" id="mp-dur">0:00</span>
+                        <button type="button" class="mp-btn" id="mp-mute" aria-label="Mute">${MP_ICON_VOL}</button>
+                        ${fsOk ? `<button type="button" class="mp-btn" id="mp-fs" aria-label="Fullscreen">${MP_ICON_FS}</button>` : ''}
+                    </div>
+                </div>`;
+            const ui = frame.querySelector('#mp-ui');
+            const centerBtn = frame.querySelector('#mp-center');
+            const seek = frame.querySelector('#mp-seek');
+            const curEl = frame.querySelector('#mp-cur');
+            const durEl = frame.querySelector('#mp-dur');
+            const muteBtn = frame.querySelector('#mp-mute');
+            let state = -1;
+
+            const showUi = (autoHide) => {
+                ui.classList.add('show');
+                clearTimeout(movieUiTimer);
+                if (autoHide && state === 1) movieUiTimer = setTimeout(() => ui.classList.remove('show'), 3000);
+            };
+            const syncProgress = () => {
+                if (!moviePlayer || !moviePlayer.getDuration) return;
+                const dur = moviePlayer.getDuration() || 0;
+                const cur = moviePlayer.getCurrentTime() || 0;
+                durEl.textContent = mpFmt(dur);
+                if (!movieSeeking) {
+                    curEl.textContent = mpFmt(cur);
+                    const pct = dur ? Math.min(100, (cur / dur) * 100) : 0;
+                    seek.value = dur ? Math.round((cur / dur) * 1000) : 0;
+                    seek.style.setProperty('--p', pct + '%');
+                }
+            };
+            const applyState = (st) => {
+                state = st;
+                const ended = st === 0, paused = st === 2 || st === 5 || st === -1;
+                frame.classList.toggle('mp-ended', ended);
+                frame.classList.toggle('mp-paused', st === 2);
+                centerBtn.innerHTML = ended ? MP_ICON_REPLAY : (st === 1 || st === 3) ? MP_ICON_PAUSE : MP_ICON_PLAY;
+                if (ended || paused) showUi(false); else showUi(true);
+            };
+            const toggle = () => {
+                if (!moviePlayer || !moviePlayer.getPlayerState) return;
+                const st = moviePlayer.getPlayerState();
+                if (st === 0) { moviePlayer.seekTo(0, true); moviePlayer.playVideo(); }
+                else if (st === 1 || st === 3) moviePlayer.pauseVideo();
+                else moviePlayer.playVideo();
+            };
+
+            frame.querySelector('#mp-tap').addEventListener('click', () => {
+                triggerHaptic(6);
+                if (ui.classList.contains('show') && state !== 1) toggle();
+                else if (ui.classList.contains('show')) { clearTimeout(movieUiTimer); ui.classList.remove('show'); }
+                else showUi(true);
+            });
+            centerBtn.addEventListener('click', () => { triggerHaptic(8); toggle(); });
+            seek.addEventListener('input', () => {
+                movieSeeking = true;
+                const dur = moviePlayer && moviePlayer.getDuration ? moviePlayer.getDuration() : 0;
+                curEl.textContent = mpFmt((seek.value / 1000) * dur);
+                seek.style.setProperty('--p', (seek.value / 10) + '%');
+                showUi(false);
+            });
+            seek.addEventListener('change', () => {
+                const dur = moviePlayer && moviePlayer.getDuration ? moviePlayer.getDuration() : 0;
+                if (moviePlayer && dur) moviePlayer.seekTo((seek.value / 1000) * dur, true);
+                movieSeeking = false;
+                showUi(true);
+            });
+            muteBtn.addEventListener('click', () => {
+                if (!moviePlayer) return;
+                if (moviePlayer.isMuted()) { moviePlayer.unMute(); muteBtn.innerHTML = MP_ICON_VOL; }
+                else { moviePlayer.mute(); muteBtn.innerHTML = MP_ICON_MUTE; }
+                showUi(true);
+            });
+            const fsBtn = frame.querySelector('#mp-fs');
+            if (fsBtn) fsBtn.addEventListener('click', () => {
+                const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+                if (fsEl) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+                else { (frame.requestFullscreen || frame.webkitRequestFullscreen).call(frame); }
+                showUi(true);
+            });
+
+            moviePlayer = new YT.Player('mp-yt', {
+                host: 'https://www.youtube-nocookie.com',
+                videoId: videoKey,
+                playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, origin: window.location.origin },
+                events: {
+                    onReady: (e) => { if (token !== movieTrailerToken) return; try { e.target.playVideo(); } catch (err) {} syncProgress(); },
+                    onStateChange: (e) => { if (token !== movieTrailerToken) return; applyState(e.data); syncProgress(); },
+                    onError: () => {
+                        if (token !== movieTrailerToken) return;
+                        destroyMoviePlayer();
+                        frame.classList.remove('mp-paused', 'mp-ended');
+                        frame.innerHTML = '<div class="movie-trailer-none">This trailer can\'t be played here.</div>';
+                    }
+                }
+            });
+            moviePlayerTimer = setInterval(syncProgress, 250);
+        }
         async function openMovieTrailer(m) {
             triggerHaptic(10);
+            const token = ++movieTrailerToken;
+            destroyMoviePlayer();
             const overlay = document.getElementById('movie-trailer-overlay');
             const frame = document.getElementById('movie-trailer-frame');
+            frame.classList.remove('mp-paused', 'mp-ended');
             document.getElementById('movie-trailer-title').textContent = m.title || '';
             document.getElementById('movie-trailer-overview').textContent = m.overview || '';
             frame.innerHTML = '<div class="movie-trailer-none">Loading trailer…</div>';
@@ -20103,17 +20268,32 @@ img,video{-webkit-user-drag:none}
                 const data = await tmdbFetch(`/movie/${m.id}/videos`);
                 const vids = (data.results || []).filter(v => v.site === 'YouTube');
                 const pick = vids.find(v => v.type === 'Trailer' && v.official) || vids.find(v => v.type === 'Trailer') || vids.find(v => v.type === 'Teaser') || vids[0];
-                if (!overlay.classList.contains('active')) return; // closed while loading
+                if (token !== movieTrailerToken || !overlay.classList.contains('active')) return; // closed/switched while loading
                 if (!pick) { frame.innerHTML = '<div class="movie-trailer-none">No trailer available for this movie yet.</div>'; return; }
-                frame.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(pick.key)}?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+                try {
+                    await loadYouTubeApi();
+                    if (token !== movieTrailerToken || !overlay.classList.contains('active')) return;
+                    mountMoviePlayer(frame, pick.key, token);
+                } catch (apiErr) {
+                    // YouTube API script blocked/unreachable: fall back to the plain embed so trailers still play.
+                    console.warn('Custom player unavailable, using plain embed:', apiErr);
+                    if (token !== movieTrailerToken) return;
+                    frame.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(pick.key)}?autoplay=1&rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+                }
             } catch (err) {
                 console.error('Trailer load failed:', err);
-                frame.innerHTML = '<div class="movie-trailer-none">Couldn\'t load the trailer.</div>';
+                if (token === movieTrailerToken) frame.innerHTML = '<div class="movie-trailer-none">Couldn\'t load the trailer.</div>';
             }
         }
         function closeMovieTrailer() {
+            movieTrailerToken++;
+            const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+            if (fsEl) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (e) {} }
+            destroyMoviePlayer();
             document.getElementById('movie-trailer-overlay').classList.remove('active');
-            document.getElementById('movie-trailer-frame').innerHTML = ''; // stops playback
+            const frame = document.getElementById('movie-trailer-frame');
+            frame.classList.remove('mp-paused', 'mp-ended');
+            frame.innerHTML = ''; // stops playback
         }
         document.getElementById('movie-trailer-close')?.addEventListener('click', closeMovieTrailer);
         document.getElementById('movie-trailer-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'movie-trailer-overlay') closeMovieTrailer(); });

@@ -33103,6 +33103,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 if (likeCountEl) likeCountEl.textContent = data.likeCount || 0;
                 const commentCountEl = card.querySelector('.feed-comment-count');
                 if (commentCountEl) commentCountEl.textContent = data.commentCount || 0;
+                const viewCommentsRow = card.querySelector('.ig-view-comments');
+                if (viewCommentsRow) viewCommentsRow.style.display = (data.commentCount || 0) > 0 ? '' : 'none';
                 const repostBtn = card.querySelector('.feed-repost-btn');
                 if (repostBtn) repostBtn.classList.toggle('reposted', repostedByMe);
                 const repostCountEl = card.querySelector('.feed-repost-count');
@@ -33321,7 +33323,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const sender = cachedUsers[msg.senderUid] || {};
             const msgId = communityMsgEngagementId(msg);
             const card = document.createElement('div');
-            card.className = 'feed-post-card community-post-card';
+            card.className = 'feed-post-card feed-post-card-ig community-post-card';
             card.dataset.groupId = msg.groupId;
             card.dataset.msgId = msgId;
             card.dataset.communityName = (group.name || '').toLowerCase();
@@ -33342,11 +33344,24 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </div>
                 </div>` : '';
             const videoHtml = (msg.mediaURL && msg.mediaType === 'video') ? `
-                <div class="feed-post-video-wrap">
-                    <video class="feed-post-video" src="${msg.mediaURL}" ${(() => { const t = cloudinaryVideoThumbnail(msg.mediaURL, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop></video>
+                <div class="feed-post-video-wrap" data-has-music="0">
+                    <video class="feed-post-video" src="${msg.mediaURL}" ${(() => { const t = cloudinaryVideoThumbnail(msg.mediaURL, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </button>
+                    <div class="feed-video-scrub-time"></div>
+                    <div class="feed-video-controls">
+                        <button type="button" class="feed-video-playpause-btn" aria-label="Play/Pause">
+                            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                            <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>
+                        </button>
+                        <div class="feed-video-progress-track"><div class="feed-video-progress-fill"></div><div class="feed-video-progress-thumb"></div></div>
+                        <span class="feed-video-time"><span class="t-cur">0:00</span><span class="t-dur">/ 0:00</span></span>
+                        <button type="button" class="feed-video-mute-btn" aria-label="Mute/Unmute">
+                            <svg class="icon-unmuted" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"></path></svg>
+                            <svg class="icon-muted" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12l3-3-1-1-3 3-3-3-1 1 3 3-3 3 1 1 3-3 3 3 1-1z"></path></svg>
+                        </button>
+                    </div>
                 </div>` : '';
             const menuBtnHtml = `
                 <button type="button" class="feed-post-menu-btn">
@@ -33371,7 +33386,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </div>
                 </div>
                 <div class="feed-post-body">
-                    ${msg.text ? `<p class="feed-post-text">${linkifyHashtags(msg.text)}</p>` : ''}
+                    ${msg.text ? `<div class="ig-caption"><p class="feed-post-text">${linkifyHashtags(msg.text)}</p></div>` : ''}
                 </div>
                 ${imageHtml}
                 ${videoHtml}
@@ -33393,11 +33408,15 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
                             <span class="feed-view-count">0</span>
                         </div>
+                        <button type="button" class="feed-post-action-btn feed-share-btn" title="Share" aria-label="Share">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                        </button>
                         <button type="button" class="feed-post-action-btn feed-save-btn ${savedByMe ? 'saved' : ''}" title="Save">
                             <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                         </button>
                     </div>
                 </div>
+                <div class="ig-view-comments" style="display:none;">View comments</div>
             `;
             // Name, avatar, verified badge, business pill, and @username are filled in (and kept
             // live) via applyLiveProfileToPostCard, same as a real feed post.
@@ -33413,21 +33432,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
             const videoWrap = card.querySelector('.feed-post-video-wrap');
             if (videoWrap) {
-                const video = videoWrap.querySelector('.feed-post-video');
-                const centerBtn = videoWrap.querySelector('.feed-video-center-btn');
-                video.muted = true;
-                centerBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (video.paused) {
-                        document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (v !== video && !v.paused) v.pause(); });
-                        video.play().catch(() => {});
-                        centerBtn.classList.add('hidden');
-                    } else {
-                        video.pause();
-                        centerBtn.classList.remove('hidden');
-                    }
-                });
-                video.addEventListener('click', (e) => e.stopPropagation());
+                initFeedVideoPlayer(videoWrap);
+                videoWrap.addEventListener('click', (e) => e.stopPropagation());
             }
 
             if (communityEngagementCache[msgId]) patchCommunityPostCardCounts(msgId, communityEngagementCache[msgId]);
@@ -33447,6 +33453,17 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (repostBtn) repostBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 toggleCommunityRepost(msgId);
+            });
+            const shareBtn = card.querySelector('.feed-share-btn');
+            if (shareBtn) shareBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activeCommunityPostOptions = { msg, msgId, card };
+                document.getElementById('btn-community-post-share').click();
+            });
+            const viewCommentsEl = card.querySelector('.ig-view-comments');
+            if (viewCommentsEl) viewCommentsEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openCommunityComments(msgId);
             });
             const saveBtn = card.querySelector('.feed-save-btn');
             if (saveBtn) saveBtn.addEventListener('click', (e) => {

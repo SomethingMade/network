@@ -30385,11 +30385,21 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const closeDmSheet = () => { if (dmSheet) dmSheet.classList.remove('active'); };
             // Already inside the Android wrapper app? No point asking to download it.
             const insideNativeApp = /median|gonative/i.test(navigator.userAgent || '');
-            if (dm) dm.addEventListener('click', () => {
+            const openMessagesEntry = () => {
                 triggerHaptic(12);
                 if (!dmSheet || insideNativeApp) { goToTab('tab-chats'); return; }
                 dmSheet.classList.add('active');
-            });
+            };
+            if (dm) dm.addEventListener('click', openMessagesEntry);
+            // The top bar's Messages circle (.fbt-circle[data-tab="tab-chats"]) is wired by the
+            // generic top-bar tab handler, so catch it first (capture phase) and show the sheet.
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest && e.target.closest('.fbt-circle[data-tab="tab-chats"]');
+                if (!btn) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                openMessagesEntry();
+            }, true);
             if (dmSheet) {
                 dmSheet.addEventListener('click', (e) => { if (e.target === dmSheet) closeDmSheet(); });
                 const dl = document.getElementById('messenger-prompt-download');

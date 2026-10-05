@@ -545,6 +545,9 @@
         #live-gift-sheet-overlay { z-index: 100062; }
         #buy-coins-sheet-overlay { z-index: 100063; }
         #create-options-sheet-overlay { z-index: 100011; }
+        #messenger-prompt-sheet-overlay { z-index: 100011; }
+        #messenger-prompt-sheet-overlay .messenger-prompt-sub { font-size: 13.5px; color: var(--text-secondary); text-align: center; margin: -4px 0 14px; line-height: 1.45; }
+        #messenger-prompt-sheet-overlay .messenger-prompt-cancel { display: block; width: 100%; margin-top: 8px; padding: 13px; background: none; border: none; color: var(--text-secondary); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
         #story-type-sheet-overlay { z-index: 100011; }
         #story-caption-sheet-overlay { z-index: 100011; }
         #story-music-sheet-overlay { z-index: 100011; }
@@ -11566,6 +11569,29 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     <span class="wa-row-sub">Broadcast to your followers in real time</span>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="messenger-prompt-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 20px;">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Open your chats</div>
+            <div class="messenger-prompt-sub">Chat faster in the Haba Messenger app, or keep messaging right here.</div>
+            <div class="wa-list-row" id="messenger-prompt-download" style="cursor:pointer;">
+                <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Get the Messenger app</span>
+                    <span class="wa-row-sub">Download Haba Messenger to open your chats</span>
+                </div>
+            </div>
+            <div class="wa-list-row" id="messenger-prompt-inapp" style="cursor:pointer;">
+                <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+                <div class="wa-row-body">
+                    <span class="wa-row-title">Use in-app messages</span>
+                    <span class="wa-row-sub">Keep chatting here without installing anything</span>
+                </div>
+            </div>
+            <button type="button" class="messenger-prompt-cancel" id="messenger-prompt-cancel">Not now</button>
         </div>
     </div>
 
@@ -30352,8 +30378,36 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 create.addEventListener('click', openCreate);
                 create.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCreate(); } });
             }
+            // Header Messages icon: offer the Messenger app, or fall through to in-app chats.
+            // TODO: set this to the real Haba Messenger Play Store listing.
+            const HABA_MESSENGER_DOWNLOAD_URL = 'https://play.google.com/store/apps/details?id=REPLACE_WITH_MESSENGER_PACKAGE_ID';
             const dm = document.getElementById('home-header-dm-btn');
-            if (dm) dm.addEventListener('click', () => { triggerHaptic(12); goToTab('tab-chats'); });
+            const dmSheet = document.getElementById('messenger-prompt-sheet-overlay');
+            const closeDmSheet = () => { if (dmSheet) dmSheet.classList.remove('active'); };
+            // Already inside the Android wrapper app? No point asking to download it.
+            const insideNativeApp = /median|gonative/i.test(navigator.userAgent || '');
+            if (dm) dm.addEventListener('click', () => {
+                triggerHaptic(12);
+                if (!dmSheet || insideNativeApp) { goToTab('tab-chats'); return; }
+                dmSheet.classList.add('active');
+            });
+            if (dmSheet) {
+                dmSheet.addEventListener('click', (e) => { if (e.target === dmSheet) closeDmSheet(); });
+                const dl = document.getElementById('messenger-prompt-download');
+                const inapp = document.getElementById('messenger-prompt-inapp');
+                const cancel = document.getElementById('messenger-prompt-cancel');
+                if (dl) dl.addEventListener('click', () => {
+                    triggerHaptic(12);
+                    closeDmSheet();
+                    window.open(HABA_MESSENGER_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+                });
+                if (inapp) inapp.addEventListener('click', () => {
+                    triggerHaptic(12);
+                    closeDmSheet();
+                    goToTab('tab-chats');
+                });
+                if (cancel) cancel.addEventListener('click', closeDmSheet);
+            }
         })();
         document.getElementById('create-options-sheet-overlay').addEventListener('click', (e) => {
             if (e.target.id === 'create-options-sheet-overlay') e.target.classList.remove('active');

@@ -8322,6 +8322,18 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         </div>
     </div>
 
+    <div id="birthday-prompt-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="text-align:center; padding:22px 24px 26px;">
+            <div class="sheet-handle"></div>
+            <div style="font-size:46px; line-height:1; margin:6px 0 10px;">🎂</div>
+            <h3 style="margin:0 0 8px; font-size:20px;">Celebrate with Haba</h3>
+            <p style="color:var(--text-secondary); font-size:14px; line-height:1.45; margin:0 0 18px;">Add your date of birth and we'll celebrate your birthday with you. You can change or remove it anytime in Edit profile.</p>
+            <input type="date" id="birthday-prompt-input" class="tm-edit-input" min="1900-01-01" style="width:100%; box-sizing:border-box; margin-bottom:14px;">
+            <button type="button" id="btn-birthday-prompt-save" class="btn-pill btn-primary" style="width:100%; margin-bottom:10px;" disabled>Save my birthday</button>
+            <button type="button" id="btn-birthday-prompt-skip" class="btn-pill btn-outline" style="width:100%;">Not now</button>
+        </div>
+    </div>
+
     <div id="share-profile-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="text-align:center; padding:22px 24px 26px;">
             <div class="sheet-handle"></div>
@@ -29628,6 +29640,56 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             });
         }
 
+        // One-time "add your date of birth" prompt. Shown at most once per account: Save or
+        // Not now both set users/{uid}/birthdayPromptSeen (and a local flag as a fallback if
+        // that write fails), and anyone who already has a birthday is never asked.
+        let birthdayPromptScheduled = false;
+        function scheduleBirthdayPrompt(user) {
+            if (birthdayPromptScheduled || !user) return;
+            birthdayPromptScheduled = true;
+            const seenKey = 'habaBirthdayPromptSeen_' + user.uid;
+            let tries = 0;
+            const tick = () => {
+                const current = auth.currentUser;
+                if (!current || current.uid !== user.uid) return;
+                const prof = cachedUsers[user.uid];
+                if (!prof) { if (++tries < 20) setTimeout(tick, 1000); return; }
+                let seenLocal = false;
+                try { seenLocal = localStorage.getItem(seenKey) === '1'; } catch (e) {}
+                if (prof.birthday || prof.birthdayPromptSeen || seenLocal) return;
+                const busy = document.querySelector('.bottom-sheet-overlay.active, .modal-overlay.active');
+                if (busy) { if (++tries < 20) setTimeout(tick, 3000); return; }
+                const input = document.getElementById('birthday-prompt-input');
+                input.value = '';
+                input.max = new Date().toISOString().slice(0, 10);
+                document.getElementById('btn-birthday-prompt-save').disabled = true;
+                document.getElementById('birthday-prompt-overlay').classList.add('active');
+            };
+            setTimeout(tick, 5000);
+        }
+        async function closeBirthdayPrompt(birthday) {
+            const user = auth.currentUser;
+            document.getElementById('birthday-prompt-overlay').classList.remove('active');
+            if (!user) return;
+            try { localStorage.setItem('habaBirthdayPromptSeen_' + user.uid, '1'); } catch (e) {}
+            const patch = { birthdayPromptSeen: true };
+            if (birthday) patch.birthday = birthday;
+            try {
+                await update(ref(database, 'users/' + user.uid), patch);
+                if (birthday) { renderMyBirthday(birthday); notify("Birthday saved \uD83C\uDF82"); }
+            } catch (err) { console.error('Failed to save birthday prompt result', err); }
+        }
+        document.getElementById('birthday-prompt-input').addEventListener('input', (e) => {
+            const v = e.target.value;
+            const ok = /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '1900-01-01' && v <= new Date().toISOString().slice(0, 10);
+            document.getElementById('btn-birthday-prompt-save').disabled = !ok;
+        });
+        document.getElementById('btn-birthday-prompt-save').addEventListener('click', () => {
+            const v = document.getElementById('birthday-prompt-input').value;
+            if (v) closeBirthdayPrompt(v);
+        });
+        document.getElementById('btn-birthday-prompt-skip').addEventListener('click', () => closeBirthdayPrompt(null));
+
         function renderMyBirthday(value) {
             const el = document.getElementById('my-profile-birthday-display');
             if (!el) return;
@@ -38457,6 +38519,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 maybeShowAppLockGate();
                 // Booked-ahead Haba rides dispatch from a timer + live query, so it has to run app-wide, not just while the ride map is open.
                 startHabaScheduledWatch();
+                scheduleBirthdayPrompt(user);
                 // Still hidden behind the branded splash at this point (higher z-index) — this
                 // just gets it ready underneath so hideLoading() below reveals shimmer, not a
                 // blank/half-populated screen, on a fresh open.

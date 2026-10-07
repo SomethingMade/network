@@ -958,6 +958,8 @@
         /* Website link reads as a small pill/chip (icon + host) rather than plain
            underlined text — pulls it in line with the stat chips below it instead of
            looking like a stray sentence. */
+        .tm-profile-birthday { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--text-secondary); font-weight: 600; }
+        .tm-profile-birthday svg { width: 15px; height: 15px; flex-shrink: 0; }
         .tm-profile-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--link-color); text-decoration: none; max-width: 100%; word-break: break-word; font-weight: 600; }
         .tm-profile-link:hover { text-decoration: underline; }
         .tm-profile-link svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -8308,6 +8310,14 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </div>
                     <input type="text" id="profile-website" class="tm-edit-input" maxlength="100" placeholder="yourwebsite.com" autocomplete="off">
                 </div>
+
+                <div class="edit-profile-section">
+                    <div class="edit-profile-section-head">
+                        <h3><label for="profile-birthday">Date of birth</label></h3>
+                        <button type="button" class="edit-profile-photo-link" id="btn-clear-birthday">Clear</button>
+                    </div>
+                    <input type="date" id="profile-birthday" class="tm-edit-input" min="1900-01-01" autocomplete="off">
+                </div>
             </div>
         </div>
     </div>
@@ -10803,6 +10813,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 <div class="profile-community-pills" id="my-profile-community-pills" style="display:none;"></div>
 
                 <div class="tm-profile-meta-row">
+                    <span id="my-profile-birthday-display" class="tm-profile-birthday" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3M12 8v3M17 8v3"/><path d="M7 4h.01M12 4h.01M17 4h.01"/></svg>
+                        <span id="my-profile-birthday-display-text"></span>
+                    </span>
                     <a href="#" id="my-profile-website-display" class="tm-profile-link" target="_blank" rel="noopener noreferrer" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
                         <span id="my-profile-website-display-text"></span>
@@ -27122,6 +27136,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = myProfile.about || '';
                 aboutDisplay.style.display = myProfile.about ? 'block' : 'none';
+                renderMyBirthday(myProfile.birthday);
                 const websiteDisplay = document.getElementById('my-profile-website-display');
                 if (myProfile.website) {
                     websiteDisplay.href = /^https?:\/\//i.test(myProfile.website) ? myProfile.website : 'https://' + myProfile.website;
@@ -27189,6 +27204,9 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             aboutInput.value = myProfile.about || '';
             updateProfileAboutCounter();
             document.getElementById('profile-website').value = myProfile.website || '';
+            const bdayInput = document.getElementById('profile-birthday');
+            bdayInput.max = new Date().toISOString().slice(0, 10);
+            bdayInput.value = /^\d{4}-\d{2}-\d{2}$/.test(myProfile.birthday || '') ? myProfile.birthday : '';
 
             editProfileSheetOverlay.classList.add('active');
         }
@@ -29610,6 +29628,22 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             });
         }
 
+        function renderMyBirthday(value) {
+            const el = document.getElementById('my-profile-birthday-display');
+            if (!el) return;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value || '')) {
+                const d = new Date(value + 'T00:00:00Z');
+                document.getElementById('my-profile-birthday-display-text').textContent =
+                    'Born ' + d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+                el.style.display = 'inline-flex';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+        document.getElementById('btn-clear-birthday').addEventListener('click', () => {
+            document.getElementById('profile-birthday').value = '';
+        });
+
         document.getElementById('btn-save-profile').addEventListener('click', async (e) => {
             e.preventDefault();
             const user = auth.currentUser;
@@ -29618,6 +29652,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const newName = document.getElementById('profile-name').value.trim();
             const newAbout = document.getElementById('profile-about').value.trim();
             const newWebsite = document.getElementById('profile-website').value.trim();
+            const newBirthday = document.getElementById('profile-birthday').value;
+            if (newBirthday && (newBirthday > new Date().toISOString().slice(0, 10) || newBirthday < '1900-01-01')) {
+                showCustomModal("Invalid date of birth", "Please enter a valid date of birth.");
+                return;
+            }
             const finalPhoto = pendingPhotoURL !== null ? pendingPhotoURL : (user.photoURL || DEFAULT_AVATAR_URL);
             const saveBtn = document.getElementById('btn-save-profile');
             const originalLabel = saveBtn.textContent;
@@ -29632,6 +29671,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     photoURL: finalPhoto,
                     about: newAbout,
                     website: newWebsite,
+                    birthday: newBirthday || '',
                     email: user.email || ""
                 });
                 updateAvatarUI(user);
@@ -29644,6 +29684,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = newAbout;
                 aboutDisplay.style.display = newAbout ? 'block' : 'none';
+                renderMyBirthday(newBirthday);
                 const websiteDisplay = document.getElementById('my-profile-website-display');
                 if (newWebsite) {
                     websiteDisplay.href = /^https?:\/\//i.test(newWebsite) ? newWebsite : 'https://' + newWebsite;

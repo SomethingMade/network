@@ -3223,6 +3223,17 @@
         /* Feed tab's Stories subtab: same .story-card items as the horizontal strip, reflowed
            into a responsive grid since this panel owns the full feed width/height instead of
            sitting as a thin row above the post list. */
+        /* Facebook-style stories row: sits at the top of the feed (scrolls away with it). */
+        .feed-stories-strip { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px 12px; scrollbar-width: none; border-bottom: 8px solid var(--bg-alt); -webkit-overflow-scrolling: touch; }
+        .feed-stories-strip::-webkit-scrollbar { display: none; }
+        .feed-stories-strip:empty { display: none; }
+        .feed-stories-strip .story-card { width: 104px; height: 176px; border-radius: 12px; }
+        .feed-stories-strip .story-card-add { justify-content: flex-end; padding-bottom: 10px; gap: 14px; }
+        .feed-stories-strip .story-card-add-avatar { opacity: 1; filter: none; bottom: 58px; }
+        .feed-stories-strip .story-card-add-scrim { display: none; }
+        .feed-stories-strip .story-card-add { background: var(--bg-surface); }
+        .feed-stories-strip .story-card-add-icon { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); border: 3px solid var(--bg-surface); width: 32px; height: 32px; box-sizing: content-box; background: #1877F2; }
+        .feed-stories-strip .story-card-add .story-card-name { left: 4px; right: 4px; bottom: 8px; text-align: center; font-size: 12.5px; white-space: normal; line-height: 1.15; }
         .story-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 10px; padding: 12px 14px 24px; }
         .story-grid .story-card { width: 100%; height: 0; padding-bottom: 155%; }
         .story-card { position: relative; flex-shrink: 0; width: 108px; height: 168px; border-radius: 14px; overflow: hidden; cursor: pointer; background: var(--bg-hover); }
@@ -10615,11 +10626,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                             <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"></path></svg>For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>Following</button>
-                                <button type="button" class="feed-subtab-btn" data-feed-subtab="stories"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.2"></circle></svg>Stories<span class="live-count-badge" id="feed-subtab-stories-count" style="display:none;">0</span></button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="movies"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"></rect><path d="M7 3v18M17 3v18M2 9h5M2 15h5M17 9h5M17 15h5"></path></svg>Movies</button>
                             </div>
                         </div>
                         <div id="feed-posts-container">
+                            <div class="feed-stories-strip" id="feed-stories-strip"></div>
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
                             <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
@@ -10637,16 +10648,6 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                             </div>
                             <div class="movies-grid" id="movies-grid"></div>
                             <p class="live-hub-empty" id="movies-empty" style="display:none;"></p>
-                        </div>
-                        <!-- Feed tab's "Stories" subtab panel: same status/story cards as the
-                             Discover tab's story-card-scroll (#stories-scroll-discover), just
-                             reflowed into a grid instead of a horizontal strip since this panel
-                             owns the full feed body. Reuses buildStoryCardItem/buildAddStoryCardItem
-                             so a story posted anywhere shows up identically in both places. Hidden
-                             unless the Stories subtab above is active (see feed-subtabs click handler). -->
-                        <div id="feed-stories-panel" style="display:none;">
-                            <div class="story-grid" id="feed-stories-grid"></div>
-                            <p class="live-hub-empty" id="feed-stories-empty" style="display:none;">No stories yet. Be the first to share one!</p>
                         </div>
                     </div>
                 </div>
@@ -18071,7 +18072,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 // closing a story — so closing a story while on the Feed's Stories subtab
                 // was silently swapping the visible panel back to feed posts underneath the
                 // still-highlighted "Stories" button.
-                if (feedContainer && feedActiveSubtab !== 'stories' && feedActiveSubtab !== 'movies') {
+                if (feedContainer && feedActiveSubtab !== 'movies') {
                     feedContainer.style.display = '';
                 }
                 if (exploreTabsBar) exploreTabsBar.style.display = '';
@@ -21142,16 +21143,6 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // "users"/"stories" DB listeners in initChatListeners() (renderFeedStoryCards is already
         // called there on every update), so opening the panel just needs an immediate render from
         // whatever's cached — no separate subscription to manage.
-        function showFeedStoriesPanel() {
-            document.getElementById('feed-posts-container').style.display = 'none';
-            document.getElementById('feed-empty-state').style.display = 'none';
-            document.getElementById('feed-stories-panel').style.display = 'block';
-            renderFeedStoryCards(cachedUsers, cachedStories);
-        }
-        function hideFeedStoriesPanel() {
-            document.getElementById('feed-stories-panel').style.display = 'none';
-            document.getElementById('feed-posts-container').style.display = '';
-        }
 
         document.getElementById('feed-subtabs')?.addEventListener('click', (e) => {
             const btn = e.target.closest('.feed-subtab-btn[data-feed-subtab]');
@@ -21162,11 +21153,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             btn.classList.add('active');
             feedActiveSubtab = btn.dataset.feedSubtab;
             hideFeedMoviesPanel();
-            hideFeedStoriesPanel();
             if (feedActiveSubtab === 'movies') {
                 showFeedMoviesPanel();
-            } else if (feedActiveSubtab === 'stories') {
-                showFeedStoriesPanel();
             } else {
                 applyFeedSubtabFilter();
                 sprinkleSuggestedPeople();
@@ -36480,8 +36468,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // --- Feed tab's Stories subtab: same story data/cards as the Discover strip, just
         // rendered into #feed-stories-grid's responsive grid instead of a horizontal scroller.
         function renderFeedStoryCards(usersData, storiesData) {
-            const grid = document.getElementById('feed-stories-grid');
-            const empty = document.getElementById('feed-stories-empty');
+            const grid = document.getElementById('feed-stories-strip');
             const user = auth.currentUser;
             if (!grid || !user) return;
             grid.innerHTML = "";
@@ -36489,6 +36476,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
             const ownProfile = (usersData && usersData[user.uid]) || {};
             grid.appendChild(buildAddStoryCardItem(ownProfile.photoURL || user.photoURL || ""));
+            const addLbl = grid.querySelector('.story-card-add .story-card-name');
+            if (addLbl) addLbl.textContent = 'Create a story';
 
             let othersCount = 0;
             let unreadCount = 0;
@@ -36524,8 +36513,6 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 grid.appendChild(buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false));
             });
 
-            if (empty) empty.style.display = (ownItems.length === 0 && othersCount === 0) ? 'block' : 'none';
-            updateLiveCountBadge('feed-subtab-stories-count', unreadCount);
         }
 
         document.getElementById('story-file-input').addEventListener('change', (e) => {

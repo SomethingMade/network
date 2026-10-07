@@ -958,6 +958,14 @@
         /* Website link reads as a small pill/chip (icon + host) rather than plain
            underlined text — pulls it in line with the stat chips below it instead of
            looking like a stray sentence. */
+        /* Custom scroll-wheel date picker (day / month / year) used for date of birth. */
+        .dp-wheel { position: relative; display: grid; grid-template-columns: 1fr 1.35fr 1.1fr; gap: 4px; height: 176px; padding: 0 8px; border-radius: 16px; background: var(--bg-alt); overflow: hidden; user-select: none; -webkit-user-select: none; }
+        .dp-band { position: absolute; left: 8px; right: 8px; top: 66px; height: 44px; border-radius: 12px; background: rgba(127,127,127,0.18); pointer-events: none; }
+        .dp-col { position: relative; z-index: 1; height: 176px; overflow-y: auto; padding: 66px 0; box-sizing: border-box; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-y; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%); }
+        .dp-col::-webkit-scrollbar { display: none; }
+        .dp-item { height: 44px; line-height: 44px; text-align: center; font-size: 17px; font-weight: 500; color: var(--text-secondary); scroll-snap-align: center; cursor: pointer; transition: color .15s ease, transform .15s ease; }
+        .dp-item.sel { color: var(--text-primary); font-weight: 800; transform: scale(1.08); }
+        .dp-wheel.dp-untouched .dp-item.sel { color: var(--text-secondary); font-weight: 500; transform: none; }
         .tm-profile-birthday { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--text-secondary); font-weight: 600; }
         .tm-profile-birthday svg { width: 15px; height: 15px; flex-shrink: 0; }
         .tm-profile-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--link-color); text-decoration: none; max-width: 100%; word-break: break-word; font-weight: 600; }
@@ -8313,10 +8321,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
                 <div class="edit-profile-section">
                     <div class="edit-profile-section-head">
-                        <h3><label for="profile-birthday">Date of birth</label></h3>
+                        <h3><label>Date of birth</label></h3>
                         <button type="button" class="edit-profile-photo-link" id="btn-clear-birthday">Clear</button>
                     </div>
-                    <input type="date" id="profile-birthday" class="tm-edit-input" min="1900-01-01" autocomplete="off">
+                    <div id="profile-birthday-picker" aria-label="Date of birth"></div>
                 </div>
             </div>
         </div>
@@ -8328,7 +8336,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             <div style="font-size:46px; line-height:1; margin:6px 0 10px;">🎂</div>
             <h3 style="margin:0 0 8px; font-size:20px;">Celebrate with Haba</h3>
             <p style="color:var(--text-secondary); font-size:14px; line-height:1.45; margin:0 0 18px;">Add your date of birth and we'll celebrate your birthday with you. You can change or remove it anytime in Edit profile.</p>
-            <input type="date" id="birthday-prompt-input" class="tm-edit-input" min="1900-01-01" style="width:100%; box-sizing:border-box; margin-bottom:14px;">
+            <div id="birthday-prompt-picker" aria-label="Date of birth" style="margin-bottom:14px;"></div>
             <button type="button" id="btn-birthday-prompt-save" class="btn-pill btn-primary" style="width:100%; margin-bottom:10px;" disabled>Save my birthday</button>
             <button type="button" id="btn-birthday-prompt-skip" class="btn-pill btn-outline" style="width:100%;">Not now</button>
         </div>
@@ -27216,9 +27224,9 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             aboutInput.value = myProfile.about || '';
             updateProfileAboutCounter();
             document.getElementById('profile-website').value = myProfile.website || '';
-            const bdayInput = document.getElementById('profile-birthday');
-            bdayInput.max = new Date().toISOString().slice(0, 10);
-            bdayInput.value = /^\d{4}-\d{2}-\d{2}$/.test(myProfile.birthday || '') ? myProfile.birthday : '';
+            if (/^\d{4}-\d{2}-\d{2}$/.test(myProfile.birthday || '')) editBdayPicker.setValue(myProfile.birthday);
+            else editBdayPicker.clear();
+            setTimeout(() => editBdayPicker.refresh(), 60);
 
             editProfileSheetOverlay.classList.add('active');
         }
@@ -29640,6 +29648,98 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             });
         }
 
+        function createDobPicker(root, onChange) {
+            const ITEM = 44;
+            const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const maxYear = new Date().getFullYear();
+            const minYear = 1900;
+            root.classList.add('dp-wheel', 'dp-untouched');
+            root.innerHTML = '<div class="dp-band"></div><div class="dp-col" data-col="d"></div><div class="dp-col" data-col="m"></div><div class="dp-col" data-col="y"></div>';
+            const col = { d: root.querySelector('[data-col="d"]'), m: root.querySelector('[data-col="m"]'), y: root.querySelector('[data-col="y"]') };
+            const state = { d: 1, m: 0, y: 2000, touched: false };
+            const timers = {};
+            const fill = (el, labels) => { el.innerHTML = labels.map(l => '<div class="dp-item">' + l + '</div>').join(''); };
+            const daysIn = (y, m) => new Date(y, m + 1, 0).getDate();
+            const idxOf = { d: () => state.d - 1, m: () => state.m, y: () => maxYear - state.y };
+            fill(col.m, MONTHS);
+            fill(col.y, Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i));
+            function rebuildDays() {
+                const n = daysIn(state.y, state.m);
+                if (state.d > n) state.d = n;
+                fill(col.d, Array.from({ length: n }, (_, i) => i + 1));
+            }
+            function mark(k) {
+                const items = col[k].children;
+                const idx = idxOf[k]();
+                for (let i = 0; i < items.length; i++) items[i].classList.toggle('sel', i === idx);
+            }
+            function place(k, smooth) {
+                col[k].scrollTo({ top: idxOf[k]() * ITEM, behavior: smooth ? 'smooth' : 'auto' });
+                mark(k);
+            }
+            function refresh() { ['d', 'm', 'y'].forEach(k => place(k, false)); }
+            function settle(k) {
+                const total = col[k].children.length;
+                const idx = Math.max(0, Math.min(total - 1, Math.round(col[k].scrollTop / ITEM)));
+                const before = { d: state.d, m: state.m, y: state.y };
+                if (k === 'd') state.d = idx + 1;
+                if (k === 'm') state.m = idx;
+                if (k === 'y') state.y = maxYear - idx;
+                const changed = before.d !== state.d || before.m !== state.m || before.y !== state.y;
+                if (k !== 'd' && (before.m !== state.m || before.y !== state.y)) { rebuildDays(); place('d', false); }
+                mark(k);
+                if (changed) {
+                    state.touched = true;
+                    root.classList.remove('dp-untouched');
+                    if (onChange) onChange();
+                }
+            }
+            ['d', 'm', 'y'].forEach(k => {
+                col[k].addEventListener('scroll', () => { clearTimeout(timers[k]); timers[k] = setTimeout(() => settle(k), 90); }, { passive: true });
+                col[k].addEventListener('click', (e) => {
+                    const item = e.target.closest('.dp-item');
+                    if (!item) return;
+                    const idx = Array.prototype.indexOf.call(col[k].children, item);
+                    col[k].scrollTo({ top: idx * ITEM, behavior: 'smooth' });
+                });
+            });
+            rebuildDays();
+            refresh();
+            return {
+                getValue() {
+                    if (!state.touched) return '';
+                    const p = n => String(n).padStart(2, '0');
+                    return state.y + '-' + p(state.m + 1) + '-' + p(state.d);
+                },
+                isValid() {
+                    const v = this.getValue();
+                    return !!v && v >= '1900-01-01' && v <= new Date().toISOString().slice(0, 10);
+                },
+                setValue(v) {
+                    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+                    if (!m) return this.clear();
+                    state.y = Math.min(maxYear, Math.max(minYear, +m[1]));
+                    state.m = +m[2] - 1;
+                    state.d = +m[3];
+                    state.touched = true;
+                    root.classList.remove('dp-untouched');
+                    rebuildDays();
+                    refresh();
+                },
+                clear() {
+                    state.d = 1; state.m = 0; state.y = 2000; state.touched = false;
+                    root.classList.add('dp-untouched');
+                    rebuildDays();
+                    refresh();
+                },
+                refresh
+            };
+        }
+        const promptBdayPicker = createDobPicker(document.getElementById('birthday-prompt-picker'), () => {
+            document.getElementById('btn-birthday-prompt-save').disabled = !promptBdayPicker.isValid();
+        });
+        const editBdayPicker = createDobPicker(document.getElementById('profile-birthday-picker'));
+
         // One-time "add your date of birth" prompt. Shown at most once per account: Save or
         // Not now both set users/{uid}/birthdayPromptSeen (and a local flag as a fallback if
         // that write fails), and anyone who already has a birthday is never asked.
@@ -29659,11 +29759,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 if (prof.birthday || prof.birthdayPromptSeen || seenLocal) return;
                 const busy = document.querySelector('.bottom-sheet-overlay.active, .modal-overlay.active');
                 if (busy) { if (++tries < 20) setTimeout(tick, 3000); return; }
-                const input = document.getElementById('birthday-prompt-input');
-                input.value = '';
-                input.max = new Date().toISOString().slice(0, 10);
+                promptBdayPicker.clear();
                 document.getElementById('btn-birthday-prompt-save').disabled = true;
                 document.getElementById('birthday-prompt-overlay').classList.add('active');
+                setTimeout(() => promptBdayPicker.refresh(), 60);
             };
             setTimeout(tick, 5000);
         }
@@ -29679,14 +29778,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 if (birthday) { renderMyBirthday(birthday); notify("Birthday saved \uD83C\uDF82"); }
             } catch (err) { console.error('Failed to save birthday prompt result', err); }
         }
-        document.getElementById('birthday-prompt-input').addEventListener('input', (e) => {
-            const v = e.target.value;
-            const ok = /^\d{4}-\d{2}-\d{2}$/.test(v) && v >= '1900-01-01' && v <= new Date().toISOString().slice(0, 10);
-            document.getElementById('btn-birthday-prompt-save').disabled = !ok;
-        });
         document.getElementById('btn-birthday-prompt-save').addEventListener('click', () => {
-            const v = document.getElementById('birthday-prompt-input').value;
-            if (v) closeBirthdayPrompt(v);
+            if (promptBdayPicker.isValid()) closeBirthdayPrompt(promptBdayPicker.getValue());
         });
         document.getElementById('btn-birthday-prompt-skip').addEventListener('click', () => closeBirthdayPrompt(null));
 
@@ -29703,7 +29796,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             }
         }
         document.getElementById('btn-clear-birthday').addEventListener('click', () => {
-            document.getElementById('profile-birthday').value = '';
+            editBdayPicker.clear();
         });
 
         document.getElementById('btn-save-profile').addEventListener('click', async (e) => {
@@ -29714,7 +29807,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const newName = document.getElementById('profile-name').value.trim();
             const newAbout = document.getElementById('profile-about').value.trim();
             const newWebsite = document.getElementById('profile-website').value.trim();
-            const newBirthday = document.getElementById('profile-birthday').value;
+            const newBirthday = editBdayPicker.getValue();
             if (newBirthday && (newBirthday > new Date().toISOString().slice(0, 10) || newBirthday < '1900-01-01')) {
                 showCustomModal("Invalid date of birth", "Please enter a valid date of birth.");
                 return;

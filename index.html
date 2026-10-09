@@ -1400,7 +1400,8 @@
         .activity-system-avatar svg { width: 24px; height: 24px; }
         .notif-type-badge { position: absolute; bottom: -3px; right: -3px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-surface); z-index: 2; }
         .notif-type-badge svg { width: 10px; height: 10px; }
-        .notif-type-badge.type-like { background: var(--danger-red); }
+        .notif-type-badge.type-like, .notif-type-badge.type-story_like { background: var(--danger-red); }
+        .notif-type-badge.type-story_sticker { background: #F59E0B; }
         .notif-type-badge.type-comment,
         .notif-type-badge.type-reply,
         .notif-type-badge.type-mention { background: var(--comment-blue); }
@@ -1808,7 +1809,7 @@
            wrapper (not #feed-subtabs itself) owns the sticky behavior; #feed-subtabs is
            demoted to a plain in-flow block inside it so the two don't double-stick. */
         .feed-sticky-header { position: sticky; top: 0; z-index: 5; background: var(--bg-base); margin-left: -14px; margin-right: -14px; }
-        .feed-sticky-header #feed-subtabs { position: static; margin-left: 0; margin-right: 0; }
+        .feed-sticky-header #feed-subtabs { position: static; margin-left: 0; margin-right: 0; margin-bottom: 0; }
         .feed-sticky-header .stories-scroll { padding-left: 14px; padding-right: 14px; box-sizing: border-box; }
         .feed-subtab-btn { flex: 1; text-align: center; padding: 14px 0 12px; border: none; background: none; color: var(--text-secondary); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; position: relative; transition: color 0.15s ease; }
         .feed-subtab-btn:hover { background: var(--bg-hover); }
@@ -3223,7 +3224,7 @@
            into a responsive grid since this panel owns the full feed width/height instead of
            sitting as a thin row above the post list. */
         /* Facebook-style stories row: sits at the top of the feed (scrolls away with it). */
-        .feed-stories-strip { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px 12px; scrollbar-width: none; border-bottom: 8px solid var(--bg-alt); -webkit-overflow-scrolling: touch; }
+        .feed-stories-strip { display: flex; gap: 8px; overflow-x: auto; padding: 6px 14px 8px; scrollbar-width: none; border-bottom: 4px solid var(--bg-alt); -webkit-overflow-scrolling: touch; }
         .feed-stories-strip::-webkit-scrollbar { display: none; }
         .feed-stories-strip:empty { display: none; }
         .feed-stories-strip .story-card { width: 104px; height: 176px; border-radius: 12px; }
@@ -4739,6 +4740,47 @@
         .text-story-textarea { width: 100%; max-width: 480px; max-height: 60vh; background: transparent; border: none; outline: none; resize: none; text-align: center; color: #fff; font-size: 30px; font-weight: 700; line-height: 1.35; text-shadow: 0 2px 14px rgba(0,0,0,0.25); font-family: inherit; }
         .text-story-textarea::placeholder { color: rgba(255,255,255,0.75); }
         .text-story-post-btn { position: absolute; right: 20px; bottom: max(28px, env(safe-area-inset-bottom)); background: rgba(0,0,0,0.35); backdrop-filter: blur(6px); color: #fff; border: none; padding: 13px 22px; border-radius: 50px; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; }
+
+        /* ── STORY PREVIEW (shown after picking photos/videos, before anything is uploaded) ── */
+        .story-preview-overlay { position: fixed; inset: 0; z-index: 100008; display: none; flex-direction: column; background: #000; color: #fff; height: 100%; height: 100dvh; }
+        .story-preview-overlay.active { display: flex; }
+        .sp-topbar { position: absolute; top: 0; left: 0; right: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: max(14px, env(safe-area-inset-top)) 14px 24px; background: linear-gradient(to bottom, rgba(0,0,0,0.65), rgba(0,0,0,0)); }
+        .sp-icon-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex-shrink: 0; }
+        .sp-icon-btn svg { width: 20px; height: 20px; }
+        .sp-counter { font-size: 13px; font-weight: 700; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 7px 14px; border-radius: 50px; }
+        .sp-music-pill { display: inline-flex; align-items: center; gap: 8px; max-width: 46vw; height: 40px; padding: 0 14px; border-radius: 50px; border: none; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .sp-music-pill svg { width: 16px; height: 16px; flex-shrink: 0; }
+        .sp-music-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sp-music-pill.has-music { background: rgba(24,119,242,0.85); }
+        .sp-music-remove { display: none; width: 18px; height: 18px; flex-shrink: 0; }
+        .sp-music-pill.has-music .sp-music-remove { display: block; }
+        .sp-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; }
+        .sp-stage img, .sp-stage video { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; }
+        .sp-stage video { display: none; }
+        .sp-side-btns { position: absolute; right: 12px; top: calc(max(14px, env(safe-area-inset-top)) + 58px); z-index: 5; display: flex; flex-direction: column; gap: 10px; }
+        .sp-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 4; width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(0,0,0,0.4); color: #fff; display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .sp-nav svg { width: 20px; height: 20px; }
+        .sp-prev { left: 10px; } .sp-next { right: 10px; }
+        .sp-bottom { position: relative; z-index: 5; padding: 40px 14px max(14px, env(safe-area-inset-bottom)); margin-top: -40px; background: linear-gradient(to top, rgba(0,0,0,0.92) 55%, rgba(0,0,0,0)); display: flex; flex-direction: column; gap: 12px; }
+        .sp-thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
+        .sp-thumbs::-webkit-scrollbar { display: none; }
+        .sp-thumb { position: relative; width: 52px; height: 68px; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 2px solid transparent; opacity: 0.6; cursor: pointer; background: #222; }
+        .sp-thumb.active { border-color: #fff; opacity: 1; }
+        .sp-thumb img, .sp-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .sp-thumb-x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.7); border: none; color: #fff; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+        .sp-thumb-x svg { width: 10px; height: 10px; }
+        .sp-thumb-vid { position: absolute; left: 3px; bottom: 3px; width: 14px; height: 14px; color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+        .sp-thumb-add { display: flex; align-items: center; justify-content: center; border: 2px dashed rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); opacity: 1; color: #fff; }
+        .sp-thumb-add svg { width: 22px; height: 22px; }
+        .sp-caption-row { display: flex; align-items: flex-end; gap: 10px; background: rgba(255,255,255,0.14); border-radius: 22px; padding: 10px 14px; }
+        .sp-caption-row textarea { flex: 1; background: none; border: none; outline: none; resize: none; color: #fff; font: inherit; font-size: 15px; line-height: 1.35; max-height: 90px; min-height: 22px; padding: 0; }
+        .sp-caption-row textarea::placeholder { color: rgba(255,255,255,0.7); }
+        .sp-caption-count { font-size: 11px; color: rgba(255,255,255,0.6); align-self: flex-end; }
+        .sp-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .sp-hint { font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.3; }
+        .sp-share-btn { display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 50px; padding: 14px 26px; background: #1877F2; color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+        .sp-share-btn svg { width: 16px; height: 16px; }
+        .sp-share-btn:disabled { opacity: 0.55; }
         #story-viewer-video { transform: translateZ(0); -webkit-transform: translateZ(0); backface-visibility: hidden; }
         .story-progress-row { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 3; }
         .story-progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
@@ -6596,7 +6638,7 @@ img,video{-webkit-user-drag:none}
 :root{--fb-bg:#F0F2F5;--fb-card:#fff;--fb-blue:#111111;--fb-hover:#F2F2F2;--fb-sep:#CED0D4;--fb-text:#050505;--fb-sub:#65676B}
 body.dark-theme{--fb-blue:#F2F2F7;--fb-bg:#18191A;--fb-card:#242526;--fb-hover:#3A3B3C;--fb-sep:#3E4042;--fb-text:#E4E6EB;--fb-sub:#B0B3B8}
 #discover-grid-scroll{background:var(--fb-bg)}
-#feed-posts-container{background:var(--fb-bg);padding:8px 0;margin:0 -14px}
+#feed-posts-container{background:var(--fb-bg);padding:0 0 8px;margin:0 -14px}
 .feed-post-card.feed-post-card-ig{background:var(--fb-card);margin:0 0 8px;padding:12px 0 0;border:none;border-radius:0;box-shadow:0 1px 2px rgba(0,0,0,.2)}
 @media(min-width:700px){.feed-post-card.feed-post-card-ig{border-radius:8px;margin:0 auto 12px;max-width:680px}}
 @media(hover:hover){.feed-post-card.feed-post-card-ig:hover{background:var(--fb-card)}}
@@ -11694,6 +11736,38 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             Send
             <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M2 21l21-9L2 3v7l15 2-15 2z"></path></svg>
         </button>
+    </div>
+
+    <div id="story-preview-overlay" class="story-preview-overlay" role="dialog" aria-label="Story preview">
+        <div class="sp-topbar">
+            <button type="button" id="sp-close" class="sp-icon-btn" aria-label="Discard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <div class="sp-counter" id="sp-counter">1 / 1</div>
+            <button type="button" id="sp-music-btn" class="sp-music-pill">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                <span id="sp-music-label">Add music</span>
+                <svg id="sp-music-remove" class="sp-music-remove" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="sp-stage" id="sp-stage">
+            <img id="sp-img" alt="Story preview" style="display:none;">
+            <video id="sp-video" muted loop playsinline></video>
+            <button type="button" id="sp-prev" class="sp-nav sp-prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+            <button type="button" id="sp-next" class="sp-nav sp-next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+            <div class="sp-side-btns">
+                <button type="button" id="sp-mute" class="sp-icon-btn" aria-label="Sound" style="display:none;"></button>
+            </div>
+        </div>
+        <div class="sp-bottom">
+            <div class="sp-thumbs" id="sp-thumbs"></div>
+            <div class="sp-caption-row">
+                <textarea id="sp-caption" rows="1" maxlength="200" placeholder="Add a caption..." autocomplete="off"></textarea>
+                <span class="sp-caption-count"><span id="sp-caption-count">0</span>/200</span>
+            </div>
+            <div class="sp-actions">
+                <div class="sp-hint" id="sp-hint">Visible for 24 hours</div>
+                <button type="button" id="sp-share" class="sp-share-btn">Share story<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z"></path></svg></button>
+            </div>
+        </div>
     </div>
 
     <input type="file" id="story-file-input" accept="image/jpeg, image/png, image/webp, video/mp4" multiple style="display:none;">
@@ -24696,6 +24770,40 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             }
         }
 
+        // Story reactions: a like or a sticker on someone's story notifies the story's owner.
+        // Likes use a deterministic id (story + liker) so liking/unliking/liking again just
+        // overwrites one row instead of piling up duplicates, and unliking removes it. Text
+        // replies already land in Messages (with an unread badge), so they aren't repeated here.
+        function storyLikeNotifId(storyKey, fromUid) { return `story_like_${storyKey}_${fromUid}`; }
+        async function createStoryReactionNotification(ownerUid, storyKey, kind, stickerChar) {
+            const me = auth.currentUser;
+            if (!me || !ownerUid || ownerUid === me.uid || !storyKey) return;
+            try {
+                const myProfile = cachedUsers[me.uid] || {};
+                const notifRef = kind === 'like'
+                    ? ref(database, `notifications/${ownerUid}/${storyLikeNotifId(storyKey, me.uid)}`)
+                    : push(ref(database, `notifications/${ownerUid}`));
+                await set(notifRef, {
+                    type: kind === 'like' ? 'story_like' : 'story_sticker',
+                    storyKey: storyKey,
+                    fromUid: me.uid,
+                    fromName: myProfile.name || me.displayName || 'Someone',
+                    fromPhotoURL: myProfile.photoURL || me.photoURL || '',
+                    text: (stickerChar || '').slice(0, 20),
+                    timestamp: serverTimestamp(),
+                    read: false
+                });
+            } catch (err) {
+                console.error('createStoryReactionNotification failed', err);
+            }
+        }
+        async function removeStoryLikeNotification(ownerUid, storyKey) {
+            const me = auth.currentUser;
+            if (!me || !ownerUid || !storyKey) return;
+            try { await remove(ref(database, `notifications/${ownerUid}/${storyLikeNotifId(storyKey, me.uid)}`)); }
+            catch (err) { /* best effort */ }
+        }
+
         // System notifications (e.g. "you're verified") aren't from another person — they're
         // about the recipient's own account — so they use this instead of createNotification,
         // which deliberately refuses to notify someone about their own action. fromName here is
@@ -24781,6 +24889,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 milestone_like: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
                 verified: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 2.2 3.2-.6.9 3.1 3.1.9-.6 3.2L23 12l-2.2 2.4.6 3.2-3.1.9-.9 3.1-3.2-.6L12 23l-2.4-2.2-3.2.6-.9-3.1-3.1-.9.6-3.2L1 12l2.2-2.4-.6-3.2 3.1-.9.9-3.1 3.2.6z"/><path d="M9 12.5l2 2 4-4.5" stroke="#1D9BF0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
             };
+            icons.story_like = icons.like;
+            icons.story_sticker = icons.milestone_post;
             const icon = icons[type];
             if (!icon) return '';
             return `<div class="notif-type-badge type-${type}">${icon}</div>`;
@@ -24791,6 +24901,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (notif.type === 'follow') return `<b>${name}</b> started following you`;
             if (notif.type === 'like') return `<b>${name}</b> liked your post`;
             if (notif.type === 'repost') return `<b>${name}</b> reposted your post`;
+            if (notif.type === 'story_like') return `<b>${name}</b> liked your story`;
+            if (notif.type === 'story_sticker') return `<b>${name}</b> reacted to your story ${notif.text || ''}`;
             if (notif.type === 'comment') return `<b>${name}</b> commented: ${notif.text || ''}`;
             if (notif.type === 'reply') return `<b>${name}</b> replied: ${notif.text || ''}`;
             if (notif.type === 'mention') return `<b>${name}</b> tagged you: ${notif.text || ''}`;
@@ -24842,6 +24954,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         let notifActiveFilter = 'all';
         function notifMatchesFilter(notif, filter) {
             if (filter === 'all') return true;
+            if (filter === 'like') return notif.type === 'like' || notif.type === 'story_like';
             // "Conversations" = comments and replies; "Mentions" is its own chip. ('comment' is
             // kept as an alias for the old combined bucket.)
             if (filter === 'conversation') return notif.type === 'comment' || notif.type === 'reply';
@@ -24898,6 +25011,21 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (!url) return '';
             const isVideoOnly = !!post.videoUrl && !post.imageUrl && !(post.imageUrls && post.imageUrls.length);
             return `<div class="activity-thumb"><img src="${escapeHtmlForPost(url)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">${isVideoOnly ? '<span class="activity-thumb-play"></span>' : ''}</div>`;
+        }
+
+        // Right-edge thumbnail for a story-reaction notification: the story itself, looked up
+        // in cachedStories (only live stories are there, so an expired one just shows no thumb).
+        function activityStoryThumbHtml(notif) {
+            const me = auth.currentUser;
+            const st = me && cachedStories && cachedStories[me.uid] && cachedStories[me.uid][notif.storyKey];
+            if (!st) return '';
+            if (st.type === 'text') {
+                return `<div class="activity-thumb" style="background:${escapeHtmlForPost(st.bgColor || '#222')};"></div>`;
+            }
+            if (st.type === 'video') {
+                return `<div class="activity-thumb"><video src="${escapeHtmlForPost(st.mediaURL || '')}#t=0.1" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;"></video><span class="activity-thumb-play"></span></div>`;
+            }
+            return `<div class="activity-thumb"><img src="${escapeHtmlForPost(st.mediaURL || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div>`;
         }
 
         function activityActionsHtml(post) {
@@ -24975,6 +25103,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             switch (notif.type) {
                 case 'follow': return 'Started following you';
                 case 'like': return 'Liked your post';
+                case 'story_like': return 'Liked your story';
+                case 'story_sticker': return 'Reacted to your story';
                 case 'repost': return 'Reposted your post';
                 case 'comment': return 'Commented on your post';
                 case 'reply': return 'Replied to you';
@@ -25046,7 +25176,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                         ${followBack ? `<button type="button" class="activity-follow-btn" data-follow-uid="${uid}">Follow back</button>` : ''}
                         ${showActions ? activityActionsHtml(post) : ''}
                     </div>
-                    <div class="activity-thumb-col">${(showActions || isNotif) ? activityThumbHtml(post) : ''}</div>
+                    <div class="activity-thumb-col">${(showActions || isNotif) ? ((isNotif && notif.storyKey) ? activityStoryThumbHtml(notif) : activityThumbHtml(post)) : ''}</div>
                 </div>`;
             row.querySelector('.activity-name').textContent = name;
             row.querySelector('.activity-sub').textContent = sub;
@@ -25270,7 +25400,9 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // Notifications is a tab, so every target (post view, applicants sheet, profile)
             // simply opens over it — the device back button pops that layer and lands back on
             // Notifications, right where the person left it.
-            if (notif.postId) {
+            if ((notif.type === 'story_like' || notif.type === 'story_sticker') && auth.currentUser) {
+                openStoryFromReplyTag({ ownerUid: auth.currentUser.uid, storyKey: notif.storyKey });
+            } else if (notif.postId) {
                 openNotificationPostView(notif.postId);
             } else if (notif.type === 'job_application' && notif.jobId) {
                 openJobApplicantsSheet(notif.jobId);
@@ -36638,14 +36770,245 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
         }
 
+        // --- STORY PREVIEW ---------------------------------------------------------------
+        // Picking (or capturing) photos/videos now opens this full-screen preview instead of
+        // jumping straight into caption → music → upload. Nothing is uploaded until the person
+        // taps "Share story"; they can review each item, remove ones they don't want, add more,
+        // write a caption and pick music (shared by all items, same as before) right on top of
+        // the media. Only then does it hand off to uploadStoriesWithMusic().
+        const STORY_PREVIEW_MAX_ITEMS = 10;
+        const spState = { items: [], index: 0, music: null, audio: null, soundOn: true, sharing: false };
+        const spEl = (id) => document.getElementById(id);
+        const SP_ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        const SP_ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+        const SP_ICON_PLAY = '<svg class="sp-thumb-vid" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>';
+        const SP_ICON_SOUND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M19 5a10 10 0 0 1 0 14"></path></svg>';
+        const SP_ICON_SOUND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+
+        function spStopAudio() {
+            if (spState.audio) { try { spState.audio.pause(); } catch (_) {} spState.audio = null; }
+        }
+        function spStartAudio() {
+            spStopAudio();
+            if (!spState.music || !spState.music.previewUrl) return;
+            try {
+                const a = new Audio(spState.music.previewUrl);
+                a.loop = true;
+                a.play().catch(() => {});
+                spState.audio = a;
+            } catch (_) {}
+        }
+
+        function spResetAndClose() {
+            spStopAudio();
+            const v = spEl('sp-video');
+            try { v.pause(); } catch (_) {}
+            v.removeAttribute('src'); v.load();
+            spEl('sp-img').removeAttribute('src');
+            spState.items.forEach(it => URL.revokeObjectURL(it.url));
+            spState.items = [];
+            spState.index = 0;
+            spState.music = null;
+            spState.sharing = false;
+            spEl('sp-caption').value = '';
+            spEl('sp-caption-count').textContent = '0';
+            spEl('sp-share').disabled = false;
+            spEl('story-preview-overlay').classList.remove('active');
+            spRenderMusicPill();
+        }
+
+        function spRenderMusicPill() {
+            const pill = spEl('sp-music-btn');
+            const label = spEl('sp-music-label');
+            if (spState.music) {
+                pill.classList.add('has-music');
+                label.textContent = `${spState.music.trackName}${spState.music.artistName ? ' · ' + spState.music.artistName : ''}`;
+            } else {
+                pill.classList.remove('has-music');
+                label.textContent = 'Add music';
+            }
+        }
+
+        function spRenderStage() {
+            const items = spState.items;
+            const it = items[spState.index];
+            const img = spEl('sp-img');
+            const vid = spEl('sp-video');
+            if (!it) return;
+            if (it.type === 'video') {
+                img.style.display = 'none';
+                if (vid.getAttribute('src') !== it.url) vid.src = it.url;
+                vid.style.display = 'block';
+                // With music chosen the preview plays the song, so the clip's own sound stays off
+                // (that's also how it'll be mixed for viewers — they hear the music chip's track).
+                vid.muted = !!spState.music || !spState.soundOn;
+                vid.play().catch(() => {});
+            } else {
+                try { vid.pause(); } catch (_) {}
+                vid.style.display = 'none';
+                img.src = it.url;
+                img.style.display = 'block';
+            }
+            const mute = spEl('sp-mute');
+            if (it.type === 'video' && !spState.music) {
+                mute.style.display = 'flex';
+                mute.innerHTML = spState.soundOn ? SP_ICON_SOUND_ON : SP_ICON_SOUND_OFF;
+            } else {
+                mute.style.display = 'none';
+            }
+            spEl('sp-counter').textContent = `${spState.index + 1} / ${items.length}`;
+            spEl('sp-counter').style.visibility = items.length > 1 ? 'visible' : 'hidden';
+            spEl('sp-prev').style.display = spState.index > 0 ? 'flex' : 'none';
+            spEl('sp-next').style.display = spState.index < items.length - 1 ? 'flex' : 'none';
+            spEl('sp-hint').textContent = items.length > 1
+                ? `${items.length} stories · caption & music apply to all`
+                : 'Visible for 24 hours';
+        }
+
+        function spRenderThumbs() {
+            const wrap = spEl('sp-thumbs');
+            wrap.innerHTML = '';
+            const items = spState.items;
+            if (items.length > 1 || items.length < STORY_PREVIEW_MAX_ITEMS) {
+                items.forEach((it, idx) => {
+                    const t = document.createElement('div');
+                    t.className = 'sp-thumb' + (idx === spState.index ? ' active' : '');
+                    if (it.type === 'video') {
+                        const v = document.createElement('video');
+                        v.src = it.url + '#t=0.1'; v.muted = true; v.preload = 'metadata'; v.playsInline = true;
+                        t.appendChild(v);
+                        t.insertAdjacentHTML('beforeend', SP_ICON_PLAY);
+                    } else {
+                        const im = document.createElement('img');
+                        im.src = it.url; im.alt = '';
+                        t.appendChild(im);
+                    }
+                    const x = document.createElement('button');
+                    x.type = 'button'; x.className = 'sp-thumb-x'; x.setAttribute('aria-label', 'Remove'); x.innerHTML = SP_ICON_X;
+                    x.addEventListener('click', (e) => { e.stopPropagation(); spRemoveItem(idx); });
+                    t.appendChild(x);
+                    t.addEventListener('click', () => { spState.index = idx; spRender(); });
+                    wrap.appendChild(t);
+                });
+                if (items.length < STORY_PREVIEW_MAX_ITEMS) {
+                    const add = document.createElement('div');
+                    add.className = 'sp-thumb sp-thumb-add';
+                    add.setAttribute('role', 'button'); add.setAttribute('aria-label', 'Add more');
+                    add.innerHTML = SP_ICON_PLUS;
+                    add.addEventListener('click', () => spEl('story-file-input').click());
+                    wrap.appendChild(add);
+                }
+            }
+            wrap.style.display = wrap.children.length ? 'flex' : 'none';
+            const active = wrap.querySelector('.sp-thumb.active');
+            if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
+        }
+
+        function spRender() { spRenderStage(); spRenderThumbs(); }
+
+        function spRemoveItem(idx) {
+            const it = spState.items[idx];
+            if (!it) return;
+            URL.revokeObjectURL(it.url);
+            spState.items.splice(idx, 1);
+            if (spState.items.length === 0) { spResetAndClose(); return; }
+            if (spState.index >= spState.items.length) spState.index = spState.items.length - 1;
+            if (idx < spState.index) spState.index--;
+            spRender();
+        }
+
+        function openStoryPreview(files) {
+            const room = STORY_PREVIEW_MAX_ITEMS - spState.items.length;
+            const accepted = [];
+            let rejected = 0;
+            files.forEach(f => {
+                const ok = f.type && (f.type.startsWith('image/') || f.type === 'video/mp4');
+                if (!ok) { rejected++; return; }
+                accepted.push(f);
+            });
+            if (rejected) notify(`${rejected} file${rejected > 1 ? 's' : ''} skipped — only photos and MP4 videos can be added`, 'error');
+            if (accepted.length > room) notify(`You can add up to ${STORY_PREVIEW_MAX_ITEMS} items to a story`, 'error');
+            const take = accepted.slice(0, Math.max(room, 0));
+            if (!take.length && !spState.items.length) return;
+            const firstNew = spState.items.length;
+            take.forEach(f => spState.items.push({
+                file: f,
+                url: URL.createObjectURL(f),
+                type: f.type.startsWith('video/') ? 'video' : 'image'
+            }));
+            if (take.length) spState.index = firstNew;
+            spEl('story-preview-overlay').classList.add('active');
+            spRender();
+            spRenderMusicPill();
+            if (spState.music && !spState.audio) spStartAudio();
+        }
+
         document.getElementById('story-file-input').addEventListener('change', (e) => {
             e.preventDefault();
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
+            const files = Array.from(e.target.files || []);
+            e.target.value = '';
+            if (files.length === 0) return;
+            if (!auth.currentUser) return;
+            openStoryPreview(files);
+        });
+
+        spEl('sp-prev').addEventListener('click', () => { if (spState.index > 0) { spState.index--; spRender(); } });
+        spEl('sp-next').addEventListener('click', () => { if (spState.index < spState.items.length - 1) { spState.index++; spRender(); } });
+        spEl('sp-mute').addEventListener('click', () => { spState.soundOn = !spState.soundOn; spRenderStage(); });
+        (function spSwipe() {
+            const stage = spEl('sp-stage');
+            let x0 = null, y0 = null;
+            stage.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+            stage.addEventListener('touchend', (e) => {
+                if (x0 === null) return;
+                const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+                x0 = null;
+                if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+                if (dx < 0 && spState.index < spState.items.length - 1) { spState.index++; spRender(); }
+                else if (dx > 0 && spState.index > 0) { spState.index--; spRender(); }
+            }, { passive: true });
+        })();
+
+        spEl('sp-caption').addEventListener('input', (e) => {
+            const ta = e.target;
+            spEl('sp-caption-count').textContent = String(ta.value.length);
+            ta.style.height = 'auto';
+            ta.style.height = Math.min(ta.scrollHeight, 90) + 'px';
+        });
+
+        spEl('sp-music-btn').addEventListener('click', (e) => {
+            if (e.target.closest('#sp-music-remove')) {
+                spState.music = null; spStopAudio(); spRenderMusicPill(); spRenderStage();
+                return;
+            }
+            openMusicPicker('Add music to your story', (music) => {
+                // Skipping/dismissing the picker returns null — keep whatever was already chosen.
+                if (!music) return;
+                spState.music = music;
+                spRenderMusicPill();
+                spRenderStage();
+                spStartAudio();
+            });
+        });
+
+        spEl('sp-close').addEventListener('click', async () => {
+            if (spState.sharing) return;
+            const ok = await showCustomModal('Discard story?', 'Your selected photos and videos won\'t be shared.', true);
+            if (ok) spResetAndClose();
+        });
+
+        spEl('sp-share').addEventListener('click', () => {
+            if (spState.sharing || !spState.items.length) return;
             const user = auth.currentUser;
             if (!user) return;
-            pendingStoryFiles = files;
-            openStoryCaptionSheet();
+            spState.sharing = true;
+            spEl('sp-share').disabled = true;
+            const files = spState.items.map(it => it.file);
+            const music = spState.music;
+            const caption = spEl('sp-caption').value.trim();
+            triggerHaptic(12);
+            spResetAndClose();
+            uploadStoriesWithMusic(files, music, caption);
         });
 
         function openStoryCaptionSheet() {
@@ -37157,6 +37520,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if(!current || !user || storyState.isOwn) return;
 
             const likeRef = ref(database, `stories/${storyState.currentUid}/${current.key}/likes/${user.uid}`);
+            const storyOwnerUidAtTap = storyState.currentUid;
             const isLiked = current.likes && current.likes[user.uid];
             
             if (!isLiked) {
@@ -37173,11 +37537,13 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 setTimeout(() => heart.remove(), 1500);
 
                 await set(likeRef, true);
+                createStoryReactionNotification(storyOwnerUidAtTap, current.key, 'like');
             } else {
                 delete current.likes[user.uid];
                 e.currentTarget.classList.remove('liked');
                 e.currentTarget.innerHTML = '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>';
                 await remove(likeRef);
+                removeStoryLikeNotification(storyOwnerUidAtTap, current.key);
             }
         });
 
@@ -37381,6 +37747,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
             try {
                 await update(ref(database), updates);
+                createStoryReactionNotification(otherUid, current.key, 'sticker', ch);
                 notify('Sticker sent');
             } catch (err) { showCustomModal('Error', 'Could not send your sticker.'); }
         }

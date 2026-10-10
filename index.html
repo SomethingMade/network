@@ -7046,6 +7046,21 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 .search-tag-tile{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;background:var(--fb-bg,#F0F2F5);color:var(--fb-text,#050505)}
 #search-recent-section{background:var(--fb-card,#fff);padding:4px 6px 6px;margin-bottom:8px}
 </style>
+<style id="profile-lock-style">
+/* Profile lock: non-followers of a locked profile only see the header + a notice */
+#user-info-sheet-overlay.profile-locked-view #user-info-media-section,
+#user-info-sheet-overlay.profile-locked-view #user-info-about,
+#user-info-sheet-overlay.profile-locked-view #user-info-website,
+#user-info-sheet-overlay.profile-locked-view #user-info-joined-row,
+#user-info-sheet-overlay.profile-locked-view #user-info-followed-by,
+#user-info-sheet-overlay.profile-locked-view #user-info-community-pills{display:none!important}
+.profile-lock-notice{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:36px 28px;margin-top:12px;border-top:1px solid var(--fb-sep,#CED0D4);color:var(--fb-sub,#65676B)}
+.profile-lock-notice-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--fb-bg,#F0F2F5);color:var(--fb-text,#050505)}
+.profile-lock-notice-icon svg{width:26px;height:26px}
+.profile-lock-notice-text{font-size:15px;line-height:1.45;max-width:280px}
+.profile-lock-badge{display:inline-flex;vertical-align:-2px;margin-left:5px;color:var(--fb-sub,#65676B)}
+.profile-lock-badge svg{width:16px;height:16px}
+</style>
 </head>
 <body>
 
@@ -8522,6 +8537,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </button>
                 </div>
 
+                <div class="profile-lock-notice" id="user-info-lock-notice" style="display:none;">
+                    <div class="profile-lock-notice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+                    <div class="profile-lock-notice-text">This profile is locked.</div>
+                </div>
+
                 <div class="wa-profile-media-section tm-profile-media-section" id="user-info-media-section">
                     <div class="profile-subtabs" id="user-info-subtabs">
                         <button type="button" class="profile-subtab-btn active" data-subtab="posts" aria-label="Posts" title="Posts"><svg class="profile-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>Posts</button>
@@ -9043,6 +9063,22 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 <div style="width:38px; flex-shrink:0;"></div>
             </div>
             <div class="settings-x-subpanel-scroll">
+            <div class="wa-section">
+                <div class="wa-section-title">Profile</div>
+                <div class="wa-list-row">
+                    <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Lock profile</span>
+                        <span class="wa-row-sub">Only people who follow you can see your posts, bio and details</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-profile-lock-toggle" aria-label="Lock profile">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="wa-note" style="margin: 6px 8px 0;">Everyone can still see your photo, name, username and follower counts, and can follow or message you. People who already follow you keep full access.</p>
+            </div>
+
             <div class="wa-section">
                 <div class="wa-section-title">Messages</div>
                 <div class="wa-list-row">
@@ -15738,6 +15774,29 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (HAPTIC_TYPING_INPUT_IDS.has(e.target.id)) triggerHaptic(6);
         });
 
+        // --- Profile lock (Settings > Privacy and safety) ---
+        // Stored on the user's own record so other people's clients can see it (see isProfileLockedFor).
+        const profileLockToggle = document.getElementById('setting-profile-lock-toggle');
+        function syncProfileLockToggle() {
+            const me = auth.currentUser;
+            if (!me || !profileLockToggle) return;
+            profileLockToggle.checked = !!(cachedUsers[me.uid] && cachedUsers[me.uid].profileLocked);
+        }
+        if (profileLockToggle) profileLockToggle.addEventListener('change', async () => {
+            const me = auth.currentUser;
+            const want = profileLockToggle.checked;
+            if (!me) { profileLockToggle.checked = !want; return; }
+            try {
+                await update(ref(database, `users/${me.uid}`), { profileLocked: want });
+                if (cachedUsers[me.uid]) cachedUsers[me.uid].profileLocked = want;
+                notify(want ? 'Profile locked' : 'Profile unlocked');
+            } catch (err) {
+                console.error('profile lock update failed', err);
+                profileLockToggle.checked = !want;
+                notify('Could not update profile lock', 'error');
+            }
+        });
+
         // --- Read Receipts Privacy Setting ---
         const readReceiptsToggle = document.getElementById('setting-read-receipts-toggle');
         readReceiptsToggle.checked = localStorage.getItem('settingReadReceiptsEnabled') !== 'false';
@@ -17432,12 +17491,22 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         let composerLocation = null; // { name, address, lat, lng } picked via the Location bottom sheet, or null
         // A 'followers'-only post is visible to its author and to anyone who follows them
         // (cachedContacts = who *I* follow, which is exactly "am I one of their followers").
+        // True when `uid` has locked their profile and I'm neither them nor someone who follows
+        // them (cachedContacts = who *I* follow, i.e. am I one of their followers).
+        function isProfileLockedFor(uid) {
+            const me = auth.currentUser;
+            if (!uid || !me || uid === me.uid) return false;
+            const u = cachedUsers[uid];
+            return !!(u && u.profileLocked && !cachedContacts[uid]);
+        }
         function canViewPost(post) {
             if (!post) return true;
             const user = auth.currentUser;
             // "Not Interested" hides a person's posts from my own feed only (not a real block —
             // doesn't affect messaging, following, or what THEY can see of me).
             if (post.uid && user && post.uid !== user.uid && cachedNotInterested[post.uid]) return false;
+            // Profile lock: a locked account's posts are for its followers only.
+            if (post.uid && isProfileLockedFor(post.uid)) return false;
             // Legacy subscribers-only posts (feature removed): visible to their author only.
             if (post.visibility === 'subscribers') return !!user && post.uid === user.uid;
             if (post.visibility !== 'followers') return true;
@@ -35042,6 +35111,18 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // a single back press collapsing the whole chain at once.
         let userInfoUidStack = [];
 
+        // Locked profile + I don't follow them: hide posts/media/bio/details and show the notice.
+        // Re-run after Follow/Unfollow (see updateUserInfoFollowButton) so it opens up straight away.
+        function applyProfileLockView(uid) {
+            const locked = isProfileLockedFor(uid);
+            userInfoSheet.classList.toggle('profile-locked-view', locked);
+            const notice = document.getElementById('user-info-lock-notice');
+            if (!notice) return;
+            notice.style.display = locked ? 'flex' : 'none';
+            const text = notice.querySelector('.profile-lock-notice-text');
+            if (text) text.textContent = `This profile is locked. Follow ${(cachedUsers[uid] && cachedUsers[uid].name) || 'them'} to see their posts and details.`;
+        }
+
         function renderUserProfileSheetContent(uid) {
             pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const profile = cachedUsers[uid] || {};
@@ -35052,7 +35133,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             avatarEl.textContent = '';
             avatarEl.setAttribute('data-full', profile.photoURL || DEFAULT_AVATAR_URL);
             applyLiveRingToProfileAvatar();
-            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false);
+            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false) + (profile.profileLocked ? '<span class="profile-lock-badge" title="Locked profile" aria-label="Locked profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>' : '');
             document.getElementById('user-info-username').innerHTML = escapeHtmlForPost(profile.username ? '@' + profile.username : '@—');
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
             const joinedRow = document.getElementById('user-info-joined-row');
@@ -35091,6 +35172,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 followBtn.style.display = isMe ? 'none' : 'flex';
                 updateUserInfoFollowButton(uid);
             }
+            applyProfileLockView(uid);
             initProfileStickyHeader(userInfoSheet, 'user-info-sticky-header', '.tm-profile-actions');
             buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
             buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
@@ -35492,6 +35574,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 followBtnSticky.classList.toggle('btn-primary', !following);
                 followBtnSticky.classList.toggle('btn-outline', following);
             }
+            if (uid === userInfoSheetUid) applyProfileLockView(uid);
         }
 
         document.getElementById('btn-close-user-info-sticky').addEventListener('click', () => {
@@ -45068,6 +45151,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 renderDiscoverGridIfActive();
                 refreshAllFeedPostProfiles();
                 refreshChatListOnlineDots();
+                if (typeof syncProfileLockToggle === 'function') syncProfileLockToggle();
+                if (userInfoSheet.classList.contains('active') && userInfoSheetUid) applyProfileLockView(userInfoSheetUid);
             });
 
             onValue(ref(database, "stories"), (snap) => {

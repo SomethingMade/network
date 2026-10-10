@@ -15255,7 +15255,13 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // Post Markup (see openPostMarkup) owns this back press — it pushed its own history
             // entry on top of whatever was open, so this pop only closes Markup and must not
             // also close the sheet underneath it.
-            if (pmHistoryPushed) return;
+            if (pmHistoryPushed) {
+                // Only defer to Markup if it is really on screen; a stale flag must never
+                // swallow a back press that is meant for the Post view / sheet underneath.
+                const pmOv = document.getElementById('post-markup-overlay');
+                if (pmOv && pmOv.classList.contains('open')) return;
+                pmHistoryPushed = false;
+            }
             if (!sheetOpenStack.length) { skipStaleSheetEntry(); return; }
             // If a hash-driven overlay (image/video/reel viewer, chat, story, etc. — see
             // HASH_OVERLAY_NAMES) is what's actually on top of the history stack right now,
@@ -15276,7 +15282,18 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // the sheet's own entry is now genuinely on top. Checking lastKnownHash there would
             // wrongly defer to handleHashChange — which has nothing to close, since the hash
             // never changes — so the back press appeared to do nothing at all.
-            if (topHistoryEntryKind === 'hash') return;
+            if (topHistoryEntryKind === 'hash') {
+                // Same idea: trust 'hash' only while a hash-driven overlay is genuinely open.
+                const hashOverlayIds = ['chat-view-overlay', 'story-viewer-overlay', 'image-viewer-overlay',
+                    'video-viewer-overlay', 'reel-viewer-overlay', 'view-once-audio-overlay',
+                    'user-info-sheet-overlay', 'post-composer-overlay', 'haba-updates-overlay'];
+                const hashOverlayOpen = hashOverlayIds.some(id => {
+                    const el = document.getElementById(id);
+                    return el && el.classList.contains('active');
+                });
+                if (hashOverlayOpen) return;
+                topHistoryEntryKind = 'sheet'; // stale value, a sheet is what's on top
+            }
             closingSheetViaBackButton = true;
             const topSheetId = sheetOpenStack[sheetOpenStack.length - 1];
             // post-comments-sheet-overlay carries real side effects beyond its own 'active'
@@ -23094,8 +23111,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // mistaking this programmatic pop for a real back press.
             if (pmHistoryPushed) {
                 pmHistoryPushed = false;
-                suppressNextPopstateClose = true;
-                history.back();
+                backSuppressingPopstate();
             }
         }
 
@@ -29110,6 +29126,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 sheetOpenStack.length = 0;
                 topHistoryEntryKind = HASH_OVERLAY_NAMES.includes(lastKnownHash) ? 'hash' : null;
                 suppressNextPopstateClose = true;
+                clearTimeout(suppressPopstateClearTimer);
+                suppressPopstateClearTimer = setTimeout(() => { suppressNextPopstateClose = false; }, 600);
                 history.go(-2);
             } else {
                 // Same reasoning as the open path above: reconcile synchronously so the pushed

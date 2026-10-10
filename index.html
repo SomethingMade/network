@@ -15193,6 +15193,29 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // closed THAT too — e.g. cancelling the App Lock PIN sheet (open on top of Settings) was
         // also closing Settings, since popstate always acted on "whatever's now on top".
         let suppressNextPopstateClose = false;
+        // A programmatic history.back() arms suppressNextPopstateClose so its own popstate isn't
+        // mistaken for a real back press. If that popstate never arrives (nothing to go back to,
+        // or the entry was already consumed), the flag used to stay armed and silently swallow
+        // the NEXT real device-back press — i.e. the person had to press back twice. Auto-disarm
+        // shortly after so a missed popstate can't eat a genuine press.
+        let suppressPopstateClearTimer = null;
+        function backSuppressingPopstate() {
+            suppressNextPopstateClose = true;
+            clearTimeout(suppressPopstateClearTimer);
+            suppressPopstateClearTimer = setTimeout(() => { suppressNextPopstateClose = false; }, 600);
+            history.back();
+        }
+        // After a back press lands on a sheet marker entry ({ sheetNav: [...] }) whose sheets are
+        // NOT open any more, that entry is a leftover (e.g. a duplicate entry for the Post view).
+        // Landing on it makes the next real back press look like it did nothing. Step past it
+        // right away so one press always equals one visible step.
+        function skipStaleSheetEntry() {
+            const nav = history.state && history.state.sheetNav;
+            if (!Array.isArray(nav) || !nav.length) return false;
+            if (nav.some(id => sheetOpenStack.includes(id))) return false;
+            backSuppressingPopstate();
+            return true;
+        }
         function scheduleSheetHistorySync() {
             if (sheetSyncScheduled) return;
             sheetSyncScheduled = true;
@@ -15220,8 +15243,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             } else if (opened.length) {
                 history.pushState({ sheetNav: sheetOpenStack.slice() }, '', location.href);
             } else {
-                suppressNextPopstateClose = true;
-                history.back();
+                backSuppressingPopstate();
             }
         }
         sheetTrackedOverlays.forEach(overlay => {
@@ -15234,7 +15256,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // entry on top of whatever was open, so this pop only closes Markup and must not
             // also close the sheet underneath it.
             if (pmHistoryPushed) return;
-            if (!sheetOpenStack.length) return;
+            if (!sheetOpenStack.length) { skipStaleSheetEntry(); return; }
             // If a hash-driven overlay (image/video/reel viewer, chat, story, etc. — see
             // HASH_OVERLAY_NAMES) is what's actually on top of the history stack right now,
             // that overlay is what this back press is closing, and handleHashChange (which runs
@@ -15296,6 +15318,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             sheetSyncScheduled = false;
             syncSheetHistory();
             closingSheetViaBackButton = false;
+            skipStaleSheetEntry();
         });
 
         // --- LIVE OVERLAY BACK-BUTTON HANDLING ---

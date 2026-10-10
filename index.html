@@ -7061,6 +7061,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 .profile-lock-badge{display:inline-flex;vertical-align:-2px;margin-left:5px;color:var(--fb-sub,#65676B)}
 .profile-lock-badge svg{width:16px;height:16px}
 </style>
+<style id="follow-request-style">
+.activity-request-actions{order:6;display:flex;gap:8px;margin-top:8px}
+.activity-request-actions .activity-follow-btn{margin-top:0}
+.activity-follow-btn.secondary{background:var(--fb-bg,#F0F2F5)!important;color:var(--fb-text,#050505)!important;border:none}
+</style>
 </head>
 <body>
 
@@ -9069,14 +9074,14 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></div>
                     <div class="wa-row-body">
                         <span class="wa-row-title">Lock profile</span>
-                        <span class="wa-row-sub">Only people who follow you can see your posts, bio and details</span>
+                        <span class="wa-row-sub">People must send a request and be accepted to see your posts, bio and details</span>
                     </div>
                     <label class="toggle-switch">
                         <input type="checkbox" id="setting-profile-lock-toggle" aria-label="Lock profile">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <p class="wa-note" style="margin: 6px 8px 0;">Everyone can still see your photo, name, username and follower counts, and can follow or message you. People who already follow you keep full access.</p>
+                <p class="wa-note" style="margin: 6px 8px 0;">Everyone can still see your photo, name, username and follower counts and can message you. New followers need your approval — you'll get a request in Notifications. People who already follow you keep full access.</p>
             </div>
 
             <div class="wa-section">
@@ -17497,7 +17502,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const me = auth.currentUser;
             if (!uid || !me || uid === me.uid) return false;
             const u = cachedUsers[uid];
-            return !!(u && u.profileLocked && !cachedContacts[uid]);
+            return !!(u && u.profileLocked && !cachedContacts[uid] && cachedSentFollowRequests[uid] !== 'accepted');
         }
         function canViewPost(post) {
             if (!post) return true;
@@ -18649,10 +18654,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             btn.disabled = true;
             btn.textContent = 'Following...';
             try {
-                await followUser(uid);
-                btn.textContent = 'Following';
+                const result = await followUser(uid);
+                btn.textContent = result === 'requested' ? 'Requested' : 'Following';
                 btn.classList.add('added');
-                notify('You followed this person');
+                notify(result === 'requested' ? 'Follow request sent' : 'You followed this person');
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = 'Follow';
@@ -18856,13 +18861,14 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     <button type="button" class="search-follow-btn${followedTags.has(t.tag) ? ' following' : ''}" data-action="follow-tag" data-tag="${t.tag}">${followedTags.has(t.tag) ? 'Following' : 'Follow tag'}</button>
                 </div>`) : '';
             const peopleHtml = show('people') ? section('People', people.slice(0, lim.people), p => {
-                const following = !!cachedContacts[p.uid];
+                const fState = followStateFor(p.uid);
+                const following = fState === 'following' || fState === 'requested';
                 const sub = [p.username ? '@' + p.username : '', (interest.authors[p.uid] || 0) > 0 ? 'You like their posts' : ''].filter(Boolean).join(' · ');
                 return `
                 <div class="search-dropdown-item" data-action="person" data-uid="${p.uid}" data-name="${searchAttr(p.name)}" data-avatar="${searchAttr(p.avatarUrl)}">
                     ${buildSearchDropdownAvatar(p.name, p.avatarUrl)}
                     <div class="search-dropdown-text">${highlightSearchMatch(p.name, query)}${sub ? `<span class="search-dropdown-sub">${escapeHtmlForSearch(sub)}</span>` : ''}</div>
-                    <button type="button" class="search-follow-btn${following ? ' following' : ''}" data-action="follow-person" data-uid="${p.uid}">${following ? 'Following' : 'Follow'}</button>
+                    <button type="button" class="search-follow-btn${following ? ' following' : ''}" data-action="follow-person" data-uid="${p.uid}">${followLabelFor(fState)}</button>
                 </div>`;
             }) : '';
             const commsHtml = show('communities') ? section('Communities', comms.slice(0, lim.comms), c => `
@@ -18896,6 +18902,20 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (followPersonBtn) {
                 e.stopPropagation();
                 const uid = followPersonBtn.dataset.uid;
+                const searchFollowState = followStateFor(uid);
+                if (searchFollowState === 'requested') {
+                    delete cachedSentFollowRequests[uid];
+                    renderDiscoverSearchDropdown();
+                    cancelFollowRequest(uid).catch(() => { cachedSentFollowRequests[uid] = 'pending'; renderDiscoverSearchDropdown(); notify('Could not cancel request', 'error'); });
+                    return;
+                }
+                if (searchFollowState === 'locked') {
+                    cachedSentFollowRequests[uid] = 'pending'; // optimistic
+                    renderDiscoverSearchDropdown();
+                    notify('Follow request sent');
+                    followUser(uid).catch((err) => { console.error('follow request failed', err); delete cachedSentFollowRequests[uid]; renderDiscoverSearchDropdown(); notify('Could not send request', 'error'); });
+                    return;
+                }
                 const wasFollowing = !!cachedContacts[uid];
                 if (wasFollowing) delete cachedContacts[uid]; else cachedContacts[uid] = true; // optimistic
                 renderDiscoverSearchDropdown();
@@ -19068,10 +19088,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             btn.disabled = true;
             btn.textContent = 'Following...';
             try {
-                await followUser(uid);
-                btn.textContent = 'Following';
+                const result = await followUser(uid);
+                btn.textContent = result === 'requested' ? 'Requested' : 'Following';
                 btn.classList.add('added');
-                notify('You followed this person');
+                notify(result === 'requested' ? 'Follow request sent' : 'You followed this person');
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = 'Follow';
@@ -25085,6 +25105,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 verified: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 2.2 3.2-.6.9 3.1 3.1.9-.6 3.2L23 12l-2.2 2.4.6 3.2-3.1.9-.9 3.1-3.2-.6L12 23l-2.4-2.2-3.2.6-.9-3.1-3.1-.9.6-3.2L1 12l2.2-2.4-.6-3.2 3.1-.9.9-3.1 3.2.6z"/><path d="M9 12.5l2 2 4-4.5" stroke="#1D9BF0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
             };
             icons.story_like = icons.like;
+            icons.follow_request = icons.follow;
+            icons.follow_accepted = icons.follow;
             icons.story_sticker = icons.milestone_post;
             const icon = icons[type];
             if (!icon) return '';
@@ -25094,6 +25116,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         function notifSentenceFor(notif) {
             const name = notif.fromName || 'Someone';
             if (notif.type === 'follow') return `<b>${name}</b> started following you`;
+            if (notif.type === 'follow_request') return `<b>${name}</b> requested to follow you`;
+            if (notif.type === 'follow_accepted') return `<b>${name}</b> accepted your follow request`;
             if (notif.type === 'like') return `<b>${name}</b> liked your post`;
             if (notif.type === 'repost') return `<b>${name}</b> reposted your post`;
             if (notif.type === 'story_like') return `<b>${name}</b> liked your story`;
@@ -25150,6 +25174,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         function notifMatchesFilter(notif, filter) {
             if (filter === 'all') return true;
             if (filter === 'like') return notif.type === 'like' || notif.type === 'story_like';
+            if (filter === 'follow') return notif.type === 'follow' || notif.type === 'follow_request' || notif.type === 'follow_accepted';
             // "Conversations" = comments and replies; "Mentions" is its own chip. ('comment' is
             // kept as an alias for the old combined bucket.)
             if (filter === 'conversation') return notif.type === 'comment' || notif.type === 'reply';
@@ -25383,6 +25408,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         function activitySubtitleFor(notif) {
             switch (notif.type) {
                 case 'follow': return 'Started following you';
+                case 'follow_request': return 'Requested to follow you';
+                case 'follow_accepted': return 'Accepted your follow request';
                 case 'like': return 'Liked your post';
                 case 'story_like': return 'Liked your story';
                 case 'story_sticker': return 'Reacted to your story';
@@ -25410,12 +25437,13 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const name = isSystem ? 'Haba' : (live.name || (isNotif ? notif.fromName : entry.post.name) || 'Someone');
             const photoURL = live.photoURL || (isNotif ? notif.fromPhotoURL : entry.post.photoURL) || '';
 
-            let sub, text = '', showActions = false, followBack = false;
+            let sub, text = '', showActions = false, followBack = false, followRequest = false;
             if (isNotif) {
                 sub = activitySubtitleFor(notif);
                 text = notif.text || (notif.type === 'verified' ? "You're verified! Your blue badge is live." : '');
                 showActions = !!notif.postId && ['like', 'repost', 'comment', 'reply', 'mention'].includes(notif.type);
                 followBack = notif.type === 'follow' && !!uid && !cachedContacts[uid];
+                followRequest = notif.type === 'follow_request' && !!uid;
                 if (notif.postId && !cachedPosts[notif.postId] && !(notif.postId in notifPostPreviewCache)) {
                     ensureNotifPostPreview(notif.postId); // fire-and-forget; hydrates this row when it lands
                 }
@@ -25455,6 +25483,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                         <div class="activity-sub"></div>
                         ${text ? '<div class="activity-text"></div>' : ''}
                         ${followBack ? `<button type="button" class="activity-follow-btn" data-follow-uid="${uid}">Follow back</button>` : ''}
+                        ${followRequest ? `<div class="activity-request-actions"><button type="button" class="activity-follow-btn" data-request-action="accept" data-request-uid="${uid}">Accept</button><button type="button" class="activity-follow-btn secondary" data-request-action="decline" data-request-uid="${uid}">Decline</button></div>` : ''}
                         ${showActions ? activityActionsHtml(post) : ''}
                     </div>
                     <div class="activity-thumb-col">${(showActions || isNotif) ? ((isNotif && notif.storyKey) ? activityStoryThumbHtml(notif) : activityThumbHtml(post)) : ''}</div>
@@ -25565,13 +25594,31 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             }
         }
 
+        async function handleFollowRequestAction(btn) {
+            const uid = btn.dataset.requestUid;
+            const action = btn.dataset.requestAction;
+            if (!uid) return;
+            const wrap = btn.closest('.activity-request-actions');
+            const buttons = wrap ? wrap.querySelectorAll('button') : [btn];
+            buttons.forEach(b => { b.disabled = true; });
+            try {
+                if (action === 'accept') { await acceptFollowRequest(uid); notify('Request accepted'); }
+                else { await declineFollowRequest(uid); notify('Request declined'); }
+            } catch (err) {
+                console.error('follow request action failed', err);
+                buttons.forEach(b => { b.disabled = false; });
+                notify('Could not update the request', 'error');
+            }
+        }
+
         async function handleActivityFollowBack(btn) {
             const uid = btn.dataset.followUid;
             if (!uid) return;
             btn.disabled = true;
             btn.textContent = 'Following';
             try {
-                await followUser(uid);
+                const result = await followUser(uid);
+                if (result === 'requested') btn.textContent = 'Requested';
             } catch (err) {
                 console.error('follow back failed', err);
                 btn.disabled = false;
@@ -25687,7 +25734,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 openNotificationPostView(notif.postId);
             } else if (notif.type === 'job_application' && notif.jobId) {
                 openJobApplicantsSheet(notif.jobId);
-            } else if (notif.type === 'follow' && notif.fromUid) {
+            } else if ((notif.type === 'follow' || notif.type === 'follow_request' || notif.type === 'follow_accepted') && notif.fromUid) {
                 openUserProfileSheet(notif.fromUid);
             }
         }
@@ -27310,6 +27357,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         });
         notifListEl.addEventListener('click', (e) => {
             if (!notifSelectionMode) {
+                const requestBtn = e.target.closest('[data-request-action]');
+                if (requestBtn) { e.stopPropagation(); handleFollowRequestAction(requestBtn); return; }
                 const followBtn = e.target.closest('.activity-follow-btn');
                 if (followBtn) { e.stopPropagation(); handleActivityFollowBack(followBtn); return; }
                 const actBtn = e.target.closest('.activity-act-btn');
@@ -27464,10 +27513,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             btn.disabled = true;
             btn.textContent = 'Following...';
             try {
-                await followUser(uid);
-                btn.textContent = 'Following';
+                const result = await followUser(uid);
+                btn.textContent = result === 'requested' ? 'Requested' : 'Following';
                 btn.classList.add('added');
-                notify('You followed this person');
+                notify(result === 'requested' ? 'Follow request sent' : 'You followed this person');
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = 'Follow';
@@ -30479,7 +30528,99 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         //   followers/$targetUid { ".read": "auth != null" }  (lets any signed-in user view someone's followers list)
         //   contacts/$uid { ".read": "auth != null" }  (lets any signed-in user view someone's following list)
         //   users/$uid/followersCount { ".write": "auth != null" }  (written by OTHER users on follow/unfollow)
+        // --- Follow requests for locked profiles ---
+        // Locked account + I don't follow them -> Follow becomes a request. Data:
+        //   followRequests/{target}/{requester}   = { ts }       (target reads these)
+        //   sentFollowRequests/{requester}/{target} = 'pending' | 'accepted'
+        //   notifications/{target}/follow_request_{requester}   (the Accept / Decline row)
+        // On Accept the target only flips the sent entry to 'accepted'; the requester's own app
+        // then performs the real follow (so each person only writes their own contacts node).
+        function followStateFor(uid) {
+            if (cachedContacts[uid] || cachedSentFollowRequests[uid] === 'accepted') return 'following';
+            if (cachedSentFollowRequests[uid] === 'pending') return 'requested';
+            const u = cachedUsers[uid];
+            return (u && u.profileLocked) ? 'locked' : 'none';
+        }
+        function followLabelFor(state) {
+            return state === 'following' ? 'Following' : state === 'requested' ? 'Requested' : state === 'locked' ? 'Request' : 'Follow';
+        }
+        function followRequestNotifId(requesterUid) { return `follow_request_${requesterUid}`; }
+
+        async function sendFollowRequest(targetUid) {
+            const me = auth.currentUser;
+            if (!me || !targetUid || targetUid === me.uid) return;
+            if (cachedSentFollowRequests[targetUid] === 'pending') return;
+            cachedSentFollowRequests[targetUid] = 'pending'; // optimistic
+            try {
+                await update(ref(database), {
+                    [`followRequests/${targetUid}/${me.uid}`]: { ts: Date.now() },
+                    [`sentFollowRequests/${me.uid}/${targetUid}`]: 'pending'
+                });
+            } catch (err) { delete cachedSentFollowRequests[targetUid]; throw err; }
+            try {
+                const p = cachedUsers[me.uid] || {};
+                await set(ref(database, `notifications/${targetUid}/${followRequestNotifId(me.uid)}`), {
+                    type: 'follow_request', fromUid: me.uid,
+                    fromName: p.name || me.displayName || 'Someone',
+                    fromPhotoURL: p.photoURL || me.photoURL || '',
+                    text: '', postId: null, commentId: null, jobId: null,
+                    timestamp: serverTimestamp(), read: false
+                });
+            } catch (err) { console.error('follow request notification failed', err); }
+        }
+        async function cancelFollowRequest(targetUid) {
+            const me = auth.currentUser;
+            if (!me || !targetUid) return;
+            delete cachedSentFollowRequests[targetUid];
+            await update(ref(database), {
+                [`followRequests/${targetUid}/${me.uid}`]: null,
+                [`sentFollowRequests/${me.uid}/${targetUid}`]: null
+            });
+            try { await remove(ref(database, `notifications/${targetUid}/${followRequestNotifId(me.uid)}`)); } catch (err) { /* best effort */ }
+        }
+        async function acceptFollowRequest(requesterUid) {
+            const me = auth.currentUser;
+            if (!me || !requesterUid) return;
+            await update(ref(database), {
+                [`followRequests/${me.uid}/${requesterUid}`]: null,
+                [`sentFollowRequests/${requesterUid}/${me.uid}`]: 'accepted'
+            });
+            try { await remove(ref(database, `notifications/${me.uid}/${followRequestNotifId(requesterUid)}`)); } catch (err) { /* best effort */ }
+            createNotification(requesterUid, { type: 'follow_accepted' });
+        }
+        async function declineFollowRequest(requesterUid) {
+            const me = auth.currentUser;
+            if (!me || !requesterUid) return;
+            await update(ref(database), {
+                [`followRequests/${me.uid}/${requesterUid}`]: null,
+                [`sentFollowRequests/${requesterUid}/${me.uid}`]: null
+            });
+            try { await remove(ref(database, `notifications/${me.uid}/${followRequestNotifId(requesterUid)}`)); } catch (err) { /* best effort */ }
+        }
+        // Requester side: once a request shows as accepted, do the real follow and clear the entry.
+        const followCompletionInFlight = new Set();
+        async function completeAcceptedFollow(targetUid) {
+            const me = auth.currentUser;
+            if (!me || followCompletionInFlight.has(targetUid)) return;
+            followCompletionInFlight.add(targetUid);
+            try {
+                if (!cachedContacts[targetUid]) await followUserDirect(targetUid);
+                await remove(ref(database, `sentFollowRequests/${me.uid}/${targetUid}`));
+            } catch (err) {
+                console.error('completing accepted follow failed', err);
+            } finally { followCompletionInFlight.delete(targetUid); }
+        }
+
+        // Returns 'requested' when the target is locked (a request was sent instead of following).
         async function followUser(targetUid) {
+            const me = auth.currentUser;
+            if (!me || !targetUid || targetUid === me.uid) return;
+            if (isProfileLockedFor(targetUid)) { await sendFollowRequest(targetUid); return 'requested'; }
+            await followUserDirect(targetUid);
+            return 'followed';
+        }
+
+        async function followUserDirect(targetUid) {
             const user = auth.currentUser;
             if (!user || !targetUid || targetUid === user.uid) return;
             const updates = {};
@@ -35115,12 +35256,21 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // Re-run after Follow/Unfollow (see updateUserInfoFollowButton) so it opens up straight away.
         function applyProfileLockView(uid) {
             const locked = isProfileLockedFor(uid);
+            const wasLockedView = userInfoSheet.classList.contains('profile-locked-view');
             userInfoSheet.classList.toggle('profile-locked-view', locked);
+            if (wasLockedView && !locked) {
+                // Just got access (request accepted): fill in the posts that were held back.
+                buildProfilePostsList(document.getElementById('user-info-posts-list'), uid);
+                buildProfileMediaGrid(document.getElementById('user-info-media-grid'), uid);
+            }
             const notice = document.getElementById('user-info-lock-notice');
             if (!notice) return;
             notice.style.display = locked ? 'flex' : 'none';
             const text = notice.querySelector('.profile-lock-notice-text');
-            if (text) text.textContent = `This profile is locked. Follow ${(cachedUsers[uid] && cachedUsers[uid].name) || 'them'} to see their posts and details.`;
+            const lockedName = (cachedUsers[uid] && cachedUsers[uid].name) || 'them';
+            if (text) text.textContent = cachedSentFollowRequests[uid] === 'pending'
+                ? `Request sent. You'll see ${lockedName}'s posts and details once they accept.`
+                : `This profile is locked. Send ${lockedName} a follow request to see their posts and details.`;
         }
 
         function renderUserProfileSheetContent(uid) {
@@ -35556,13 +35706,17 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 if (followBtnSticky) followBtnSticky.style.display = 'none';
                 return;
             }
-            const following = !!cachedContacts[uid];
+            const followState = followStateFor(uid);
+            const following = followState === 'following';
+            const requested = followState === 'requested';
+            const outline = following || requested;
+            const followLabel = followLabelFor(followState);
             followBtn.style.display = 'flex';
-            followBtnText.textContent = following ? 'Following' : 'Follow';
-            followBtn.classList.toggle('btn-primary', !following);
-            followBtn.classList.toggle('btn-outline', following);
+            followBtnText.textContent = followLabel;
+            followBtn.classList.toggle('btn-primary', !outline);
+            followBtn.classList.toggle('btn-outline', outline);
             if (followBtnIcon) {
-                followBtnIcon.innerHTML = following
+                followBtnIcon.innerHTML = (following || requested)
                     ? '<polyline points="20 6 9 17 4 12"></polyline>'
                     : '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line>';
             }
@@ -35570,9 +35724,9 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             // of sync with the real one it's a compact stand-in for.
             if (followBtnSticky && followBtnStickyText) {
                 followBtnSticky.style.display = 'flex';
-                followBtnStickyText.textContent = following ? 'Following' : 'Follow';
-                followBtnSticky.classList.toggle('btn-primary', !following);
-                followBtnSticky.classList.toggle('btn-outline', following);
+                followBtnStickyText.textContent = followLabel;
+                followBtnSticky.classList.toggle('btn-primary', !outline);
+                followBtnSticky.classList.toggle('btn-outline', outline);
             }
             if (uid === userInfoSheetUid) applyProfileLockView(uid);
         }
@@ -35615,20 +35769,27 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const followBtn = document.getElementById('btn-user-info-follow');
             const followBtnText = document.getElementById('btn-user-info-follow-text');
             const wasFollowing = !!cachedContacts[uid];
+            const wasRequested = followStateFor(uid) === 'requested';
             followBtn.disabled = true;
             try {
-                if (wasFollowing) {
+                let countDelta = 0;
+                if (wasRequested) {
+                    await cancelFollowRequest(uid);
+                    notify('Request cancelled');
+                } else if (wasFollowing) {
                     await unfollowUser(uid);
                     notify('Unfollowed');
+                    countDelta = -1;
                 } else {
-                    await followUser(uid);
-                    notify("You're now following them!");
+                    const result = await followUser(uid);
+                    if (result === 'requested') notify('Follow request sent');
+                    else { notify("You're now following them!"); countDelta = 1; }
                 }
                 updateUserInfoFollowButton(uid);
                 const followersCountEl = document.getElementById('user-info-followers-count');
-                if (followersCountEl) {
+                if (followersCountEl && countDelta) {
                     const current = parseInt(followersCountEl.textContent, 10) || 0;
-                    followersCountEl.textContent = Math.max(0, current + (wasFollowing ? -1 : 1));
+                    followersCountEl.textContent = Math.max(0, current + countDelta);
                 }
             } catch (err) {
                 notify(wasFollowing ? 'Could not unfollow this person' : 'Could not follow this person', 'error');
@@ -35803,18 +35964,30 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const uid = btn.dataset.uid;
             if (!uid) return;
             const wasFollowing = !!cachedContacts[uid];
+            const wasRequested = followStateFor(uid) === 'requested';
             btn.disabled = true;
-            btn.textContent = wasFollowing ? 'Unfollowing...' : 'Following...';
+            btn.textContent = (wasFollowing || wasRequested) ? 'Updating...' : 'Following...';
             try {
-                if (wasFollowing) {
+                if (wasRequested) {
+                    await cancelFollowRequest(uid);
+                    btn.textContent = 'Request';
+                    btn.classList.remove('added');
+                    notify('Request cancelled');
+                } else if (wasFollowing) {
                     await unfollowUser(uid);
                     btn.textContent = 'Follow';
                     btn.classList.remove('added');
                 } else {
-                    await followUser(uid);
-                    btn.textContent = 'Following';
-                    btn.classList.add('added');
-                    notify("You're now following them!");
+                    const result = await followUser(uid);
+                    if (result === 'requested') {
+                        btn.textContent = 'Requested';
+                        btn.classList.add('added');
+                        notify('Follow request sent');
+                    } else {
+                        btn.textContent = 'Following';
+                        btn.classList.add('added');
+                        notify("You're now following them!");
+                    }
                 }
             } catch (err) {
                 btn.textContent = wasFollowing ? 'Following' : 'Follow';
@@ -38200,6 +38373,9 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // cachedContacts = who I follow (contacts/{me}). cachedFollowers = who follows me
         // (followers/{me}) — the reverse index kept in sync by followUser/unfollowUser.
         let cachedContacts = {};
+        // My outgoing follow requests to locked profiles: targetUid -> 'pending' | 'accepted'
+        // (sentFollowRequests/{me}). 'accepted' = they approved; I finish the follow on my side.
+        let cachedSentFollowRequests = {};
         let cachedFollowers = {};
         let cachedBlocked = {};
         let cachedNotInterested = {}; // authorUid -> true, from not_interested/{me} — private feed hide list
@@ -39394,6 +39570,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 notifListenersAttached = false;
                 emptyOlderFetchCount = 0;
                 cachedNotifications = {};
+                cachedSentFollowRequests = {};
                 updateNotifBellUI();
                 jobsListenersAttached = false;
                 cachedJobs = {};
@@ -45271,8 +45448,16 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 renderGroupInvites();
             });
 
+            onValue(ref(database, `sentFollowRequests/${user.uid}`), (snap) => {
+                cachedSentFollowRequests = snap.exists() ? snap.val() : {};
+                Object.entries(cachedSentFollowRequests).forEach(([targetUid, state]) => { if (state === 'accepted') completeAcceptedFollow(targetUid); });
+                if (userInfoSheet.classList.contains('active') && userInfoSheetUid) updateUserInfoFollowButton(userInfoSheetUid);
+                renderDiscoverGridIfActive();
+            }, (err) => console.warn('sentFollowRequests listener', err && err.message));
+
             onValue(ref(database, `contacts/${user.uid}`), (snap) => {
                 cachedContacts = snap.exists() ? snap.val() : {};
+                if (userInfoSheet.classList.contains('active') && userInfoSheetUid) updateUserInfoFollowButton(userInfoSheetUid);
                 renderContactsLists();
                 renderChatRequests();
                 renderDiscoverGridIfActive();

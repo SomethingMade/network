@@ -7034,6 +7034,18 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 #post-options-sheet-overlay .msg-option-btn.with-icon[style*="display: block"],#community-post-options-sheet-overlay .msg-option-btn.with-icon[style*="display:block"],#community-post-options-sheet-overlay .msg-option-btn.with-icon[style*="display: block"],#post-options-sheet-overlay .msg-option-btn.with-icon[style*="display:block"]{display:flex!important;flex-direction:row;align-items:center}
 #post-options-sheet-overlay .msg-option-btn.with-icon span,#community-post-options-sheet-overlay .msg-option-btn.with-icon span{display:block;flex:1;min-width:0}
 </style>
+<style id="search-redesign-style">
+/* Search tab redesign: filter chips, tag + community results, Follow buttons, inline Recent */
+.search-filter-row{display:flex;gap:8px;overflow-x:auto;padding:4px 10px 10px;position:sticky;top:0;z-index:2;background:var(--fb-card,#fff);scrollbar-width:none}
+.search-filter-row::-webkit-scrollbar{display:none}
+.search-filter-chip{flex:0 0 auto;border:0;border-radius:999px;padding:8px 14px;min-height:36px;font:inherit;font-size:14px;font-weight:600;background:var(--fb-bg,#F0F2F5);color:var(--fb-text,#050505);cursor:pointer}
+.search-filter-chip.active{background:var(--fb-blue,#111);color:var(--fb-card,#fff)}
+.search-follow-btn{flex:none;border:0;border-radius:18px;padding:8px 16px;min-height:36px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;background:var(--fb-blue,#111);color:var(--fb-card,#fff)}
+.search-follow-btn.following{background:var(--fb-bg,#F0F2F5);color:var(--fb-text,#050505)}
+.search-dropdown-sub{display:block;font-size:12.5px;color:var(--fb-sub,#65676B);overflow:hidden;text-overflow:ellipsis}
+.search-tag-tile{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;background:var(--fb-bg,#F0F2F5);color:var(--fb-text,#050505)}
+#search-recent-section{background:var(--fb-card,#fff);padding:4px 6px 6px;margin-bottom:8px}
+</style>
 </head>
 <body>
 
@@ -10708,7 +10720,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                         <div class="search-tab-header-row">
                             <div class="search-box search-tab-box">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                    <input type="search" id="search-discover" placeholder="Search by name or @handle" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
+                                    <input type="search" id="search-discover" placeholder="Search people, posts, #tags" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
                             </div>
                         </div>
                     </div>
@@ -10722,6 +10734,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                             <div class="ads-banner-scroll" id="ads-banner-scroll"></div>
                             <div class="ads-banner-dots" id="ads-banner-dots"></div>
                         </div>
+                        <div id="search-recent-section" style="display:none;"></div>
                         <!-- X-style Explore tabs — live in the Search tab, right below the search
                              bar and suggested people. -->
                         <div class="explore-tabs-bar" id="explore-tabs-bar">
@@ -18187,6 +18200,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // nothing from an earlier visit lingers stale; leaving clears the query, like the old
         // overlay did on close, so the tab always opens fresh.
         function onSearchTabEntered() {
+            if (typeof renderSearchRecent === 'function') { try { renderSearchRecent(); } catch (e) { /* input not ready yet */ } }
             renderExploreTrending();
             renderExplorePeople();
             renderAdsBannerRow();
@@ -18671,69 +18685,170 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 posts.push({ postId, caption: post.text, authorName: author.name || post.name || 'Someone', avatarUrl: author.photoURL || '', thumbUrl });
             });
 
-            return { people: people.slice(0, 6), posts: posts.slice(0, 20) };
+            return { people: people.slice(0, 20), posts: posts.slice(0, 40) };
         }
         function hideDiscoverSearchDropdown() {
             discoverSearchDropdownEl.classList.remove('active');
         }
+        // --- Search redesign: filters (Top / People / Posts / Communities / Tags) ---
+        let searchActiveFilter = 'all';
+        const SEARCH_FILTERS = [['all', 'Top'], ['people', 'People'], ['posts', 'Posts'], ['communities', 'Communities'], ['tags', 'Tags']];
+        const FOLLOWED_TAGS_KEY = 'habaFollowedTags'; // (getFollowedTags below reads the same literal key so it is safe before this line runs)
+        function getFollowedTags() {
+            try { const a = JSON.parse(localStorage.getItem('habaFollowedTags') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+        }
+        function toggleFollowedTag(tag) {
+            const tags = getFollowedTags(); const i = tags.indexOf(tag);
+            if (i >= 0) tags.splice(i, 1); else tags.unshift(tag);
+            try { localStorage.setItem(FOLLOWED_TAGS_KEY, JSON.stringify(tags.slice(0, 30))); } catch (e) { /* storage unavailable */ }
+        }
+        const searchAttr = (s) => escapeHtmlForSearch(s).replace(/"/g, '&quot;');
+        function getSearchTags(query) {
+            const q = query.trim().toLowerCase().replace(/^#/, '');
+            if (!q) return [];
+            const counts = {};
+            Object.values(cachedPosts || {}).forEach((p) => {
+                if (!p || !p.text) return;
+                new Set(extractHashtags(p.text)).forEach((t) => { if (t.includes(q)) counts[t] = (counts[t] || 0) + 1; });
+            });
+            return Object.entries(counts).map(([tag, count]) => ({ tag, count }))
+                .sort((a, b) => (Number(b.tag.startsWith(q)) - Number(a.tag.startsWith(q))) || (b.count - a.count)).slice(0, 20);
+        }
+        function getSearchCommunities(query) {
+            const q = query.trim().toLowerCase().replace(/^#/, '');
+            if (!q) return [];
+            const me = auth.currentUser && auth.currentUser.uid;
+            const out = [];
+            Object.entries(cachedCommunities || {}).forEach(([gid, g]) => {
+                if (!g || !g.name || !g.name.toLowerCase().includes(q)) return;
+                const isMember = !!(me && g.members && g.members[me]);
+                if (g.isPublic === false && !isMember) return;
+                out.push({ gid, name: g.name, category: g.category || 'General', members: Object.keys(g.members || {}).length, isMember });
+            });
+            return out.sort((a, b) => (Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q))) || (b.members - a.members)).slice(0, 20);
+        }
+        function renderSearchRecent() {
+            const el = document.getElementById('search-recent-section');
+            if (!el) return;
+            const history = getDiscoverSearchHistory();
+            if (searchDiscoverInput.value.trim() || !history.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            el.style.display = '';
+            el.innerHTML = `
+                <div class="chat-search-dropdown-label"><span>Recent</span><span class="clear-history-btn" data-action="clear-history">Clear all</span></div>
+                ${history.map(term => `
+                    <div class="search-dropdown-item" data-action="history" data-term="${searchAttr(term)}">
+                        <div class="search-dropdown-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></div>
+                        <div class="search-dropdown-text">${escapeHtmlForSearch(term)}</div>
+                        <div class="search-dropdown-remove" data-action="remove-history" data-term="${searchAttr(term)}" role="button" aria-label="Remove">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </div>
+                    </div>`).join('')}`;
+        }
+        const searchRecentEl = document.getElementById('search-recent-section');
+        if (searchRecentEl) searchRecentEl.addEventListener('click', (e) => {
+            if (e.target.closest('[data-action="clear-history"]')) { saveDiscoverSearchHistory([]); renderSearchRecent(); return; }
+            const rm = e.target.closest('[data-action="remove-history"]');
+            if (rm) { removeDiscoverSearchHistory(rm.dataset.term); renderSearchRecent(); return; }
+            const item = e.target.closest('[data-action="history"]');
+            if (item) {
+                searchDiscoverInput.value = item.dataset.term;
+                addDiscoverSearchHistory(item.dataset.term);
+                searchDiscoverInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+
         function renderDiscoverSearchDropdown() {
             const query = searchDiscoverInput.value.trim();
-
-            if (!query) {
-                const history = getDiscoverSearchHistory();
-                if (!history.length) { hideDiscoverSearchDropdown(); return; }
-                discoverSearchDropdownEl.innerHTML = `
-                    <div class="chat-search-dropdown-label">
-                        <span>Recent searches</span>
-                        <span class="clear-history-btn" data-action="clear-history">Clear all</span>
-                    </div>
-                    ${history.map(term => `
-                        <div class="search-dropdown-item" data-action="history" data-term="${escapeHtmlForSearch(term)}">
-                            <div class="search-dropdown-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg></div>
-                            <div class="search-dropdown-text">${escapeHtmlForSearch(term)}</div>
-                            <div class="search-dropdown-remove" data-action="remove-history" data-term="${escapeHtmlForSearch(term)}">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </div>
-                        </div>
-                    `).join('')}
-                `;
-                discoverSearchDropdownEl.classList.add('active');
-                return;
-            }
+            renderSearchRecent();
+            // Nothing typed: Recent now lives inline on the page (above Trending), so no popup.
+            if (!query) { searchActiveFilter = 'all'; hideDiscoverSearchDropdown(); return; }
 
             const { people, posts } = getGlobalSearchResults(query);
-            if (!people.length && !posts.length) {
-                discoverSearchDropdownEl.innerHTML = `<div class="chat-search-dropdown-empty">No results for "${escapeHtmlForSearch(query)}"</div>`;
-                discoverSearchDropdownEl.classList.add('active');
-                return;
-            }
+            const tags = getSearchTags(query);
+            const comms = getSearchCommunities(query);
+            const f = searchActiveFilter;
+            const lim = f === 'all' ? { people: 3, comms: 2, tags: 2, posts: 6 } : { people: 20, comms: 20, tags: 20, posts: 40 };
+            const show = (k) => f === 'all' || f === k;
+            const me = auth.currentUser && auth.currentUser.uid;
+            const interest = me ? buildActivityInterestProfile(me) : { authors: {} };
+            const followedTags = new Set(getFollowedTags());
+
+            const chips = `<div class="search-filter-row" role="tablist">${SEARCH_FILTERS.map(([k, label]) =>
+                `<button type="button" class="search-filter-chip${f === k ? ' active' : ''}" data-action="filter" data-filter="${k}" role="tab" aria-selected="${f === k}">${label}</button>`).join('')}</div>`;
 
             const section = (label, items, renderItem) => !items.length ? '' : `
                 <div class="chat-search-dropdown-label"><span>${label}</span></div>
-                ${items.map(renderItem).join('')}
-            `;
+                ${items.map(renderItem).join('')}`;
 
-            discoverSearchDropdownEl.innerHTML =
-                section('People', people, p => `
-                    <div class="search-dropdown-item" data-action="person" data-uid="${p.uid}" data-name="${escapeHtmlForSearch(p.name)}" data-avatar="${p.avatarUrl}">
-                        ${buildSearchDropdownAvatar(p.name, p.avatarUrl)}
-                        <div class="search-dropdown-text">${highlightSearchMatch(p.name, query)}${p.username ? ` <span style="color:var(--text-secondary);">@${escapeHtmlForSearch(p.username)}</span>` : ''}</div>
+            const tagsHtml = show('tags') ? section('Tags', tags.slice(0, lim.tags), t => `
+                <div class="search-dropdown-item" data-action="tag" data-tag="${t.tag}">
+                    <div class="search-tag-tile">#</div>
+                    <div class="search-dropdown-text">#${highlightSearchMatch(t.tag, query.replace(/^#/, ''))}<span class="search-dropdown-sub">Tag · ${t.count} post${t.count === 1 ? '' : 's'}</span></div>
+                    <button type="button" class="search-follow-btn${followedTags.has(t.tag) ? ' following' : ''}" data-action="follow-tag" data-tag="${t.tag}">${followedTags.has(t.tag) ? 'Following' : 'Follow tag'}</button>
+                </div>`) : '';
+            const peopleHtml = show('people') ? section('People', people.slice(0, lim.people), p => {
+                const following = !!cachedContacts[p.uid];
+                const sub = [p.username ? '@' + p.username : '', (interest.authors[p.uid] || 0) > 0 ? 'You like their posts' : ''].filter(Boolean).join(' · ');
+                return `
+                <div class="search-dropdown-item" data-action="person" data-uid="${p.uid}" data-name="${searchAttr(p.name)}" data-avatar="${searchAttr(p.avatarUrl)}">
+                    ${buildSearchDropdownAvatar(p.name, p.avatarUrl)}
+                    <div class="search-dropdown-text">${highlightSearchMatch(p.name, query)}${sub ? `<span class="search-dropdown-sub">${escapeHtmlForSearch(sub)}</span>` : ''}</div>
+                    <button type="button" class="search-follow-btn${following ? ' following' : ''}" data-action="follow-person" data-uid="${p.uid}">${following ? 'Following' : 'Follow'}</button>
+                </div>`;
+            }) : '';
+            const commsHtml = show('communities') ? section('Communities', comms.slice(0, lim.comms), c => `
+                <div class="search-dropdown-item" data-action="community" data-gid="${c.gid}" data-name="${searchAttr(c.name)}">
+                    <div class="search-tag-tile">${escapeHtmlForSearch(c.name.charAt(0).toUpperCase())}</div>
+                    <div class="search-dropdown-text">${highlightSearchMatch(c.name, query.replace(/^#/, ''))}<span class="search-dropdown-sub">${escapeHtmlForSearch(c.category)} · ${c.members} member${c.members === 1 ? '' : 's'}${c.isMember ? ' · Joined' : ''}</span></div>
+                </div>`) : '';
+            const postsHtml = show('posts') ? section('Posts', posts.slice(0, lim.posts), ps => `
+                <div class="search-post-card" data-action="post" data-post-id="${ps.postId}">
+                    ${buildSearchDropdownAvatar(ps.authorName, ps.avatarUrl)}
+                    <div class="search-post-card-body">
+                        <div class="search-post-card-author">${escapeHtmlForSearch(ps.authorName)}</div>
+                        <div class="search-post-card-caption">${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
                     </div>
-                `) +
-                section('Posts', posts, ps => `
-                    <div class="search-post-card" data-action="post" data-post-id="${ps.postId}">
-                        ${buildSearchDropdownAvatar(ps.authorName, ps.avatarUrl)}
-                        <div class="search-post-card-body">
-                            <div class="search-post-card-author">${escapeHtmlForSearch(ps.authorName)}</div>
-                            <div class="search-post-card-caption">${highlightSearchMatch(truncateAroundMatch(ps.caption, query), query)}</div>
-                        </div>
-                        ${ps.thumbUrl ? `<div class="search-post-card-thumb" style="background-image:url('${ps.thumbUrl}')"></div>` : ''}
-                    </div>
-                `);
+                    ${ps.thumbUrl ? `<div class="search-post-card-thumb" style="background-image:url('${ps.thumbUrl}')"></div>` : ''}
+                </div>`) : '';
+
+            const body = tagsHtml + peopleHtml + commsHtml + postsHtml;
+            discoverSearchDropdownEl.innerHTML = chips + (body || `<div class="chat-search-dropdown-empty">No results for "${escapeHtmlForSearch(query)}"</div>`);
             discoverSearchDropdownEl.classList.add('active');
         }
 
         discoverSearchDropdownEl.addEventListener('click', (e) => {
+            const filterChip = e.target.closest('[data-action="filter"]');
+            if (filterChip) { searchActiveFilter = filterChip.dataset.filter; renderDiscoverSearchDropdown(); return; }
+
+            const followTagBtn = e.target.closest('[data-action="follow-tag"]');
+            if (followTagBtn) { e.stopPropagation(); toggleFollowedTag(followTagBtn.dataset.tag); renderDiscoverSearchDropdown(); return; }
+
+            const followPersonBtn = e.target.closest('[data-action="follow-person"]');
+            if (followPersonBtn) {
+                e.stopPropagation();
+                const uid = followPersonBtn.dataset.uid;
+                const wasFollowing = !!cachedContacts[uid];
+                if (wasFollowing) delete cachedContacts[uid]; else cachedContacts[uid] = true; // optimistic
+                renderDiscoverSearchDropdown();
+                (wasFollowing ? unfollowUser(uid) : followUser(uid)).catch((err) => {
+                    console.error('search follow toggle failed', err);
+                    if (wasFollowing) cachedContacts[uid] = true; else delete cachedContacts[uid];
+                    renderDiscoverSearchDropdown();
+                    notify('Could not update follow', 'error');
+                });
+                return;
+            }
+
+            const tagItem = e.target.closest('[data-action="tag"]');
+            if (tagItem) {
+                searchDiscoverInput.value = '#' + tagItem.dataset.tag;
+                searchActiveFilter = 'posts';
+                addDiscoverSearchHistory('#' + tagItem.dataset.tag);
+                renderDiscoverGrid(searchDiscoverInput.value);
+                renderDiscoverSearchDropdown();
+                return;
+            }
+
             const clearBtn = e.target.closest('[data-action="clear-history"]');
             if (clearBtn) { saveDiscoverSearchHistory([]); renderDiscoverSearchDropdown(); return; }
 
@@ -18754,7 +18869,18 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 searchDiscoverInput.value = '';
                 renderDiscoverGrid('');
                 searchDiscoverInput.blur();
+                renderSearchRecent();
             };
+
+            const communityItem = e.target.closest('[data-action="community"]');
+            if (communityItem) {
+                addDiscoverSearchHistory(communityItem.dataset.name);
+                resetSearchBox();
+                const searchOverlay = document.getElementById('search-fullscreen-overlay');
+                if (searchOverlay) searchOverlay.classList.remove('active');
+                openGroupChatView(communityItem.dataset.gid);
+                return;
+            }
 
             const personItem = e.target.closest('[data-action="person"]');
             if (personItem) {
@@ -25074,10 +25200,51 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // already-loaded cachedPosts, so it costs no extra reads.
         const ACTIVITY_DAY_MS = 24 * 60 * 60 * 1000;
         const ACTIVITY_SUGGESTION_LIMIT = 8;
+        const ACTIVITY_MAX_PER_AUTHOR = 2;
+        const ACTIVITY_STOPWORDS = new Set(('that this with from have your about just like they them were been will what when where which their there would could should into over than then also more some very much only your yours our ours its it\'s dont didnt cant wont for and the are but not you all can had her him his she who why how was out get got has too any one two new now').split(' '));
+
+        // Learns what the person likes from signals already sitting in memory (no extra reads):
+        // posts they liked / reposted (strongest), and their own posts (hashtags only). Returns
+        // weighted hashtags, authors, keywords and a text-vs-media lean. Empty on a brand-new
+        // account, in which case ranking falls back to follows + popularity.
+        function buildActivityInterestProfile(me) {
+            const tags = {}, authors = {}, words = {};
+            let mediaSignals = 0, textSignals = 0;
+            const bump = (map, key, w) => { if (key) map[key] = (map[key] || 0) + w; };
+            Object.values(cachedPosts).forEach((p) => {
+                if (!p) return;
+                const liked = !!(p.reactions && p.reactions[me]);
+                const reposted = !!(p.reposts && p.reposts[me]);
+                const mine = p.uid === me;
+                if (!liked && !reposted && !mine) return;
+                const w = (reposted ? 4 : 0) + (liked ? 3 : 0) + (mine ? 2 : 0);
+                extractHashtags(p.text).forEach((t) => bump(tags, t, w));
+                if (!mine) {
+                    bump(authors, p.uid, w);
+                    if (activityThumbUrlFor(p)) mediaSignals += w; else textSignals += w;
+                    (String(p.text || '').toLowerCase().match(/[a-z]{4,}/g) || [])
+                        .filter((t) => !ACTIVITY_STOPWORDS.has(t))
+                        .forEach((t) => bump(words, t, 1));
+                }
+            });
+            getFollowedTags().forEach((t) => bump(tags, t, 6)); // tags they chose to follow in Search
+            // Keywords only count once they recur, so one-off words don't skew the feed.
+            Object.keys(words).forEach((t) => { if (words[t] < 2) delete words[t]; });
+            const total = mediaSignals + textSignals;
+            return { tags, authors, words, mediaLean: total ? mediaSignals / total : 0.5, hasSignal: Object.keys(tags).length + Object.keys(authors).length > 0 };
+        }
+
+        // Posts worth surfacing in Activity, ranked for THIS person. Candidates are recent posts
+        // that aren't yours, aren't already liked, aren't from blocked / "Not interested" authors
+        // and aren't already shown as a notification. Score blends: popularity, following the
+        // author, how much they've engaged with that author before, hashtag / keyword overlap with
+        // what they like, and a nudge toward the media type they tend to like — all decayed by age.
+        // Each result carries a `reason` so the row says why it's there.
         function getActivitySuggestions(excludePostIds) {
             const me = auth.currentUser ? auth.currentUser.uid : null;
             if (!me) return [];
             const now = Date.now();
+            const profile = buildActivityInterestProfile(me);
             const scored = [];
             Object.entries(cachedPosts).forEach(([postId, p]) => {
                 if (!p || excludePostIds.has(postId)) return;
@@ -25088,15 +25255,60 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 if (p.reactions && p.reactions[me]) return;
                 const hasMedia = !!activityThumbUrlFor(p);
                 if (!p.text && !hasMedia) return;
+
                 const followed = !!cachedContacts[p.uid];
                 const engagement = (p.likeCount || 0) + 2 * (p.commentCount || 0) + 3 * (p.repostCount || 0);
-                if (!followed && engagement < 1) return;
+
+                // Personal-interest components
+                let bestTag = '', bestTagW = 0, tagScore = 0;
+                extractHashtags(p.text).forEach((t) => {
+                    const w = profile.tags[t] || 0;
+                    if (w) { tagScore += w; if (w > bestTagW) { bestTagW = w; bestTag = t; } }
+                });
+                tagScore = Math.min(tagScore, 9);
+                const authorScore = Math.min((profile.authors[p.uid] || 0) * 1.5, 8);
+                let wordScore = 0;
+                if (p.text) {
+                    const seen = new Set((String(p.text).toLowerCase().match(/[a-z]{4,}/g) || []));
+                    seen.forEach((t) => { if (profile.words[t]) wordScore += 0.5; });
+                    wordScore = Math.min(wordScore, 3);
+                }
+                const mediaBonus = profile.hasSignal && hasMedia && profile.mediaLean > 0.6 ? 1.5
+                                 : (profile.hasSignal && !hasMedia && profile.mediaLean < 0.4 ? 1.5 : 0);
+                const interest = tagScore + authorScore + wordScore;
+
+                // Strangers need either some traction or a real interest match to qualify.
+                if (!followed && engagement < 1 && interest <= 0) return;
+
                 const ageHours = (now - ts) / 3600000;
-                const score = (engagement + (followed ? 6 : 0)) / (1 + ageHours / 36);
-                scored.push({ kind: 'suggested', postId, post: p, ts, followed, score });
+                const raw = engagement * 0.6 + (followed ? 6 : 0) + interest + mediaBonus;
+                const score = raw / (1 + ageHours / 36);
+
+                // Why it's here: whichever signal contributed most.
+                const authorName = (cachedUsers[p.uid] && cachedUsers[p.uid].name) || p.name || '';
+                let reason = 'Suggested post';
+                const top = Math.max(tagScore, authorScore, followed ? 6 : 0);
+                if (top > 0) {
+                    if (tagScore === top && bestTag) reason = 'Because you like #' + bestTag;
+                    else if (authorScore === top && authorName) reason = 'More from ' + authorName;
+                    else if (followed) reason = 'Because you follow';
+                } else if (engagement >= 5) {
+                    reason = 'Popular right now';
+                }
+                scored.push({ kind: 'suggested', postId, post: p, ts, followed, score, reason });
             });
             scored.sort((a, b) => b.score - a.score);
-            return scored.slice(0, ACTIVITY_SUGGESTION_LIMIT);
+
+            // Keep the list varied: at most ACTIVITY_MAX_PER_AUTHOR posts from any one person.
+            const perAuthor = {}, picked = [];
+            for (const e of scored) {
+                const n = perAuthor[e.post.uid] || 0;
+                if (n >= ACTIVITY_MAX_PER_AUTHOR) continue;
+                perAuthor[e.post.uid] = n + 1;
+                picked.push(e);
+                if (picked.length >= ACTIVITY_SUGGESTION_LIMIT) break;
+            }
+            return picked;
         }
 
         function activitySubtitleFor(notif) {
@@ -25139,7 +25351,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     ensureNotifPostPreview(notif.postId); // fire-and-forget; hydrates this row when it lands
                 }
             } else {
-                sub = entry.followed ? 'Because you follow' : 'Suggested post';
+                sub = entry.reason || (entry.followed ? 'Because you follow' : 'Suggested post');
                 text = entry.post.text || '';
                 showActions = true;
             }

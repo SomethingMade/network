@@ -6770,15 +6770,25 @@ body.dark-theme #feed-posts-container .feed-post-card-ig .feed-post-action-btn{c
 #feed-posts-container .feed-post-card-ig .x-post-username{display:flex;align-items:center;gap:0 5px;flex-wrap:wrap;min-width:0;margin-top:1px}
 #feed-posts-container .feed-post-card-ig .x-post-username-text{display:block;flex:0 0 100%;font-size:12.5px;font-weight:500;color:var(--sc-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #feed-posts-container .feed-post-card-ig .x-post-username-text:empty{display:none}
-/* Header: segmented pill tabs (For you / Following) in a soft rounded tray, gradient active pill */
-.feed-sticky-header{background:var(--sc-bg)!important;padding:10px 12px 6px;box-sizing:border-box}
-.feed-sticky-header #feed-subtabs{display:flex;gap:6px;padding:5px;margin:0!important;border:none;border-radius:20px;background:var(--sc-card);box-shadow:var(--sc-shadow)}
-.feed-sticky-header #feed-subtabs .feed-subtab-btn{flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:11px 0;border-radius:15px;background:var(--sc-chip);color:var(--sc-sub);font-size:14.5px;font-weight:600;transition:background .2s ease,color .2s ease,transform .12s ease}
-.feed-sticky-header #feed-subtabs .feed-subtab-btn:hover{background:var(--sc-chip)}
-.feed-sticky-header #feed-subtabs .feed-subtab-btn:active{transform:scale(.97)}
-.feed-sticky-header #feed-subtabs .feed-subtab-btn::after{display:none!important}
+/* Header: X / Twitter style. Top bar (avatar, logo, settings) + flat full-width tabs with a short rounded underline */
+.x-topbar{display:none}
+.feed-sticky-header{background:var(--sc-card)!important;padding:0;border-bottom:1px solid rgba(128,128,128,.18)}
+.feed-sticky-header #feed-subtabs{display:flex;gap:0;padding:0;margin:0!important;border:none!important;border-radius:0;background:transparent;box-shadow:none}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn{flex:1 1 0;display:flex;align-items:center;justify-content:center;padding:15px 0 14px;border-radius:0;background:transparent;color:var(--sc-sub);font-size:15px;font-weight:600;box-shadow:none;transition:background .15s ease,color .15s ease}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn:hover,.feed-sticky-header #feed-subtabs .feed-subtab-btn:active{background:rgba(128,128,128,.10)}
 .feed-sticky-header #feed-subtabs .feed-subtab-state-icon{display:none}
-.feed-sticky-header #feed-subtabs .feed-subtab-btn.active{background:linear-gradient(135deg,#1FB5A5 0%,#A4D04A 100%);color:#fff;box-shadow:0 4px 12px rgba(31,181,165,.28)}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn::after{display:block!important;content:'';position:absolute;left:50%;bottom:0;width:56px;height:4px;border-radius:999px;transform:translateX(-50%) scaleX(.4);background:var(--comment-blue);opacity:0;transition:opacity .18s ease,transform .18s ease}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn[data-feed-subtab="following"]::after{width:74px}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn.active{background:transparent;color:var(--sc-text);font-weight:700;box-shadow:none}
+.feed-sticky-header #feed-subtabs .feed-subtab-btn.active::after{opacity:1;transform:translateX(-50%) scaleX(1)}
+@media (max-width:768px){
+  .x-topbar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;height:52px;padding:min(env(safe-area-inset-top),20px) 12px 0;box-sizing:content-box}
+  .x-topbar-avatar{width:34px!important;height:34px!important;justify-self:start;border-radius:50%}
+  .x-topbar-logo{width:30px;height:30px;justify-self:center;color:var(--sc-text)}
+  .x-topbar-btn{justify-self:end;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--sc-text);cursor:pointer;border-radius:50%;padding:0}
+  .x-topbar-btn svg{width:23px;height:23px}
+  .x-topbar-btn:active{background:rgba(128,128,128,.14)}
+}
 /* Tighten the name / @username / meta stack: the 34px menu button was stretching the name row */
 #feed-posts-container .feed-post-card-ig .x-post-headline{min-height:0;align-items:center;line-height:1.2}
 #feed-posts-container .feed-post-card-ig .x-post-headline .name{line-height:1.2}
@@ -6901,6 +6911,16 @@ body.dark-theme .feed-post-card.feed-post-card-ig .feed-post-action-btn.liked{ba
   html body .side-nav .nav-badge{border-color:var(--sc-card)}
 }
 </style>
+<script>
+/* X-style header: settings button opens the existing settings panel. */
+(function(){
+  function wire(){
+    var b=document.getElementById('x-topbar-settings'); if(!b||b.__w) return; b.__w=true;
+    b.addEventListener('click',function(e){e.stopPropagation();try{triggerHaptic(12)}catch(_){}var t=document.getElementById('btn-open-settings');if(t)t.click();});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wire); else wire();
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap" rel="stylesheet">
 <style id="fb-wordmark-font">
 /* Instagram-style script wordmark (Grand Hotel is the closest free match to Instagram's Billabong logo) */
@@ -10885,7 +10905,12 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </div>
                     <div class="discover-grid-scroll" id="discover-grid-scroll">
                         <div class="feed-sticky-header" id="feed-sticky-header">
-                            <div class="feed-subtabs" id="feed-subtabs">
+                            <div class="x-topbar" id="x-topbar">
+                                <div class="profile-btn header-profile-btn x-topbar-avatar" data-profile-trigger title="Menu"></div>
+                                <svg class="x-topbar-logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M44 44a14 14 0 0 1 28 0V156a14 14 0 0 1-28 0Z" fill="currentColor" stroke="none"/><path d="M58 100C58 74 80 64 102 64C128 64 140 80 140 104V156" fill="none" stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/><circle cx="146" cy="32" r="14" fill="#FFB020" stroke="none"/></svg>
+                                <button type="button" class="x-topbar-btn" id="x-topbar-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+                            </div>
+                                                        <div class="feed-subtabs" id="feed-subtabs">
                                 <button type="button" class="feed-subtab-btn active" data-feed-subtab="forYou"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2z"></path></svg>For you</button>
                                 <button type="button" class="feed-subtab-btn" data-feed-subtab="following"><svg class="feed-subtab-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><polyline points="17 11 19 13 23 9"></polyline></svg>Following</button>
                             </div>

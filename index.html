@@ -1038,6 +1038,8 @@
         .ig-profile-stats-grid { display: flex; align-items: center; flex-wrap: wrap; gap: 0; min-width: 0; margin: 2px 0 16px; }
         .ig-profile-stat { display: inline-flex; align-items: baseline; gap: 4px; background: none; border: none; padding: 0; margin: 0; border-radius: 6px; cursor: pointer; color: inherit; font-family: inherit; transition: opacity 0.15s ease, transform 0.15s ease; }
         .ig-profile-stat:hover { opacity: 0.7; }
+        /* Likes received is display-only (no list to open), so no tap affordance */
+        #btn-user-info-likes-stat, #btn-my-profile-likes-stat { cursor: default; pointer-events: none; }
         .ig-profile-stat:active { transform: scale(0.97); }
         .ig-profile-stat + .ig-profile-stat::before,
         .ig-profile-stat + .tm-profile-stat-link::before,
@@ -8691,6 +8693,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                         <span class="ig-profile-stat-num" id="user-info-following-count">0</span>
                         <span class="ig-profile-stat-label">following</span>
                     </button>
+                    <button type="button" class="ig-profile-stat" id="btn-user-info-likes-stat" aria-label="Likes received">
+                        <span class="ig-profile-stat-num" id="user-info-likes-count">0</span>
+                        <span class="ig-profile-stat-label">likes</span>
+                    </button>
                 </div>
 
                 <div class="tm-profile-followed-by" id="user-info-followed-by" style="display:none;">
@@ -11101,6 +11107,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     <button type="button" class="ig-profile-stat tm-profile-stat-link" data-follow-tab="following">
                         <span class="ig-profile-stat-num" id="my-profile-following-count">0</span>
                         <span class="ig-profile-stat-label">following</span>
+                    </button>
+                    <button type="button" class="ig-profile-stat" id="btn-my-profile-likes-stat" aria-label="Likes received">
+                        <span class="ig-profile-stat-num" id="my-profile-likes-count">0</span>
+                        <span class="ig-profile-stat-label">likes</span>
                     </button>
                 </div>
 
@@ -17751,6 +17761,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
         // These hold the full set of a user's post ids from a uid-indexed query.
         const profilePostIdsByUid = {};
         const profilePostsFetchedAt = {};
+        // postId -> likeCount for every post fetched/seen on a profile. cachedPosts only holds a
+        // live window of the feed (posts fall out of it), so this keeps the like totals accurate
+        // for posts that are no longer cached.
+        const profilePostLikeCounts = {};
+        let likesReceivedSyncKicked = false; // one-time per session: backfill my likesReceived total
         const profilePostsInflight = {};
         let pendingNewPosts = {}; // postId -> post, queued live arrivals not yet shown (see "New posts" pill)
         // True while the initial page of posts is still streaming in from Firebase on first
@@ -19827,6 +19842,10 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 const post = snap.val();
                 const oldPost = cachedPosts[postId];
                 cachedPosts[postId] = post;
+                if (post && post.uid) {
+                    profilePostLikeCounts[postId] = Number(post.likeCount) || 0;
+                    updateProfileLikesUI(post.uid);
+                }
                 patchReelItemIfPresent(postId, post);
                 const list = document.getElementById('feed-posts-list');
                 const existingCard = list ? list.querySelector(`[data-post-id="${postId}"]`) : null;
@@ -19895,6 +19914,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
                 delete cachedPosts[postId];
                 forgetDeletedPostForProfiles(postId);
+                delete profilePostLikeCounts[postId];
+                if (removedPost && removedPost.uid) updateProfilePostCountUI(removedPost.uid);
                 // A genuinely deleted post can be showing in more than one place at once — the
                 // main feed, and/or a profile's Posts tab (yours or the author's) — so clean up
                 // every card for it, not just whichever one lives in the main feed list.
@@ -21280,6 +21301,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
             try {
                 forgetDeletedPostForProfiles(postId);
+                await reclaimLikesForPost(postId, deletedPost);
                 await remove(ref(database, `posts/${postId}`));
                 await remove(ref(database, `postComments/${postId}`));
                 if (deletedPost && deletedPost.repostOf) {
@@ -23378,6 +23400,28 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
         const DEFAULT_POST_REACTION = '👍';
 
+        // users/{authorUid}/likesReceived is a running total of likes on that person's posts, so a
+        // profile can show it without loading every post. Bumped next to every like/unlike (same
+        // pattern as followersCount); the owner's own app re-syncs it from their posts (see
+        // loadFullProfilePosts) so it self-heals if an update was ever missed.
+        function bumpLikesReceived(authorUid, delta) {
+            if (!authorUid || !delta || authorUid === AI_UID) return;
+            update(ref(database, `users/${authorUid}`), { likesReceived: increment(delta) })
+                .catch((e) => console.warn('likesReceived update failed:', e));
+        }
+
+        // Call before deleting a post: its likes disappear with it, so take them off the author's total.
+        async function reclaimLikesForPost(postId, knownPost) {
+            try {
+                let post = knownPost;
+                if (!post) {
+                    const snap = await get(ref(database, `posts/${postId}`));
+                    post = snap.exists() ? snap.val() : null;
+                }
+                if (post && post.uid && (post.likeCount || 0) > 0) bumpLikesReceived(post.uid, -(post.likeCount || 0));
+            } catch (e) { console.warn('reclaimLikesForPost failed:', e); }
+        }
+
         // Sets (or clears) the current user's like on a post.
         async function setPostReaction(postId, emoji) {
             const user = auth.currentUser;
@@ -23392,12 +23436,14 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     [`reactions/${user.uid}`]: null,
                     likeCount: increment(-1)
                 });
+                bumpLikesReceived(post.uid, -1);
                 return;
             }
 
             const updates = { [`reactions/${user.uid}`]: emoji };
             if (!myCurrentEmoji) updates.likeCount = increment(1);
             await update(ref(database, `posts/${postId}`), updates);
+            if (!myCurrentEmoji) bumpLikesReceived(post.uid, 1);
             createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
             if (post.uid !== user.uid) awardFirstMilestone('firstLike');
         }
@@ -23429,6 +23475,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 
             if (myExistingRepostKey) {
                 try {
+                    await reclaimLikesForPost(myExistingRepostKey);
                     await remove(ref(database, `posts/${myExistingRepostKey}`));
                     await remove(ref(database, `postComments/${myExistingRepostKey}`));
                 } catch (e) {}
@@ -24639,6 +24686,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     const existing = snap.val();
                     await remove(myRepostRef);
                     if (typeof existing === 'string') {
+                        await reclaimLikesForPost(existing);
                         await remove(ref(database, `posts/${existing}`));
                         await remove(ref(database, `postComments/${existing}`));
                     }
@@ -25774,12 +25822,14 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     post.likeCount = Math.max(0, (post.likeCount || 1) - 1);
                     hydrateActivityRowsForPost(postId, post);
                     await update(ref(database, `posts/${postId}`), { [`reactions/${user.uid}`]: null, likeCount: increment(-1) });
+                    bumpLikesReceived(post.uid, -1);
                 } else {
                     post.reactions = post.reactions || {};
                     post.reactions[user.uid] = DEFAULT_POST_REACTION;
                     post.likeCount = (post.likeCount || 0) + 1;
                     hydrateActivityRowsForPost(postId, post);
                     await update(ref(database, `posts/${postId}`), { [`reactions/${user.uid}`]: DEFAULT_POST_REACTION, likeCount: increment(1) });
+                    bumpLikesReceived(post.uid, 1);
                     createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
                     if (post.uid !== user.uid) awardFirstMilestone('firstLike');
                 }
@@ -27824,6 +27874,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 document.getElementById('my-profile-followers-count').textContent = myProfile.followersCount || 0;
                 const myPostsCount = profilePostCountFor(user.uid);
                 document.getElementById('my-profile-posts-count').textContent = myPostsCount;
+                document.getElementById('my-profile-likes-count').textContent = formatProfileCount(profileLikesCountFor(user.uid));
                 loadFullProfilePosts(user.uid);
                 document.getElementById('my-profile-sticky-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
                 document.getElementById('my-profile-sticky-count').textContent = `${myPostsCount} posts`;
@@ -35259,6 +35310,44 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             return ids.size;
         }
 
+        // Total likes/reactions received across a person's posts (same set of posts the
+        // profile's "posts" count uses, so private/follower-only posts stay excluded).
+        function profileLikesCountFor(uid) {
+            // Synced running total on the user record (covers every post, including ones this
+            // viewer hasn't loaded). Until the owner's app has synced it, fall back to summing
+            // the posts we can see.
+            const stored = cachedUsers[uid];
+            if (stored && stored.likesReceivedSynced === true && typeof stored.likesReceived === 'number') {
+                return Math.max(0, stored.likesReceived);
+            }
+            const ids = new Set(profilePostIdsByUid[uid] || []);
+            Object.keys(cachedPosts).forEach(id => {
+                const p = cachedPosts[id];
+                if (p && p.uid === uid && profileViewablePost(p)) ids.add(id);
+            });
+            let total = 0;
+            ids.forEach(id => {
+                const p = cachedPosts[id];
+                const n = p ? p.likeCount : profilePostLikeCounts[id];
+                total += Math.max(0, Number(n) || 0);
+            });
+            return total;
+        }
+
+        // Refresh just the likes stat (own profile and/or the open profile sheet) for a person.
+        function updateProfileLikesUI(uid) {
+            if (!uid) return;
+            const me = auth.currentUser;
+            if (me && uid === me.uid) {
+                const el = document.getElementById('my-profile-likes-count');
+                if (el) el.textContent = formatProfileCount(profileLikesCountFor(uid));
+            }
+            if (userInfoSheetUid === uid) {
+                const el = document.getElementById('user-info-likes-count');
+                if (el) el.textContent = formatProfileCount(profileLikesCountFor(uid));
+            }
+        }
+
         function forgetDeletedPostForProfiles(postId) {
             Object.values(profilePostIdsByUid).forEach(set => set.delete(postId));
         }
@@ -35269,12 +35358,16 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (me && uid === me.uid) {
                 const numEl = document.getElementById('my-profile-posts-count');
                 if (numEl) numEl.textContent = count;
+                const likesEl = document.getElementById('my-profile-likes-count');
+                if (likesEl) likesEl.textContent = formatProfileCount(profileLikesCountFor(uid));
                 const stickyEl = document.getElementById('my-profile-sticky-count');
                 if (stickyEl) stickyEl.textContent = `${count} posts`;
             }
             if (userInfoSheetUid === uid) {
                 const numEl = document.getElementById('user-info-posts-count');
                 if (numEl) numEl.textContent = formatProfileCount(count);
+                const likesEl = document.getElementById('user-info-likes-count');
+                if (likesEl) likesEl.textContent = formatProfileCount(profileLikesCountFor(uid));
                 const stickyEl = document.getElementById('user-info-sticky-count');
                 if (stickyEl) stickyEl.textContent = `${formatProfileCount(count)} posts`;
             }
@@ -35289,17 +35382,31 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     const snap = await get(query(ref(database, 'posts'), orderByChild('uid'), equalTo(uid)));
                     const ids = new Set();
                     let mergedNew = false;
+                    let freshLikesTotal = 0;
                     if (snap.exists()) {
                         snap.forEach((child) => {
                             const post = child.val();
                             if (!profileViewablePost(post)) return false;
                             ids.add(child.key);
+                            freshLikesTotal += Math.max(0, Number(post.likeCount) || 0);
+                            profilePostLikeCounts[child.key] = Number(post.likeCount) || 0;
                             if (!cachedPosts[child.key]) { cachedPosts[child.key] = post; mergedNew = true; }
                             return false;
                         });
                     }
                     profilePostIdsByUid[uid] = ids;
                     profilePostsFetchedAt[uid] = Date.now();
+                    // On my own profile every post is visible to me, so this total is exact — write it
+                    // back so likesReceived is correct for everyone (and repairs any drift / backfills
+                    // accounts from before this counter existed).
+                    const meNow = auth.currentUser;
+                    if (meNow && uid === meNow.uid) {
+                        const rec = cachedUsers[uid] || {};
+                        if (rec.likesReceivedSynced !== true || rec.likesReceived !== freshLikesTotal) {
+                            update(ref(database, `users/${uid}`), { likesReceived: freshLikesTotal, likesReceivedSynced: true })
+                                .catch((e) => console.warn('likesReceived sync failed:', e));
+                        }
+                    }
                     updateProfilePostCountUI(uid);
                     // Older posts only just arrived — rebuild whichever profile is showing this user.
                     if (mergedNew) {
@@ -35515,6 +35622,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             document.getElementById('user-info-followers-count').textContent = formatProfileCount(profile.followersCount);
             const postsCount = profilePostCountFor(uid);
             document.getElementById('user-info-posts-count').textContent = formatProfileCount(postsCount);
+            document.getElementById('user-info-likes-count').textContent = formatProfileCount(profileLikesCountFor(uid));
             loadFullProfilePosts(uid);
             document.getElementById('user-info-sticky-name').textContent = profile.name || 'Unknown User';
             document.getElementById('user-info-sticky-count').textContent = `${formatProfileCount(postsCount)} posts`;
@@ -39776,6 +39884,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 feedAutoFillStreak = 0;
                 Object.keys(profilePostIdsByUid).forEach(k => delete profilePostIdsByUid[k]);
                 Object.keys(profilePostsFetchedAt).forEach(k => delete profilePostsFetchedAt[k]);
+                Object.keys(profilePostLikeCounts).forEach(k => delete profilePostLikeCounts[k]);
                 notifListenersAttached = false;
                 emptyOlderFetchCount = 0;
                 cachedNotifications = {};
@@ -45537,6 +45646,12 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 renderDiscoverGridIfActive();
                 refreshAllFeedPostProfiles();
                 refreshChatListOnlineDots();
+                updateProfileLikesUI(user.uid);
+                if (userInfoSheetUid) updateProfileLikesUI(userInfoSheetUid);
+                if (!likesReceivedSyncKicked && cachedUsers[user.uid] && cachedUsers[user.uid].likesReceivedSynced !== true) {
+                    likesReceivedSyncKicked = true;
+                    loadFullProfilePosts(user.uid, true);
+                }
                 if (typeof syncProfileLockToggle === 'function') syncProfileLockToggle();
                 if (userInfoSheet.classList.contains('active') && userInfoSheetUid) applyProfileLockView(userInfoSheetUid);
             });

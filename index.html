@@ -5331,11 +5331,11 @@
         #tab-profile .tm-profile-header { display: none; }
         /* No cover photo: hide it (kept in the DOM — the profile JS looks it up by id) and stop pulling
            the avatar up over where it used to be. */
-        #tab-profile .fb-profile-cover { display: none !important; }
+        #tab-profile .fb-profile-cover { display: block !important; }
         /* !important: the cover-era rules for these two selectors come later in the file and would
            otherwise win (they gave 0 top padding and pulled the avatar up by 68px). */
-        #tab-profile .tm-profile-content { padding-top: calc(16px + min(env(safe-area-inset-top), 20px)) !important; }
-        #tab-profile .fb-profile-identity { margin-top: 0 !important; }
+        #tab-profile .tm-profile-content { padding-top: 0 !important; }
+        #tab-profile .fb-profile-identity { margin-top: -68px !important; }
         #tab-profile .fb-profile-cover.is-uploading::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
         #tab-profile .fb-profile-cover-btn, #tab-profile .fb-profile-avatar-edit { display: flex; align-items: center; justify-content: center; border: none; border-radius: 50%; background: var(--fb-hover, #e4e6eb); color: var(--text-primary); cursor: pointer; padding: 0; z-index: 3; -webkit-tap-highlight-color: transparent; }
         #tab-profile .fb-profile-cover-btn { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; }
@@ -7447,6 +7447,22 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 .ve-tools button.on{background:#2A2A31;color:#FFB020}
 .ve-tools button:active{transform:scale(.97)}
 </style>
+<style id="profile-cover-style">
+/* ── Profile cover photos ── */
+#tab-profile .fb-profile-cover{height:clamp(130px,38vw,210px);background-size:cover;background-position:center}
+#tab-profile .fb-profile-cover:not(.has-image),#user-info-cover:not(.has-image){background-image:linear-gradient(135deg,#25252A 0%,#4A4A52 55%,#8A6A2A 130%)}
+#tab-profile .fb-profile-cover::before,#user-info-cover::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.28),transparent 35%,transparent 70%,rgba(0,0,0,.18));pointer-events:none}
+#tab-profile .fb-profile-cover-btn{background:rgba(0,0,0,.45);color:#fff;backdrop-filter:blur(8px)}
+.cover-menu{position:absolute;right:12px;bottom:56px;z-index:6;min-width:200px;padding:6px;border-radius:16px;background:var(--bg-surface);box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;flex-direction:column}
+.cover-menu button{border:none;background:none;text-align:left;padding:11px 12px;border-radius:10px;font:inherit;font-size:var(--fs-md,15px);font-weight:600;color:var(--text-primary);cursor:pointer}
+.cover-menu button:active{background:var(--bg-hover)}
+.cover-menu button.danger{color:var(--danger-red)}
+/* Other people's profile: cover with the back/notify/share buttons floating over it */
+#user-info-cover{position:relative;flex:0 0 auto;height:clamp(130px,38vw,190px);background-size:cover;background-position:center}
+#user-info-sheet-overlay .tm-profile-header{position:absolute;top:0;left:0;right:0;z-index:6;padding:calc(10px + min(env(safe-area-inset-top),20px)) 12px 0}
+#user-info-sheet-overlay .tm-profile-header .tm-profile-back-btn,#user-info-sheet-overlay .tm-profile-header .tm-profile-icon-btn{background:rgba(0,0,0,.42);color:#fff;border-radius:50%;backdrop-filter:blur(8px)}
+#user-info-sheet-overlay .fb-profile-identity{margin-top:-64px}
+</style>
 </head>
 <body>
 
@@ -8873,6 +8889,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                     </button>
                 </div>
             </div>
+
+            <div class="profile-cover-banner" id="user-info-cover"></div>
 
             <div class="tm-profile-content">
                 <div class="fb-profile-identity">
@@ -28328,7 +28346,46 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             const btn = document.getElementById('btn-change-cover');
             const input = document.getElementById('cover-photo-input');
             if (!btn || !input) return;
-            btn.addEventListener('click', () => input.click());
+            async function prepCover(file) {
+                try {
+                    const bmp = await createImageBitmap(file);
+                    const k = Math.min(1, 1600 / bmp.width);
+                    const c = document.createElement('canvas');
+                    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+                    const g = c.getContext('2d');
+                    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+                    g.drawImage(bmp, 0, 0, c.width, c.height);
+                    return await new Promise(r => c.toBlob(b => r(b || file), 'image/jpeg', 0.86));
+                } catch (e) { return file; }
+            }
+            function closeCoverMenu() { const m = document.querySelector('.cover-menu'); if (m) m.remove(); }
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const user = auth.currentUser;
+                if (!user) return;
+                if (document.querySelector('.cover-menu')) return closeCoverMenu();
+                if (!(cachedUsers[user.uid] || {}).coverPhoto) return input.click();
+                const menu = document.createElement('div');
+                menu.className = 'cover-menu';
+                menu.innerHTML = '<button type="button" data-a="change">Change cover photo</button><button type="button" data-a="remove" class="danger">Remove cover photo</button>';
+                document.getElementById('my-profile-cover').appendChild(menu);
+                menu.addEventListener('click', async (ev) => {
+                    const a = ev.target.closest('button') && ev.target.closest('button').dataset.a;
+                    ev.stopPropagation();
+                    closeCoverMenu();
+                    if (a === 'change') input.click();
+                    else if (a === 'remove') {
+                        try {
+                            await update(ref(database, `users/${user.uid}`), { coverPhoto: null });
+                            if (cachedUsers[user.uid]) delete cachedUsers[user.uid].coverPhoto;
+                            const cv = document.getElementById('my-profile-cover');
+                            cv.style.backgroundImage = ''; cv.classList.remove('has-image');
+                            notify('Cover photo removed');
+                        } catch (err) { notify("Couldn't remove cover photo", 'error'); }
+                    }
+                });
+                setTimeout(() => document.addEventListener('click', closeCoverMenu, { once: true }), 0);
+            });
             input.addEventListener('change', async () => {
                 const file = input.files && input.files[0];
                 input.value = '';
@@ -28339,8 +28396,8 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 const cover = document.getElementById('my-profile-cover');
                 cover.classList.add('is-uploading');
                 try {
-                    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                    const url = await uploadToFirebaseStorage(file, `profile_photos/${user.uid}/cover_${Date.now()}_${safeName}`);
+                    const blob = await prepCover(file);
+                    const url = await uploadToFirebaseStorage(blob, `profile_photos/${user.uid}/cover_${Date.now()}.jpg`);
                     await update(ref(database, `users/${user.uid}`), { coverPhoto: url });
                     if (cachedUsers[user.uid]) cachedUsers[user.uid].coverPhoto = url;
                     cover.style.backgroundImage = `url('${url}')`;
@@ -36125,6 +36182,11 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             avatarEl.style.backgroundColor = '';
             avatarEl.textContent = '';
             avatarEl.setAttribute('data-full', profile.photoURL || DEFAULT_AVATAR_URL);
+            const userCoverEl = document.getElementById('user-info-cover');
+            if (userCoverEl) {
+                userCoverEl.style.backgroundImage = profile.coverPhoto ? `url('${profile.coverPhoto}')` : '';
+                userCoverEl.classList.toggle('has-image', !!profile.coverPhoto);
+            }
             applyLiveRingToProfileAvatar();
             document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false) + (profile.profileLocked ? '<span class="profile-lock-badge" title="Locked profile" aria-label="Locked profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>' : '');
             document.getElementById('user-info-username').innerHTML = escapeHtmlForPost(profile.username ? '@' + profile.username : '@—');

@@ -7508,6 +7508,12 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 /* "Haba" in the header uses the brand font (Michroma), same as the logo wordmark on the splash/login */
 #tab-status .home-header-wordmark .hw-text{font-family:var(--font-brand)!important;font-size:clamp(18px,5.6vw,22px)!important;font-weight:400!important;letter-spacing:2px!important;line-height:1!important;padding-top:0!important}
 </style>
+<style id="story-ring-blue">
+/* Blue ring on a post avatar when that person has an active story (the red live ring wins if they're live) */
+.x-post-avatar-col.has-story-ring{position:relative}
+.x-post-avatar-col.has-story-ring:not(.is-live)::before,#user-info-avatar.has-story-ring:not(.is-live)::before{content:'';position:absolute;inset:-4px;border:2.5px solid #0095F6;border-radius:50%;pointer-events:none;z-index:2}
+#user-info-avatar.has-story-ring{position:relative}
+</style>
 </head>
 <body>
 
@@ -37677,11 +37683,13 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
             if (!col) return;
             const uid = card.dataset.uid;
             col.classList.toggle('is-live', !!(uid && liveHostMap[uid]));
+            col.classList.toggle('has-story-ring', !!(uid && getActiveStoryItemsForUid(uid).length));
         }
         function applyLiveRingToProfileAvatar() {
             const el = document.getElementById('user-info-avatar');
             if (!el) return;
             el.classList.toggle('is-live', !!(userInfoSheetUid && liveHostMap[userInfoSheetUid]));
+            el.classList.toggle('has-story-ring', !!(userInfoSheetUid && getActiveStoryItemsForUid(userInfoSheetUid).length));
         }
         function refreshPostLiveRings() {
             applyLiveRingToProfileAvatar();
@@ -46307,6 +46315,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderFeedStoryCards(cachedUsers, cachedStories);
+                refreshPostLiveRings();
                 if (userChatsInitialized) renderChatListFromCache();
             });
 

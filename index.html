@@ -7587,6 +7587,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
   html body #messenger-screen .side-nav .nav-badge{top:10px}
 }
 </style>
+<style id="story-edit-tools">
+.sp-text-layer{position:absolute;inset:0;z-index:3;pointer-events:none}
+.sp-text{position:absolute;transform:translate(-50%,-50%);color:#fff;font-weight:800;line-height:1.2;white-space:pre;text-shadow:0 2px 8px rgba(0,0,0,.55);padding:2px 8px;border-radius:8px;pointer-events:auto;touch-action:none;outline:none;cursor:grab;-webkit-user-select:none;user-select:none;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+.sp-text[contenteditable="plaintext-only"],.sp-text[contenteditable="true"]{-webkit-user-select:text;user-select:text;background:rgba(0,0,0,.35);cursor:text}
+.sp-edit-tray{align-items:center;gap:8px}
+.sp-edit-btn{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+.sp-filter-row{flex:1;min-width:0;gap:6px;overflow-x:auto;scrollbar-width:none}
+.sp-filter-chip{flex:0 0 auto;border:0;border-radius:50px;padding:8px 14px;font-size:12.5px;font-weight:600;color:#fff;background:rgba(255,255,255,.16);cursor:pointer}
+.sp-filter-chip.active{background:#fff;color:#000}
+</style>
+
 
 
 </head>
@@ -12350,6 +12361,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         <div class="sp-stage" id="sp-stage">
             <img id="sp-img" alt="Story preview" style="display:none;">
             <video id="sp-video" muted loop playsinline></video>
+            <div id="sp-text-layer" class="sp-text-layer"></div>
             <button type="button" id="sp-prev" class="sp-nav sp-prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
             <button type="button" id="sp-next" class="sp-nav sp-next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
             <div class="sp-side-btns">
@@ -12357,6 +12369,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             </div>
         </div>
         <div class="sp-bottom">
+            <div class="sp-edit-tray" id="sp-edit-tray" style="display:none;"><button type="button" id="sp-add-text" class="sp-edit-btn" aria-label="Add text">Aa</button><div class="sp-filter-row" id="sp-filter-row"></div></div>
             <div class="sp-thumbs" id="sp-thumbs"></div>
             <div class="sp-caption-row">
                 <textarea id="sp-caption" rows="1" maxlength="200" placeholder="Add a caption..." autocomplete="off"></textarea>
@@ -38410,7 +38423,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
         }
 
-        function spRender() { spRenderStage(); spRenderThumbs(); }
+        function spRender() { spRenderStage(); spRenderThumbs(); spRenderEdit(); }
 
         function spRemoveItem(idx) {
             const it = spState.items[idx];
@@ -38503,19 +38516,176 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (ok) spResetAndClose();
         });
 
-        spEl('sp-share').addEventListener('click', () => {
+        spEl('sp-share').addEventListener('click', async () => {
             if (spState.sharing || !spState.items.length) return;
             const user = auth.currentUser;
             if (!user) return;
             spState.sharing = true;
             spEl('sp-share').disabled = true;
-            const files = spState.items.map(it => it.file);
+            const files = await Promise.all(spState.items.map(it => spBakeItem(it)));
             const music = spState.music;
             const caption = spEl('sp-caption').value.trim();
             triggerHaptic(12);
             spResetAndClose();
             uploadStoriesWithMusic(files, music, caption);
         });
+
+
+        // ---- Story editing (photos): filters + text, baked into the image on share ----
+        const SP_FILTERS = [
+            { id: 'none', label: 'Original', css: 'none' },
+            { id: 'vivid', label: 'Vivid', css: 'saturate(1.5) contrast(1.1)' },
+            { id: 'warm', label: 'Warm', css: 'sepia(.3) saturate(1.3) brightness(1.05)' },
+            { id: 'cool', label: 'Cool', css: 'saturate(1.1) brightness(1.05) hue-rotate(-15deg)' },
+            { id: 'fade', label: 'Fade', css: 'contrast(.85) brightness(1.1) saturate(.85)' },
+            { id: 'bw', label: 'B&W', css: 'grayscale(1) contrast(1.1)' },
+            { id: 'noir', label: 'Noir', css: 'grayscale(1) contrast(1.4) brightness(.9)' }
+        ];
+        const SP_TEXT_SIZE = 0.07;
+        const SP_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+        const SP_CAN_FILTER = (typeof CanvasRenderingContext2D !== 'undefined') && ('filter' in CanvasRenderingContext2D.prototype);
+        const spEdit = (it) => it.edit || (it.edit = { filter: 'none', texts: [] });
+        const spFilterCss = (id) => (SP_FILTERS.find(f => f.id === id) || SP_FILTERS[0]).css;
+
+        function spImgRect() {
+            const stage = spEl('sp-stage'), img = spEl('sp-img');
+            const nw = img.naturalWidth, nh = img.naturalHeight;
+            if (!nw || !nh) return null;
+            const sc = Math.min(stage.clientWidth / nw, stage.clientHeight / nh);
+            const w = nw * sc, h = nh * sc;
+            return { left: (stage.clientWidth - w) / 2, top: (stage.clientHeight - h) / 2, w, h };
+        }
+
+        function spEditText(node, t) {
+            try { node.contentEditable = 'plaintext-only'; } catch (_) {}
+            if (node.contentEditable !== 'plaintext-only') node.contentEditable = 'true';
+            node.focus();
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            const sel = window.getSelection();
+            sel.removeAllRanges(); sel.addRange(range);
+            node.addEventListener('blur', () => {
+                t.text = node.innerText.replace(/\s+$/, '').slice(0, 80);
+                node.contentEditable = 'false';
+                if (!t.text) {
+                    const it = spState.items[spState.index];
+                    if (it) spEdit(it).texts = spEdit(it).texts.filter(x => x !== t);
+                }
+                spRenderEdit();
+            }, { once: true });
+        }
+
+        function spRenderEdit() {
+            const it = spState.items[spState.index];
+            const tray = spEl('sp-edit-tray'), layer = spEl('sp-text-layer'), img = spEl('sp-img');
+            const isImg = !!it && it.type === 'image';
+            tray.style.display = isImg ? 'flex' : 'none';
+            layer.style.display = isImg ? 'block' : 'none';
+            if (!isImg) { img.style.filter = ''; layer.innerHTML = ''; return; }
+            const ed = spEdit(it);
+            img.style.filter = spFilterCss(ed.filter) === 'none' ? '' : spFilterCss(ed.filter);
+
+            const row = spEl('sp-filter-row');
+            row.style.display = SP_CAN_FILTER ? 'flex' : 'none';
+            if (!row.children.length) {
+                SP_FILTERS.forEach(f => {
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.className = 'sp-filter-chip'; b.dataset.id = f.id; b.textContent = f.label;
+                    b.addEventListener('click', () => {
+                        const cur = spState.items[spState.index];
+                        if (cur) { spEdit(cur).filter = f.id; spRenderEdit(); }
+                    });
+                    row.appendChild(b);
+                });
+            }
+            Array.from(row.children).forEach(b => b.classList.toggle('active', b.dataset.id === ed.filter));
+
+            layer.innerHTML = '';
+            const r = spImgRect();
+            if (!r) return;
+            ed.texts.forEach(t => {
+                const node = document.createElement('div');
+                node.className = 'sp-text';
+                node.textContent = t.text;
+                node.style.fontSize = (SP_TEXT_SIZE * r.w) + 'px';
+                node.style.left = (r.left + t.x * r.w) + 'px';
+                node.style.top = (r.top + t.y * r.h) + 'px';
+                node.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+                node.addEventListener('touchend', e => e.stopPropagation(), { passive: true });
+                node.addEventListener('pointerdown', e => {
+                    if (node.isContentEditable) return;
+                    e.stopPropagation();
+                    node.setPointerCapture(e.pointerId);
+                    const sx = e.clientX, sy = e.clientY, ox = t.x, oy = t.y;
+                    let moved = false;
+                    const mv = ev => {
+                        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+                        if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+                        t.x = Math.min(1, Math.max(0, ox + dx / r.w));
+                        t.y = Math.min(1, Math.max(0, oy + dy / r.h));
+                        node.style.left = (r.left + t.x * r.w) + 'px';
+                        node.style.top = (r.top + t.y * r.h) + 'px';
+                    };
+                    const up = () => {
+                        node.removeEventListener('pointermove', mv);
+                        node.removeEventListener('pointerup', up);
+                        node.removeEventListener('pointercancel', up);
+                        if (!moved) spEditText(node, t);
+                    };
+                    node.addEventListener('pointermove', mv);
+                    node.addEventListener('pointerup', up);
+                    node.addEventListener('pointercancel', up);
+                });
+                layer.appendChild(node);
+            });
+        }
+
+        spEl('sp-img').addEventListener('load', spRenderEdit);
+        window.addEventListener('resize', () => { if (spEl('story-preview-overlay').classList.contains('active')) spRenderEdit(); });
+        spEl('sp-add-text').addEventListener('click', () => {
+            const it = spState.items[spState.index];
+            if (!it || it.type !== 'image') return;
+            const t = { text: 'Text', x: 0.5, y: 0.5 };
+            spEdit(it).texts.push(t);
+            spRenderEdit();
+            const nodes = spEl('sp-text-layer').children;
+            if (nodes.length) spEditText(nodes[nodes.length - 1], t);
+        });
+
+        // Draw filter + text onto a canvas and hand back a JPEG file; untouched photos and videos upload as-is.
+        async function spBakeItem(it) {
+            if (it.type !== 'image' || !it.edit) return it.file;
+            const ed = it.edit;
+            const css = SP_CAN_FILTER ? spFilterCss(ed.filter) : 'none';
+            const texts = ed.texts.filter(t => t.text);
+            if (css === 'none' && !texts.length) return it.file;
+            try {
+                const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = it.url; });
+                const k = Math.min(1, 2160 / Math.max(img.naturalWidth, img.naturalHeight));
+                const W = Math.round(img.naturalWidth * k), H = Math.round(img.naturalHeight * k);
+                const c = document.createElement('canvas');
+                c.width = W; c.height = H;
+                const ctx = c.getContext('2d');
+                if (css !== 'none') ctx.filter = css;
+                ctx.drawImage(img, 0, 0, W, H);
+                ctx.filter = 'none';
+                const size = SP_TEXT_SIZE * W;
+                ctx.font = `800 ${size}px ${SP_FONT}`;
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0,0,0,.55)';
+                ctx.shadowBlur = size * 0.2;
+                ctx.shadowOffsetY = size * 0.06;
+                texts.forEach(t => {
+                    const lines = t.text.split('\n');
+                    lines.forEach((ln, i) => ctx.fillText(ln, t.x * W, t.y * H + (i - (lines.length - 1) / 2) * size * 1.2));
+                });
+                const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+                if (!blob) return it.file;
+                return new File([blob], (it.file.name || 'story').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+            } catch (_) { return it.file; }
+        }
 
         function openStoryCaptionSheet() {
             const input = document.getElementById('story-caption-input');
@@ -38864,6 +39034,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }
 
             storyState.elapsedMs = 0;
+            storyState.bufferHold = false;
 
             const musicAudioEl = document.getElementById('story-music-audio');
             const musicChip = document.getElementById('story-music-chip');
@@ -38871,6 +39042,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             musicAudioEl.currentTime = 0;
             const hasMusic = !!(current.music && current.music.previewUrl);
             if (hasMusic) {
+                musicAudioEl.preload = 'auto';
                 musicAudioEl.src = current.music.previewUrl;
                 musicAudioEl.muted = storiesGloballyMuted;
                 document.getElementById('story-music-chip-art').src = current.music.artworkUrl || '';
@@ -38909,6 +39081,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 videoEl.style.display = 'block';
                 videoEl.src = current.mediaURL;
                 videoEl.currentTime = 0;
+                // With a song the story runs 30s, so a shorter clip loops to stay in step with the music.
+                videoEl.loop = hasMusic;
                 videoEl.muted = hasMusic ? true : storiesGloballyMuted;
                 muteBtn.style.display = 'flex';
                 updateMuteIcon();
@@ -39006,7 +39180,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
             if (current.type === 'video') { videoEl.play().catch(() => {}); }
             if (current.music) {
-                musicAudioEl.currentTime = storyState.elapsedMs / 1000;
+                let musicTarget = storyState.elapsedMs / 1000;
+                if (current.type === 'video' && !videoEl.loop && !videoEl.ended && videoEl.readyState >= 1) musicTarget = videoEl.currentTime;
+                if (Math.abs(musicAudioEl.currentTime - musicTarget) > 0.25) musicAudioEl.currentTime = musicTarget;
                 musicAudioEl.play().catch(() => {});
             }
 
@@ -46275,6 +46451,38 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             videoEl.addEventListener('error', show);
         }
         wireStoryVideoLoadingOverlay(document.getElementById('story-viewer-video'), document.getElementById('story-viewer-loading'));
+
+        // Story video + music stay in sync: if either one is buffering, pause both (and the progress
+        // timer) until both can play again, then resume together.
+        (function wireStoryBufferSync() {
+            const vid = document.getElementById('story-viewer-video');
+            const aud = document.getElementById('story-music-audio');
+            const loading = document.getElementById('story-viewer-loading');
+            const needsSync = () => {
+                const c = storyState.items[storyState.index];
+                return !!(c && c.type === 'video' && c.music && c.music.previewUrl);
+            };
+            const bothReady = () => vid.readyState >= 3 && (aud.readyState >= 3 || !!aud.error);
+            const hold = () => {
+                if (!needsSync() || storyState.bufferHold || !storyState.timer || aud.seeking) return;
+                storyState.bufferHold = true;
+                pauseStory();
+                loading.classList.remove('hidden');
+            };
+            const release = () => {
+                if (!storyState.bufferHold || !needsSync() || !bothReady()) return;
+                storyState.bufferHold = false;
+                loading.classList.add('hidden');
+                resumeStory();
+            };
+            [vid, aud].forEach(el => {
+                el.addEventListener('waiting', hold);
+                el.addEventListener('stalled', hold);
+                el.addEventListener('canplay', release);
+                el.addEventListener('playing', release);
+            });
+            aud.addEventListener('error', release);
+        })();
 
         function playIconSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>'; }
 

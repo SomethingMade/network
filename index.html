@@ -6915,6 +6915,7 @@ body.dark-theme .feed-comment-icon-btn{color:#C9CDD5}
     if(window.ResizeObserver) new ResizeObserver(check).observe(cap);
   }
   function scan(root){ (root.querySelectorAll?root.querySelectorAll('.feed-post-card-ig'):[]).forEach(setup); if(root.classList&&root.classList.contains('feed-post-card-ig')) setup(root); }
+  window.__scScan=scan;
   function boot(){
     var c=document.getElementById('feed-posts-container'); if(!c) return;
     scan(c);
@@ -9776,6 +9777,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         <input type="checkbox" id="setting-black-accent-toggle">
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+                <div class="wa-list-row">
+                    <div class="wa-row-icon chip-black"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="7" y1="8" x2="17" y2="8"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="7" y1="16" x2="12" y2="16"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Post design</span>
+                        <span class="wa-row-sub">Choose how posts look in the feed, profiles and communities</span>
+                    </div>
+                    <select id="setting-post-design-select" class="post-design-select" aria-label="Post design">
+                        <option value="current">Current</option>
+                        <option value="x">X (Twitter)</option>
+                    </select>
                 </div>
             </div>
             </div>
@@ -12809,6 +12821,38 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 if (!e.target.checked) { try { pauseAllFeedMedia(); } catch (err) {} }
             });
         }
+
+        // --- POST DESIGN (Current vs X/Twitter) ---
+        // 'current' = the existing card (.feed-post-card-ig); 'x' = X-style card
+        // (.feed-post-card-x, see <style id="x-post-design">). Cards are built with whichever
+        // class matches the setting, and already-rendered cards are swapped live on change.
+        function getPostDesign() {
+            try { return localStorage.getItem('messenger_post_design') === 'x' ? 'x' : 'current'; }
+            catch (e) { return 'current'; }
+        }
+        window.postCardDesignClass = () => (getPostDesign() === 'x' ? 'feed-post-card-x' : 'feed-post-card-ig');
+        function applyPostDesign(design) {
+            const isX = design === 'x';
+            document.body.classList.toggle('post-design-x', isX);
+            document.querySelectorAll('.feed-post-card.feed-post-card-ig, .feed-post-card.feed-post-card-x').forEach((card) => {
+                card.classList.toggle('feed-post-card-x', isX);
+                card.classList.toggle('feed-post-card-ig', !isX);
+            });
+            if (!isX && typeof window.__scScan === 'function') {
+                const feed = document.getElementById('feed-posts-container');
+                if (feed) window.__scScan(feed);
+            }
+        }
+        const postDesignSelect = document.getElementById('setting-post-design-select');
+        if (postDesignSelect) {
+            postDesignSelect.value = getPostDesign();
+            postDesignSelect.addEventListener('change', (e) => {
+                const d = e.target.value === 'x' ? 'x' : 'current';
+                try { localStorage.setItem('messenger_post_design', d); } catch (err) {}
+                applyPostDesign(d);
+            });
+        }
+        applyPostDesign(getPostDesign());
 
         // --- CHAT WALLPAPER SETTINGS ---
         const WALLPAPER_CSS_CLASSES = ['wallpaper-default-1', 'wallpaper-default-2', 'wallpaper-default-3', 'wallpaper-custom'];
@@ -23392,7 +23436,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const targetId = (isRepost && !isQuote) ? originalId : postId;
 
             const card = document.createElement('div');
-            card.className = 'feed-post-card feed-post-card-ig';
+            card.className = 'feed-post-card ' + (window.postCardDesignClass ? window.postCardDesignClass() : 'feed-post-card-ig');
             card.dataset.postId = postId;
             card.dataset.contentPostId = targetId;
 
@@ -35213,7 +35257,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const sender = cachedUsers[msg.senderUid] || {};
             const msgId = communityMsgEngagementId(msg);
             const card = document.createElement('div');
-            card.className = 'feed-post-card feed-post-card-ig community-post-card' + (opts && opts.inCommunity ? ' in-community-view' : '');
+            card.className = 'feed-post-card ' + (window.postCardDesignClass ? window.postCardDesignClass() : 'feed-post-card-ig') + ' community-post-card' + (opts && opts.inCommunity ? ' in-community-view' : '');
             card.dataset.groupId = msg.groupId;
             card.dataset.msgId = msgId;
             card.dataset.communityName = (group.name || '').toLowerCase();
@@ -47550,5 +47594,44 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
   btn.addEventListener('click',function(e){e.stopPropagation();try{triggerHaptic(10)}catch(x){}var b=document.getElementById('btn-open-settings');if(b)b.click();});
 })();
 </script>
+<style id="x-post-design">
+/* X (Twitter) post design — active only on cards carrying .feed-post-card-x
+   (Settings > Accessibility, display and languages > Post design). */
+.post-design-select { flex-shrink: 0; max-width: 130px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-input, var(--bg-alt)); color: var(--text-primary); font-family: inherit; font-size: 13.5px; font-weight: 600; }
+body.post-design-x #feed-posts-container { background: var(--bg-surface); }
+.feed-post-card.feed-post-card-x {
+    --x-avatar-size: 40px;
+    display: flex; flex-direction: column; position: relative;
+    background: var(--bg-surface) !important; color: var(--text-primary);
+    margin: 0 !important; padding: 12px 16px 6px;
+    border: none !important; border-bottom: 1px solid var(--border-color) !important;
+    border-radius: 0 !important; box-shadow: none !important; overflow: visible;
+}
+@media (hover: hover) { .feed-post-card.feed-post-card-x:hover { background: var(--bg-hover) !important; } }
+.feed-post-card-x .x-post-row { padding: 0; gap: 12px; align-items: flex-start; }
+.feed-post-card-x .x-post-avatar-col .avatar { width: 40px; height: 40px; font-size: 15px; }
+.feed-post-card-x .x-post-headline .name { font-size: 15px; font-weight: 700; }
+.feed-post-card-x .x-post-headline-main { gap: 4px; }
+.feed-post-card-x .x-post-headline-main .time { display: inline !important; font-size: 15px; color: var(--text-secondary); }
+.feed-post-card-x .x-post-headline-main .x-post-handle { font-size: 15px; font-weight: 400; color: var(--text-secondary); }
+.feed-post-card-x .x-post-username-text, .feed-post-card-x .x-post-username .sc-dot, .feed-post-card-x .x-post-username .sc-date { display: none !important; }
+.feed-post-card-x .x-post-username:not(:has(.feed-post-location)) { display: none; }
+.feed-post-card-x .feed-thread-connector { display: none; }
+.feed-post-card-x.has-connector-down > .feed-thread-connector-down, .feed-post-card-x.has-connector-up > .feed-thread-connector-up { display: block; left: calc(16px + 20px - 1px); }
+.feed-post-card-x .feed-post-body { margin: 2px 0 0 52px; width: calc(100% - 52px); padding: 0; }
+.feed-post-card-x .ig-caption { display: block; }
+.feed-post-card-x .ig-caption .feed-post-text { display: block; margin: 0; font-size: 15px; font-weight: 400; line-height: 1.4; overflow: visible; -webkit-line-clamp: unset; }
+.feed-post-card-x .ig-caption .sc-more, .feed-post-card-x .ig-view-comments, .feed-post-card-x .ig-likes-line, .feed-post-card-x .ig-timestamp { display: none !important; }
+.feed-post-card-x > .x-media-grid { margin: 10px 0 0 52px; width: calc(100% - 52px); }
+.feed-post-card-x > .x-media-grid[data-count="1"], .feed-post-card-x > .x-media-collage { border-radius: 16px; border: 1px solid var(--border-color); overflow: hidden; }
+.feed-post-card-x > .feed-post-video-wrap { margin: 10px 0 0 52px; width: calc(100% - 52px); border-radius: 16px; border: 1px solid var(--border-color); overflow: hidden; }
+.feed-post-card-x > .feed-post-ad-cta { margin: 10px 0 0 52px; }
+.feed-post-card-x .feed-post-ad-card-footer { margin: 0; width: 100%; border-radius: 0 0 16px 16px; }
+.feed-post-card-x .feed-post-actions { order: 0; margin: 4px 0 0 52px; padding: 0; width: auto; max-width: calc(100% - 52px); border: none; }
+.feed-post-card-x .feed-post-actions-left { justify-content: space-between; gap: 0; width: 100%; flex-wrap: nowrap; }
+.feed-post-card-x .feed-post-action-btn { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+.feed-post-card-x .feed-post-action-btn svg { width: 18px; height: 18px; }
+.feed-post-card-x .feed-post-reactors { margin: 4px 0 0 52px; padding: 0; order: 0; font-size: 13px; color: var(--text-secondary); }
+</style>
 </body>
 </html>

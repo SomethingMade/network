@@ -9783,15 +9783,15 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div class="wa-list-row">
+                <div class="wa-list-row" style="display:none">
                     <div class="wa-row-icon chip-black"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="7" y1="8" x2="17" y2="8"></line><line x1="7" y1="12" x2="17" y2="12"></line><line x1="7" y1="16" x2="12" y2="16"></line></svg></div>
                     <div class="wa-row-body">
                         <span class="wa-row-title">Post design</span>
                         <span class="wa-row-sub">Choose how posts look in the feed, profiles and communities</span>
                     </div>
                     <select id="setting-post-design-select" class="post-design-select" aria-label="Post design">
-                        <option value="current">Current</option>
                         <option value="x">X (Twitter)</option>
+                        <option value="current">Current</option>
                     </select>
                 </div>
             </div>
@@ -11305,7 +11305,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 </button>
                                 <button type="button" class="home-header-heart-btn" id="home-header-heart-btn" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
                                 <button type="button" class="home-header-dm-btn" id="home-header-dm-btn" aria-label="Messages" title="Messages">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.7 8.7 0 0 1-3.7-.8L3 20.5l1.6-4.9A8.1 8.1 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3.2 8.4 8.4 0 0 1 21 11.5z"></path></svg>
                                     <span class="home-header-dm-dot"></span>
                                 </button>
                                 <div class="chat-view-menu-wrap">
@@ -12832,8 +12832,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // (.feed-post-card-x, see <style id="x-post-design">). Cards are built with whichever
         // class matches the setting, and already-rendered cards are swapped live on change.
         function getPostDesign() {
-            try { return localStorage.getItem('messenger_post_design') === 'x' ? 'x' : 'current'; }
-            catch (e) { return 'current'; }
+            // X design is forced for everyone (the old "Current" look is retired).
+            return 'x';
         }
         window.postCardDesignClass = () => (getPostDesign() === 'x' ? 'feed-post-card-x' : 'feed-post-card-ig');
         function applyPostDesign(design) {
@@ -12852,7 +12852,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         if (postDesignSelect) {
             postDesignSelect.value = getPostDesign();
             postDesignSelect.addEventListener('change', (e) => {
-                const d = e.target.value === 'x' ? 'x' : 'current';
+                const d = 'x';
                 try { localStorage.setItem('messenger_post_design', d); } catch (err) {}
                 applyPostDesign(d);
             });

@@ -47696,5 +47696,55 @@ body.post-design-x .feed-post-card-x .feed-post-text,
 body.post-design-x .feed-post-card-x .ig-caption .feed-post-text,
 body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list) .feed-post-card-x .feed-post-text { font-weight: 700 !important; }
 </style>
+
+<style id="x-feed-header">
+/* ══ X-style feed header (phones): avatar · centered logo · messages bubble, equal-width tabs, floating + ══ */
+@media (max-width: 768px) {
+    body #tab-status .chat-header-area { padding: calc(8px + min(env(safe-area-inset-top), 20px)) 16px 4px; background: color-mix(in srgb, var(--bg-base) 88%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-bottom: none; }
+    body #tab-status .chat-header-top { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+    /* left: your avatar (opens profile) */
+    body #tab-status .home-header-title-row { margin: 0; flex: 0 0 auto; }
+    body #tab-status .home-header-title-row .header-profile-btn { display: flex !important; width: 32px; height: 32px; }
+    body #tab-status .home-header-title-row h1,
+    body #tab-status .home-header-wordmark { display: none !important; }
+    /* center: brand mark */
+    body #tab-status .home-header-logo { display: block !important; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); color: var(--text-primary); pointer-events: none; }
+    /* right: messages only */
+    body #tab-status .chat-header-icons { margin: 0; gap: 0; }
+    body #tab-status .chat-header-icons > :not(.home-header-dm-btn) { display: none !important; }
+    body #tab-status .home-header-dm-btn { display: flex !important; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -8px; }
+    body #tab-status .home-header-dm-btn svg { width: 25px; height: 25px; }
+
+    /* tabs: equal width, medium grey when idle, bold + short blue bar when active */
+    body #feed-subtabs .feed-subtab-btn { flex: 1 1 0; font-weight: 500; font-size: 15px; padding: 13px 0 12px; color: var(--text-secondary); }
+    body #feed-subtabs .feed-subtab-btn.active { font-weight: 700; color: var(--text-primary); }
+    body #feed-subtabs .feed-subtab-btn.active::after { left: 50%; right: auto; width: 56px; height: 4px; border-radius: 4px; transform: translateX(-50%); background: var(--primary-blue); }
+
+    /* floating create button, only on Home */
+    #x-feed-fab { display: none; position: fixed; right: 18px; bottom: calc(var(--nav-float-h, 64px) + 34px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--primary-blue); color: #fff; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.28); z-index: 90; cursor: pointer; transition: transform .2s ease, opacity .2s ease; -webkit-tap-highlight-color: transparent; }
+    #x-feed-fab:active { transform: scale(.92); }
+    #x-feed-fab svg { width: 26px; height: 26px; }
+    body:has(#tab-status.active-tab) #x-feed-fab { display: flex; }
+    #x-feed-fab.x-fab-hidden { transform: translateY(140%); opacity: 0; pointer-events: none; }
+}
+@media (min-width: 769px) { #x-feed-fab { display: none !important; } }
+</style>
+<button type="button" id="x-feed-fab" aria-label="Create" title="Create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+<script>
+(function xFeedFab(){
+  var fab=document.getElementById('x-feed-fab'); if(!fab) return;
+  fab.addEventListener('click',function(){
+    try{triggerHaptic(12)}catch(e){}
+    var o=document.getElementById('create-options-sheet-overlay'); if(o) o.classList.add('active');
+  });
+  // slide away while reading down, come back on scroll up (same cue as the header)
+  var sc=document.getElementById('discover-grid-scroll'); if(!sc) return;
+  var last=sc.scrollTop;
+  sc.addEventListener('scroll',function(){
+    var cur=sc.scrollTop, d=cur-last; if(Math.abs(d)<6) return;
+    fab.classList.toggle('x-fab-hidden', d>0 && cur>40); last=cur;
+  },{passive:true});
+})();
+</script>
 </body>
 </html>

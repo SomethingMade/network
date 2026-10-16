@@ -3229,7 +3229,12 @@
         .feed-stories-strip { display: flex; gap: 8px; overflow-x: auto; padding: 6px 14px 8px; scrollbar-width: none; border-bottom: 4px solid var(--bg-alt); -webkit-overflow-scrolling: touch; }
         .feed-stories-strip::-webkit-scrollbar { display: none; }
         .feed-stories-strip:empty { display: none; }
-        .feed-stories-strip .story-card { width: 104px; height: 176px; border-radius: 12px; }
+        /* X-style circular stories: avatar rings instead of tall cards. */
+        .feed-stories-strip { gap: 14px; padding: 10px 14px 12px; }
+        .feed-stories-strip .story-item { width: 68px; }
+        .feed-stories-strip .story-ring { width: 64px; height: 64px; }
+        .feed-stories-strip .story-ring-inner { width: 56px; height: 56px; }
+        .feed-stories-strip .story-label { font-size: 12px; max-width: 68px; }
         /* White fade at the bottom of each story card, with dark name text on top of it. */
         .feed-stories-strip .story-card-gradient { height: 48%; background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.75) 55%, rgba(255,255,255,0.95) 100%); }
         .feed-stories-strip .story-card:not(.story-card-add) .story-card-name { color: #111111; text-shadow: none; }
@@ -22942,6 +22947,23 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             let label = names.join(', ');
             if (remaining > 0) label += (names.length ? ' and ' : '') + `${formatFeedCount(remaining)} other${remaining === 1 ? '' : 's'}`;
             labelEl.textContent = label ? `Liked by ${label}` : '';
+
+            // Profiles load lazily, so on first paint the names/avatars may not be cached yet and
+            // would show as "Someone". Fetch whoever is missing, then redraw this row with the
+            // real names. (Guarded so each uid is only fetched once per pass — no loops.)
+            const missingShown = shown.filter(uid => !Object.prototype.hasOwnProperty.call(userStore, uid) && !userMissing.has(uid));
+            if (missingShown.length && !card._reactorsFetching) {
+                card._reactorsFetching = true;
+                Promise.all(missingShown.map(async (uid) => {
+                    try {
+                        const snap = await get(ref(database, `users/${uid}`));
+                        storeUserSnapshot(uid, snap, true);
+                    } catch (err) { userMissing.add(uid); }
+                })).then(() => {
+                    card._reactorsFetching = false;
+                    try { renderPostReactors(card, post); } catch (e) { /* card gone */ }
+                });
+            }
         }
 
         // ── "Who reacted" bottom sheet ──
@@ -38538,9 +38560,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const now = Date.now();
 
             const ownProfile = (usersData && usersData[user.uid]) || {};
-            grid.appendChild(buildAddStoryCardItem(ownProfile.photoURL || user.photoURL || ""));
-            const addLbl = grid.querySelector('.story-card-add .story-card-name');
-            if (addLbl) addLbl.textContent = 'Create a story';
+            grid.appendChild(buildAddStoryItem(false, ownProfile.photoURL || user.photoURL || ""));
+            const addLbl = grid.querySelector('.story-item.is-add-story .story-label');
+            if (addLbl) addLbl.textContent = 'Create story';
 
             let othersCount = 0;
             let unreadCount = 0;
@@ -38551,7 +38573,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
 
             if (ownItems.length > 0) {
-                grid.appendChild(buildStoryCardItem(
+                grid.appendChild(buildStoryItem(
                     user.uid,
                     ownProfile.name || user.displayName || "You",
                     ownProfile.photoURL || user.photoURL || "",
@@ -38573,7 +38595,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // mirroring how their ring shows colored (not greyed out) in the grid below.
                 if (items.some(item => !(item.views && item.views[user.uid]))) unreadCount++;
                 const profile = (usersData && usersData[uid]) || {};
-                grid.appendChild(buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false));
+                grid.appendChild(buildStoryItem(uid, profile.name || "User", profile.photoURL || "", items, false));
             });
 
         }

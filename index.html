@@ -46936,7 +46936,29 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const uids = [];
                 snap.forEach((c) => { uids.push(c.key); });
                 uids.reverse().slice(0, 300).forEach(watchStoryAuthor);
-            });
+            }, () => { discoverStoryAuthors(); });
+
+            // Safety net so EVERYONE's live stories are visible to everyone: the story_authors index
+            // can miss people (stories posted before the index existed, a failed/blocked index write,
+            // or an index read that errors). So also scan the stories node for anyone with a live
+            // story, start watching them, and repair my own index entry. Runs at start and every
+            // few minutes while the app is open.
+            const discoverStoryAuthors = async () => {
+                try {
+                    const snap = await get(ref(database, 'stories'));
+                    const now = Date.now();
+                    const found = [];
+                    snap.forEach((c) => {
+                        const v = c.val() || {};
+                        const hasLive = Object.keys(v).some((k) => v[k] && now - v[k].createdAt < STORY_TTL);
+                        if (hasLive) found.push(c.key);
+                    });
+                    found.slice(0, 300).forEach(watchStoryAuthor);
+                    if (found.includes(user.uid)) markStoryAuthor(user.uid);
+                } catch (e) { /* non-fatal: the index listener above still works */ }
+            };
+            discoverStoryAuthors();
+            setInterval(() => { if (document.visibilityState === 'visible') discoverStoryAuthors(); }, 5 * 60 * 1000);
 
             onValue(ref(database, "communities"), (snap) => {
                 cachedCommunities = snap.exists() ? snap.val() : {};

@@ -16387,7 +16387,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             await Promise.all(archivedUids.map(async (uid) => {
                 if (uid === AI_UID) return;
                 const meta = chats[uid];
-                if (meta && isE2EPayload(meta.text)) meta.text = await decryptForPeer(uid, meta.text);
+                if (meta && isE2EPayload(meta.text)) meta.text = friendlyE2EPreview(await decryptForPeer(uid, meta.text));
             }));
 
             archivedUids.sort((a, b) => (chats[b].timestamp || 0) - (chats[a].timestamp || 0));
@@ -42699,6 +42699,19 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // with our cached shared key (most commonly because the peer's key rotated after we
         // cached it), we drop the cache and retry once against whatever is currently published
         // before giving up — this self-heals the vast majority of "Unable to decrypt" cases.
+        // Old messages sealed with a key this account no longer has (no backup PIN set, or the PIN
+        // was lost and the key was reset) can never be opened again. Rather than littering chats with
+        // "Unable to decrypt" rows, those text messages are dropped from the thread and previews, and
+        // the chat just carries on with the current (new) key.
+        const E2E_UNREADABLE_TEXT = '🔒 Unable to decrypt message';
+        function dropUnreadableE2EMessages(list) {
+            for (let i = list.length - 1; i >= 0; i--) {
+                const m = list[i];
+                if (m && m.text === E2E_UNREADABLE_TEXT && !m.mediaURL) list.splice(i, 1);
+            }
+        }
+        function friendlyE2EPreview(text) { return text === E2E_UNREADABLE_TEXT ? '🔒 Encrypted message' : text; }
+
         async function decryptForPeer(peerUid, payload) {
             if (!isE2EPayload(payload)) return payload;
             const key = await deriveSharedKey(peerUid);
@@ -43237,9 +43250,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             try {
                 const backup = await fetchKeyBackup(uid);
                 if (backup) return; // already backed up — nothing to prompt
-                const snoozedUntil = parseInt(localStorage.getItem(snoozeKeyFor(uid)) || '0', 10);
-                if (Date.now() < snoozedUntil) return;
-                setTimeout(() => showE2EBackupPromptSheet(false), 900); // let the UI settle first
+                // No PIN yet? Don't interrupt: chats just work with this device's key. The PIN
+                // stays optional under Settings > Encryption & recovery.
             } catch (e) { /* if we can't tell, don't nag */ }
         }
 
@@ -44969,6 +44981,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                     msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
                                 }
                             }));
+                            dropUnreadableE2EMessages(entries);
                         }
 
                         entries.forEach(msg => {
@@ -45545,6 +45558,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                             msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
                         }
                     }));
+                    dropUnreadableE2EMessages(liveItems);
                 }
 
                 // Sound cue for a message that just landed in this thread: a brand-new key that's
@@ -47139,7 +47153,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const profile = cachedUsers[chatUid] || {};
                 let text = meta.text || '';
                 if (isE2EPayload(text)) {
-                    try { text = await decryptForPeer(chatUid, text); } catch (err) { text = 'New message'; }
+                    try { text = friendlyE2EPreview(await decryptForPeer(chatUid, text)); } catch (err) { text = 'New message'; }
                 }
 
                 enqueueInAppMessageBanner({
@@ -47172,7 +47186,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 await Promise.all(Object.keys(chats || {}).map(async (chatUid) => {
                     if (chatUid === AI_UID) return;
                     const meta = chats[chatUid];
-                    if (meta && isE2EPayload(meta.text)) meta.text = await decryptForPeer(chatUid, meta.text);
+                    if (meta && isE2EPayload(meta.text)) meta.text = friendlyE2EPreview(await decryptForPeer(chatUid, meta.text));
                 }));
                 const myGroupIds = Object.keys(cachedCommunities).filter(gid => cachedCommunities[gid].members && cachedCommunities[gid].members[user.uid]);
 

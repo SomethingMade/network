@@ -9792,6 +9792,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             <div class="settings-x-subpanel-scroll">
             <div class="wa-section">
                 <div class="wa-section-title">Storage &amp; Data</div>
+                <div class="wa-list-row">
+                    <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v13"></path><polyline points="7 11 12 16 17 11"></polyline><path d="M5 21h14"></path></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Data saver</span>
+                        <span class="wa-row-sub">Compress photos before upload and stop videos from auto-playing</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-data-saver-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
                 <div class="wa-list-row wa-row-clickable" id="setting-storage-data">
                     <div class="wa-row-icon chip-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div>
                     <div class="wa-row-body">
@@ -12780,6 +12791,24 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const savedAccentColor = localStorage.getItem('messenger_accent_color') || 'black';
         blackAccentToggle.checked = savedAccentColor === 'black';
         applyAccentColor(savedAccentColor);
+
+        // --- DATA SAVER ---
+        // ON by default: only an explicit '0' (the person switching it off) disables it.
+        // When on, uploads are compressed (compressImageForUpload) and feed videos wait
+        // for a tap instead of auto-playing as they scroll into view.
+        function isDataSaverOn() {
+            try { return localStorage.getItem('messenger_data_saver') !== '0'; }
+            catch (e) { return true; }
+        }
+        window.isDataSaverOn = isDataSaverOn;
+        const dataSaverToggle = document.getElementById('setting-data-saver-toggle');
+        if (dataSaverToggle) {
+            dataSaverToggle.checked = isDataSaverOn();
+            dataSaverToggle.addEventListener('change', (e) => {
+                try { localStorage.setItem('messenger_data_saver', e.target.checked ? '1' : '0'); } catch (err) {}
+                if (!e.target.checked) { try { pauseAllFeedMedia(); } catch (err) {} }
+            });
+        }
 
         // --- CHAT WALLPAPER SETTINGS ---
         const WALLPAPER_CSS_CLASSES = ['wallpaper-default-1', 'wallpaper-default-2', 'wallpaper-default-3', 'wallpaper-custom'];
@@ -17369,6 +17398,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // isn't actually smaller.
         async function compressImageForUpload(file, maxEdge = 1600, quality = 0.8) {
             try {
+                if (typeof window.isDataSaverOn === 'function' && !window.isDataSaverOn()) return file;
                 const type = (file && file.type || '').toLowerCase();
                 if (!/^image\/(jpeg|jpg|png|webp|heic|heif)$/.test(type)) return file;
                 let bmp;
@@ -22491,6 +22521,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 entries.forEach((entry) => {
                     const video = entry.target;
                     if (entry.isIntersecting) {
+                        if (typeof window.isDataSaverOn === 'function' && window.isDataSaverOn()) return; // Data saver: tap to play
                         if (video.paused) {
                             document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(v => { if (v !== video && !v.paused) v.pause(); });
                             video.play().catch(() => {});

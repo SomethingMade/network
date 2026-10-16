@@ -7274,6 +7274,9 @@ body.dark-theme .dhc-input{background:var(--fb-hover)}
 <style id="fb-community-post-theme">
 /* Community posts use the exact feed-post design; the community shows inline in the header ("@user in Community") instead of a separate strip above the post. */
 .community-post-card:active{background:var(--fb-card)}
+.community-post-card.in-community-view .community-post-in{display:none}
+.community-post-card.in-community-view,.community-post-card.in-community-view:active{cursor:default;background:var(--bg-surface)}
+#chat-view-messages .community-post-card{align-self:stretch;width:100%;max-width:100%;box-sizing:border-box;margin:6px 0;border-radius:14px;overflow:hidden}
 .community-post-in{display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:inherit;color:var(--fb-sub);vertical-align:middle;min-width:0}
 .community-post-in .avatar{width:16px;height:16px;border-radius:4px;flex-shrink:0}
 .community-post-in-name{color:var(--fb-text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
@@ -12681,7 +12684,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction, orderByKey, limitToFirst, orderByValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -17359,6 +17362,37 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // onProgress, when passed, receives 0-100 as the upload streams (used by the story
         // upload progress ring). Existing callers that don't pass it keep the original
         // one-shot uploadBytes behavior untouched.
+        // Data saver: phone photos are 3-10MB, and every viewer downloads them at that size. Scale
+        // the long edge down and re-encode as JPEG before upload so posts, stories and profile
+        // photos cost far less data for everyone. GIFs, non-images, already-small files and anything
+        // the browser can't decode pass through untouched; the original is also kept if the result
+        // isn't actually smaller.
+        async function compressImageForUpload(file, maxEdge = 1600, quality = 0.8) {
+            try {
+                const type = (file && file.type || '').toLowerCase();
+                if (!/^image\/(jpeg|jpg|png|webp|heic|heif)$/.test(type)) return file;
+                let bmp;
+                try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+                catch (e) { bmp = await createImageBitmap(file); }
+                const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+                if (scale === 1 && file.size <= 300 * 1024) { if (bmp.close) bmp.close(); return file; }
+                const w = Math.max(1, Math.round(bmp.width * scale));
+                const h = Math.max(1, Math.round(bmp.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(bmp, 0, 0, w, h);
+                if (bmp.close) bmp.close();
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+                if (!blob || blob.size >= file.size) return file;
+                const base = (file.name || 'photo').replace(/\.[^.]+$/, '');
+                return new File([blob], base + '.jpg', { type: 'image/jpeg' });
+            } catch (e) { return file; }
+        }
+
         async function uploadToFirebaseStorage(file, path, onProgress) {
             const sRef = storageRef(storage, path);
             if (typeof onProgress !== 'function') {
@@ -18976,6 +19010,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         let discoverShuffleSeed = 0;
 
         function getDiscoverableUsers() {
+            ensureDiscoverPool();
             const user = auth.currentUser;
             const myUid = user ? user.uid : null;
             return Object.keys(cachedUsers || {}).filter(uid =>
@@ -19038,6 +19073,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!grid) return;
 
             const term = (searchTerm || '').trim().toLowerCase();
+            if (term) prefetchUsersMatching(term);
             const exploreTabsBar = document.getElementById('explore-tabs-bar');
             const explorePanels = document.querySelectorAll('.explore-panel');
             const suggestedPeopleSection = document.getElementById('suggested-people-section');
@@ -19569,6 +19605,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function getGlobalSearchResults(query) {
             const q = query.trim().toLowerCase();
             if (!q) return { people: [], posts: [] };
+            prefetchUsersMatching(q).then((changed) => { if (changed && searchDiscoverInput.value.trim().toLowerCase() === q) renderDiscoverSearchDropdown(); });
             const myUid = auth.currentUser && auth.currentUser.uid;
             const startsWithSort = (arr, keyFn) => arr.sort((a, b) => {
                 const aStarts = keyFn(a).toLowerCase().startsWith(q) ? 0 : 1;
@@ -20893,7 +20930,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             function uploadComposerImageEntry(entry, file, uid) {
                 const safeName = (file.name || 'image').replace(/[^a-zA-Z0-9.\-_]/g, '_');
                 const path = `posts/${uid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-                entry.promise = uploadToFirebaseStorage(file, path).then((url) => {
+                entry.promise = compressImageForUpload(file).then((small) => uploadToFirebaseStorage(small, path)).then((url) => {
                     entry.url = url;
                     entry.uploading = false;
                     if (feedComposerImages.includes(entry)) renderComposerPreview();
@@ -21242,6 +21279,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         : null;
 
                     // Union of people typed as @mentions and people picked via the Tag People sheet.
+                    await ensureMentionsLoaded(text);
                     const mentionedUids = new Set([...extractMentionedUids(text), ...pendingTaggedUids]);
                     const mentionsMap = {};
                     mentionedUids.forEach(uid => { mentionsMap[uid] = true; });
@@ -23367,16 +23405,16 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         const shown = postImages.slice(0, 5);
                         const extra = postImages.length - shown.length;
                         return `<div class="x-media-collage" data-n="${shown.length}">
-                            ${shown.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt="">${(extra > 0 && idx === shown.length - 1) ? `<span class="x-media-collage-more">+${extra}</span>` : ''}</div>`).join('')}
+                            ${shown.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt="" loading="lazy" decoding="async">${(extra > 0 && idx === shown.length - 1) ? `<span class="x-media-collage-more">+${extra}</span>` : ''}</div>`).join('')}
                         </div>`;
                     })() : `<div class="x-media-carousel-track">
-                        ${postImages.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt=""></div>`).join('')}
+                        ${postImages.map((url, idx) => `<div class="x-media-grid-item"><img src="${url}" data-idx="${idx}" alt="" loading="lazy" decoding="async"></div>`).join('')}
                     </div>`}
                     ${post.music ? `<button type="button" class="feed-post-music-toggle-btn" aria-label="Play sound"><svg class="feed-music-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></button>` : ''}
                 </div>${post.music ? `<audio class="feed-post-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}` : '';
             const videoHtml = post.videoUrl ? `
                 <div class="feed-post-video-wrap${isCardAd ? ' has-ad-cta' : ''}" data-has-music="${post.music ? '1' : '0'}">
-                    <video class="feed-post-video" src="${post.videoUrl}" ${(() => { const t = post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
+                    <video class="feed-post-video" src="${post.videoUrl}" ${(() => { const t = post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1); return t ? `poster="${t}" preload="none"` : 'preload="metadata"'; })()} playsinline muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
                     ${post.music ? `<audio class="feed-post-video-music-audio" src="${post.music.previewUrl}" preload="none" loop></audio>` : ''}
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
@@ -25492,9 +25530,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 if (post) createNotification(post.uid, { type: 'comment', postId, commentId: newCommentRef.key, text: notifText });
             }
             // Anyone @tagged in the comment text gets a mention notification too.
-            extractMentionedUids(text).forEach((uid) => {
+            ensureMentionsLoaded(text).then(() => extractMentionedUids(text).forEach((uid) => {
                 if (uid !== user.uid) createNotification(uid, { type: 'mention', postId, commentId: newCommentRef.key, text: notifText });
-            });
+            }));
         }
 
         // --- MENTIONS ---
@@ -25548,6 +25586,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const match = textBefore.match(/(?:^|\s)@([a-zA-Z0-9_]{0,20})$/);
                 if (!match) { hideDropdown(); return; }
                 const query = match[1].toLowerCase();
+                prefetchUsersMatching(query).then((changed) => { if (changed && document.activeElement === inputEl) inputEl.dispatchEvent(new Event('input')); });
                 const me = auth.currentUser;
                 const results = Object.entries(cachedUsers)
                     .filter(([uid, u]) => u && u.username && (!me || uid !== me.uid) && u.username.toLowerCase().startsWith(query))
@@ -25610,6 +25649,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         function renderTagPeopleList(filterText) {
+            loadUsers([...Object.keys(cachedContacts || {}), ...Object.keys(cachedFollowers || {})]).then((ch) => { if (ch) renderTagPeopleList(filterText); });
+            prefetchUsersMatching(filterText).then((ch) => { if (ch) renderTagPeopleList(filterText); });
             const list = document.getElementById('tag-people-list');
             const emptyEl = document.getElementById('tag-people-empty');
             const me = auth.currentUser;
@@ -25821,6 +25862,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // Single-select variant of the Tag People sheet, filtered to Business Accounts. Tapping
         // an entry sets it immediately (no separate "Done" step) and closes the sheet.
         function renderChooseBusinessList(filterText) {
+            if (!businessPoolLoaded) loadBusinessUsersOnce().then((ch) => { businessPoolLoaded = true; if (ch) renderChooseBusinessList(filterText); });
+            prefetchUsersMatching(filterText).then((ch) => { if (ch) renderChooseBusinessList(filterText); });
             const list = document.getElementById('choose-business-list');
             const emptyEl = document.getElementById('choose-business-empty');
             const me = auth.currentUser;
@@ -27673,7 +27716,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             wrapper.classList.add('uploading');
             try {
                 const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(file, `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
+                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingSignupPhotoURL = url;
                 const preview = document.getElementById('signup-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
@@ -29949,7 +29992,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             wrapper.classList.add('uploading');
             try {
                 const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(file, `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
+                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingPhotoURL = url;
                 const preview = document.getElementById('profile-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
@@ -31425,6 +31468,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 remove(ref(database, 'userReplies/' + uid)),
                 remove(ref(database, 'call_log/' + uid)),
                 remove(ref(database, 'stories/' + uid)),
+                remove(ref(database, 'story_authors/' + uid)),
             ];
             try {
                 const username = cachedUsers[uid] && cachedUsers[uid].username;
@@ -31714,6 +31758,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
                 if (looksLikePhone) {
                     const key = normalizePhone(digitsOnly);
+                    await loadAllUsersOnce();
                     for (const uid of Object.keys(cachedUsers)) {
                         if (normalizePhone(cachedUsers[uid].phoneNumber) === key) { friendUid = uid; break; }
                     }
@@ -34746,7 +34791,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (ctx.realtimeGroupIds.has(gid)) return;
             ctx.realtimeGroupIds.add(gid);
             const cutoff = isFinite(sinceCreatedAt) ? sinceCreatedAt : Date.now();
-            const q = query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), startAt(cutoff + 1));
+            const q = query(ref(database, `community_posts/${gid}`), orderByChild('createdAt'), startAt(cutoff + 1));
             onChildAdded(q, (snap) => {
                 const m = snap.val();
                 if (!m) return;
@@ -34787,7 +34832,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     const batchIds = ctx.remainingGroupIds.splice(0, COMMUNITY_FEED_GROUPS_PER_BATCH);
                     const results = await Promise.all(batchIds.map(async (gid) => {
                         try {
-                            const snap = await get(query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            const snap = await get(query(ref(database, `community_posts/${gid}`), orderByChild('createdAt'), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
                             if (!snap.exists()) { ctx.groupCursors[gid] = null; attachCommunityFeedRealtimeListener(ctx, gid, Date.now()); return []; }
                             const entries = [];
                             let oldest = Infinity;
@@ -34811,7 +34856,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     const results = await Promise.all(eligibleIds.map(async (gid) => {
                         const cursor = ctx.groupCursors[gid];
                         try {
-                            const snap = await get(query(ref(database, `communities/${gid}/posts`), orderByChild('createdAt'), endAt(cursor - 1), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
+                            const snap = await get(query(ref(database, `community_posts/${gid}`), orderByChild('createdAt'), endAt(cursor - 1), limitToLast(COMMUNITY_FEED_MSGS_PER_GROUP)));
                             if (!snap.exists()) { ctx.groupCursors[gid] = null; return []; }
                             const entries = [];
                             let oldest = Infinity;
@@ -35123,12 +35168,21 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             patchCommunityPostCardCounts(msgId, data);
         }
 
-        function buildCommunityPostCard(msg) {
+        // Thread messages that read as posts (plain text, photo, video) are shown as feed-style
+        // cards inside a community; calls, GIFs, stickers, music and deleted messages stay bubbles.
+        function isCommunityPostLike(msg) {
+            if (!msg || msg.deleted || msg.callStatus) return false;
+            const t = msg.mediaType || '';
+            if (t === '') return !!msg.text;
+            return (t === 'image' || t === 'video') && !!msg.mediaURL;
+        }
+
+        function buildCommunityPostCard(msg, opts) {
             const group = cachedCommunities[msg.groupId] || {};
             const sender = cachedUsers[msg.senderUid] || {};
             const msgId = communityMsgEngagementId(msg);
             const card = document.createElement('div');
-            card.className = 'feed-post-card feed-post-card-ig community-post-card';
+            card.className = 'feed-post-card feed-post-card-ig community-post-card' + (opts && opts.inCommunity ? ' in-community-view' : '');
             card.dataset.groupId = msg.groupId;
             card.dataset.msgId = msgId;
             card.dataset.communityName = (group.name || '').toLowerCase();
@@ -35145,12 +35199,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const imageHtml = postImages.length ? `
                 <div class="x-media-grid" data-count="1">
                     <div class="x-media-carousel-track">
-                        <div class="x-media-grid-item"><img src="${postImages[0]}" data-idx="0" alt=""></div>
+                        <div class="x-media-grid-item"><img src="${postImages[0]}" data-idx="0" alt="" loading="lazy" decoding="async"></div>
                     </div>
                 </div>` : '';
             const videoHtml = (msg.mediaURL && msg.mediaType === 'video') ? `
                 <div class="feed-post-video-wrap" data-has-music="0">
-                    <video class="feed-post-video" src="${msg.mediaURL}" ${(() => { const t = cloudinaryVideoThumbnail(msg.mediaURL, 1); return t ? `poster="${t}"` : ''; })()} playsinline preload="metadata" muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
+                    <video class="feed-post-video" src="${msg.mediaURL}" ${(() => { const t = cloudinaryVideoThumbnail(msg.mediaURL, 1); return t ? `poster="${t}" preload="none"` : 'preload="metadata"'; })()} playsinline muted loop onloadedmetadata="if(!this.poster)this.currentTime=Math.min(this.duration*0.3,2)"></video>
                     <button type="button" class="feed-video-center-btn" aria-label="Play">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
                     </button>
@@ -35226,7 +35280,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             // Name, avatar, verified badge, business pill, and @username are filled in (and kept
             // live) via applyLiveProfileToPostCard, same as a real feed post.
             applyLiveProfileToPostCard(card);
-            card.addEventListener('click', () => openGroupChatView(msg.groupId));
+            if (!(opts && opts.inCommunity)) card.addEventListener('click', () => openGroupChatView(msg.groupId));
 
             const avatarCol = card.querySelector('.x-post-avatar-col');
             if (avatarCol) avatarCol.addEventListener('click', (e) => {
@@ -35423,7 +35477,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const updates = {};
             Object.keys(deletionFields).forEach(field => {
                 updates[`group_threads/${msg.groupId}/messages/${msg.key}/${field}`] = deletionFields[field];
-                updates[`communities/${msg.groupId}/posts/${msg.key}/${field}`] = deletionFields[field];
+                updates[`community_posts/${msg.groupId}/${msg.key}/${field}`] = deletionFields[field];
             });
             try {
                 await update(ref(database), updates);
@@ -37191,10 +37245,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const updates = {};
                 updates[`communities/${groupId}`] = null;
                 updates[`group_threads/${groupId}`] = null;
+                updates[`community_posts/${groupId}`] = null;
                 // group_invites is keyed by invitee uid first (group_invites/{uid}/{groupId}), so
                 // there's no single path to strike this group from — sweep every cached user's
                 // entry instead. Best-effort: users not yet in cachedUsers just keep a dead invite
                 // that silently no-ops when opened, same as the old-groups-node cleanup elsewhere.
+                await loadAllUsersOnce();
                 Object.keys(cachedUsers).forEach(uid => {
                     updates[`group_invites/${uid}/${groupId}`] = null;
                 });
@@ -37368,6 +37424,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                             daySep.dataset.dayKey = String(msgDateKey);
                             container.appendChild(daySep);
                             lastDateKey = msgDateKey;
+                        }
+                        if (isCommunityPostLike(msg)) {
+                            container.appendChild(buildCommunityPostCard({ ...msg, groupId }, { inCommunity: true }));
+                            return;
                         }
                         const isOwn = msg.senderUid === user.uid;
                         const bubble = document.createElement('div');
@@ -37576,7 +37636,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 updates[`group_threads/${activeGroupId}/messages/${newMsgKey}`] = msgPayload;
                 // Mirror into communities/{id}/posts so the Communities feed (loadMoreCommunityPosts)
                 // has a dedicated posts node to read from, decoupled from group_threads chat history.
-                updates[`communities/${activeGroupId}/posts/${newMsgKey}`] = msgPayload;
+                updates[`community_posts/${activeGroupId}/${newMsgKey}`] = msgPayload;
 
                 const memberIds = group.members ? Object.keys(group.members) : [];
                 memberIds.forEach(memberUid => {
@@ -37774,7 +37834,151 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         // --- STORIES WITH ADD BUTTON & LIKES ---
         const STORY_TTL = 24 * 60 * 60 * 1000; 
-        let cachedUsers = {};
+        // Small index of who has posted a story recently (story_authors/{uid} = last post time) so the
+        // app only loads stories from those people instead of the whole stories node.
+        function markStoryAuthor(uid) {
+            try { set(ref(database, `story_authors/${uid}`), Date.now()).catch(() => {}); } catch (e) { /* non-fatal */ }
+        }
+        // ── LAZY USER CACHE ──
+        // Used to be one live listener on the ENTIRE users node: every app open downloaded every
+        // profile on Haba, and every profile change was pushed to every device. Now profiles are
+        // fetched only when something on screen needs them (a post author, a chat, a story...).
+        // `cachedUsers[uid]` still works exactly as before: a miss returns undefined, kicks off a
+        // fetch, and the UI re-renders (usersChangedHook) when the profile lands. Only users
+        // actually seen get a live listener (capped), so online dots and profile edits stay live.
+        let usersChangedHook = null;
+        const userStore = {};
+        const userMissing = new Set();
+        const userLive = {};
+        const userPending = new Set();
+        const USER_LIVE_CAP = 150;
+        let userLiveCount = 0;
+        let userNotifyTimer = null;
+        const LAZY_UID_RE = /^[A-Za-z0-9_-]{6,128}$/;
+        const LAZY_UID_JUNK = new Set(['undefined', 'null', 'NaN']);
+        function notifyUsersChanged() {
+            if (userNotifyTimer) return;
+            userNotifyTimer = setTimeout(() => {
+                userNotifyTimer = null;
+                try { if (usersChangedHook) usersChangedHook(); } catch (e) { console.warn('users hook', e); }
+            }, 150);
+        }
+        function storeUserSnapshot(uid, snap, quiet) {
+            if (snap.exists()) {
+                const v = snap.val();
+                if (v && typeof v === 'object' && !v.photoURL) v.photoURL = DEFAULT_AVATAR_URL;
+                userStore[uid] = v;
+                userMissing.delete(uid);
+            } else {
+                delete userStore[uid];
+                userMissing.add(uid);
+            }
+            if (!quiet) notifyUsersChanged();
+        }
+        function fetchUserProfile(uid) {
+            if (userPending.has(uid) || userLive[uid]) return;
+            userPending.add(uid);
+            try {
+                if (userLiveCount < USER_LIVE_CAP) {
+                    userLive[uid] = true; userLiveCount++;
+                    onValue(ref(database, `users/${uid}`),
+                        (snap) => { userPending.delete(uid); storeUserSnapshot(uid, snap); },
+                        () => { userPending.delete(uid); userMissing.add(uid); });
+                } else {
+                    get(ref(database, `users/${uid}`))
+                        .then((snap) => storeUserSnapshot(uid, snap))
+                        .catch(() => userMissing.add(uid))
+                        .finally(() => userPending.delete(uid));
+                }
+            } catch (e) { userPending.delete(uid); }
+        }
+        let cachedUsers = new Proxy(userStore, {
+            get(target, key) {
+                if (typeof key !== 'string') return target[key];
+                if (Object.prototype.hasOwnProperty.call(target, key)) return target[key];
+                if (key in Object.prototype) return target[key];
+                try {
+                    if (LAZY_UID_RE.test(key) && !LAZY_UID_JUNK.has(key) && !userMissing.has(key) && auth && auth.currentUser) fetchUserProfile(key);
+                } catch (e) { /* auth not ready yet */ }
+                return undefined;
+            }
+        });
+        // Bulk-merge helper for bounded queries (no live listeners; never clobbers a live profile).
+        function mergeUsersBulk(obj) {
+            Object.keys(obj || {}).forEach((uid) => {
+                const v = obj[uid];
+                if (!v || typeof v !== 'object') return;
+                if (!v.photoURL) v.photoURL = DEFAULT_AVATAR_URL;
+                if (!userLive[uid]) userStore[uid] = v;
+                userMissing.delete(uid);
+            });
+            notifyUsersChanged();
+        }
+        // Rare features that genuinely need everyone (matching phone numbers, sweeping invites):
+        // one-time download, only when the person uses them.
+        let allUsersPromise = null;
+        function loadAllUsersOnce() {
+            if (!allUsersPromise) {
+                allUsersPromise = get(ref(database, 'users'))
+                    .then((s) => { if (s.exists()) mergeUsersBulk(s.val()); })
+                    .catch((e) => { allUsersPromise = null; console.warn('loadAllUsersOnce', e && e.message); });
+            }
+            return allUsersPromise;
+        }
+        // "People you may know" pool: one small bounded query instead of the whole directory.
+        let discoverPoolStarted = false;
+        function ensureDiscoverPool() {
+            if (discoverPoolStarted) return;
+            try { if (!auth || !auth.currentUser) return; } catch (e) { return; }
+            discoverPoolStarted = true;
+            get(query(ref(database, 'users'), limitToLast(80)))
+                .then((s) => { if (s.exists()) mergeUsersBulk(s.val()); })
+                .catch(() => { setTimeout(() => { discoverPoolStarted = false; }, 30000); });
+        }
+        // Loads specific profiles; resolves true if anything new arrived.
+        function loadUsers(uids) {
+            const need = (uids || []).filter((uid) => uid && !userStore[uid] && !userMissing.has(uid) && LAZY_UID_RE.test(uid));
+            if (!need.length) return Promise.resolve(false);
+            return Promise.all(need.map((uid) => get(ref(database, `users/${uid}`)).then((s) => storeUserSnapshot(uid, s, true)).catch(() => userMissing.add(uid))))
+                .then(() => { notifyUsersChanged(); return true; });
+        }
+        // Username-prefix search against the small usernames index (keys are usernames, so no
+        // database index is needed). Pulls the matching profiles into the cache. Resolves true
+        // the first time it adds anything for a term.
+        const userSearchDone = new Set();
+        function prefetchUsersMatching(term) {
+            const q = (term || '').trim().toLowerCase().replace(/^@/, '');
+            if (q.length < 2 || !/^[a-z0-9_.]+$/.test(q) || userSearchDone.has(q)) return Promise.resolve(false);
+            userSearchDone.add(q);
+            return get(query(ref(database, 'usernames'), orderByKey(), startAt(q), endAt(q + '\uf8ff'), limitToFirst(10)))
+                .then((snap) => {
+                    if (!snap.exists()) return false;
+                    const uids = [];
+                    snap.forEach((c) => { if (typeof c.val() === 'string') uids.push(c.val()); });
+                    return loadUsers(uids);
+                })
+                .catch(() => { userSearchDone.delete(q); return false; });
+        }
+        // Make sure every @handle in a piece of text can be resolved to a uid.
+        function ensureMentionsLoaded(text) {
+            if (!text) return Promise.resolve();
+            const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]{2,20})/g)].map((m) => m[1].toLowerCase()))];
+            const known = new Set(Object.values(userStore).map((u) => u && u.username && u.username.toLowerCase()));
+            return Promise.all(handles.filter((h) => !known.has(h)).map((h) =>
+                get(ref(database, `usernames/${h}`)).then((s) => { const uid = s.val(); return typeof uid === 'string' ? loadUsers([uid]) : false; }).catch(() => false)
+            )).then(() => {});
+        }
+        // Business directory: bounded indexed query (falls back to a scan if no index exists yet).
+        let businessPoolPromise = null, businessPoolLoaded = false;
+        function loadBusinessUsersOnce() {
+            if (!businessPoolPromise) {
+                businessPoolPromise = get(query(ref(database, 'users'), orderByChild('isBusinessAccount'), equalTo(true), limitToFirst(100)))
+                    .then((s) => { if (s.exists()) { mergeUsersBulk(s.val()); return true; } return false; })
+                    .catch(() => { businessPoolPromise = null; return false; });
+            }
+            return businessPoolPromise;
+        }
+
         let cachedStories = {};
         // hostUid -> liveId for broadcasts that are live right now; drives the red ring on post avatars.
         let liveHostMap = {};
@@ -38031,6 +38235,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             btn.disabled = true;
             try {
                 const newRef = push(ref(database, `stories/${user.uid}`));
+                markStoryAuthor(user.uid);
                 await set(newRef, { type: 'text', text, bgColor: selectedTextStoryBg, createdAt: Date.now() });
                 notify('Story added');
                 document.getElementById('text-story-composer-overlay').classList.remove('active');
@@ -38752,12 +38957,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     const type = file.type.startsWith('video/') ? 'video' : 'image';
                     const safeName = (file.name || type).replace(/[^a-zA-Z0-9.\-_]/g, '_');
                     const url = await uploadToFirebaseStorage(
-                        file,
+                        type === 'image' ? await compressImageForUpload(file, 1440, 0.8) : file,
                         `stories/${user.uid}/${Date.now()}_${i}_${safeName}`,
                         (filePct) => updateAddStoryUploadProgress(((i + filePct / 100) / total) * 100)
                     );
                     const duration = type === 'video' ? await getClientVideoDuration(file) : null;
                     const newRef = push(ref(database, `stories/${user.uid}`));
+                    markStoryAuthor(user.uid);
                     await set(newRef, {
                         mediaURL: url,
                         type: type,
@@ -39258,6 +39464,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const originalOwnerName = document.getElementById('story-viewer-name').textContent || 'User';
 
                 const newRef = push(ref(database, `stories/${user.uid}`));
+                markStoryAuthor(user.uid);
                 await set(newRef, {
                     type: current.type,
                     createdAt: Date.now(),
@@ -39841,6 +40048,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
                 // Build lookup of app users by normalized phone
                 const phoneToUid = {};
+                await loadAllUsersOnce();
                 Object.keys(cachedUsers).forEach(uid => {
                     const key = normalizePhone(cachedUsers[uid].phoneNumber);
                     if (key) phoneToUid[key] = uid;
@@ -43964,7 +44172,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         const updates = {};
                         Object.keys(deletionFields).forEach(field => {
                             updates[`group_threads/${activeGroupId}/messages/${msgKey}/${field}`] = deletionFields[field];
-                            updates[`communities/${activeGroupId}/posts/${msgKey}/${field}`] = deletionFields[field];
+                            updates[`community_posts/${activeGroupId}/${msgKey}/${field}`] = deletionFields[field];
                         });
                         await update(ref(database), updates);
                     } else {
@@ -44029,8 +44237,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     await update(ref(database), {
                         [`group_threads/${activeGroupId}/messages/${msgKey}/text`]: newText,
                         [`group_threads/${activeGroupId}/messages/${msgKey}/editedAt`]: editedAt,
-                        [`communities/${activeGroupId}/posts/${msgKey}/text`]: newText,
-                        [`communities/${activeGroupId}/posts/${msgKey}/editedAt`]: editedAt
+                        [`community_posts/${activeGroupId}/${msgKey}/text`]: newText,
+                        [`community_posts/${activeGroupId}/${msgKey}/editedAt`]: editedAt
                     });
                 } else {
                     const otherUid = activeChatUid;
@@ -46056,7 +46264,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 updates[`group_threads/${groupId}/messages/${newMsgKey}`] = msgPayload;
                 // Mirror into communities/{id}/posts so the Communities feed (loadMoreCommunityPosts)
                 // has a dedicated posts node to read from, decoupled from group_threads chat history.
-                updates[`communities/${groupId}/posts/${newMsgKey}`] = msgPayload;
+                updates[`community_posts/${groupId}/${newMsgKey}`] = msgPayload;
 
                 const previewText = caption || (isVideo ? '🎥 Video' : '📷 Photo');
                 const memberIds = group.members ? Object.keys(group.members) : [];
@@ -46563,17 +46771,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (chatListenersAttached) return;
             chatListenersAttached = true;
 
-            onValue(ref(database, "users"), (snap) => {
-                cachedUsers = snap.exists() ? snap.val() : {};
-                // Normalize once here (rather than at every render call site) so that any user who
-                // never set a profile picture — no photoURL field, or an empty string — consistently
-                // shows the default avatar graphic everywhere in the app, instead of a per-screen
-                // mix of blank circles, initials, or broken images.
-                Object.keys(cachedUsers).forEach(uid => {
-                    if (cachedUsers[uid] && !cachedUsers[uid].photoURL) {
-                        cachedUsers[uid].photoURL = DEFAULT_AVATAR_URL;
-                    }
-                });
+            usersChangedHook = () => {
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderFeedStoryCards(cachedUsers, cachedStories);
@@ -46592,26 +46790,41 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 }
                 if (typeof syncProfileLockToggle === 'function') syncProfileLockToggle();
                 if (userInfoSheet.classList.contains('active') && userInfoSheetUid) applyProfileLockView(userInfoSheetUid);
-            });
+            };
+            void cachedUsers[user.uid]; // load my own profile (and keep it live)
 
-            onValue(ref(database, "stories"), (snap) => {
-                cachedStories = snap.exists() ? snap.val() : {};
-                const now = Date.now();
-                
-                Object.keys(cachedStories).forEach(uid => {
-                    const userStories = cachedStories[uid];
-                    Object.keys(userStories).forEach(storyKey => {
-                        if (now - userStories[storyKey].createdAt >= STORY_TTL) {
-                            remove(ref(database, `stories/${uid}/${storyKey}`));
-                            delete cachedStories[uid][storyKey];
-                        }
-                    });
-                });
+            // Stories: instead of one live listener on the whole stories node (everyone's stories,
+            // views and likes, forever), watch the small story_authors index for people who posted in
+            // the last 24h and listen only to those people's stories (newest 300 authors, plus mine).
+            const storyWatchers = {};
+            const rerenderStories = () => {
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderFeedStoryCards(cachedUsers, cachedStories);
                 refreshPostLiveRings();
                 if (userChatsInitialized) renderChatListFromCache();
+            };
+            const watchStoryAuthor = (uid) => {
+                if (!uid || storyWatchers[uid]) return;
+                storyWatchers[uid] = true;
+                onValue(ref(database, `stories/${uid}`), (s) => {
+                    const now = Date.now();
+                    const val = s.exists() ? s.val() : {};
+                    const live = {};
+                    Object.keys(val).forEach((k) => {
+                        const st = val[k];
+                        if (st && now - st.createdAt >= STORY_TTL) remove(ref(database, `stories/${uid}/${k}`));
+                        else if (st) live[k] = st;
+                    });
+                    if (Object.keys(live).length) cachedStories[uid] = live; else delete cachedStories[uid];
+                    rerenderStories();
+                }, () => { delete storyWatchers[uid]; });
+            };
+            watchStoryAuthor(user.uid);
+            onValue(query(ref(database, 'story_authors'), orderByValue(), startAt(Date.now() - STORY_TTL)), (snap) => {
+                const uids = [];
+                snap.forEach((c) => { uids.push(c.key); });
+                uids.reverse().slice(0, 300).forEach(watchStoryAuthor);
             });
 
             onValue(ref(database, "communities"), (snap) => {
@@ -46627,7 +46840,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             // people can tell at a glance whether it's worth opening, without needing the
             // hub/panel itself to be open. Both entry points share this one listener rather
             // than each subscribing separately.
-            onValue(ref(database, "lives"), (snap) => {
+            onValue(query(ref(database, "lives"), orderByChild("status"), equalTo("live")), (snap) => {
                 const all = snap.val() || {};
                 const count = Object.values(all).filter(v => v && v.status === 'live').length;
                 liveHostMap = {};
@@ -46651,6 +46864,30 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     console.log('[cleanup] old "groups" node removed.');
                 } catch (err) {
                     console.error('[cleanup] failed to remove old "groups" node:', err);
+                }
+            };
+
+            // ONE-TIME MIGRATION — community feed posts used to live under communities/{id}/posts,
+            // which meant the app's communities listener downloaded every post of every community.
+            // They now live in community_posts/{id}. Run window.migrateCommunityPosts() once from the
+            // console (as an authenticated user with write access to the DB root) to move the old
+            // ones across; it is safe to re-run.
+            window.migrateCommunityPosts = async function () {
+                if (!confirm('Move all community posts to the new community_posts node?')) return;
+                try {
+                    const snap = await get(ref(database, 'communities'));
+                    const all = snap.exists() ? snap.val() : {};
+                    let moved = 0;
+                    for (const gid of Object.keys(all)) {
+                        const posts = all[gid] && all[gid].posts;
+                        if (!posts) continue;
+                        await update(ref(database), { [`community_posts/${gid}`]: posts, [`communities/${gid}/posts`]: null });
+                        moved++;
+                        console.log('[migrate] moved posts for community', gid);
+                    }
+                    console.log(`[migrate] done — ${moved} communities moved.`);
+                } catch (err) {
+                    console.error('[migrate] failed:', err);
                 }
             };
 

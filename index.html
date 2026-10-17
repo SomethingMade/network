@@ -11356,10 +11356,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 <div id="tab-search" class="tab-content">
                     <div class="chat-header-area search-tab-header">
                         <div class="search-tab-header-row">
+                            <div class="profile-btn header-profile-btn x-search-avatar" data-profile-trigger title="View Profile"></div>
                             <div class="search-box search-tab-box">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                     <input type="search" id="search-discover" placeholder="Search people, posts, #tags" autocomplete="off" name="haba-search-discover" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
                             </div>
+                            <button type="button" class="x-search-gear" id="x-search-gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
                         </div>
                     </div>
                     <div class="search-tab-scroll" id="search-tab-scroll">
@@ -11381,6 +11383,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                             <button type="button" class="feed-subtab-btn" data-explore-tab="news">News</button>
                         </div>
                         <div class="explore-panel active" id="explore-panel-trending">
+                            <div class="x-explore-hero" id="x-explore-hero">
+                                <h3>Global Trending</h3>
+                                <p>The most popular posts</p>
+                                <button type="button" id="x-explore-hero-btn">Explore</button>
+                            </div>
                             <div id="explore-trending-list"></div>
                         </div>
                         <div class="explore-panel" id="explore-panel-people">
@@ -19277,11 +19284,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 list.innerHTML = `<div class="explore-empty">No trending hashtags yet — post something with a #hashtag to kick one off</div>`;
                 return;
             }
-            list.innerHTML = tags.map(tag => `
+            list.innerHTML = tags.map((tag, i) => `
                 <div class="trend-item" data-action="trend" data-tag="${escapeHtmlForSearch(tag)}">
-                    <div class="trend-item-eyebrow">Trending on Haba</div>
+                    <div class="trend-item-eyebrow">${i + 1} • Trending on Haba</div>
                     <div class="trend-item-tag">#${escapeHtmlForSearch(tag)}</div>
                     <div class="trend-item-count">${counts[tag]} post${counts[tag] === 1 ? '' : 's'}</div>
+                    <span class="trend-item-more" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></span>
                 </div>
             `).join('');
         }
@@ -47787,6 +47795,60 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
     var cur=sc.scrollTop, d=cur-last; if(Math.abs(d)<6) return;
     fab.classList.toggle('x-fab-hidden', d>0 && cur>40); last=cur;
   },{passive:true});
+})();
+</script>
+
+<style id="x-explore">
+/* ══ X-style Search / Explore tab ══ */
+html body #tab-search .search-tab-header { background: var(--bg-base) !important; border-bottom: none !important; }
+html body #tab-search .search-tab-header-row { display: flex; align-items: center; gap: 12px; padding: 8px 14px 6px; }
+html body #tab-search .x-search-avatar { display: block !important; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background-size: cover; background-position: center; }
+html body #tab-search .search-tab-box { flex: 1 1 auto; min-width: 0; height: 46px; border-radius: 999px !important; background: var(--bg-input) !important; box-shadow: none !important; border: none !important; }
+html body #tab-search .search-tab-box input { text-align: center; font-size: 17px; }
+html body #tab-search .search-tab-box input:focus { text-align: left; }
+html body #tab-search .x-search-gear { flex: 0 0 auto; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--text-primary); cursor: pointer; border-radius: 50%; -webkit-tap-highlight-color: transparent; }
+html body #tab-search .x-search-gear svg { width: 26px; height: 26px; }
+html body #tab-search .search-tab-scroll { background: var(--bg-base); }
+
+/* tabs: scrollable text tabs, bold, blue underline on the active one */
+html body #tab-search .explore-tabs-bar { display: flex !important; gap: 0; overflow-x: auto; margin: 0 -14px 0; padding: 0 6px; background: transparent !important; border: 0 !important; border-bottom: 1px solid var(--border-color) !important; border-radius: 0 !important; scrollbar-width: none; position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: color-mix(in srgb, var(--bg-base) 90%, transparent) !important; }
+html body #tab-search .explore-tabs-bar::-webkit-scrollbar { display: none; }
+html body #tab-search .explore-tabs-bar .feed-subtab-btn { flex: 0 0 auto !important; position: relative; padding: 14px 16px 12px !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--text-secondary) !important; font-size: 16px !important; font-weight: 700 !important; white-space: nowrap; }
+html body #tab-search .explore-tabs-bar .feed-subtab-btn.active { color: var(--text-primary) !important; }
+html body #tab-search .explore-tabs-bar .feed-subtab-btn.active::after { display: block !important; content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 4px; border-radius: 4px; background: var(--primary-blue); }
+html body #tab-search .explore-tabs-bar [data-explore-tab="trending"].active::before { content: ''; display: inline-block; width: 20px; height: 20px; margin-right: 8px; vertical-align: -4px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 7 13.5 15.5 8.5 10.5 2 17'/%3E%3Cpolyline points='16 7 22 7 22 13'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 7 13.5 15.5 8.5 10.5 2 17'/%3E%3Cpolyline points='16 7 22 7 22 13'/%3E%3C/svg%3E") center/contain no-repeat; }
+
+/* hero banner */
+.x-explore-hero { position: relative; overflow: hidden; margin: 16px 0 6px; padding: 22px 20px; min-height: 150px; border-radius: 18px; color: #fff; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px;
+  background:
+    radial-gradient(ellipse 62% 105% at 80% 128%, #4aa3ff 0%, #1d5fc4 22%, #0b2a63 46%, transparent 66%),
+    radial-gradient(circle at 66% 76%, rgba(255,255,255,.95) 0 1.5px, rgba(190,220,255,.55) 4px, transparent 46px),
+    radial-gradient(1.2px 1.2px at 12% 22%, #fff, transparent), radial-gradient(1px 1px at 30% 62%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 46% 18%, #fff, transparent), radial-gradient(1px 1px at 58% 40%, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 90% 20%, #fff, transparent), radial-gradient(1px 1px at 78% 52%, #fff, transparent),
+    radial-gradient(1px 1px at 22% 86%, #fff, transparent), #02040b; }
+.x-explore-hero h3 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.2px; }
+.x-explore-hero p { margin: 0 0 12px; font-size: 16.5px; font-weight: 600; }
+.x-explore-hero button { padding: 9px 20px; border-radius: 999px; border: 2px solid #fff; background: transparent; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.x-explore-hero button:active { background: rgba(255,255,255,.18); }
+
+/* trend rows */
+html body #tab-search #explore-trending-list { display: block; gap: 0; counter-reset: none; }
+html body #tab-search .trend-item { position: relative; display: block; margin: 0; padding: 16px 40px 16px 4px; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; cursor: pointer; }
+html body #tab-search .trend-item::before, html body #tab-search .trend-item::after { display: none !important; }
+html body #tab-search .trend-item-eyebrow { font-size: 15px; font-weight: 600; color: var(--text-secondary); }
+html body #tab-search .trend-item-tag { margin-top: 3px; font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1.25; word-break: break-word; }
+html body #tab-search .trend-item-count { margin-top: 3px; font-size: 14.5px; font-weight: 500; color: var(--text-secondary); }
+html body #tab-search .trend-item-more { position: absolute; right: 2px; top: 12px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+html body #tab-search .trend-item-more svg { width: 20px; height: 20px; }
+@media (hover: hover) { html body #tab-search .trend-item:hover { background: var(--bg-hover) !important; } }
+</style>
+<script>
+(function xExploreWiring(){
+  var gear=document.getElementById('x-search-gear');
+  if(gear) gear.addEventListener('click',function(){ try{triggerHaptic(12)}catch(e){} var b=document.getElementById('btn-open-settings'); if(b) b.click(); });
+  var hero=document.getElementById('x-explore-hero-btn');
+  if(hero) hero.addEventListener('click',function(){ var l=document.getElementById('explore-trending-list'); if(l) l.scrollIntoView({behavior:'smooth',block:'start'}); });
 })();
 </script>
 </body>

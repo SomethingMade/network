@@ -292,11 +292,11 @@
         #page-shimmer-overlay .pshim-block { position: relative; overflow: hidden; background: var(--bg-alt); border-radius: 10px; }
         #page-shimmer-overlay .pshim-block::after {
             content: ''; position: absolute; inset: 0;
-            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
-            background-size: 200% 100%; animation: statusShimmer 1.4s ease-in-out infinite;
+            background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.7) 50%, transparent 80%);
+            background-size: 200% 100%; animation: statusShimmer 1.2s ease-in-out infinite;
         }
         body.dark-theme #page-shimmer-overlay .pshim-block::after {
-            background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+            background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.16) 50%, transparent 80%);
             background-size: 200% 100%;
         }
         #page-shimmer-overlay .pshim-topbar { display: flex; align-items: center; gap: 12px; height: 34px; margin-bottom: 24px; flex-shrink: 0; }
@@ -7782,7 +7782,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         <div class="otp-fail-label">Incorrect code</div>
     </div>
 
-    <div id="page-shimmer-overlay" aria-hidden="true">
+    <div id="page-shimmer-overlay" class="active" aria-hidden="true">
         <!-- Mirrors the real Home layout: header (drawer + For you / Following), stories row,
              post cards (avatar column + name/handle/text/media/actions), bottom nav. -->
         <div class="pshim-header">
@@ -41192,14 +41192,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 if (streakBtn) streakBtn.style.display = 'none';
             }
             if (isInitialLoad) {
-                // Branded splash stays up for 2 seconds from page start (SPLASH_MS), then it lifts away and
+                // Branded splash stays up for 1 second from page start (SPLASH_MS), then it lifts away and
                 // the page shimmer underneath keeps showing while the feed loads. The shimmer ends as soon
                 // as the first page of posts is in (never before SHIMMER_MIN_MS, never after SHIMMER_MAX_MS),
                 // so the sequence is: splash → shimmer → content, with no blank frame or double blink.
-                const SPLASH_MS = 2000, SHIMMER_MIN_MS = 500, SHIMMER_MAX_MS = 8000;
+                const SPLASH_MS = 0, SHIMMER_MIN_MS = 800, SHIMMER_MAX_MS = 8000;
                 const closeSplash = () => {
                     const loadingOverlay = document.getElementById('loading-overlay');
-                    const logo = loadingOverlay.querySelector('.haba-mark');
+                    const logo = null; // splash removed — nothing to animate out
                     if (logo) {
                         logo.classList.add('splash-exit');
                         requestAnimationFrame(() => requestAnimationFrame(() => logo.classList.add('splash-exit-run')));
@@ -41211,9 +41211,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         loadingOverlay.style.transition = '';
                         if (logo) logo.classList.remove('splash-exit', 'splash-exit-run');
                         // splash is gone: shimmer is what the person sees until the feed is ready
-                        const shimmerStart = Date.now();
                         const endShimmerWhenReady = () => {
-                            const shown = Date.now() - shimmerStart;
+                            const shown = performance.now(); // shimmer has been up since first paint
                             const ready = !user || feedInitialLoadComplete;
                             if ((ready && shown >= SHIMMER_MIN_MS) || shown >= SHIMMER_MAX_MS) hidePageShimmer();
                             else setTimeout(endShimmerWhenReady, 100);
@@ -47925,6 +47924,9 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
 #page-shimmer-overlay .pshim-nav { position: absolute; left: 0; right: 0; bottom: 0; max-width: none; display: flex; justify-content: space-around; align-items: center; height: calc(58px + env(safe-area-inset-bottom, 0px)); padding: 0 8px env(safe-area-inset-bottom, 0px); background: var(--bg-base); border-top: 1px solid var(--border-color); }
 #page-shimmer-overlay .pshim-nav .pshim-block { width: 28px; height: 28px; border-radius: 50%; }
 @media (min-width: 769px) { #page-shimmer-overlay .pshim-nav { display: none; } }
+
+/* Splash removed: the app opens straight onto the shimmer. */
+#loading-overlay { display: none !important; }
 </style>
 
 <style id="x-feed-header">

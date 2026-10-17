@@ -47754,10 +47754,18 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
     body #tab-status .home-header-title-row h1,
     body #tab-status .home-header-wordmark { display: none !important; }
     /* center: brand mark */
-    body #tab-status .home-header-logo { display: block !important; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); color: var(--text-primary); cursor: pointer; }
+    body #tab-status .home-header-logo { display: none !important; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%); color: var(--text-primary); cursor: pointer; }
     /* right: messages only */
     body #tab-status .chat-header-icons { margin: 0; gap: 0; }
     body #tab-status .chat-header-icons { display: none !important; }
+
+    /* header row = drawer button + the For you / Following tabs (tabs are moved in by script below) */
+    body #tab-status .home-header-title-row { display: none !important; }
+    body #tab-status .chat-header-area { padding-bottom: 0; border-bottom: 1px solid var(--border-color); }
+    body #tab-status .chat-header-top { align-items: stretch; min-height: 0; padding: 0; }
+    body #tab-status .chat-header-top > .explore-drawer-btn { align-self: center; margin: 0 6px 0 -4px; }
+    body #tab-status .chat-header-top > #feed-subtabs { flex: 1 1 auto; display: flex; margin: 0; padding: 0; border: 0; background: transparent; }
+    body #tab-status #feed-sticky-header:empty { display: none; }
 
     /* tabs: equal width, medium grey when idle, bold + short blue bar when active */
     body #feed-subtabs .feed-subtab-btn { flex: 1 1 0; font-weight: 500; font-size: 15px; padding: 13px 0 12px; color: var(--text-secondary); }
@@ -47782,6 +47790,20 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
 </style>
 <button type="button" id="x-feed-fab" aria-label="Create" title="Create"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
 <script>
+(function xFeedTabsInHeader(){
+  var mq=window.matchMedia('(max-width: 768px)');
+  function place(){
+    var tabs=document.getElementById('feed-subtabs'), top=document.querySelector('#tab-status .chat-header-top'), home=document.getElementById('feed-sticky-header');
+    if(!tabs||!top||!home) return;
+    if(mq.matches){
+      if(tabs.parentNode!==top){ var icons=top.querySelector('.chat-header-icons'); top.insertBefore(tabs, icons||null); }
+    } else if(tabs.parentNode!==home){ home.appendChild(tabs); }
+  }
+  place();
+  if(mq.addEventListener) mq.addEventListener('change',place); else if(mq.addListener) mq.addListener(place);
+  // the drawer button is injected a moment after load; re-assert order once it exists
+  setTimeout(place,600);
+})();
 (function xFeedFab(){
   var fab=document.getElementById('x-feed-fab'); if(!fab) return;
   fab.addEventListener('click',function(){

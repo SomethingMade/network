@@ -22628,6 +22628,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // each video remembering its own mute state independently.
         let feedVideoMuted = true;
         function applyFeedMuteStateToAllVideoWraps() {
+            document.querySelectorAll('.feed-post-music-audio').forEach(a => { a.muted = feedVideoMuted; });
             document.querySelectorAll('.feed-post-video-wrap').forEach(wrap => {
                 const video = wrap.querySelector('.feed-post-video');
                 if (!video) return;
@@ -22873,8 +22874,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const audio = card.querySelector('.feed-post-music-audio');
             if (!chip || !audio) return;
             const playIcon = chip.querySelector('.feed-music-play-icon');
+            // Music starts muted (shared with the video mute preference: unmute once and later
+            // posts follow). The chip shows a muted speaker until the person taps to unmute.
+            audio.muted = feedVideoMuted;
 
             function updateIcon() {
+                if (audio.muted) {
+                    playIcon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4z"></path><path d="M22 9l-6 6M16 9l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>';
+                    chip.setAttribute('aria-label', 'Unmute sound');
+                    return;
+                }
+                chip.setAttribute('aria-label', 'Play sound');
                 playIcon.innerHTML = audio.paused
                     ? '<path d="M8 5v14l11-7z"></path>'
                     : '<rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect>';
@@ -22882,6 +22892,18 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
             chip.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (audio.muted) {
+                    // First tap = unmute (and make sure it's playing). Applies to every feed track.
+                    feedVideoMuted = false;
+                    document.querySelectorAll('.feed-post-music-audio').forEach(a => { a.muted = false; });
+                    try { applyFeedMuteStateToAllVideoWraps(); } catch (err) {}
+                    if (audio.paused) {
+                        document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(el => { if (el !== audio && !el.paused) el.pause(); });
+                        audio.play().catch(() => {});
+                    }
+                    updateIcon();
+                    return;
+                }
                 if (audio.paused) {
                     // Only one feed media element (video or post music) plays at a time.
                     document.querySelectorAll('.feed-post-video, .feed-post-music-audio').forEach(el => { if (el !== audio && !el.paused) el.pause(); });
@@ -22892,6 +22914,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             });
             audio.addEventListener('play', updateIcon);
             audio.addEventListener('pause', updateIcon);
+            audio.addEventListener('volumechange', updateIcon);
             updateIcon();
 
             const postImg = card.querySelector('.x-media-grid-item img');

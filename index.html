@@ -20296,9 +20296,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // Appends a few shimmering placeholder cards to the bottom of the feed so the loading
         // state reads as "more posts incoming" rather than a bare spinner/label. Returns the
         // elements so the caller can remove exactly these once the real batch is in.
+        // After a For you / Following switch the feed may quietly fetch more posts to fill the new
+        // view. That should be invisible — no shimmer placeholders popping in like a reload.
+        let feedSilentUntil = 0;
         function showFeedLoadingSkeletons() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return [];
+            if (Date.now() < feedSilentUntil) return [];
             const nodes = [];
             for (let i = 0; i < FEED_SKELETON_COUNT; i++) {
                 const card = buildFeedPostSkeletonCard(i === 0);
@@ -22483,6 +22487,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const scroller = document.getElementById('discover-grid-scroll');
             const feedList = document.getElementById('feed-posts-list');
             const prevTab = feedActiveSubtab;
+            feedSilentUntil = Date.now() + 10000;
             if (scroller) feedSubtabScroll[prevTab] = scroller.scrollTop;
             if (feedList) feedList.classList.add('feed-switching');
             document.querySelectorAll('#feed-subtabs .feed-subtab-btn').forEach(b => b.classList.remove('active'));
@@ -22496,6 +22501,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 sprinkleSuggestedPeople();
                 if (scroller) scroller.scrollTop = feedSubtabScroll[feedActiveSubtab] || 0;
             }
+            document.body.classList.add('feed-quiet');
+            setTimeout(() => document.body.classList.remove('feed-quiet'), 10000);
             if (feedList) requestAnimationFrame(() => requestAnimationFrame(() => feedList.classList.remove('feed-switching')));
         });
         const feedSubtabScroll = {};
@@ -47764,6 +47771,8 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
 
 /* Subtab switch must be silent: no card fade/replay while the filter flips. */
 #feed-posts-list.feed-switching, #feed-posts-list.feed-switching * { animation: none !important; transition: none !important; }
+
+#feed-posts-list.feed-switching ~ #feed-loading-more, body.feed-quiet #feed-loading-more { display: none !important; }
 </style>
 
 <style id="x-feed-header">

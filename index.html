@@ -23018,13 +23018,20 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 });
             }
             const shown = reactorUids.slice(0, 3);
-            avatarsEl.innerHTML = shown.map(uid => feedAvatarHtml(cachedUsers[uid] || {})).join('');
             const names = shown.map(uid => (cachedUsers[uid] && cachedUsers[uid].name) || 'Someone');
             const total = post.likeCount || reactorUids.length;
             const remaining = total - shown.length;
             let label = names.join(', ');
             if (remaining > 0) label += (names.length ? ' and ' : '') + `${formatFeedCount(remaining)} other${remaining === 1 ? '' : 's'}`;
-            labelEl.textContent = label ? `Liked by ${label}` : '';
+            // Only touch the DOM when something visible actually changed — rewriting the avatar
+            // <img>s on every like makes them blink as they reload.
+            const avatarKey = shown.map(uid => uid + ':' + ((cachedUsers[uid] && cachedUsers[uid].photoURL) || '')).join(',');
+            if (row._avatarKey !== avatarKey) {
+                row._avatarKey = avatarKey;
+                avatarsEl.innerHTML = shown.map(uid => feedAvatarHtml(cachedUsers[uid] || {})).join('');
+            }
+            const labelText = label ? `Liked by ${label}` : '';
+            if (labelEl.textContent !== labelText) labelEl.textContent = labelText;
 
             // Profiles load lazily, so on first paint the names/avatars may not be cached yet and
             // would show as "Someone". Fetch whoever is missing, then redraw this row with the
@@ -24340,22 +24347,42 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!post) return;
             triggerHaptic(15);
             const myCurrentEmoji = (post.reactions && post.reactions[user.uid]) || null;
+            const removing = myCurrentEmoji === emoji;
 
-            if (myCurrentEmoji === emoji) {
-                await update(ref(database, `posts/${postId}`), {
-                    [`reactions/${user.uid}`]: null,
-                    likeCount: increment(-1)
-                });
-                bumpLikesReceived(post.uid, -1);
-                return;
+            // Optimistic, in-place update: the heart/count/"liked by" change instantly with no
+            // card rebuild and no waiting on the network. The DB listener then confirms it silently.
+            const before = { reactions: post.reactions ? { ...post.reactions } : undefined, likeCount: post.likeCount || 0 };
+            const nextReactions = { ...(post.reactions || {}) };
+            if (removing) delete nextReactions[user.uid]; else nextReactions[user.uid] = emoji;
+            const nextCount = Math.max(0, (post.likeCount || 0) + (removing ? -1 : (myCurrentEmoji ? 0 : 1)));
+            const refreshCards = () => {
+                const cur = cachedPosts[postId]; if (!cur) return;
+                document.querySelectorAll(`[data-post-id="${postId}"], [data-content-post-id="${postId}"]`).forEach(c => { try { patchFeedPostCounts(c, cur); } catch (e) {} });
+            };
+            cachedPosts[postId] = { ...post, reactions: Object.keys(nextReactions).length ? nextReactions : undefined, likeCount: nextCount };
+            refreshCards();
+
+            try {
+                if (removing) {
+                    await update(ref(database, `posts/${postId}`), {
+                        [`reactions/${user.uid}`]: null,
+                        likeCount: increment(-1)
+                    });
+                    bumpLikesReceived(post.uid, -1);
+                    return;
+                }
+                const updates = { [`reactions/${user.uid}`]: emoji };
+                if (!myCurrentEmoji) updates.likeCount = increment(1);
+                await update(ref(database, `posts/${postId}`), updates);
+                if (!myCurrentEmoji) bumpLikesReceived(post.uid, 1);
+                createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
+                if (post.uid !== user.uid) awardFirstMilestone('firstLike');
+            } catch (err) {
+                // network/permission failure: put the card back the way it was
+                if (cachedPosts[postId]) cachedPosts[postId] = { ...cachedPosts[postId], reactions: before.reactions, likeCount: before.likeCount };
+                refreshCards();
+                notify('Could not update your like', 'error');
             }
-
-            const updates = { [`reactions/${user.uid}`]: emoji };
-            if (!myCurrentEmoji) updates.likeCount = increment(1);
-            await update(ref(database, `posts/${postId}`), updates);
-            if (!myCurrentEmoji) bumpLikesReceived(post.uid, 1);
-            createNotification(post.uid, { type: 'like', postId, text: post.text || '' });
-            if (post.uid !== user.uid) awardFirstMilestone('firstLike');
         }
 
         // Tap on the like button: toggles the like on/off.

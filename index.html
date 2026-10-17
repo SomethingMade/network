@@ -41169,13 +41169,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 if (streakBtn) streakBtn.style.display = 'none';
             }
             if (isInitialLoad) {
-                // Branded splash: shown for at least 800ms AND until the first page of the feed has
-                // actually loaded (capped at 6s so a bad connection can't trap people on it). It used
-                // to close on a fixed timer, which let the app flash open on an empty screen and then
-                // blink again when the loading shimmer took over. Now the splash and the shimmer go
-                // away together, once there is something to show. The logo lifts and fades out, then
-                // the overlay snaps away instantly so nothing behind it flashes through.
-                const splashStartedAt = Date.now();
+                // Branded splash stays up for 2 seconds from page start (SPLASH_MS), then it lifts away and
+                // the page shimmer underneath keeps showing while the feed loads. The shimmer ends as soon
+                // as the first page of posts is in (never before SHIMMER_MIN_MS, never after SHIMMER_MAX_MS),
+                // so the sequence is: splash → shimmer → content, with no blank frame or double blink.
+                const SPLASH_MS = 2000, SHIMMER_MIN_MS = 500, SHIMMER_MAX_MS = 8000;
                 const closeSplash = () => {
                     const loadingOverlay = document.getElementById('loading-overlay');
                     const logo = loadingOverlay.querySelector('.haba-mark');
@@ -41189,16 +41187,18 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         void loadingOverlay.offsetWidth;
                         loadingOverlay.style.transition = '';
                         if (logo) logo.classList.remove('splash-exit', 'splash-exit-run');
-                        hidePageShimmer();
+                        // splash is gone: shimmer is what the person sees until the feed is ready
+                        const shimmerStart = Date.now();
+                        const endShimmerWhenReady = () => {
+                            const shown = Date.now() - shimmerStart;
+                            const ready = !user || feedInitialLoadComplete;
+                            if ((ready && shown >= SHIMMER_MIN_MS) || shown >= SHIMMER_MAX_MS) hidePageShimmer();
+                            else setTimeout(endShimmerWhenReady, 100);
+                        };
+                        if (user) endShimmerWhenReady(); else hidePageShimmer();
                     }, logo ? 450 : 0);
                 };
-                const waitForFeed = () => {
-                    const elapsed = Date.now() - splashStartedAt;
-                    const ready = !user || feedInitialLoadComplete;
-                    if ((elapsed >= 800 && ready) || elapsed >= 6000) closeSplash();
-                    else setTimeout(waitForFeed, 100);
-                };
-                setTimeout(waitForFeed, 800);
+                setTimeout(closeSplash, Math.max(0, SPLASH_MS - performance.now()));
                 isInitialLoad = false;
             }
         });

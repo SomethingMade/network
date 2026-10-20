@@ -11323,7 +11323,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     <div class="msgs-fav-strip" id="msgs-fav-strip"><div class="msgs-fav-strip-title">Favourites</div><div class="msgs-fav-strip-scroll" id="msgs-fav-strip-scroll"></div></div>
                     <div class="chat-list-container" id="chat-list-container"></div>
                     <div class="chat-list-container" id="chat-updates-container" style="display:none;"></div>
-                    <button type="button" class="xc-fab" id="xc-fab" aria-label="New message" title="New message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path><line x1="17" y1="3" x2="17" y2="9"></line><line x1="14" y1="6" x2="20" y2="6"></line></svg></button>
+                    <button type="button" class="xc-fab" id="xc-fab" aria-label="New message" title="New message"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path><path d="M8 12h8"></path><path d="M12 8v8"></path></svg></button>
                 </div>
 
                 <div id="tab-status" class="tab-content active-tab">
@@ -47390,6 +47390,77 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
 
         // ── X-STYLE MESSAGES TAB: "All" view dropdown, new-chat button, "Suggested" people ──
+
+        // Preview sheet for a "Suggested" person (tap their avatar): cover, avatar, name, bio, counts, mutuals, View profile / Chat.
+        let xcSheetReq = 0;
+        function openSuggestedSheet(uid) {
+            const p = cachedUsers[uid];
+            if (!p) return;
+            let ov = document.getElementById('xc-sheet-overlay');
+            if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'xc-sheet-overlay';
+                ov.className = 'xc-sheet-overlay';
+                ov.innerHTML = `<div class="xc-sheet" role="dialog" aria-modal="true">
+                    <div class="xc-sheet-cover" id="xc-sheet-cover"></div>
+                    <div class="xc-sheet-avatar" id="xc-sheet-avatar"></div>
+                    <div class="xc-sheet-body">
+                        <div class="xc-sheet-name" id="xc-sheet-name"></div>
+                        <div class="xc-sheet-user" id="xc-sheet-user"></div>
+                        <div class="xc-sheet-bio" id="xc-sheet-bio"></div>
+                        <div class="xc-sheet-meta" id="xc-sheet-joined"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="8" y1="2.5" x2="8" y2="6.5"></line><line x1="16" y1="2.5" x2="16" y2="6.5"></line></svg><span id="xc-sheet-joined-text"></span></div>
+                        <div class="xc-sheet-counts"><span><b id="xc-sheet-following">0</b> Following</span><span><b id="xc-sheet-followers">0</b> Followers</span></div>
+                        <div class="xc-sheet-fb" id="xc-sheet-fb"><span class="xc-sheet-fb-av" id="xc-sheet-fb-av"></span><span id="xc-sheet-fb-text"></span></div>
+                    </div>
+                    <div class="xc-sheet-actions"><button type="button" class="xc-sheet-view" id="xc-sheet-view">View profile</button><button type="button" class="xc-sheet-chat" id="xc-sheet-chat">Chat</button></div>
+                </div>`;
+                document.body.appendChild(ov);
+                ov.addEventListener('click', (e) => { if (e.target === ov) closeSuggestedSheet(); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSuggestedSheet(); });
+            }
+            const $ = (id) => document.getElementById(id);
+            const photo = p.photoURL || DEFAULT_AVATAR_URL;
+            $('xc-sheet-cover').style.backgroundImage = p.coverPhoto ? `url('${p.coverPhoto}')` : '';
+            $('xc-sheet-avatar').style.backgroundImage = `url('${photo}')`;
+            $('xc-sheet-name').innerHTML = escapeHtmlForSearch(p.name || 'Unknown User') + verifiedBadgeFor(uid, false);
+            $('xc-sheet-user').textContent = p.username ? '@' + p.username : '';
+            $('xc-sheet-user').style.display = p.username ? '' : 'none';
+            $('xc-sheet-bio').textContent = p.about || '';
+            $('xc-sheet-bio').style.display = p.about ? '' : 'none';
+            const joined = formatJoinedDate(p.createdAt);
+            $('xc-sheet-joined-text').textContent = joined ? 'Joined ' + joined : '';
+            $('xc-sheet-joined').style.display = joined ? 'flex' : 'none';
+            $('xc-sheet-following').textContent = formatProfileCount(p.followingCount);
+            $('xc-sheet-followers').textContent = formatProfileCount(p.followersCount);
+            $('xc-sheet-fb').classList.remove('show');
+            $('xc-sheet-view').onclick = () => { closeSuggestedSheet(); openUserProfileSheet(uid); };
+            $('xc-sheet-chat').onclick = () => { closeSuggestedSheet(); openChatView(uid, p.name || 'User', photo); };
+            ov.querySelector('.xc-sheet').scrollTop = 0;
+            requestAnimationFrame(() => ov.classList.add('open'));
+
+            // "Followed by …": people I follow who also follow them (best effort, one read)
+            const req = ++xcSheetReq;
+            (async () => {
+                try {
+                    const me = auth.currentUser;
+                    const snap = await get(ref(database, `followers/${uid}`));
+                    const theirs = snap.exists() ? snap.val() : {};
+                    const mutual = Object.keys(theirs).filter(f => cachedContacts[f] && f !== me.uid && cachedUsers[f]);
+                    if (req !== xcSheetReq || !mutual.length) return;
+                    const shown = mutual.slice(0, 2).map(f => cachedUsers[f]);
+                    const extra = mutual.length - shown.length;
+                    $('xc-sheet-fb-av').innerHTML = shown.map(u => `<span style="background-image:url('${u.photoURL || DEFAULT_AVATAR_URL}')"></span>`).join('');
+                    const names = shown.map(u => u.name || 'Someone');
+                    $('xc-sheet-fb-text').textContent = 'Followed by ' + names.join(', ') + (extra > 0 ? ` and ${extra} ${extra === 1 ? 'other' : 'others'}` : '');
+                    $('xc-sheet-fb').classList.add('show');
+                } catch (err) { /* cosmetic row, skip */ }
+            })();
+        }
+        function closeSuggestedSheet() {
+            xcSheetReq++;
+            const ov = document.getElementById('xc-sheet-overlay');
+            if (ov) ov.classList.remove('open');
+        }
         function renderChatSuggestions() {
             const list = document.getElementById('chat-list-container');
             if (!list) return;
@@ -47433,6 +47504,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (list) list.addEventListener('click', (e) => {
                 const row = e.target.closest('.xc-sg-row');
                 if (!row) return;
+                if (e.target.closest('.xc-sg-avatar')) { e.stopPropagation(); openSuggestedSheet(row.dataset.uid); return; }
                 openChatView(row.dataset.uid, row.dataset.name, row.dataset.avatar);
             });
             const btn = document.getElementById('xc-all-btn');
@@ -48497,10 +48569,36 @@ html body #tab-chats .xc-sg-sub{font-size:15px;color:var(--text-secondary);white
 html body #tab-chats .xc-sg-btn{flex-shrink:0;padding:9px 20px;border:none;border-radius:999px;background:var(--xc-btn-bg);color:var(--xc-btn-fg);font:700 16px 'Inter',sans-serif;cursor:pointer}
 html body #tab-chats .xc-sg-btn:active{opacity:.65}
 /* blue new-chat button */
-html body #tab-chats .xc-fab{display:none;position:fixed;right:16px;bottom:calc(var(--nav-bar-total) + env(safe-area-inset-bottom,0px) - 14px);width:56px;height:56px;border-radius:50%;border:none;background:var(--xc-blue);color:#fff;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(29,155,240,.4);cursor:pointer;z-index:40}
+html body #tab-chats .xc-fab{display:none;position:fixed;right:16px;bottom:calc(var(--nav-bar-height) + 16px);width:56px;height:56px;border-radius:50%;border:none;background:var(--xc-blue);color:#fff;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(29,155,240,.4);cursor:pointer;z-index:40}
 html body #tab-chats .xc-fab svg{width:26px;height:26px}
 html body #tab-chats .xc-fab:active{transform:scale(.94)}
 @media (max-width:768px){html body #tab-chats.active-tab .xc-fab{display:flex}}
+/* Suggested-person preview sheet */
+.xc-sheet-overlay{position:fixed;inset:0;z-index:5000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);visibility:hidden;transition:background .25s ease,visibility 0s linear .25s}
+.xc-sheet-overlay.open{background:rgba(0,0,0,.5);visibility:visible;transition:background .25s ease}
+.xc-sheet{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;background:var(--bg-surface);color:var(--text-primary);border-radius:22px 22px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .3s var(--ease-smooth,cubic-bezier(.16,1,.3,1))}
+.xc-sheet-overlay.open .xc-sheet{transform:translateY(0)}
+.xc-sheet-cover{height:104px;background:var(--bg-input) center/cover no-repeat;border-radius:22px 22px 0 0}
+.xc-sheet-avatar{width:78px;height:78px;border-radius:50%;margin:-39px 0 0 16px;background:var(--bg-input) center/cover no-repeat;border:4px solid var(--bg-surface);box-sizing:border-box}
+.xc-sheet-body{padding:8px 16px 0}
+.xc-sheet-name{display:flex;align-items:center;gap:5px;font-size:22px;font-weight:800;letter-spacing:-.3px;line-height:1.25}
+.xc-sheet-user{font-size:15px;color:var(--text-secondary);margin-top:1px}
+.xc-sheet-bio{font-size:15px;line-height:1.4;margin-top:12px;white-space:pre-wrap;word-break:break-word}
+.xc-sheet-meta{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:15px;color:var(--text-secondary)}
+.xc-sheet-meta svg{width:18px;height:18px;flex-shrink:0}
+.xc-sheet-counts{display:flex;gap:16px;margin-top:12px;font-size:15px;color:var(--text-secondary)}
+.xc-sheet-counts b{color:var(--text-primary);font-weight:700}
+.xc-sheet-fb{display:none;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:var(--text-secondary)}
+.xc-sheet-fb.show{display:flex}
+.xc-sheet-fb-av{display:flex}
+.xc-sheet-fb-av span{width:24px;height:24px;border-radius:50%;background:var(--bg-input) center/cover no-repeat;border:2px solid var(--bg-surface);margin-left:-8px;box-sizing:border-box}
+.xc-sheet-fb-av span:first-child{margin-left:0}
+.xc-sheet-actions{display:flex;gap:12px;padding:20px 16px 0}
+.xc-sheet-actions button{flex:1;height:50px;border:none;border-radius:999px;font:700 17px 'Inter',sans-serif;cursor:pointer}
+.xc-sheet-actions button:active{opacity:.7}
+.xc-sheet-actions .xc-sheet-view{background:#CFD9DE;color:#0F1419}
+body.dark-theme .xc-sheet-actions .xc-sheet-view{background:#2F3336;color:#E7E9EA}
+.xc-sheet-actions .xc-sheet-chat{background:var(--text-primary);color:var(--bg-surface)}
 </style>
 <script>
 /* Icon-only nav (1025–1279px) has no labels: give every nav item a tooltip from its label. */

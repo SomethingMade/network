@@ -40467,7 +40467,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         document.getElementById('chat-requests-container').addEventListener('click', async (e) => {
             const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
+            if (avatarEl) {
+                e.stopPropagation();
+                const reqRow = avatarEl.closest('[data-uid]');
+                if (reqRow && reqRow.dataset.uid && window.openSuggestedSheet) window.openSuggestedSheet(reqRow.dataset.uid);
+                else openImageViewer(avatarEl.getAttribute('data-full'));
+                return;
+            }
 
             // Tapping the row itself (not the Follow Back button) opens that conversation.
             const reqRow = e.target.closest('.chat-request-row');
@@ -41010,7 +41016,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
         document.getElementById('msgs-fav-strip-scroll').addEventListener('click', (e) => {
             const btn = e.target.closest('.msgs-fav-item');
-            if (btn && btn.dataset.uid) openChatView(btn.dataset.uid, btn.dataset.name, btn.dataset.avatar);
+            if (btn && btn.dataset.uid) {
+                if (e.target.closest('.msgs-fav-avatar') && window.openSuggestedSheet) { window.openSuggestedSheet(btn.dataset.uid); return; }
+                openChatView(btn.dataset.uid, btn.dataset.name, btn.dataset.avatar);
+            }
         });
 
         function refreshChatListOnlineDots() {
@@ -45805,7 +45814,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         document.getElementById('chat-list-container').addEventListener('click', (e) => {
             if (chatItemPressState.triggered) { chatItemPressState.triggered = false; return; }
             const avatarEl = e.target.closest('.avatar[data-full]');
-            if (avatarEl) { e.stopPropagation(); openImageViewer(avatarEl.getAttribute('data-full')); return; }
+            if (avatarEl) {
+                e.stopPropagation();
+                const rowEl = avatarEl.closest('.chat-item');
+                const rowUid = rowEl && rowEl.dataset.uid;
+                if (rowUid && !rowEl.dataset.groupId && rowUid !== AI_UID && window.openSuggestedSheet) window.openSuggestedSheet(rowUid);
+                else openImageViewer(avatarEl.getAttribute('data-full'));
+                return;
+            }
             const card = e.target.closest('.chat-item');
             if (!card) return;
             if (card.dataset.groupId) { openGroupChatView(card.dataset.groupId); return; }
@@ -47456,6 +47472,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 } catch (err) { /* cosmetic row, skip */ }
             })();
         }
+        window.openSuggestedSheet = openSuggestedSheet;
         function closeSuggestedSheet() {
             xcSheetReq++;
             const ov = document.getElementById('xc-sheet-overlay');

@@ -17981,6 +17981,15 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // gold for a Business Account, and blue (VERIFIED_BADGE_SVG) for everyone else who's
         // verified — Goza AI, a purchased Verified Badge, or reaching FRIENDS_BADGE_THRESHOLD
         // followers organically. Same blue badge, no matter which path got them there.
+        // The small business-avatar tag shown after the verified badge (same one posts show), for a profile's name.
+        function companyTagHtmlFor(uid) {
+            const biz = getTaggedBusiness(cachedUsers[uid]);
+            if (!biz) return '';
+            const safe = String(biz.photoURL).replace(/'/g, "%27");
+            const title = String(biz.name || '').replace(/"/g, '&quot;');
+            return `<span class="feed-post-company-tag" data-uid="${biz.uid}" title="${title}"><span class="feed-post-company-tag-avatar" style="background-image: url('${safe}')"></span></span>`;
+        }
+
         function verifiedBadgeFor(uid, isAI) {
             if (isAI) return VERIFIED_BADGE_SVG;
             const profile = cachedUsers[uid];
@@ -25792,6 +25801,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const tagEl = e.target.closest('.feed-post-company-tag');
             if (tagEl && tagEl.dataset.uid) {
                 e.stopPropagation();
+                // On a profile header, show the quick preview sheet (same one as tapping an avatar in Messages).
+                if (tagEl.closest('.tm-profile-name') && window.openSuggestedSheet) { window.openSuggestedSheet(tagEl.dataset.uid); return; }
                 pauseAllFeedMedia();
                 openUserProfileSheet(tagEl.dataset.uid);
             }
@@ -28846,7 +28857,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
                 // Read-only display (the profile view itself is no longer editable in
                 // place — tapping "Edit Profile" below opens a separate sheet for that).
-                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(user.displayName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(user.displayName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false) + companyTagHtmlFor(user.uid);
                 document.getElementById('my-profile-username-display').innerHTML = escapeHtmlForPost(myProfile.username ? '@' + myProfile.username : '@—');
                 const avatarDisplay = document.getElementById('my-profile-avatar-display');
                 avatarDisplay.style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
@@ -31542,7 +31553,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // Refresh the read-only view sheet underneath with the values just saved,
                 // rather than re-fetching — cachedUsers may take a moment to catch up with
                 // the write above.
-                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false);
+                document.getElementById('my-profile-name-display').innerHTML = escapeHtmlForPost(newName || (user.email ? user.email.split('@')[0] : 'User')) + verifiedBadgeFor(user.uid, false) + companyTagHtmlFor(user.uid);
                 document.getElementById('my-profile-avatar-display').style.backgroundImage = `url('${finalPhoto}')`;
                 const aboutDisplay = document.getElementById('my-profile-about-display');
                 aboutDisplay.textContent = newAbout;
@@ -36618,7 +36629,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 userCoverEl.classList.toggle('has-image', !!profile.coverPhoto);
             }
             applyLiveRingToProfileAvatar();
-            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false) + (profile.profileLocked ? '<span class="profile-lock-badge" title="Locked profile" aria-label="Locked profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>' : '');
+            document.getElementById('user-info-name').innerHTML = (profile.name || 'Unknown User') + verifiedBadgeFor(uid, false) + companyTagHtmlFor(uid) + (profile.profileLocked ? '<span class="profile-lock-badge" title="Locked profile" aria-label="Locked profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>' : '');
             document.getElementById('user-info-username').innerHTML = escapeHtmlForPost(profile.username ? '@' + profile.username : '@—');
             document.getElementById('user-info-about').innerHTML = profile.about ? linkifyBioMentions(profile.about) : 'No about yet.';
             const joinedRow = document.getElementById('user-info-joined-row');
@@ -48648,7 +48659,7 @@ html body #tab-notifications .xc-all-menu button:active{background:var(--bg-hove
 html body #tab-notifications .xn-menu-sep{height:1px;background:var(--border-color);margin:6px 4px}
 html body #tab-notifications #notif-filter-row{display:none!important}
 /* Suggested-person preview sheet */
-.xc-sheet-overlay{position:fixed;inset:0;z-index:5000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);visibility:hidden;transition:background .25s ease,visibility 0s linear .25s}
+.xc-sheet-overlay{position:fixed;inset:0;z-index:100020;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);visibility:hidden;transition:background .25s ease,visibility 0s linear .25s}
 .xc-sheet-overlay.open{background:rgba(0,0,0,.5);visibility:visible;transition:background .25s ease}
 .xc-sheet{width:100%;max-width:560px;max-height:88vh;overflow-y:auto;background:var(--bg-surface);color:var(--text-primary);border-radius:22px 22px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform .3s var(--ease-smooth,cubic-bezier(.16,1,.3,1))}
 .xc-sheet-overlay.open .xc-sheet{transform:translateY(0)}
@@ -48735,8 +48746,9 @@ html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-media-section .
 </style>
 <style id="profile-x-redesign-2">
 /* Avatar overlaps the cover again; Posts and Likes counts removed (kept in the DOM, hidden, so the profile JS still finds them) */
-html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-id .ig-profile-stat:nth-child(1),
-html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-id .ig-profile-stat:nth-child(4){display:none!important}
+html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-id .ig-profile-stat:nth-child(1){display:none!important}
+html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-name .feed-post-company-tag{margin-left:2px}
+html body :is(#tab-profile,#user-info-sheet-overlay) .tm-profile-name .feed-post-company-tag-avatar{width:20px;height:20px}
 html body #tab-profile .fb-profile-identity,
 html body #user-info-sheet-overlay .fb-profile-identity{flex-direction:column!important;align-items:flex-start!important;gap:8px!important;padding-top:0!important;margin:0 0 4px!important}
 html body #tab-profile .fb-profile-avatar-wrap,

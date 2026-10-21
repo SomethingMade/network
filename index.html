@@ -556,45 +556,81 @@
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s var(--ease-smooth); max-height: min(85vh, 100%); overflow-y: auto; overflow-x: hidden; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
 
-        /* ── SIDEBAR DRAWER (opened by tapping the header avatar) ──
-           X-style account drawer: identity + follow counts up top, large primary links,
-           then a pinned footer (settings + theme toggle). Same z-index tier as the sheets. */
-        .sidebar-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: stretch; justify-content: flex-start; }
+        /* ── SIDEBAR DRAWER (header menu button / avatar) ──
+           Profile card with cover, stat chips, quick-action tiles, a clean list and a pinned
+           footer with a dark-mode switch. */
+        .sidebar-drawer-overlay { position: fixed; inset: 0; background: rgba(8,8,12,0.5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); z-index: 100002; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: stretch; justify-content: flex-start; }
         .sidebar-drawer-overlay.active { opacity: 1; visibility: visible; }
-        .sidebar-drawer { position: relative; background: var(--bg-surface); width: min(340px, 84vw); height: 100%; box-sizing: border-box; border-radius: 0 24px 24px 0; box-shadow: 10px 0 40px rgba(0,0,0,0.2); transform: translateX(-100%); transition: transform 0.35s var(--ease-smooth); overflow-y: auto; overscroll-behavior: contain; color: var(--text-primary); padding: calc(18px + env(safe-area-inset-top)) 0 calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+        .sidebar-drawer { position: relative; background: var(--bg-surface); width: min(344px, 86vw); height: 100%; box-sizing: border-box; border-radius: 0 28px 28px 0; box-shadow: 14px 0 50px rgba(0,0,0,0.28); transform: translateX(-102%); transition: transform 0.4s var(--ease-smooth); overflow-y: auto; overscroll-behavior: contain; color: var(--text-primary); padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; scrollbar-width: none; }
+        .sidebar-drawer::-webkit-scrollbar { display: none; }
         .sidebar-drawer-overlay.active .sidebar-drawer { transform: translateX(0); }
         .sidebar-drawer-close { display: none; }
-        .sidebar-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 0 20px; }
-        .sidebar-drawer-avatar { width: 42px; height: 42px; flex-shrink: 0; background-color: var(--primary-blue); cursor: pointer; }
-        .sidebar-drawer-more-wrap { position: relative; flex-shrink: 0; }
-        .sidebar-drawer-more { width: 34px; height: 34px; border-radius: 50%; border: 1.6px solid var(--text-primary); background: none; color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background 0.15s ease; }
-        .sidebar-drawer-more:active { background: var(--bg-alt); }
+
+        /* profile card */
+        .sidebar-drawer-card { position: relative; border-radius: 24px; background: var(--bg-alt); border: 1px solid var(--border-color); flex-shrink: 0; }
+        .sidebar-drawer-cover { height: 80px; border-radius: 23px 23px 0 0; background-color: #1d1d22; background-image: radial-gradient(120% 140% at 0% 0%, #5b5b66 0%, rgba(91,91,102,0) 55%), radial-gradient(90% 120% at 100% 100%, #3a4a6b 0%, rgba(58,74,107,0) 60%), linear-gradient(135deg, #1b1b20, #2b2b33); background-size: cover; background-position: center; }
+        .sidebar-drawer-more-wrap { position: absolute; top: 10px; right: 10px; z-index: 3; }
+        .sidebar-drawer-more { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255,255,255,0.22); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: transform 0.12s ease, background 0.15s ease; }
+        .sidebar-drawer-more:active { transform: scale(0.92); background: rgba(255,255,255,0.34); }
         .sidebar-drawer-more svg { width: 16px; height: 16px; }
-        .sidebar-drawer-more-menu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 170px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); padding: 6px; z-index: 2; display: none; }
-        .sidebar-drawer-more-menu.open { display: block; }
-        .sidebar-drawer-more-menu .sidebar-drawer-item { padding: 11px 12px; border-radius: 10px; font-size: 15px; gap: 12px; }
-        .sidebar-drawer-more-menu .sidebar-drawer-item svg { width: 20px; height: 20px; }
-        .sidebar-drawer-profile { padding: 12px 20px 0; cursor: pointer; }
+        .sidebar-drawer-more-menu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 176px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 14px 34px rgba(0,0,0,0.22); padding: 6px; display: none; transform-origin: top right; }
+        .sidebar-drawer-more-menu.open { display: block; animation: sdPop 0.16s var(--ease-smooth); }
+        @keyframes sdPop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+        .sidebar-drawer-card-body { padding: 0 16px 16px; }
+        .sidebar-drawer-avatar { width: 68px; height: 68px; margin-top: -34px; flex-shrink: 0; background-color: var(--primary-blue); border: 4px solid var(--bg-alt); box-sizing: border-box; box-shadow: 0 6px 18px rgba(0,0,0,0.18); cursor: pointer; position: relative; z-index: 2; }
+        .sidebar-drawer-profile { padding-top: 10px; cursor: pointer; }
         .sidebar-drawer-identity { min-width: 0; }
-        .sidebar-drawer-identity h4 { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sidebar-drawer-identity p { font-size: 15px; color: var(--text-secondary); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
-        .sidebar-drawer-stats { display: flex; gap: 18px; padding: 12px 20px 16px; }
-        .sidebar-drawer-stat { border: none; background: none; padding: 0; margin: 0; font-family: inherit; font-size: 14.5px; color: var(--text-secondary); cursor: pointer; display: inline-flex; gap: 4px; align-items: baseline; }
-        .sidebar-drawer-stat b { color: var(--text-primary); font-weight: 800; }
-        .sidebar-drawer-stat:active { opacity: 0.6; }
-        .sidebar-drawer-divider { height: 1px; background: var(--border-color); margin: 0 20px; flex-shrink: 0; }
-        .sidebar-drawer-menu { display: flex; flex-direction: column; gap: 0; padding: 8px 0; }
-        .sidebar-drawer-menu-spacer { flex: 1 1 auto; min-height: 12px; }
-        .sidebar-drawer-item { display: flex; align-items: center; gap: 18px; width: 100%; text-align: left; border: none; background: none; color: var(--text-primary); font-size: 19px; font-weight: 700; font-family: inherit; padding: 13px 20px; border-radius: 0; cursor: pointer; transition: background 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        .sidebar-drawer-identity h4 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-drawer-identity p { font-size: 14px; color: var(--text-secondary); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+        .sidebar-drawer-stats { display: flex; gap: 8px; margin-top: 14px; }
+        .sidebar-drawer-stat { flex: 1; border: 1px solid var(--border-color); background: var(--bg-surface); border-radius: 14px; padding: 9px 12px; font-family: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; transition: transform 0.12s ease; }
+        .sidebar-drawer-stat:active { transform: scale(0.97); }
+        .sidebar-drawer-stat b { font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em; }
+        .sidebar-drawer-stat span { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+
+        /* quick-action tiles */
+        .sidebar-drawer-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; flex-shrink: 0; }
+        .sidebar-drawer-tile { position: relative; border: 1px solid var(--border-color); background: var(--bg-alt); color: var(--text-primary); border-radius: 18px; padding: 12px 2px 10px; font-family: inherit; text-align: center; cursor: pointer; display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: 0; transition: transform 0.12s ease, background 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        .sidebar-drawer-tile:active { transform: scale(0.96); }
+        .sidebar-drawer-tile svg { width: 38px; height: 38px; padding: 9px; box-sizing: border-box; border-radius: 13px; stroke-width: 1.9; color: var(--tile-c, #111); background: color-mix(in srgb, var(--tile-c, #111) 14%, transparent); flex-shrink: 0; }
+        .sidebar-drawer-tile span.sd-tile-label { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-drawer-tile .live-count-badge { position: absolute; top: -6px; right: -3px; margin: 0; font-size: 10px; padding: 3px 6px; border: 2px solid var(--bg-surface); }
+        .sidebar-drawer-tile[data-tone="ride"] { --tile-c: #2f6bff; }
+        .sidebar-drawer-tile[data-tone="live"] { --tile-c: #ff3b5c; }
+        .sidebar-drawer-tile[data-tone="market"] { --tile-c: #f59e0b; }
+        .sidebar-drawer-tile[data-tone="jobs"] { --tile-c: #10b981; }
+        body.dark-theme .sidebar-drawer-tile svg { color: color-mix(in srgb, var(--tile-c) 70%, #fff); }
+
+        /* list rows */
+        .sidebar-drawer-menu { display: flex; flex-direction: column; gap: 2px; }
+        .sidebar-drawer-menu-spacer { flex: 1 1 auto; min-height: 4px; }
+        .sidebar-drawer-item { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: none; background: none; color: var(--text-primary); font-size: 16.5px; font-weight: 650; font-family: inherit; padding: 8px 10px; border-radius: 16px; cursor: pointer; transition: background 0.15s ease, transform 0.12s ease; -webkit-tap-highlight-color: transparent; }
         .sidebar-drawer-item:hover, .sidebar-drawer-item:active { background: var(--bg-alt); }
-        .sidebar-drawer-item svg { width: 26px; height: 26px; flex-shrink: 0; stroke-width: 1.8; }
-        .sidebar-drawer-footer { display: flex; flex-direction: column; padding: 8px 0 0; flex-shrink: 0; }
-        .sidebar-drawer-footer .sidebar-drawer-item { font-size: 16px; padding: 11px 20px; gap: 16px; }
-        .sidebar-drawer-footer .sidebar-drawer-item svg { width: 23px; height: 23px; }
-        .sidebar-drawer-footer .sidebar-drawer-theme { align-self: flex-start; width: auto; margin: 4px 0 0 8px; padding: 12px; border-radius: 50%; }
-        .sidebar-drawer-footer .sidebar-drawer-theme svg { width: 24px; height: 24px; }
+        .sidebar-drawer-item:active { transform: scale(0.985); }
+        .sidebar-drawer-item > svg:not(.sd-chev) { width: 38px; height: 38px; padding: 9px; box-sizing: border-box; border-radius: 13px; background: var(--bg-alt); border: 1px solid var(--border-color); flex-shrink: 0; stroke-width: 1.8; }
+        .sidebar-drawer-item > span:not(.live-count-badge):not(.sd-switch) { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-drawer-item .sd-chev { width: 16px; height: 16px; stroke: var(--text-secondary); opacity: 0.55; flex-shrink: 0; }
+        .sidebar-drawer-more-menu .sidebar-drawer-item { padding: 9px 10px; font-size: 15px; border-radius: 12px; }
+        .sidebar-drawer-more-menu .sidebar-drawer-item > svg:not(.sd-chev) { width: 34px; height: 34px; padding: 8px; border-radius: 11px; }
+
+        /* footer */
+        .sidebar-drawer-footer { display: flex; flex-direction: column; gap: 2px; padding-top: 8px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
+        .sidebar-drawer-theme .sd-switch { width: 46px; height: 28px; border-radius: 99px; background: var(--border-color); position: relative; flex: 0 0 auto; transition: background 0.2s ease; }
+        .sidebar-drawer-theme .sd-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.25); transition: transform 0.25s var(--ease-smooth); }
+        .sidebar-drawer-theme.on .sd-switch { background: #34c759; }
+        .sidebar-drawer-theme.on .sd-switch::after { transform: translateX(18px); }
         .sidebar-drawer-item-danger { color: var(--danger-red); }
+        .sidebar-drawer-item-danger > svg:not(.sd-chev) { color: var(--danger-red); }
         .sidebar-drawer-item-danger:hover, .sidebar-drawer-item-danger:active { background: rgba(255,69,58,0.08); }
+
+        /* staggered entrance */
+        .sidebar-drawer-overlay.active .sidebar-drawer > * { animation: sdRise 0.5s var(--ease-smooth) both; }
+        .sidebar-drawer-overlay.active .sidebar-drawer > *:nth-child(2) { animation-delay: 0.04s; }
+        .sidebar-drawer-overlay.active .sidebar-drawer > *:nth-child(3) { animation-delay: 0.08s; }
+        .sidebar-drawer-overlay.active .sidebar-drawer > *:nth-child(4) { animation-delay: 0.12s; }
+        .sidebar-drawer-overlay.active .sidebar-drawer > *:nth-child(5) { animation-delay: 0.16s; }
+        @keyframes sdRise { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+        @media (prefers-reduced-motion: reduce) { .sidebar-drawer-overlay.active .sidebar-drawer > *, .sidebar-drawer-more-menu.open { animation: none; } }
         /* --- Explore drawer: right-hand drawer opened from the right side of every tab's header.
            Lists the app's "other" surfaces (Haba Ride, Live, Market, Jobs, Communities). --- */
         .explore-drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 100003; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s; display: flex; align-items: stretch; justify-content: flex-start; }
@@ -10237,76 +10273,81 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             <button type="button" id="btn-close-sidebar-drawer" class="sidebar-drawer-close" aria-label="Close" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <div class="sidebar-drawer-head">
-                <div class="avatar sidebar-drawer-avatar" id="sidebar-drawer-avatar"></div>
+            <div class="sidebar-drawer-card">
+                <div class="sidebar-drawer-cover" id="sidebar-drawer-cover"></div>
                 <div class="sidebar-drawer-more-wrap">
                     <button type="button" class="sidebar-drawer-more" id="sidebar-drawer-more-btn" aria-label="More" aria-haspopup="menu" aria-expanded="false">
                         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
                     </button>
                     <div class="sidebar-drawer-more-menu" id="sidebar-drawer-more-menu" role="menu">
-                <button type="button" class="sidebar-drawer-item sidebar-drawer-item-danger" role="menuitem" id="sidebar-drawer-logout">
+                <button type="button" class="sidebar-drawer-item sidebar-drawer-item-danger" id="sidebar-drawer-logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     <span>Log out</span>
                 </button>
                     </div>
                 </div>
-            </div>
-            <div class="sidebar-drawer-profile" id="sidebar-drawer-profile-trigger">
-                <div class="sidebar-drawer-identity">
-                    <h4 id="sidebar-drawer-name">—</h4>
-                    <p id="sidebar-drawer-username">@—</p>
+                <div class="sidebar-drawer-card-body">
+                    <div class="avatar sidebar-drawer-avatar" id="sidebar-drawer-avatar"></div>
+                    <div class="sidebar-drawer-profile" id="sidebar-drawer-profile-trigger">
+                        <div class="sidebar-drawer-identity">
+                            <h4 id="sidebar-drawer-name">—</h4>
+                            <p id="sidebar-drawer-username">@—</p>
+                        </div>
+                    </div>
+                    <div class="sidebar-drawer-stats">
+                        <button type="button" class="sidebar-drawer-stat" id="sidebar-drawer-following" data-follow-tab="following"><b id="sidebar-drawer-following-count">0</b><span>Following</span></button>
+                        <button type="button" class="sidebar-drawer-stat" id="sidebar-drawer-followers" data-follow-tab="followers"><b id="sidebar-drawer-followers-count">0</b><span>Followers</span></button>
+                    </div>
                 </div>
             </div>
-            <div class="sidebar-drawer-stats">
-                <button type="button" class="sidebar-drawer-stat" id="sidebar-drawer-following" data-follow-tab="following"><b id="sidebar-drawer-following-count">0</b><span>Following</span></button>
-                <button type="button" class="sidebar-drawer-stat" id="sidebar-drawer-followers" data-follow-tab="followers"><b id="sidebar-drawer-followers-count">0</b><span>Followers</span></button>
+            <div class="sidebar-drawer-tiles">
+                <button type="button" class="sidebar-drawer-tile" id="sidebar-drawer-haba-ride" data-tone="ride">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v5h-2"></path><path d="M3 12h18"></path><circle cx="7.5" cy="17" r="2"></circle><circle cx="16.5" cy="17" r="2"></circle></svg>
+                    <span class="sd-tile-label">Ride</span>
+                </button>
+                <button type="button" class="sidebar-drawer-tile" id="sidebar-drawer-live" data-tone="live">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                    <span class="sd-tile-label">Live</span>
+                    <span class="live-count-badge" id="sidebar-drawer-live-count" style="display:none;">0</span>
+                </button>
+                <button type="button" class="sidebar-drawer-tile" id="sidebar-drawer-market" data-tone="market">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                    <span class="sd-tile-label">Market</span>
+                </button>
+                <button type="button" class="sidebar-drawer-tile" id="sidebar-drawer-jobs" data-tone="jobs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><line x1="2" y1="13" x2="22" y2="13"/></svg>
+                    <span class="sd-tile-label">Jobs</span>
+                </button>
             </div>
-            <div class="sidebar-drawer-divider"></div>
             <nav class="sidebar-drawer-menu">
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-profile">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <span>Profile</span>
+                    <span>Profile</span><svg class="sd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-groups">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    <span>Communities</span>
+                    <span>Communities</span><svg class="sd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-saved">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                    <span>Saved</span>
-                </button>
-                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-haba-ride">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5a2 2 0 0 1 1.9-1.4h10.2A2 2 0 0 1 19 7l2 5v5h-2"></path><path d="M3 12h18"></path><circle cx="7.5" cy="17" r="2"></circle><circle cx="16.5" cy="17" r="2"></circle></svg>
-                    <span>Haba Ride</span>
-                </button>
-                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-live">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                    <span>Live</span>
-                    <span class="live-count-badge" id="sidebar-drawer-live-count" style="display:none;">0</span>
+                    <span>Saved</span><svg class="sd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-insights">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                    <span>Insights</span>
-                </button>
-                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-jobs">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><line x1="2" y1="13" x2="22" y2="13"/></svg>
-                    <span>Jobs</span>
-                </button>
-                <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-market">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-                    <span>Market</span>
+                    <span>Insights</span><svg class="sd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
             </nav>
             <div class="sidebar-drawer-menu-spacer"></div>
-            <div class="sidebar-drawer-divider"></div>
             <div class="sidebar-drawer-footer">
                 <button type="button" class="sidebar-drawer-item" id="sidebar-drawer-settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    <span>Settings and privacy</span>
+                    <span>Settings</span><svg class="sd-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
-                <button type="button" class="sidebar-drawer-item sidebar-drawer-theme" id="sidebar-drawer-theme" aria-label="Switch theme">
+                <button type="button" class="sidebar-drawer-item sidebar-drawer-theme" id="sidebar-drawer-theme" aria-label="Toggle dark mode" role="switch" aria-checked="false">
                     <svg id="sidebar-drawer-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"></circle><line x1="12" y1="1.8" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22.2"></line><line x1="4.6" y1="4.6" x2="6.2" y2="6.2"></line><line x1="17.8" y1="17.8" x2="19.4" y2="19.4"></line><line x1="1.8" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22.2" y2="12"></line><line x1="4.6" y1="19.4" x2="6.2" y2="17.8"></line><line x1="17.8" y1="6.2" x2="19.4" y2="4.6"></line></svg>
                     <svg id="sidebar-drawer-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+                    <span>Dark mode</span>
+                    <span class="sd-switch"></span>
                 </button>
             </div>
         </div>
@@ -29072,6 +29113,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const moon = document.getElementById('sidebar-drawer-theme-moon');
             if (sun) sun.style.display = dark ? 'none' : '';
             if (moon) moon.style.display = dark ? '' : 'none';
+            const btn = document.getElementById('sidebar-drawer-theme');
+            if (btn) { btn.classList.toggle('on', dark); btn.setAttribute('aria-checked', dark ? 'true' : 'false'); }
         }
         function closeSidebarDrawerMoreMenu() {
             const menu = document.getElementById('sidebar-drawer-more-menu');
@@ -29087,6 +29130,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 document.getElementById('sidebar-drawer-avatar').style.backgroundImage = `url('${user.photoURL || DEFAULT_AVATAR_URL}')`;
                 document.getElementById('sidebar-drawer-name').textContent = user.displayName || 'Me';
                 document.getElementById('sidebar-drawer-username').innerHTML = escapeHtmlForPost(myProfile.username ? '@' + myProfile.username : '@—') + verifiedBadgeFor(user.uid, user.uid === AI_UID);
+                const coverEl = document.getElementById('sidebar-drawer-cover');
+                if (coverEl) coverEl.style.backgroundImage = myProfile.coverPhoto ? `url('${myProfile.coverPhoto}')` : '';
                 document.getElementById('sidebar-drawer-following-count').textContent = formatProfileCount(myProfile.followingCount);
                 document.getElementById('sidebar-drawer-followers-count').textContent = formatProfileCount(myProfile.followersCount);
             }

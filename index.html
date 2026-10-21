@@ -11464,17 +11464,26 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                      the render / select / delete logic below is unchanged. -->
                 <div id="tab-notifications" class="tab-content">
                     <div class="chat-header-area">
-                        <div class="chat-header-top activity-header" id="notif-header-default">
-                            <div class="activity-title-row">
-                                <h1 class="activity-title">Notifications</h1>
-                                <button type="button" id="btn-activity-bell" class="activity-bell-btn" aria-label="Notification settings"></button>
+                        <div class="chat-header-top activity-header xn-top" id="notif-header-default">
+                            <div class="profile-btn header-profile-btn xc-avatar" data-profile-trigger title="View Profile"></div>
+                            <h1 class="xc-title xn-title">Notifications</h1>
+                            <div class="xc-all-wrap xn-all-wrap">
+                                <button type="button" class="xc-all-btn" id="xn-all-btn" aria-haspopup="true" aria-expanded="false"><span id="xn-all-label">All</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                                <div class="xc-all-menu" id="xn-all-menu" role="menu">
+                                    <button type="button" role="menuitem" data-xn-filter="all" class="active">All</button>
+                                    <button type="button" role="menuitem" data-xn-filter="follow">Follows</button>
+                                    <button type="button" role="menuitem" data-xn-filter="conversation">Conversations</button>
+                                    <button type="button" role="menuitem" data-xn-filter="mention">Mentions</button>
+                                    <button type="button" role="menuitem" data-xn-filter="like">Likes</button>
+                                    <button type="button" role="menuitem" data-xn-filter="repost">Reposts</button>
+                                    <div class="xn-menu-sep"></div>
+                                    <button type="button" role="menuitem" data-xn-action="markread">Mark all as read</button>
+                                    <button type="button" role="menuitem" data-xn-action="settings">Settings</button>
+                                </div>
                             </div>
-                            <div class="activity-header-actions">
-                                <svg id="btn-mark-all-notifs-read" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg>
-                                <button type="button" class="search-icon-btn" id="notif-header-settings-btn" aria-label="Settings" title="Settings">
+                            <div class="xc-legacy-hidden" style="display:none;"><button type="button" id="btn-activity-bell" class="activity-bell-btn" aria-label="Notification settings"></button><svg id="btn-mark-all-notifs-read" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;" title="Mark all as read"><path d="M2 13l4 4L15 6"></path><path d="M8 13l4 4L23 6"></path></svg><button type="button" class="search-icon-btn" id="notif-header-settings-btn" aria-label="Settings" title="Settings">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                                </button>
-                            </div>
+                                </button></div>
                         </div>
                         <div class="chat-header-top notif-tab-selection-header" id="notif-header-selection" style="display:none;">
                             <div style="display:flex; align-items:center; gap:14px;">
@@ -47088,6 +47097,39 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
         function pauseIconSvg() { return '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'; }
 
+
+        // Notifications header: category pill menu drives the (hidden) filter chips
+        (function initNotifHeaderMenu() {
+            const btn = document.getElementById('xn-all-btn');
+            const menu = document.getElementById('xn-all-menu');
+            const label = document.getElementById('xn-all-label');
+            if (!btn || !menu) return;
+            const names = { all: 'All', follow: 'Follows', conversation: 'Conversations', mention: 'Mentions', like: 'Likes', repost: 'Reposts' };
+            const close = () => { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const open = menu.classList.toggle('open');
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            document.addEventListener('click', (e) => { if (!menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) close(); });
+            menu.addEventListener('click', (e) => {
+                const item = e.target.closest('button');
+                if (!item) return;
+                if (item.dataset.xnFilter) {
+                    const f = item.dataset.xnFilter;
+                    const chip = document.querySelector('#notif-filter-row .wa-chip[data-notif-filter="' + f + '"]');
+                    if (chip) chip.click();
+                    label.textContent = names[f];
+                    menu.querySelectorAll('[data-xn-filter]').forEach(i => i.classList.toggle('active', i === item));
+                } else if (item.dataset.xnAction === 'markread') {
+                    const b = document.getElementById('btn-mark-all-notifs-read'); if (b) b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                } else if (item.dataset.xnAction === 'settings') {
+                    const b = document.getElementById('notif-header-settings-btn'); if (b) b.click();
+                }
+                close();
+            });
+        })();
+
         function initChatListeners() {
             const user = auth.currentUser;
             if(!user) return;
@@ -48590,6 +48632,23 @@ html body #tab-chats .xc-fab{display:none;position:fixed;right:16px;bottom:calc(
 html body #tab-chats .xc-fab svg{width:26px;height:26px}
 html body #tab-chats .xc-fab:active{transform:scale(.94)}
 @media (max-width:768px){html body #tab-chats.active-tab .xc-fab{display:flex}}
+
+/* Notifications header, same layout as Messages; categories live in the pill menu */
+html body #tab-notifications .chat-header-area{padding:0 0 4px!important;border-bottom:1px solid var(--border-color)!important;box-shadow:none!important;background:var(--bg-base)!important}
+html body #tab-notifications .xn-top{align-items:center;justify-content:space-between;height:56px;padding:0 16px!important;margin:0!important;position:relative;gap:0}
+html body #tab-notifications .xn-top .xc-avatar{display:block!important;width:36px;height:36px;border-radius:50%;background-size:cover;background-position:center;margin:0;flex-shrink:0}
+html body #tab-notifications .xn-title{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;white-space:nowrap;font-family:'Inter',sans-serif!important;font-size:20px!important;font-weight:800!important;letter-spacing:-.2px!important;line-height:1!important;padding:0!important;color:var(--text-primary)!important;pointer-events:none}
+html body #tab-notifications .xn-all-wrap{position:relative}
+html body #tab-notifications .xc-all-btn{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px 0 18px;border-radius:999px;border:1.5px solid var(--border-color);background:transparent;color:var(--text-primary);font:700 16px 'Inter',sans-serif;cursor:pointer}
+html body.dark-theme #tab-notifications .xc-all-btn{border-color:#536471}
+html body #tab-notifications .xc-all-btn svg{width:18px;height:18px}
+html body #tab-notifications .xc-all-menu{display:none;position:absolute;right:0;top:46px;min-width:190px;padding:6px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-color);box-shadow:var(--shadow-elevated);z-index:60}
+html body #tab-notifications .xc-all-menu.open{display:block}
+html body #tab-notifications .xc-all-menu button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:11px 12px;border:none;background:none;border-radius:9px;color:var(--text-primary);font:600 15px 'Inter',sans-serif;text-align:left;cursor:pointer}
+html body #tab-notifications .xc-all-menu button.active{color:#1D9BF0}
+html body #tab-notifications .xc-all-menu button:active{background:var(--bg-hover)}
+html body #tab-notifications .xn-menu-sep{height:1px;background:var(--border-color);margin:6px 4px}
+html body #tab-notifications #notif-filter-row{display:none!important}
 /* Suggested-person preview sheet */
 .xc-sheet-overlay{position:fixed;inset:0;z-index:5000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0);visibility:hidden;transition:background .25s ease,visibility 0s linear .25s}
 .xc-sheet-overlay.open{background:rgba(0,0,0,.5);visibility:visible;transition:background .25s ease}

@@ -226,6 +226,28 @@
         }
         #page-shimmer-overlay.active { opacity: 1; visibility: visible; }
 
+        /* ── AUTH PROGRESS OVERLAY ── shown while a sign-in / sign-up request is in flight
+           (sending the code, verifying it, email sign-in/sign-up, reset link) so the person
+           always sees what's happening instead of a silent wait. Sits above the auth screen
+           and the splash, but below the OTP success/fail animations and the modal. */
+        #auth-progress-overlay {
+            position: fixed; inset: 0; z-index: 100001; display: flex; align-items: center; justify-content: center;
+            padding: 24px; background: rgba(0,0,0,0.45); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+            opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s;
+        }
+        #auth-progress-overlay.active { opacity: 1; visibility: visible; }
+        .auth-progress-card {
+            display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;
+            min-width: 210px; max-width: 280px; padding: 28px 28px 24px; border-radius: 20px;
+            background: var(--bg-surface, var(--bg-base)); color: var(--text-primary);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.28); transform: scale(0.96); transition: transform 0.2s var(--ease-smooth, ease);
+        }
+        #auth-progress-overlay.active .auth-progress-card { transform: scale(1); }
+        .auth-progress-spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid var(--border-color); border-top-color: var(--primary-blue); animation: spin 0.9s linear infinite; }
+        .auth-progress-text { font-size: 15px; font-weight: 600; line-height: 1.35; }
+        .auth-progress-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.35; margin-top: -8px; min-height: 0; }
+        .auth-progress-sub:empty { display: none; }
+
         /* ── OTP SUCCESS ANIMATION ── shown right after a phone code is confirmed, on top of
            everything (even the loading splash/shimmer that onAuthStateChanged brings up while
            it swaps to the main app), so signup always gets a clear "you're verified" beat
@@ -1711,6 +1733,34 @@
         .pm-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(128,128,128,0.35); }
         .pm-swatch.active { border-color: #1D9BF0; transform: scale(1.12); }
         .pm-overlay.pm-arming { pointer-events: none; }
+
+        /* ── POST AI ANALYSIS SHEET (long-press a post) ── */
+        .pa-overlay { position: fixed; inset: 0; z-index: 100030; display: none; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.45); }
+        .pa-overlay.open { display: flex; }
+        .pa-overlay.pa-arming { pointer-events: none; }
+        .pa-sheet { width: 100%; max-width: 560px; max-height: 78vh; display: flex; flex-direction: column; background: var(--bg-surface); color: var(--text-primary); border-radius: 22px 22px 0 0; padding: 8px 18px calc(env(safe-area-inset-bottom, 0px) + 16px); box-shadow: 0 -8px 30px rgba(0,0,0,0.25); animation: paUp .22s var(--ease-smooth); }
+        @media (min-width: 769px) { .pa-overlay { align-items: center; } .pa-sheet { border-radius: 22px; } }
+        @keyframes paUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .pa-grab { width: 38px; height: 4px; border-radius: 3px; background: var(--border-color); margin: 4px auto 10px; }
+        .pa-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .pa-title { font-size: 16px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .pa-spark { color: #FFB020; }
+        .pa-x { background: none; border: none; color: var(--text-secondary); padding: 6px; cursor: pointer; border-radius: 50%; display: inline-flex; }
+        .pa-quote { font-size: 13px; color: var(--text-secondary); background: var(--bg-input); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .pa-body { overflow-y: auto; font-size: 15px; line-height: 1.5; min-height: 70px; }
+        .pa-body p { margin: 0 0 8px; }
+        .pa-body ul { margin: 0 0 8px; padding-left: 20px; }
+        .pa-body li { margin-bottom: 4px; }
+        .pa-err { color: var(--danger-red); }
+        .pa-loading { display: flex; gap: 6px; padding: 18px 4px; }
+        .pa-loading span { width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary); animation: paDot 1s infinite ease-in-out; }
+        .pa-loading span:nth-child(2) { animation-delay: .15s; } .pa-loading span:nth-child(3) { animation-delay: .3s; }
+        @keyframes paDot { 0%, 80%, 100% { opacity: .25; transform: scale(.8); } 40% { opacity: 1; transform: scale(1); } }
+        .pa-actions { display: none; gap: 8px; margin-top: 12px; }
+        .pa-actions.ready { display: flex; }
+        .pa-act { flex: 1; background: var(--bg-input); color: var(--text-primary); border: none; border-radius: 50px; padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .pa-act:active { opacity: .7; }
+
         .feed-text-more-btn, .feed-text-less-btn { background: none; border: none; padding: 0; margin-left: 2px; font: inherit; font-weight: 600; color: var(--primary-blue); cursor: pointer; }
         .x-media-grid { position: relative; margin-top: 10px; margin-left: 60px; width: calc(100% - 60px); }
         .x-media-grid[data-count="1"] { border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); }
@@ -7075,8 +7125,7 @@ body.dark-theme .feed-post-card.feed-post-card-ig .feed-post-action-btn.liked{ba
 </style>
 <style id="fb-notifications-theme">
 /* Facebook-style Notifications */
-#tab-notifications,#tab-notifications .chat-header-area{background:var(--bg-base)}
-#tab-notifications .chat-header-area{background:var(--bg-base);border-bottom:none;box-shadow:0 1px 2px rgba(0,0,0,.12);padding-bottom:8px}
+#tab-notifications .chat-header-area{background:var(--fb-card);border-bottom:none;box-shadow:0 1px 2px rgba(0,0,0,.12);padding-bottom:8px}
 #tab-notifications .activity-header{margin-bottom:8px}
 #tab-notifications .activity-title{font-size:25px;font-weight:800;letter-spacing:-.4px;color:var(--fb-text)}
 #tab-notifications .activity-header-actions{gap:8px}
@@ -7090,7 +7139,7 @@ body.dark-theme #tab-notifications .activity-header-actions>svg,body.dark-theme 
 body.dark-theme #notif-filter-row .wa-chip{background:var(--fb-hover)}
 body.dark-theme #notif-filter-row .wa-chip.active{background:rgba(255,255,255,0.17);color:#F2F2F7}
 /* List */
-#tab-notifications .notif-tab-scroll{background:var(--bg-base)}
+#tab-notifications .notif-tab-scroll{background:var(--fb-card)}
 #tab-notifications .activity-section-title{font-size:17px;font-weight:700;color:var(--fb-text);padding:14px 16px 6px;margin:0;border-top:none}
 .activity-row{position:relative;align-items:center;gap:12px;padding:8px 16px;background:transparent}
 .activity-row:active{background:var(--fb-hover)}
@@ -7099,7 +7148,7 @@ body.dark-theme .activity-row.is-unread{background:rgba(255,255,255,0.1)}
 .activity-row.is-unread::after{content:"";position:absolute;right:6px;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:50%;background:var(--fb-blue)}
 .activity-row .avatar{width:56px;height:56px}
 .activity-avatar-wrap{margin-top:0}
-.notif-type-badge{width:26px;height:26px;bottom:-3px;right:-4px;border:2px solid var(--bg-base)}
+.notif-type-badge{width:26px;height:26px;bottom:-3px;right:-4px;border:2px solid var(--fb-card)}
 .notif-type-badge svg{width:14px;height:14px}
 .activity-content{align-items:center;padding-bottom:0;border-bottom:none}
 .activity-main{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:4px;min-width:0}
@@ -7807,6 +7856,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                         </button>
                                     </div>
                                     </div>
+
+    <div id="auth-progress-overlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="auth-progress-card">
+            <div class="auth-progress-spinner"></div>
+            <div class="auth-progress-text" id="auth-progress-text">Please wait…</div>
+            <div class="auth-progress-sub" id="auth-progress-sub"></div>
+        </div>
+    </div>
 
     <div id="otp-success-overlay" aria-hidden="true">
         <div class="otp-success-ring-wrap">
@@ -11510,9 +11567,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 <p>The most popular posts</p>
                                 <button type="button" id="x-explore-hero-btn">Explore</button>
                             </div>
+                            <h2 class="x-explore-section-title">Trends for you</h2>
                             <div id="explore-trending-list"></div>
                         </div>
                         <div class="explore-panel" id="explore-panel-people">
+                            <h2 class="x-explore-section-title">Who to follow</h2>
                             <div class="discover-grid" id="explore-people-grid"></div>
                         </div>
                         <!-- Headlines used to be sprinkled directly into the Home feed's own post
@@ -13276,6 +13335,33 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function showLoading() { document.getElementById("loading-overlay").classList.add("active"); }
         function hideLoading() { document.getElementById("loading-overlay").classList.remove("active"); }
 
+        // Auth progress overlay: spinner + a message describing the current step. If the step
+        // drags on, a reassurance line appears so it never looks frozen.
+        let authProgressSlowTimer = null;
+        function showAuthProgress(message) {
+            const ov = document.getElementById('auth-progress-overlay');
+            if (!ov) return;
+            document.getElementById('auth-progress-text').textContent = message || 'Please wait…';
+            document.getElementById('auth-progress-sub').textContent = '';
+            clearTimeout(authProgressSlowTimer);
+            authProgressSlowTimer = setTimeout(() => {
+                document.getElementById('auth-progress-sub').textContent = 'Taking a little longer than usual…';
+            }, 7000);
+            ov.setAttribute('aria-hidden', 'false');
+            ov.classList.add('active');
+        }
+        function updateAuthProgress(message) {
+            const el = document.getElementById('auth-progress-text');
+            if (el) el.textContent = message;
+        }
+        function hideAuthProgress() {
+            clearTimeout(authProgressSlowTimer);
+            const ov = document.getElementById('auth-progress-overlay');
+            if (!ov) return;
+            ov.classList.remove('active');
+            ov.setAttribute('aria-hidden', 'true');
+        }
+
         // Whole-page shimmer shown only on a fresh app open (guarded by isInitialLoad in
         // onAuthStateChanged below) — not on every auth refire. 2000ms is the default floor;
         // bump it if slower connections need more cover, or wire it to real data-ready events
@@ -14465,6 +14551,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
                             </button>
                         </div>
+                        ${window.habaOpenAppPillHtml ? '<div class="haba-open-app-row">' + window.habaOpenAppPillHtml('haba-open-app-pill--dark') + '</div>' : ''}
                     </div>
                     <button type="button" class="reel-item-mute-btn${reelSoundMuted ? ' is-muted' : ''}" aria-label="Mute or unmute">
                         <svg class="reel-icon-unmuted" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zM16.5 12a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"></path></svg>
@@ -23324,7 +23411,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             return { href, label };
         }
 
-        const FEED_TEXT_TOKEN_REGEX = /(#[A-Za-z0-9_]+)|(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|co\.uk|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-]|\.[a-zA-Z0-9])(?:\/[^\s<]*)?\b)/g;
+        const FEED_TEXT_TOKEN_REGEX = /(#[A-Za-z0-9_]+)|(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|org\.za|net\.za|gov\.za|ac\.za|web\.za|co\.uk|org\.uk|ac\.uk|com\.au|co\.nz|co\.ke|co\.zw|co\.bw|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-])(?:\/[^\s<]*)?\b)/g;
 
         function linkifyHashtags(text) {
             if (!text) return '';
@@ -23406,7 +23493,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // preview for it before the post is saved.
         function extractFirstUrlFromText(text) {
             if (!text) return null;
-            const regex = /(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|co\.uk|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-]|\.[a-zA-Z0-9])(?:\/[^\s<]*)?\b)/i;
+            const regex = /(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|org\.za|net\.za|gov\.za|ac\.za|web\.za|co\.uk|org\.uk|ac\.uk|com\.au|co\.nz|co\.ke|co\.zw|co\.bw|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-])(?:\/[^\s<]*)?\b)/i;
             const match = text.match(regex);
             if (!match) return null;
             const cleaned = match[0].replace(/[.,!?;:'")\]]+$/, '');
@@ -24095,10 +24182,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 });
             }
 
-            // Long-press a text-only post (no media, poll, quote embed or ad) to draw/annotate over it.
-            if (!opts.isPreview && !isCardAd && !isQuote && !isCommentQuote && post.text && post.text.trim()
-                && !postImages.length && !post.videoUrl && !post.poll) {
-                bindPostMarkupLongPress(card, post);
+            // Long-press any post (not ads / the read-only preview) to get an AI analysis of it.
+            // Text-only posts (no media, poll, quote embed) also get a Markup button in that sheet.
+            if (!opts.isPreview && !isCardAd && (post.text && post.text.trim() || postImages.length || post.videoUrl || post.poll)) {
+                const canMarkup = !isQuote && !isCommentQuote && !!(post.text && post.text.trim())
+                    && !postImages.length && !post.videoUrl && !post.poll;
+                const quoted = isQuote ? cachedPosts[wrapperPost.repostOf] : null;
+                bindPostLongPress(card, post, { canMarkup, quotedText: quoted && quoted.text ? quoted.text : '' });
             }
 
             return card;
@@ -24125,7 +24215,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function pmInkColor() { return document.body.classList.contains('dark-theme') ? '#F2F2F7' : '#111111'; }
         function pmResolveColor(c) { return c === 'ink' ? pmInkColor() : c; }
 
-        function bindPostMarkupLongPress(card, post) {
+        function bindPostLongPress(card, post, meta) {
             card.classList.add('markup-enabled');
             let timer = null, sx = 0, sy = 0;
             const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
@@ -24139,7 +24229,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     card._markupSuppressClickUntil = Date.now() + 1200;
                     try { window.getSelection().removeAllRanges(); } catch (err) { /* no-op */ }
                     triggerHaptic(20);
-                    openPostMarkup(card, post);
+                    openPostAI(card, post, meta || {});
                 }, PM_LONG_PRESS_MS);
             });
             card.addEventListener('pointermove', (e) => {
@@ -24156,6 +24246,156 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     e.preventDefault();
                 }
             }, true);
+        }
+
+
+        // ── POST AI ANALYSIS ────────────────────────────────────────────────────────────
+        // Long-press a post → bottom sheet that asks Haba AI (the habaAIChat Cloud Function,
+        // key stays server-side) to explain / assess the post. Results are cached per post
+        // for the session. The model only sees text (caption, poll, quoted text, a note that
+        // media exists) — it can't see images/video.
+        const paState = { built: false, token: 0, cache: {}, current: null };
+
+        function paBuild() {
+            if (paState.built) return;
+            paState.built = true;
+            const ov = document.createElement('div');
+            ov.id = 'post-ai-overlay';
+            ov.className = 'pa-overlay';
+            ov.innerHTML = `
+                <div class="pa-sheet" role="dialog" aria-label="AI analysis">
+                    <div class="pa-grab"></div>
+                    <div class="pa-head">
+                        <span class="pa-title"><span class="pa-spark">✦</span> ${AI_NAME}</span>
+                        <button type="button" class="pa-x" id="pa-close" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    <div class="pa-quote" id="pa-quote"></div>
+                    <div class="pa-body" id="pa-body"></div>
+                    <div class="pa-actions" id="pa-actions">
+                        <button type="button" class="pa-act" id="pa-copy">Copy</button>
+                        <button type="button" class="pa-act" id="pa-retry">Retry</button>
+                        <button type="button" class="pa-act" id="pa-markup">Markup</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(ov);
+            ov.addEventListener('click', (e) => { if (e.target === ov) paClose(); });
+            ov.querySelector('#pa-close').addEventListener('click', paClose);
+            ov.querySelector('#pa-copy').addEventListener('click', () => {
+                const t = paState.current && paState.current.result;
+                if (!t) return;
+                try { navigator.clipboard.writeText(t); notify('Copied'); } catch (err) { notify("Couldn't copy", 'error'); }
+            });
+            ov.querySelector('#pa-retry').addEventListener('click', () => {
+                const c = paState.current; if (!c) return;
+                delete paState.cache[c.key];
+                paRun(c);
+            });
+            ov.querySelector('#pa-markup').addEventListener('click', () => {
+                const c = paState.current; if (!c) return;
+                paClose();
+                openPostMarkup(c.card, c.post);
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ov.classList.contains('open')) paClose();
+            });
+        }
+
+        function paClose() {
+            const ov = document.getElementById('post-ai-overlay');
+            if (ov) ov.classList.remove('open');
+            paState.token++; // drop any in-flight response
+        }
+
+        // Tiny, safe renderer: escape first, then **bold**, "- " bullets and line breaks.
+        function paRender(text) {
+            const lines = String(text).split(/\r?\n/);
+            let html = '', inList = false;
+            const inline = (t) => escapeHtmlForPost(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            for (const raw of lines) {
+                const line = raw.trim();
+                const m = line.match(/^[-*•]\s+(.*)$/);
+                if (m) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(m[1]) + '</li>'; continue; }
+                if (inList) { html += '</ul>'; inList = false; }
+                if (line) html += '<p>' + inline(line.replace(/^#+\s*/, '')) + '</p>';
+            }
+            if (inList) html += '</ul>';
+            return html;
+        }
+
+        function paBuildPrompt(c) {
+            const post = c.post, parts = [];
+            parts.push('Analyse this post from the Haba social feed for the person who long-pressed it.');
+            parts.push(`Author: ${c.name}${c.username ? ' (' + c.username + ')' : ''}`);
+            if (post.text && post.text.trim()) parts.push('Post text:\n---\n' + post.text.trim().slice(0, 3000) + '\n---');
+            if (c.quotedText) parts.push('It quotes this earlier post:\n---\n' + String(c.quotedText).trim().slice(0, 1500) + '\n---');
+            if (post.poll) {
+                const opts = (post.poll.options || []).filter(Boolean).join(' | ');
+                parts.push(`It includes a poll: "${post.poll.question || ''}" — options: ${opts}`);
+            }
+            const imgs = (post.imageUrls && post.imageUrls.length) ? post.imageUrls.length : (post.imageUrl ? 1 : 0);
+            const media = [];
+            if (imgs) media.push(imgs + ' image' + (imgs > 1 ? 's' : ''));
+            if (post.videoUrl) media.push('a video');
+            if (post.music) media.push('a song credit');
+            if (media.length) parts.push('It also has ' + media.join(' and ') + '. You cannot see the media, so do not guess what it shows; only mention it exists.');
+            parts.push('Reply in 120 words or fewer, plain text, no headings. Use these labelled lines: **What it is:** (one sentence), **Tone:** (a few words), **Worth knowing:** (1-3 short "- " bullets with context, any claims that look doubtful or need a fact-check, or anything misleading; say "nothing notable" if so). Be neutral and do not invent facts. Reply in the same language as the post.');
+            return parts.join('\n\n');
+        }
+
+        async function paRun(c) {
+            const body = document.getElementById('pa-body');
+            const actions = document.getElementById('pa-actions');
+            const token = ++paState.token;
+            if (paState.cache[c.key]) {
+                c.result = paState.cache[c.key];
+                body.innerHTML = paRender(c.result);
+                actions.classList.add('ready');
+                return;
+            }
+            actions.classList.remove('ready');
+            body.innerHTML = '<div class="pa-loading"><span></span><span></span><span></span></div>';
+            try {
+                const res = await habaAIChatCallable({ messages: [{ role: 'user', content: paBuildPrompt(c) }] });
+                if (token !== paState.token) return;
+                const text = res.data && res.data.text;
+                if (!text) throw new Error('empty');
+                c.result = text;
+                paState.cache[c.key] = text;
+                body.innerHTML = paRender(text);
+            } catch (err) {
+                if (token !== paState.token) return;
+                console.error('Post AI analysis failed', err);
+                c.result = '';
+                body.innerHTML = '<p class="pa-err">Couldn\u2019t reach ' + escapeHtmlForPost(AI_NAME) + ' right now. Tap Retry to try again.</p>';
+            }
+            actions.classList.add('ready');
+        }
+
+        function openPostAI(card, post, meta) {
+            paBuild();
+            const ov = document.getElementById('post-ai-overlay');
+            const nameEl = card.querySelector('.x-post-headline .name');
+            const userEl = card.querySelector('.x-post-username-text');
+            const c = {
+                card, post,
+                key: card.dataset.contentPostId || card.dataset.postId || '',
+                name: (nameEl && nameEl.textContent.trim()) || post.name || 'User',
+                username: (userEl && userEl.textContent.trim()) || '',
+                quotedText: meta.quotedText || '',
+                canMarkup: !!meta.canMarkup,
+                result: ''
+            };
+            paState.current = c;
+            const snippet = (post.text && post.text.trim()) ? post.text.trim() : (post.poll ? (post.poll.question || 'Poll') : 'Media post');
+            document.getElementById('pa-quote').textContent = c.name + ': ' + snippet.slice(0, 140) + (snippet.length > 140 ? '…' : '');
+            document.getElementById('pa-markup').style.display = c.canMarkup ? '' : 'none';
+            // The finger that triggered the long press may still be down — ignore taps briefly.
+            ov.classList.add('pa-arming');
+            ov.classList.add('open');
+            setTimeout(() => ov.classList.remove('pa-arming'), 400);
+            paRun(c);
         }
 
         function pmBuild() {
@@ -27805,7 +28045,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         // Matches http(s):// links, www.-prefixed links, and bare domain-looking words with a
         // recognizable TLD (e.g. "check haba.app out"), each optionally followed by a path.
-        const MSG_URL_REGEX = /(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|co\.uk|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-]|\.[a-zA-Z0-9])(?:\/[^\s<]*)?\b)/gi;
+        const MSG_URL_REGEX = /(https?:\/\/[^\s<]+)|(www\.[^\s<]+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+(?:co\.za|org\.za|net\.za|gov\.za|ac\.za|web\.za|co\.uk|org\.uk|ac\.uk|com\.au|co\.nz|co\.ke|co\.zw|co\.bw|com|net|org|io|co|app|dev|me|ai|edu|gov|info|biz|xyz|za|ca|uk|us|ly|sh|to|so|tech|store|shop|link|live|tv|news|blog)(?![a-zA-Z0-9-])(?:\/[^\s<]*)?\b)/gi;
 
         // Renders `text` into `container` as plain text with any URLs swapped for real, tappable
         // <a> links (opening in a new tab/browser) — everything still goes in via textContent/
@@ -28293,7 +28533,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!rawNumber) return showCustomModal("Required", "Please enter your phone number.");
             const fullNumber = code + rawNumber;
             otpSendInFlight = true;
-            showLoading();
+            showAuthProgress('Sending verification code…');
             try {
                 const verifier = ensureRecaptcha();
                 confirmationResult = await signInWithPhoneNumber(auth, fullNumber, verifier);
@@ -28306,7 +28546,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             } catch (err) {
                 showCustomModal("Couldn't Send Code", err.message.replace("Firebase: ", ""));
                 resetRecaptcha();
-            } finally { hideLoading(); otpSendInFlight = false; }
+            } finally { hideAuthProgress(); otpSendInFlight = false; }
         });
 
         document.getElementById('btn-resend-otp').addEventListener('click', async (e) => {
@@ -28314,7 +28554,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (otpSendInFlight) return;
             if (!pendingPhoneNumber) return showAuthStep('phone');
             otpSendInFlight = true;
-            showLoading();
+            showAuthProgress('Resending code…');
             try {
                 const verifier = ensureRecaptcha();
                 confirmationResult = await signInWithPhoneNumber(auth, pendingPhoneNumber, verifier);
@@ -28325,7 +28565,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             } catch (err) {
                 showCustomModal("Couldn't Resend Code", err.message.replace("Firebase: ", ""));
                 resetRecaptcha();
-            } finally { hideLoading(); otpSendInFlight = false; }
+            } finally { hideAuthProgress(); otpSendInFlight = false; }
         });
 
         // Plays the OTP success checkmark full-screen, on top of whatever's underneath (the
@@ -28376,12 +28616,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const otpCode = document.getElementById('auth-otp-code').value.trim();
             if (!otpCode || otpCode.length < 6) return showCustomModal("Required", "Please enter the 6-digit code.");
             if (!confirmationResult) return showCustomModal("Session Expired", "Please request a new code.");
-            showLoading();
+            showAuthProgress('Verifying code…');
             authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
             try {
                 const cred = await confirmationResult.confirm(otpCode);
                 stopWebOtpAutofill();
-                hideLoading();
+                hideAuthProgress();
                 await playOtpSuccessAnimation();
                 const addInfo = getAdditionalUserInfo(cred);
                 if (addInfo && addInfo.isNewUser) {
@@ -28396,7 +28636,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     }
                 }
             } catch (err) {
-                hideLoading();
+                hideAuthProgress();
                 // Wrong or expired digits get the matching red-X animation instead of a modal —
                 // other failures (network issues, rate limits, etc.) aren't about the code itself,
                 // so those still get the descriptive error modal.
@@ -28450,13 +28690,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!email || !password) return showCustomModal("Required", "Please enter your email and password.");
             if (password.length < 6) return showCustomModal("Password Too Short", "Your password must be at least 6 characters.");
             emailAuthInFlight = true;
-            showLoading();
             const isSignupAttempt = emailAuthMode === 'signup';
+            showAuthProgress(isSignupAttempt ? 'Creating your account…' : 'Signing you in…');
             if (isSignupAttempt) authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
             try {
                 if (isSignupAttempt) {
                     const cred = await createUserWithEmailAndPassword(auth, email, password);
-                    hideLoading();
+                    hideAuthProgress();
                     const chosenName = await promptSetName();
                     try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
                     await promptAppIntro();
@@ -28472,7 +28712,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             } catch (err) {
                 showCustomModal(emailAuthMode === 'signup' ? "Couldn't Create Account" : "Couldn't Sign In", err.message.replace("Firebase: ", ""));
             } finally {
-                hideLoading();
+                hideAuthProgress();
                 emailAuthInFlight = false;
                 if (authGateResolve) { authGateResolve(); authGateResolve = null; }
             }
@@ -28481,13 +28721,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         document.getElementById('btn-forgot-password').addEventListener('click', async () => {
             const email = document.getElementById('auth-email').value.trim();
             if (!email) return showCustomModal("Enter Your Email", "Type your email address above first, then tap Forgot password? again.");
-            showLoading();
+            showAuthProgress('Sending reset link…');
             try {
                 await sendPasswordResetEmail(auth, email);
                 showCustomModal("Check Your Inbox", `We sent a password reset link to ${email}.`);
             } catch (err) {
                 showCustomModal("Couldn't Send Reset Link", err.message.replace("Firebase: ", ""));
-            } finally { hideLoading(); }
+            } finally { hideAuthProgress(); }
         });
 
         document.querySelectorAll('.js-open-jobs-sheet').forEach(btn => {
@@ -46238,8 +46478,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // --- HABA AI MESSAGING ---
         // Writes the user's message straight into the normal dm_threads thread (so it renders
         // with the existing bubble/typing/scroll code), bumps the AI card's position in the chat
-        // list like a real contact, then hands the conversation to the shared "chatWithNuru"
-        // Cloud Function (xAI/Grok) the same way Nuru does. The reply is written back into the
+        // list like a real contact, then hands the conversation to Haba's own "habaAIChat"
+        // Cloud Function (xAI Grok 4.3; the API key stays in Firebase secrets). The reply is written back into the
         // same dm_thread once it comes back.
         async function sendMessageToAI(text, user) {
             const threadId = threadIdFor(user.uid, AI_UID);
@@ -46260,11 +46500,16 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // Pull this thread's existing history so the model has context: an array of
                 // { role, content } turns, oldest first.
                 const historySnap = await get(ref(database, `dm_threads/${threadId}/messages`));
-                const conversation = historySnap.exists()
+                // Only text turns, newest 30 — keeps requests small and fast (the Cloud Function
+                // also enforces this). Falls back to just the current message.
+                let conversation = historySnap.exists()
                     ? Object.values(historySnap.val())
                         .sort((a, b) => a.createdAt - b.createdAt)
-                        .map(m => ({ role: m.senderUid === AI_UID ? 'assistant' : 'user', content: m.text || '' }))
-                    : [{ role: 'user', content: text }];
+                        .map(m => ({ role: m.senderUid === AI_UID ? 'assistant' : 'user', content: (m.text || '').trim() }))
+                        .filter(m => m.content)
+                        .slice(-30)
+                    : [];
+                if (!conversation.length || conversation[conversation.length - 1].role !== 'user') conversation.push({ role: 'user', content: text });
 
                 const result = await habaAIChatCallable({ messages: conversation });
                 const reply = result.data && result.data.text;
@@ -48420,9 +48665,8 @@ body.post-design-x :is(#feed-posts-container,#my-profile-posts-list,#user-info-p
     html body #messenger-screen .side-nav #nav-profile-btn .nav-avatar { display: block; width: 28px; height: 28px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; }
 
     /* floating create button, only on Home */
-    #x-feed-fab { display: none; position: fixed; right: 18px; bottom: calc(var(--nav-float-h, 64px) + 34px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: none; background: #0A84FF; color: #fff; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(10,132,255,.4); z-index: 90; cursor: pointer; transition: transform .2s ease, opacity .2s ease; -webkit-tap-highlight-color: transparent; }
+    #x-feed-fab { display: none; position: fixed; right: 18px; bottom: calc(var(--nav-float-h, 64px) + 34px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; border-radius: 50%; border: none; background: var(--primary-blue); color: #fff; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.28); z-index: 90; cursor: pointer; transition: transform .2s ease, opacity .2s ease; -webkit-tap-highlight-color: transparent; }
     #x-feed-fab:active { transform: scale(.92); }
-    #x-feed-fab:hover { background: #0972DB; }
     #x-feed-fab svg { width: 26px; height: 26px; }
     body:has(#tab-status.active-tab) #x-feed-fab { display: flex; }
     #x-feed-fab.x-fab-hidden { transform: translateY(140%); opacity: 0; pointer-events: none; }
@@ -48505,6 +48749,41 @@ html body #tab-search .trend-item-count { margin-top: 3px; font-size: 14.5px; fo
 html body #tab-search .trend-item-more { position: absolute; right: 2px; top: 12px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
 html body #tab-search .trend-item-more svg { width: 20px; height: 20px; }
 @media (hover: hover) { html body #tab-search .trend-item:hover { background: var(--bg-hover) !important; } }
+
+/* ══ X-style Explore, pass 2: section titles, flat "Who to follow" rows, flat News rows ══ */
+html body #tab-search .x-explore-section-title { margin: 0; padding: 14px 4px 6px; font-size: 20px; font-weight: 800; letter-spacing: -.2px; color: var(--text-primary); }
+html body #tab-search .x-explore-hero + .x-explore-section-title { padding-top: 16px; }
+html body #tab-search .x-explore-hero { border-radius: 16px; margin: 12px 0 4px; }
+/* people: flat divided rows, small avatar, black pill Follow button */
+html body #tab-search #explore-people-grid, html body #tab-search #discover-grid { display: block; gap: 0; }
+html body #tab-search .discover-card { display: flex; align-items: center; gap: 12px; padding: 12px 4px !important; margin: 0; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; cursor: pointer; }
+html body #tab-search .discover-card-avatar-wrap { width: 44px; height: 44px; padding: 0 !important; background: none !important; flex: 0 0 auto; }
+html body #tab-search .discover-card-body h3 { font-size: 15px; font-weight: 800; color: var(--text-primary); margin: 0; }
+html body #tab-search .discover-card-username { font-size: 14px; color: var(--text-secondary); }
+html body #tab-search .discover-card-bio { font-size: 14px; color: var(--text-primary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 2px 0 0; }
+html body #tab-search .discover-card-add-btn { padding: 7px 16px !important; border-radius: 999px !important; background: var(--text-primary) !important; color: var(--bg-base) !important; font-size: 14px !important; font-weight: 700 !important; border: 1px solid transparent !important; }
+html body #tab-search .discover-card-add-btn.added { background: transparent !important; color: var(--text-primary) !important; border-color: var(--border-color) !important; }
+@media (hover: hover) { html body #tab-search .discover-card:hover { background: var(--bg-hover) !important; } }
+/* news: flat full-width rows */
+html body #tab-search .feed-news-card { margin: 0 -14px; padding: 12px 14px; background: transparent; border-bottom: 1px solid var(--border-color); }
+html body #tab-search .explore-empty, html body #tab-search .discover-grid-empty { background: transparent !important; border-radius: 0 !important; }
+
+/* ══ X-style search bar polish ══ */
+html body #tab-search .search-tab-header::before { display: none !important; }
+html body #tab-search .search-tab-header { padding: 0 !important; position: sticky; top: 0; z-index: 5; }
+html body #tab-search .search-tab-header-row { gap: 12px; padding: 10px 14px 8px; align-items: center; }
+html body #tab-search .x-search-avatar { width: 32px; height: 32px; }
+html body #tab-search .search-tab-box { position: relative; height: 40px; margin: 0; background: none !important; }
+html body #tab-search .search-tab-box > svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke-width: 2.2; color: var(--text-secondary); pointer-events: none; transition: color .15s ease; }
+html body #tab-search .search-tab-box:focus-within > svg { color: var(--primary-blue); }
+html body #tab-search .search-tab-box input { display: block; width: 100%; height: 40px; box-sizing: border-box; padding: 0 40px 0 44px !important; text-align: left !important; font-size: 15.5px; font-weight: 400; line-height: 40px; color: var(--text-primary); background: var(--bg-input) !important; border: 1px solid transparent !important; border-radius: 999px !important; box-shadow: none !important; -webkit-appearance: none; appearance: none; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
+html body #tab-search .search-tab-box input::placeholder { color: var(--text-secondary); opacity: 1; }
+html body #tab-search .search-tab-box input:focus { background: var(--bg-base) !important; border-color: var(--primary-blue) !important; box-shadow: 0 0 0 1px var(--primary-blue) !important; }
+/* clear (x) button, shown by the browser only when there's text */
+html body #tab-search .search-tab-box input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: block; width: 20px; height: 20px; margin-right: -26px; border-radius: 50%; cursor: pointer; background: var(--primary-blue) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M8 8l8 8M16 8l-8 8'/%3E%3C/svg%3E") center / 12px no-repeat; }
+html body #tab-search .x-search-gear { width: 36px; height: 36px; margin-right: -4px; }
+html body #tab-search .x-search-gear svg { width: 24px; height: 24px; }
+html body #tab-search .x-search-gear:active { background: var(--bg-hover); }
 </style>
 <script>
 (function xExploreWiring(){
@@ -48664,99 +48943,6 @@ body:has(#tab-status.active-tab) #x-scroll-top { display: flex; }
   }
   html body .side-nav .nav-post-btn.nav-desktop-only::before { content: none; }
 }
-</style>
-<style id="tabs-black-bg">
-/* Every tab shares the feed's background (--bg-base: pure black in dark mode, white in light mode).
-   Placed last so it wins over the earlier per-tab theme blocks. */
-html body .tab-content:not(.map-fullview),
-html body .tab-content:not(#tab-profile):not(.map-fullview) .chat-header-area,
-html body #tab-search .search-tab-scroll,
-html body #tab-search > .chat-search-dropdown,
-html body #tab-chats .msgs-fav-strip,
-html body #tab-chats #chat-list-container,
-html body #tab-chats #chat-updates-container,
-html body #chat-requests-container,
-html body #tab-groups #communities-feed-container,
-html body #tab-contacts #contacts-list-container,
-html body #tab-calls #calls-list-container,
-html body #tab-profile #profile-tab-scroll,
-html body #tab-notifications .notif-tab-scroll{background:var(--bg-base)!important}
-/* avatar rings/badges that were cut out in the old grey now cut out in black */
-html body #tab-chats .msgs-fav-unread,
-html body #tab-chats .msgs-chip-icon.has-filter::after{border-color:var(--bg-base)}
-html body #chat-list-container .chat-avatar-status-wrap .online-status-dot,
-html body #tab-chats .msgs-fav-avatar .online-status-dot,
-html body #tab-status .home-header-dm-dot{border-color:var(--bg-base)}
-</style>
-<style id="search-header-redesign">
-/* Search / Explore header redesign: row 1 = menu · "Explore" title · profile · settings,
-   row 2 = full-width search pill. Tabs below are evenly spaced. Bottom nav matches the black tabs. */
-html body #tab-search .search-tab-header{padding:10px 16px 10px!important;background:var(--bg-base)!important;border:none!important;box-shadow:none!important;border-radius:0!important}
-html body #tab-search .search-tab-header::before{content:none!important;display:none!important}
-html body #tab-search .search-tab-header-row{display:grid!important;grid-template-columns:auto 1fr auto auto;grid-template-areas:"menu title avatar gear" "search search search search";align-items:center;column-gap:10px;row-gap:12px;padding:0!important}
-html body #tab-search .search-tab-header-row::before{content:"Explore";grid-area:title;min-width:0;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;color:var(--text-primary)}
-html body #tab-search .search-tab-header-row>.explore-drawer-btn{grid-area:menu;width:40px!important;height:40px!important;margin:0!important;border-radius:50%!important;background:var(--bg-input)!important;color:var(--text-primary)!important}
-html body #tab-search .search-tab-header-row>.explore-drawer-btn svg{width:20px!important;height:20px!important}
-html body #tab-search .x-search-avatar{grid-area:avatar;width:38px;height:38px}
-html body #tab-search .x-search-gear{grid-area:gear;width:40px;height:40px;border-radius:50%;background:var(--bg-input);color:var(--text-primary)}
-html body #tab-search .x-search-gear svg{width:21px;height:21px}
-/* search pill: icon centred vertically, text left-aligned, full width */
-html body #tab-search .search-tab-box{grid-area:search;position:relative;display:flex;align-items:center;height:46px!important;margin:0!important;border-radius:999px!important;background:var(--bg-input)!important;border:1px solid transparent!important;box-shadow:none!important}
-html body #tab-search .search-tab-box>svg{position:absolute;left:16px;top:50%!important;transform:translateY(-50%);width:19px;height:19px;color:var(--text-secondary);pointer-events:none}
-html body #tab-search .search-tab-box input{width:100%;height:100%;padding:0 16px 0 46px!important;text-align:left!important;font-size:16px;font-weight:500;color:var(--text-primary);background:transparent!important;border:none!important;border-radius:999px;box-shadow:none!important}
-html body #tab-search .search-tab-box input::placeholder{color:var(--text-secondary);font-weight:400}
-html body #tab-search .search-tab-box:focus-within{border-color:var(--text-secondary)!important;background:var(--bg-input)!important;box-shadow:none!important}
-/* Trending / People / News: equal-width tabs, short clean underline, no one-off icon */
-html body #tab-search .explore-tabs-bar{padding:0!important;justify-content:stretch}
-html body #tab-search .explore-tabs-bar .feed-subtab-btn{flex:1 1 0!important;text-align:center;padding:12px 0 !important;font-size:15px!important}
-html body #tab-search .explore-tabs-bar .feed-subtab-btn.active::after{left:28%!important;right:28%!important;height:3px!important;border-radius:3px 3px 0 0!important;background:var(--text-primary)!important}
-html body #tab-search .explore-tabs-bar [data-explore-tab="trending"].active::before{display:none!important}
-/* Bottom nav: same background as every tab (black in dark mode, white in light mode) */
-@media (max-width:768px){
-  html body .side-nav,html body.dark-theme .side-nav{background:var(--bg-base)!important;box-shadow:none!important;border-top:1px solid var(--border-color)!important}
-  html body .side-nav .nav-badge{border-color:var(--bg-base)}
-}
-</style>
-<style id="profile-black-bg">
-/* Profile tab: same background as the feed and the other tabs (--bg-base). Placed last so it wins. */
-html body #tab-profile .tm-profile-content{background:var(--bg-base)!important;box-shadow:none!important}
-html body #tab-profile .tm-profile-media-section,
-html body #tab-profile .profile-subtabs,
-html body #tab-profile .wa-suggested-section,
-html body #tab-profile .profile-posts-list,
-html body #tab-profile .profile-media-grid,
-html body #tab-profile .fb-profile-composer,
-html body #tab-profile .saved-filter-bar,
-html body #my-profile-posts-list{background:var(--bg-base)!important}
-html body #tab-profile .fb-profile-composer{border-bottom:1px solid var(--border-color)!important}
-/* sticky mini-header that slides in on scroll */
-html body #tab-profile .tm-profile-sticky-header{background:color-mix(in srgb,var(--bg-base) 88%,transparent)!important;box-shadow:none!important}
-/* cover photo fades into black instead of grey */
-html body #tab-profile .fb-profile-cover::before{background:linear-gradient(180deg,rgba(0,0,0,.28),transparent 35%,transparent 55%,color-mix(in srgb,var(--bg-base) 55%,transparent) 80%,var(--bg-base) 100%)}
-/* avatar + edit-badge rings cut out in the new background */
-html body #tab-profile .fb-profile-avatar-wrap .ig-profile-avatar,
-html body #tab-profile .fb-profile-avatar-wrap .avatar-circle,
-html body #tab-profile .fb-profile-avatar-edit{border-color:var(--bg-base)}
-</style>
-<style id="user-profile-black-bg">
-/* Profile view of other people (the sheet opened by tapping a name/avatar): same background as the
-   feed and the other tabs (--bg-base). Placed last so it wins. */
-html body #user-info-sheet-overlay .bottom-sheet,
-html body #user-info-sheet-overlay .tm-profile-content,
-html body #user-info-sheet-overlay .tm-profile-media-section,
-html body #user-info-sheet-overlay .profile-subtabs,
-html body #user-info-sheet-overlay .profile-posts-list,
-html body #user-info-sheet-overlay .profile-media-grid,
-html body #user-info-sheet-overlay #user-info-posts-list,
-html body.dark-theme #user-info-posts-list,
-html body:not(.dark-theme) #user-info-posts-list{background:var(--bg-base)!important;box-shadow:none!important}
-html body #user-info-sheet-overlay .tm-profile-sticky-header{background:color-mix(in srgb,var(--bg-base) 88%,transparent)!important;box-shadow:none!important}
-html body #user-info-sheet-overlay #user-info-cover::before{background:linear-gradient(180deg,rgba(0,0,0,.28),transparent 35%,transparent 55%,color-mix(in srgb,var(--bg-base) 55%,transparent) 80%,var(--bg-base) 100%)}
-html body #user-info-sheet-overlay .fb-profile-avatar-wrap .ig-profile-avatar,
-html body #user-info-sheet-overlay .fb-profile-avatar-wrap .avatar-circle{border-color:var(--bg-base)}
-/* own profile's post list too, so both profile views match */
-html body.dark-theme #my-profile-posts-list,
-html body:not(.dark-theme) #my-profile-posts-list{background:var(--bg-base)!important}
 </style>
 <style id="chat-x-redesign">
 /* Messages tab, X-style: avatar · "Chat" · "All" dropdown, flat list, "Suggested" with Chat buttons. Placed last so it wins. */
@@ -48978,6 +49164,21 @@ html body #tab-status .home-header-wordmark{grid-column:2;grid-row:1;justify-sel
 html body #tab-status .xh-wrap{grid-column:3;grid-row:1;justify-self:end;align-self:center}
 html body #tab-status .xh-fab{display:none!important}
 </style>
+<style id="feed-x-redesign-web">
+/* Website version: the "Open app" pill joins the Home header, left of the filter pill */
+html body #tab-status .chat-header-top{grid-template-columns:auto 1fr auto auto}
+html body #tab-status .xh-wrap{grid-column:4;grid-row:1}
+html body #tab-status .chat-header-top > .haba-open-app-pill{grid-column:3;grid-row:1;align-self:center;justify-self:end;margin:0 8px 0 0;height:34px}
+</style>
+<style id="feed-subtabs-icons-mobile">
+/* Phones: For you / Following tabs show icons only */
+@media (max-width:768px){
+html body #tab-status #feed-subtabs .feed-subtab-btn{font-size:0!important;line-height:0;gap:0;padding:12px 0}
+html body #tab-status #feed-subtabs .feed-subtab-btn .feed-subtab-state-icon{width:24px;height:24px;margin:0;opacity:.6}
+html body #tab-status #feed-subtabs .feed-subtab-btn.active .feed-subtab-state-icon{opacity:1}
+html body #tab-status #feed-subtabs .feed-subtab-btn.active::after{width:36px;margin-left:-18px}
+}
+</style>
 <script>
 /* Icon-only nav (1025–1279px) has no labels: give every nav item a tooltip from its label. */
 (function xDesktopNavTitles(){
@@ -48988,6 +49189,67 @@ html body #tab-status .xh-fab{display:none!important}
     });
   }
   run(); setTimeout(run,800);
+})();
+</script>
+
+<style id="haba-open-app-pill-css">
+.haba-open-app-pill { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 32px; padding: 0 14px 0 11px; box-sizing: border-box; border-radius: 999px; border: 0; background: var(--primary-blue, #1d9bf0); color: #fff !important; font: 700 13px/1 inherit; font-family: inherit; text-decoration: none; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s, opacity .15s; }
+.haba-open-app-pill:active { transform: scale(.94); opacity: .9; }
+.haba-open-app-pill svg { width: 15px; height: 15px; fill: currentColor; flex: none; display: block; }
+.haba-open-app-pill--dark { background: #fff; color: #000 !important; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.haba-in-app .haba-open-app-pill, .haba-in-app .haba-open-app-row { display: none !important; }
+/* home header (phones: right of the For you / Following tabs; desktop top bar: before Messages) */
+body #tab-status .chat-header-top > .haba-open-app-pill { align-self: center; margin: 0 10px 0 4px; height: 30px; padding: 0 12px 0 9px; }
+#fb-topbar .fbt-right > .haba-open-app-pill { margin-right: 6px; }
+/* reel (video) view: its own row under the back / author / menu row */
+.haba-open-app-row { display: flex; padding: 0 12px 8px; }
+/* video viewer: pinned left of the mute / save / fullscreen / close icons */
+.video-viewer-top-bar > .haba-open-app-pill { margin-right: auto; }
+/* image viewer: top-left; drops below the author bar when a post bar is showing */
+#image-viewer-overlay > .haba-open-app-pill { position: absolute; z-index: 4; top: calc(env(safe-area-inset-top, 0px) + 20px); left: 16px; height: 36px; transition: opacity .2s; }
+#image-viewer-overlay.has-post-bar > .haba-open-app-pill { top: calc(env(safe-area-inset-top, 0px) + 66px); left: 12px; }
+#image-viewer-overlay.iv-chrome-hidden > .haba-open-app-pill { opacity: 0; pointer-events: none; }
+</style>
+<script id="haba-open-app-pill-js">
+(function () {
+    var PLAY_URL = 'https://play.google.com/store/apps/details?id=haba.app.feed.com';
+    var PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z"/></svg>';
+    // Hide everywhere the app is already running (installed PWA / TWA from Play / Android WebView wrapper).
+    var inApp = false;
+    try {
+        inApp = (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: minimal-ui)').matches))
+            || window.navigator.standalone === true
+            || /^android-app:\/\//.test(document.referrer || '')
+            || /; wv\)/.test(navigator.userAgent || '');
+    } catch (e) {}
+    if (inApp) document.documentElement.classList.add('haba-in-app');
+
+    window.HABA_PLAY_STORE_URL = PLAY_URL;
+    window.habaOpenAppPillHtml = function (extraClass) {
+        return '<a class="haba-open-app-pill ' + (extraClass || '') + '" href="' + PLAY_URL + '" target="_blank" rel="noopener" aria-label="Open the Haba app on Google Play">' + PLAY_ICON + '<span>Open app</span></a>';
+    };
+    function make(extraClass) {
+        var t = document.createElement('div'); t.innerHTML = window.habaOpenAppPillHtml(extraClass); return t.firstChild;
+    }
+    function inject() {
+        if (inApp) return;
+        var home = document.querySelector('#tab-status .chat-header-top');
+        if (home && !home.querySelector(':scope > .haba-open-app-pill')) home.appendChild(make(''));
+        var desk = document.querySelector('#fb-topbar .fbt-right');
+        if (desk && !desk.querySelector(':scope > .haba-open-app-pill')) desk.insertBefore(make(''), desk.firstChild);
+        var vv = document.getElementById('video-viewer-top-bar');
+        if (vv && !vv.querySelector(':scope > .haba-open-app-pill')) vv.insertBefore(make('haba-open-app-pill--dark'), vv.firstChild);
+        var iv = document.getElementById('image-viewer-overlay');
+        if (iv && !iv.querySelector(':scope > .haba-open-app-pill')) iv.appendChild(make('haba-open-app-pill--dark'));
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', inject); else inject();
+    window.addEventListener('load', inject);
+    // Keep taps on the pill from reaching viewer gestures (tap-to-hide chrome, swipe, close).
+    ['click', 'pointerdown', 'touchstart', 'mousedown'].forEach(function (ev) {
+        document.addEventListener(ev, function (e) {
+            if (e.target && e.target.closest && e.target.closest('.haba-open-app-pill')) e.stopPropagation();
+        }, true);
+    });
 })();
 </script>
 </body>

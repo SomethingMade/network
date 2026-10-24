@@ -49999,5 +49999,47 @@ html body #tab-status .xh-fab{display:none!important}
   run(); setTimeout(run,800);
 })();
 </script>
+<style id="home-header-fit">
+/* Phones: one flex row (menu · For you / Following · filter pill). Text size is set by --xh-fs, which the script
+   below shrinks until everything fits the screen; the clamp is the no-JS starting point. */
+@media (max-width:768px){
+html body #tab-status .chat-header-top{display:flex!important;flex-wrap:nowrap;align-items:center;gap:6px;padding:0 10px 0 8px!important;height:56px!important;min-height:56px;--xh-fs:clamp(11px,3.9vw,15px)}
+html body #tab-status .chat-header-top > *{grid-row:auto;grid-column:auto}
+html body #tab-status .chat-header-top > .explore-drawer-btn{flex:0 0 auto;margin:0!important}
+html body #tab-status .chat-header-top > #feed-subtabs{flex:1 1 auto;display:flex;align-items:stretch;align-self:stretch;gap:0;padding:0;margin:0;border:0!important}
+html body #tab-status #feed-subtabs .feed-subtab-btn{flex:1 1 auto;white-space:nowrap;font-size:var(--xh-fs);padding:13px 6px 12px;gap:.35em}
+html body #tab-status #feed-subtabs .feed-subtab-btn .feed-subtab-state-icon{width:1.15em;height:1.15em;margin:0}
+html body #tab-status .chat-header-top > .xh-wrap{flex:0 0 auto;margin:0;justify-self:auto}
+html body #tab-status .xc-all-btn{white-space:nowrap;gap:.3em;height:auto;padding:.55em .7em .55em .9em;font:700 var(--xh-fs)/1.1 'Inter',sans-serif}
+html body #tab-status .xc-all-btn span{white-space:nowrap}
+html body #tab-status .xc-all-btn svg{width:1.15em;height:1.15em;flex:0 0 auto}
+}
+</style>
+<script>
+(function fitHomeHeader(){
+  var mq=window.matchMedia('(max-width:768px)'), raf=0;
+  function fit(){
+    var top=document.querySelector('#tab-status .chat-header-top');
+    if(!top||!top.clientWidth||!mq.matches) return;
+    var fs=15, min=9;
+    top.style.setProperty('--xh-fs',fs+'px');
+    while(fs>min && top.scrollWidth>top.clientWidth+1){ fs-=0.5; top.style.setProperty('--xh-fs',fs+'px'); }
+  }
+  function queue(){ cancelAnimationFrame(raf); raf=requestAnimationFrame(fit); }
+  window.addEventListener('resize',queue);
+  window.addEventListener('orientationchange',queue);
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(queue);
+  function bind(){
+    var top=document.querySelector('#tab-status .chat-header-top'), label=document.getElementById('xh-all-label');
+    if(!top) return;
+    if(window.ResizeObserver) new ResizeObserver(queue).observe(top);   // also fires when the Home tab is shown
+    if(label&&window.MutationObserver) new MutationObserver(queue).observe(label,{childList:true,characterData:true,subtree:true});
+    if(window.MutationObserver) new MutationObserver(queue).observe(top,{childList:true});
+    queue();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else bind();
+  setTimeout(queue,700); setTimeout(queue,1800);
+})();
+</script>
 </body>
 </html>

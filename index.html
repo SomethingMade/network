@@ -23912,8 +23912,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }
             embedEl.innerHTML = buildQuoteEmbedHtmlInner(originalId, originalPost);
             embedEl.addEventListener('click', (e) => {
+                // Let real links inside the preview (hashtags, URLs) do their own thing.
+                if (e.target.closest('a')) return;
                 e.stopPropagation();
-                openPostComments(originalId);
+                // Open the original in the full Post view (post + its replies), not the Comments-only drawer.
+                openPostComments(originalId, { fullView: true, preloadedPost: cachedPosts[originalId] });
             });
         }
 
@@ -23957,7 +23960,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             embedEl.innerHTML = buildCommentQuoteEmbedHtmlInner(commentId, comment);
             embedEl.addEventListener('click', (e) => {
                 e.stopPropagation();
-                openPostComments(postId);
+                openPostComments(postId, { fullView: true, preloadedPost: cachedPosts[postId] });
             });
         }
 

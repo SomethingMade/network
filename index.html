@@ -10090,6 +10090,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             <div class="insights-tabs" id="insights-tabs">
                 <button type="button" class="insights-tab-btn active" data-insights-tab="overview">Overview</button>
                 <button type="button" class="insights-tab-btn" data-insights-tab="audience">Audience</button>
+                <button type="button" class="insights-tab-btn" data-insights-tab="website" id="insights-tab-website" style="display:none;">Website</button>
             </div>
 
             <!-- ── OVERVIEW TAB ─────────────────────────────────────────────────── -->
@@ -10163,6 +10164,49 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             </div>
 
             <!-- ── AUDIENCE TAB ─────────────────────────────────────────────────── -->
+            <div class="insights-tab-panel" id="insights-panel-website">
+                <div class="site-wrap">
+                    <div class="site-hero">
+                        <div class="site-hero-title">Your business website, built by AI</div>
+                        <div class="site-hero-sub">Haba writes and hosts a mobile-friendly website from your business profile and shop. It updates when you rebuild it.</div>
+                    </div>
+
+                    <div class="site-live" id="site-live" style="display:none;">
+                        <div class="site-live-row">
+                            <span class="site-status" id="site-status">Live</span>
+                            <span class="site-updated" id="site-updated"></span>
+                        </div>
+                        <a class="site-url" id="site-url" href="#" target="_blank" rel="noopener"></a>
+                        <div class="site-actions">
+                            <button type="button" class="site-btn primary" id="site-open">Open</button>
+                            <button type="button" class="site-btn" id="site-copy">Copy link</button>
+                            <button type="button" class="site-btn" id="site-share">Share</button>
+                        </div>
+                        <div class="site-actions">
+                            <button type="button" class="site-btn" id="site-rebuild-toggle">Rebuild with AI</button>
+                            <button type="button" class="site-btn danger" id="site-toggle-publish">Unpublish</button>
+                        </div>
+                    </div>
+
+                    <div class="site-form" id="site-form">
+                        <div class="site-label">Look &amp; feel</div>
+                        <div class="site-chips" id="site-style-chips">
+                            <button type="button" class="site-chip active" data-site-style="auto">Let AI choose</button>
+                            <button type="button" class="site-chip" data-site-style="clean">Clean</button>
+                            <button type="button" class="site-chip" data-site-style="bold">Bold</button>
+                            <button type="button" class="site-chip" data-site-style="warm">Warm</button>
+                            <button type="button" class="site-chip" data-site-style="dark">Dark</button>
+                            <button type="button" class="site-chip" data-site-style="elegant">Elegant</button>
+                        </div>
+                        <div class="site-label">Anything the AI should know? <span class="site-opt">(optional)</span></div>
+                        <textarea id="site-notes" class="site-notes" maxlength="300" rows="3" placeholder="e.g. We deliver across Gauteng. Friendly, family-run tone."></textarea>
+                        <button type="button" class="site-btn primary wide" id="site-build">Build my website</button>
+                        <div class="site-hint">Uses your profile name, bio, website link and shop items. Add shop products first for a richer site. You can rebuild up to 5 times a day.</div>
+                    </div>
+                    <div class="site-msg" id="site-msg" style="display:none;"></div>
+                </div>
+            </div>
+
             <div class="insights-tab-panel" id="insights-panel-audience">
 
                 <div class="wa-section" style="margin-top:4px;">
@@ -31622,8 +31666,142 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!tabBtn) return;
             const tab = tabBtn.dataset.insightsTab;
             document.querySelectorAll('#insights-tabs .insights-tab-btn').forEach(b => b.classList.toggle('active', b === tabBtn));
-            document.getElementById('insights-panel-overview').classList.toggle('active', tab === 'overview');
-            document.getElementById('insights-panel-audience').classList.toggle('active', tab === 'audience');
+            ['overview', 'audience', 'website'].forEach(t => {
+                const panel = document.getElementById('insights-panel-' + t);
+                if (panel) panel.classList.toggle('active', tab === t);
+            });
+        });
+
+        // --- Insights › Website (Business Accounts): AI builds and hosts a site from the business profile ---
+        // Server side: functions/habaSite.js (habaBuildSite callable + habaSite HTTPS host at /b/<slug>).
+        const habaBuildSiteCallable = httpsCallable(functionsClient, 'habaBuildSite', { timeout: 120000 });
+        const siteState = { busy: false, style: 'auto', rec: null, loadToken: 0 };
+        const siteEl = (id) => document.getElementById(id);
+        function siteIsBusiness() {
+            const u = auth.currentUser;
+            return !!(u && cachedUsers[u.uid] && cachedUsers[u.uid].isBusinessAccount);
+        }
+        function siteLink(rec) { return rec && rec.slug ? 'https://habaapp.co.za/b/' + rec.slug : ''; }
+        function siteMsg(text, isError) {
+            const m = siteEl('site-msg');
+            if (!text) { m.style.display = 'none'; return; }
+            m.textContent = text;
+            m.classList.toggle('error', !!isError);
+            m.style.display = 'block';
+        }
+        function siteRender() {
+            const rec = siteState.rec;
+            const has = !!(rec && rec.slug && rec.content);
+            siteEl('site-live').style.display = has ? '' : 'none';
+            siteEl('site-form').style.display = has ? 'none' : '';
+            siteEl('site-build').textContent = has ? 'Rebuild my website' : 'Build my website';
+            if (!has) return;
+            const live = rec.status === 'published';
+            const st = siteEl('site-status');
+            st.textContent = live ? 'Live' : 'Unpublished';
+            st.classList.toggle('off', !live);
+            siteEl('site-updated').textContent = rec.updatedAt ? 'Updated ' + new Date(rec.updatedAt).toLocaleDateString() : '';
+            const a = siteEl('site-url');
+            a.textContent = siteLink(rec).replace('https://', '');
+            a.href = siteLink(rec);
+            siteEl('site-toggle-publish').textContent = live ? 'Unpublish' : 'Publish again';
+            siteEl('site-toggle-publish').classList.toggle('danger', live);
+        }
+        async function siteLoad() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const token = ++siteState.loadToken;
+            try {
+                const snap = await get(ref(database, 'business_sites/' + user.uid));
+                if (token !== siteState.loadToken) return;
+                siteState.rec = snap.exists() ? snap.val() : null;
+            } catch (err) {
+                console.error('business_sites read failed', err);
+            }
+            siteRender();
+        }
+        function siteSyncTab() {
+            const biz = siteIsBusiness();
+            siteEl('insights-tab-website').style.display = biz ? '' : 'none';
+            if (!biz) {
+                if (siteEl('insights-panel-website').classList.contains('active')) {
+                    const first = document.querySelector('#insights-tabs .insights-tab-btn[data-insights-tab="overview"]');
+                    if (first) first.click();
+                }
+                return;
+            }
+            siteLoad();
+        }
+        document.getElementById('btn-open-insights').addEventListener('click', siteSyncTab);
+
+        siteEl('site-style-chips').addEventListener('click', (e) => {
+            const chip = e.target.closest('.site-chip[data-site-style]');
+            if (!chip) return;
+            siteState.style = chip.dataset.siteStyle;
+            document.querySelectorAll('#site-style-chips .site-chip').forEach(c => c.classList.toggle('active', c === chip));
+        });
+        siteEl('site-rebuild-toggle').addEventListener('click', () => {
+            const f = siteEl('site-form');
+            f.style.display = f.style.display === 'none' ? '' : 'none';
+        });
+        siteEl('site-build').addEventListener('click', async () => {
+            if (siteState.busy) return;
+            if (!siteIsBusiness()) { notify('Websites are for Business Accounts', 'error'); return; }
+            const btn = siteEl('site-build');
+            siteState.busy = true;
+            btn.disabled = true;
+            btn.textContent = 'Building… this can take up to a minute';
+            siteMsg('');
+            try {
+                const r = await habaBuildSiteCallable({ action: 'build', style: siteState.style, notes: siteEl('site-notes').value.trim() });
+                const d = r.data || {};
+                if (!d.url) throw new Error('empty');
+                await siteLoad();
+                notify('Your website is live');
+            } catch (err) {
+                console.error('habaBuildSite failed', err);
+                const code = err && err.code ? String(err.code) : '';
+                let msg = 'Couldn\u2019t build your website. Please try again.';
+                if (/resource-exhausted|permission-denied|failed-precondition/.test(code) && err.message) msg = err.message;
+                else if (/unauthenticated/.test(code)) msg = 'Please sign in again.';
+                else if (/unavailable/.test(code) && err.message) msg = err.message;
+                siteMsg(msg, true);
+            } finally {
+                siteState.busy = false;
+                btn.disabled = false;
+                siteRender();
+            }
+        });
+        siteEl('site-toggle-publish').addEventListener('click', async () => {
+            const rec = siteState.rec;
+            if (!rec || siteState.busy) return;
+            const action = rec.status === 'published' ? 'unpublish' : 'publish';
+            siteState.busy = true;
+            siteMsg('');
+            try {
+                await habaBuildSiteCallable({ action });
+                await siteLoad();
+                notify(action === 'publish' ? 'Website is live again' : 'Website unpublished');
+            } catch (err) {
+                console.error('habaBuildSite ' + action + ' failed', err);
+                siteMsg('Couldn\u2019t update your website. Please try again.', true);
+            } finally { siteState.busy = false; }
+        });
+        siteEl('site-open').addEventListener('click', () => {
+            const u = siteLink(siteState.rec);
+            if (u) window.open(u, '_blank', 'noopener');
+        });
+        siteEl('site-copy').addEventListener('click', async () => {
+            const u = siteLink(siteState.rec);
+            if (!u) return;
+            try { await navigator.clipboard.writeText(u); notify('Link copied'); }
+            catch (err) { window.prompt('Copy your website link:', u); }
+        });
+        siteEl('site-share').addEventListener('click', async () => {
+            const u = siteLink(siteState.rec);
+            if (!u) return;
+            if (navigator.share) { try { await navigator.share({ title: (siteState.rec && siteState.rec.title) || 'Our website', url: u }); } catch (err) { /* cancelled */ } }
+            else siteEl('site-copy').click();
         });
 
         // Generic date-range dropdown wiring, shared by the Profile stats range and the
@@ -50041,5 +50219,33 @@ html body #tab-status .xc-all-btn svg{width:1.15em;height:1.15em;flex:0 0 auto}
   setTimeout(queue,700); setTimeout(queue,1800);
 })();
 </script>
+<style id="insights-website-css">
+.site-wrap{padding:6px 16px 28px}
+.site-hero{padding:6px 0 14px}
+.site-hero-title{font-size:18px;font-weight:700;color:var(--text-primary)}
+.site-hero-sub{font-size:13.5px;color:var(--text-secondary);margin-top:4px;line-height:1.45}
+.site-live{background:var(--bg-surface);border:1px solid var(--border-color);border-radius:16px;padding:14px;margin-bottom:14px}
+.site-live-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.site-status{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(0,186,124,.16);color:#00a66f}
+.site-status.off{background:rgba(128,128,128,.18);color:var(--text-secondary)}
+.site-updated{font-size:12px;color:var(--text-secondary)}
+.site-url{display:block;font-size:15px;font-weight:600;color:var(--comment-blue,#1D9BF0);word-break:break-all;text-decoration:none;margin-bottom:12px}
+.site-actions{display:flex;gap:8px;margin-top:8px}
+.site-btn{flex:1;border:1px solid var(--border-color);background:transparent;color:var(--text-primary);font:600 14px 'Inter',sans-serif;padding:11px 10px;border-radius:999px;cursor:pointer}
+.site-btn:active{opacity:.65}
+.site-btn.primary{background:var(--comment-blue,#1D9BF0);border-color:transparent;color:#fff}
+.site-btn.danger{color:#f4212e}
+.site-btn.wide{width:100%;flex:none;margin-top:14px;padding:13px}
+.site-btn:disabled{opacity:.55;cursor:default}
+.site-label{font-size:13.5px;font-weight:700;color:var(--text-primary);margin:12px 0 8px}
+.site-opt{font-weight:500;color:var(--text-secondary)}
+.site-chips{display:flex;flex-wrap:wrap;gap:8px}
+.site-chip{border:1px solid var(--border-color);background:transparent;color:var(--text-primary);font:600 13.5px 'Inter',sans-serif;padding:8px 14px;border-radius:999px;cursor:pointer}
+.site-chip.active{border-color:var(--comment-blue,#1D9BF0);color:var(--comment-blue,#1D9BF0);background:rgba(29,155,240,.10)}
+.site-notes{width:100%;box-sizing:border-box;border:1px solid var(--border-color);border-radius:12px;background:var(--bg-surface);color:var(--text-primary);font:14px 'Inter',sans-serif;padding:10px 12px;resize:none}
+.site-hint{font-size:12.5px;color:var(--text-secondary);margin-top:10px;line-height:1.45;text-align:center}
+.site-msg{margin-top:12px;font-size:13.5px;text-align:center;color:var(--text-secondary)}
+.site-msg.error{color:#f4212e}
+</style>
 </body>
 </html>

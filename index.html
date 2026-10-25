@@ -2354,6 +2354,14 @@
         .feed-comment-item { display: flex; gap: 12px; padding: 14px 0; align-items: flex-start; }
         .feed-comment-item .avatar { width: 34px; height: 34px; border-radius: 50%; background-color: var(--primary-blue); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .feed-comment-item.is-reply { margin-left: 46px; padding: 10px 0; position: relative; }
+        .comment-ad-item { cursor: pointer; }
+        .comment-ad-body { flex: 1; min-width: 0; }
+        .comment-ad-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+        .comment-ad-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .comment-ad-tag { font-size: 10px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-secondary); background: var(--bg-alt); padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
+        .comment-ad-text { font-size: 14px; line-height: 1.35; color: var(--text-primary); margin: 0 0 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .comment-ad-media { width: 100%; height: 140px; border-radius: 12px; background-size: cover; background-position: center; background-color: var(--bg-alt); margin-bottom: 8px; }
+        .comment-ad-cta { display: inline-block; background: var(--text-primary); color: var(--bg-primary, #fff); font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: 20px; }
         .feed-comment-item.is-reply .avatar { width: 26px; height: 26px; font-size: 11px; }
         .feed-comment-item.is-reply::before {
             content: ''; position: absolute; left: -24px; top: -14px; width: 24px; height: 37px;
@@ -3326,6 +3334,9 @@
         .ads-banner-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
         .ads-banner-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border-color); transition: background 0.2s, width 0.2s; }
         .ads-banner-dot.active { background: var(--text-primary); width: 16px; }
+        /* Only 4 dots are ever visible; the window slides as you swipe and the edge dot shrinks when more cards lie beyond it */
+        .ads-banner-dot.hidden { display: none; }
+        .ads-banner-dot.edge { width: 4px; height: 4px; opacity: 0.7; }
         .trend-item { padding: 10px 2px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
         .trend-item:last-child { border-bottom: none; }
         .trend-item:hover { background: var(--bg-hover); }
@@ -20018,6 +20029,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             dots.innerHTML = ads.map((_, i) => `<span class="ads-banner-dot${i === 0 ? ' active' : ''}"></span>`).join('');
             scroll.scrollLeft = 0;
             adsBannerIndex = 0;
+            updateAdsBannerDots(0);
             const searchEl = document.getElementById('search-discover');
             section.style.display = (searchEl && searchEl.value.trim()) ? 'none' : '';
             if (ads.length > 1) startAdsBannerAutoSlide();
@@ -20040,7 +20052,15 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function updateAdsBannerDots(index) {
             const dots = document.getElementById('ads-banner-dots');
             if (!dots) return;
-            dots.querySelectorAll('.ads-banner-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+            const all = dots.querySelectorAll('.ads-banner-dot');
+            const n = all.length, MAX = 4;
+            const start = n <= MAX ? 0 : Math.max(0, Math.min(index - 1, n - MAX));
+            const end = Math.min(n, start + MAX) - 1;
+            all.forEach((d, i) => {
+                d.classList.toggle('active', i === index);
+                d.classList.toggle('hidden', i < start || i > end);
+                d.classList.toggle('edge', n > MAX && i !== index && ((i === start && start > 0) || (i === end && end < n - 1)));
+            });
         }
         // A manual swipe pauses the auto-slide for a bit rather than fighting it, and keeps the
         // dots synced to whatever card is actually in view.
@@ -26362,7 +26382,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 return (a[1].timestamp || 0) - (b[1].timestamp || 0);
             });
 
-            topLevel.forEach(([commentId, comment]) => {
+            topLevel.forEach(([commentId, comment], topLevelIdx) => {
                 const replies = repliesByParent[commentId] || [];
                 const el = buildCommentEl(commentId, comment, false, replies.length);
                 list.appendChild(el);
@@ -26372,9 +26392,67 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     list.appendChild(replyEl);
                     getCommentImpressionObserver().observe(replyEl);
                 });
+                const adEl = buildCommentAdEl(topLevelIdx);
+                if (adEl) list.appendChild(adEl);
             });
             list.scrollTop = list.scrollHeight;
         }
+
+        // Random sponsored rows inside a post's comment thread. They reuse the same ads that feed
+        // the Explore banner (isAd + adUrl posts in cachedPosts). The thread is rebuilt from scratch
+        // on every Firebase update, so the random choices (first slot + which ad) are rolled once
+        // per post and remembered — otherwise the ad would jump around each time anyone reacts.
+        // One ad lands after a random 2nd–4th top-level comment, then again every 6 comments.
+        // Never shown on an ad's own thread.
+        let commentAdState = { postId: null, offset: 0, adIds: {} };
+        function buildCommentAdEl(topLevelIdx) {
+            const postId = activeCommentsPostId;
+            if (!postId) return null;
+            const thisPost = cachedPosts[postId];
+            if (thisPost && thisPost.isAd) return null;
+            if (commentAdState.postId !== postId) {
+                commentAdState = { postId, offset: 1 + Math.floor(Math.random() * 3), adIds: {} };
+            }
+            const pos = topLevelIdx - commentAdState.offset;
+            if (pos < 0 || pos % 6 !== 0) return null;
+            const slot = pos / 6;
+            let ad = cachedPosts[commentAdState.adIds[slot]];
+            if (!ad || !ad.isAd || !ad.adUrl) {
+                const used = Object.values(commentAdState.adIds);
+                const pool = Object.entries(cachedPosts).filter(([id, a]) => a && a.isAd && a.adUrl && id !== postId);
+                if (!pool.length) return null;
+                const fresh = pool.filter(([id]) => !used.includes(id));
+                const pick = fresh.length ? fresh : pool;
+                const [pickedId, pickedAd] = pick[Math.floor(Math.random() * pick.length)];
+                ad = pickedAd;
+                commentAdState.adIds[slot] = pickedId;
+            }
+            const media = ad.imageUrl || (ad.imageUrls && ad.imageUrls[0]) || ad.videoThumbnail || '';
+            const item = document.createElement('div');
+            item.className = 'feed-comment-item comment-ad-item';
+            item.dataset.adUrl = ad.adUrl || '';
+            item.innerHTML = `
+                <div class="avatar" style="background-image:url('${escapeHtmlForPost(ad.photoURL || '')}')"></div>
+                <div class="comment-ad-body">
+                    <div class="comment-ad-head">
+                        <span class="comment-ad-name">${escapeHtmlForPost(ad.name || 'Business')}</span>
+                        <span class="comment-ad-tag">Sponsored</span>
+                    </div>
+                    ${ad.text ? `<p class="comment-ad-text">${escapeHtmlForPost(ad.text)}</p>` : ''}
+                    ${media ? `<div class="comment-ad-media" style="background-image:url('${escapeHtmlForPost(media)}')"></div>` : ''}
+                    <span class="comment-ad-cta">${escapeHtmlForPost(ad.adCta || 'Learn More')}</span>
+                </div>`;
+            return item;
+        }
+        (function initCommentAdClicks() {
+            const list = document.getElementById('post-comments-list');
+            if (!list) return;
+            list.addEventListener('click', (e) => {
+                const ad = e.target.closest('.comment-ad-item');
+                if (!ad || !ad.dataset.adUrl) return;
+                window.open(ad.dataset.adUrl, '_blank', 'noopener,noreferrer');
+            });
+        })();
 
         // Same 1s-dwell-then-count-once approach as getFeedImpressionObserver, scoped to
         // comments/replies inside the post-comments sheet. The comments list is rebuilt from

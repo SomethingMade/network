@@ -2241,6 +2241,11 @@
         .feed-post-reactors-avatars .avatar { width: 20px; height: 20px; font-size: 9px; font-weight: 700; border: 2px solid var(--bg-surface); border-radius: 50%; margin-left: -7px; flex-shrink: 0; }
         .feed-post-reactors-avatars .avatar:first-child { margin-left: 0; }
         .feed-post-reactors-label { font-size: 12px; color: var(--text-secondary); }
+        /* "AI generated image" note under a post whose photo came from the composer's AI Image tool */
+        .feed-post-ai-label { display: flex; align-items: center; gap: 5px; margin: 6px 0 0 60px; font-size: 12px; color: var(--text-secondary); }
+        .feed-post-ai-label svg { width: 13px; height: 13px; flex-shrink: 0; }
+        .feed-post-card-ig .feed-post-ai-label { margin: 6px 0 0; padding: 0 16px; }
+        :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list) .feed-post-card-ig>.feed-post-ai-label { order: 8; padding: 6px 2px 0; margin: 0; color: var(--sc-sub, var(--text-secondary)); font-size: 12.5px; }
 
         /* X-style action row: all icons (comment, repost, like, views, bookmark, share) spread
            evenly across the full card width in one line, rather than a left cluster plus a
@@ -21821,7 +21826,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 clearComposerVideoOnly();
                 const uid = auth.currentUser ? auth.currentUser.uid : 'unknown';
                 toUpload.forEach((file) => {
-                    const entry = { previewUrl: URL.createObjectURL(file), url: null, uploading: true, promise: null };
+                    const entry = { previewUrl: URL.createObjectURL(file), url: null, uploading: true, promise: null, ai: /^haba-ai-/.test(file.name || '') };
                     feedComposerImages.push(entry);
                     uploadComposerImageEntry(entry, file, uid).catch(() => {});
                 });
@@ -22077,6 +22082,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         music: ((resolvedImageUrls.length || resolvedVideo) && pendingMusic) ? pendingMusic : null,
                         poll: pollData ? { question: pollData.question, options: pollData.options, votes: {} } : null,
                         linkPreview: linkPreview,
+                        aiGenerated: pendingImages.some(item => item && item.ai) || null,
                         mentions: mentionedUids.size ? mentionsMap : null,
                         visibility: pendingVisibility === 'followers' ? pendingVisibility : 'everyone',
                         isAd: pendingIsAd || null,
@@ -24393,6 +24399,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     <span class="feed-post-reactors-label"></span>
                 </div>
                 <div class="ig-view-comments"${(post.commentCount || 0) > 0 ? '' : ' style="display:none;"'}>View comments</div>
+                ${post.aiGenerated ? `<div class="feed-post-ai-label"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2zm7 11l.9 2.6L22.5 16.5l-2.6.9L19 20l-.9-2.6-2.6-.9 2.6-.9L19 13z"/></svg><span>AI generated image</span></div>` : ''}
             `;
             // Name, avatar, and verified badge are filled in (and kept live) via applyLiveProfileToPostCard.
             applyLiveProfileToPostCard(card);

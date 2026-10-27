@@ -1663,6 +1663,8 @@
            so it still lines up at the narrow-screen avatar size below. */
         :root { --x-avatar-size: 48px; }
         .feed-post-card { position: relative; }
+        #feed-offline-banner { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translate(-50%, -150%); z-index: 9999; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 20px; padding: 6px 14px; font-size: 12.5px; font-weight: 650; box-shadow: var(--shadow-elevated); transition: transform 0.3s ease; pointer-events: none; }
+        #feed-offline-banner.show { transform: translate(-50%, 0); }
         .feed-thread-connector { display: none; position: absolute; left: calc(16px + (var(--x-avatar-size) / 2) - 1px); width: 2px; background: var(--border-color); pointer-events: none; z-index: 0; }
         .feed-thread-connector-down { top: calc(12px + var(--x-avatar-size)); bottom: 0; }
         .feed-thread-connector-up { top: 0; height: 12px; }
@@ -11953,7 +11955,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                     <span class="avatar-verified-badge" id="ride-header-profile-badge"></span>
                                 </div>
                             </div>
-                            <p id="map-permission-hint" style="display:none;">Turn on location access to navigate from where you are.</p>
                         </div>
 
                         <div class="haba-ride-sheet" id="haba-ride-sheet">
@@ -21028,6 +21029,104 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }, { passive: true });
         }
 
+
+        // ---- Feed cache (IndexedDB): instant first paint + offline viewing -------------------
+        // Stores the newest FEED_CACHE_SIZE visible posts per user. On open the cached cards
+        // render immediately, then the live Firebase listener patches/reconciles them.
+        const FEED_CACHE_SIZE = 30;
+        const FEED_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // ignore caches older than a week
+        let feedCacheTimer = null;
+        function openFeedCacheDB() {
+            return new Promise((resolve, reject) => {
+                try {
+                    const req = indexedDB.open('feed_cache_db', 1);
+                    req.onupgradeneeded = () => { req.result.createObjectStore('feed'); };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                } catch (e) { reject(e); }
+            });
+        }
+        async function feedCacheRead(uid) {
+            try {
+                const db = await openFeedCacheDB();
+                return await new Promise((resolve) => {
+                    const r = db.transaction('feed', 'readonly').objectStore('feed').get(uid);
+                    r.onsuccess = () => resolve(r.result || null);
+                    r.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+        async function feedCacheWrite(uid, data) {
+            try {
+                const db = await openFeedCacheDB();
+                db.transaction('feed', 'readwrite').objectStore('feed').put(data, uid);
+            } catch (e) { /* cache is best-effort */ }
+        }
+        async function feedCacheClear() {
+            try {
+                const db = await openFeedCacheDB();
+                db.transaction('feed', 'readwrite').objectStore('feed').clear();
+            } catch (e) {}
+        }
+        window.feedCacheClear = feedCacheClear; // call on sign-out
+        function scheduleFeedCacheSave() {
+            clearTimeout(feedCacheTimer);
+            feedCacheTimer = setTimeout(() => {
+                const user = auth.currentUser;
+                if (!user) return;
+                const posts = Object.entries(cachedPosts)
+                    .filter(([id, p]) => p && p.timestamp && canViewPost(p))
+                    .sort((a, b) => b[1].timestamp - a[1].timestamp)
+                    .slice(0, FEED_CACHE_SIZE);
+                if (posts.length) feedCacheWrite(user.uid, { savedAt: Date.now(), posts });
+            }, 2000);
+        }
+        async function hydrateFeedFromCache(uid) {
+            const data = await feedCacheRead(uid);
+            if (!data || !Array.isArray(data.posts) || !data.posts.length) return;
+            if (Date.now() - (data.savedAt || 0) > FEED_CACHE_MAX_AGE_MS) return;
+            const list = document.getElementById('feed-posts-list');
+            // Live data already arrived first (fast connection) — nothing to hydrate.
+            if (!list || list.querySelector('.feed-post-card[data-post-id]')) return;
+            removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
+            feedInitialSkeletonNodes = [];
+            data.posts.forEach(([postId, post]) => {
+                if (!post || !canViewPost(post)) return;
+                if (list.querySelector(`[data-post-id="${postId}"]`)) return;
+                if (!cachedPosts[postId]) cachedPosts[postId] = post;
+                const card = buildFeedPostCard(postId, post);
+                card.dataset.fromCache = '1';
+                list.appendChild(card);
+            });
+            reorderFeedCards();
+            applyFeedSubtabFilter();
+        }
+        // After the live window has loaded: any card still flagged from-cache was not
+        // re-delivered by Firebase. Keep it if the post still exists, drop it if deleted.
+        async function reconcileCachedFeedCards() {
+            if (!navigator.onLine) return; // can't verify offline — keep showing cached cards
+            const stale = document.querySelectorAll('#feed-posts-list [data-from-cache="1"]');
+            for (const card of stale) {
+                const postId = card.dataset.postId;
+                try {
+                    const snap = await get(ref(database, `posts/${postId}`));
+                    if (snap.exists()) { cachedPosts[postId] = snap.val(); patchFeedPostCounts(card, snap.val()); delete card.dataset.fromCache; }
+                    else { card.remove(); delete cachedPosts[postId]; }
+                } catch (e) { /* offline: keep showing the cached card */ }
+            }
+        }
+        function initFeedOfflineBanner() {
+            if (document.getElementById('feed-offline-banner')) return;
+            const el = document.createElement('div');
+            el.id = 'feed-offline-banner';
+            el.textContent = "You're offline \u2014 showing saved posts";
+            document.body.appendChild(el);
+            const sync = () => el.classList.toggle('show', !navigator.onLine);
+            window.addEventListener('online', () => { sync(); if (auth.currentUser) scheduleFeedCacheSave(); });
+            window.addEventListener('offline', sync);
+            sync();
+        }
+
         async function initFeedListeners() {
             const user = auth.currentUser;
             if (!user) return;
@@ -21100,12 +21199,19 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             // feedInitialLoadComplete is still false, so these are the only thing shown here.
             document.getElementById('feed-empty-state').style.display = 'none';
             feedInitialSkeletonNodes = showFeedLoadingSkeletons();
+            initFeedOfflineBanner();
+            hydrateFeedFromCache(user.uid); // instant paint from IndexedDB; live data reconciles it
+            let feedBurstEnded = false;
             const endFeedInitialBurst = () => {
+                if (feedBurstEnded) return;
+                feedBurstEnded = true;
                 feedInitialBurstActive = false;
                 feedInitialLoadComplete = true;
                 removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
                 feedInitialSkeletonNodes = [];
                 updateFeedEmptyState();
+                reconcileCachedFeedCards();
+                scheduleFeedCacheSave();
             };
             const bumpFeedBurstQuiet = () => {
                 clearTimeout(feedBurstQuietTimer);
@@ -21140,6 +21246,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
                 cachedPosts[postId] = post;
                 const list = document.getElementById('feed-posts-list');
+                const cachedCard = list && list.querySelector(`[data-post-id="${postId}"][data-from-cache="1"]`);
+                if (cachedCard) { patchFeedPostCounts(cachedCard, post); delete cachedCard.dataset.fromCache; }
                 if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
                     list.prepend(buildFeedPostCard(postId, post));
                     reorderFeedCards();
@@ -21152,6 +21260,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             onChildChanged(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
+                scheduleFeedCacheSave();
                 const oldPost = cachedPosts[postId];
                 cachedPosts[postId] = post;
                 if (post && post.uid) {
@@ -31643,6 +31752,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             showLoading();
             try {
                 await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);
+                try { await feedCacheClear(); } catch (e) {}
                 await signOut(auth);
                 clearMediaCache();
                 confirmationResult = null;
@@ -32623,7 +32733,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 showLoading();
                 try {
                     await teardownPushNotifications(auth.currentUser ? auth.currentUser.uid : null);
-                    await signOut(auth);
+                    try { await feedCacheClear(); } catch (e) {}
+                await signOut(auth);
                     clearMediaCache();
                     confirmationResult = null;
                     document.getElementById('auth-phone').value = '';

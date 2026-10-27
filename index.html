@@ -21100,6 +21100,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             });
             reorderFeedCards();
             applyFeedSubtabFilter();
+            syncFeedFollowPills();
         }
         // After the live window has loaded: any card still flagged from-cache was not
         // re-delivered by Firebase. Keep it if the post still exists, drop it if deleted.
@@ -33034,6 +33035,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         // Returns 'requested' when the target is locked (a request was sent instead of following).
+        // The feed's inline "Follow" pill is decided when a card is built, from cachedContacts.
+        // contacts/{me} arrives asynchronously (and cached cards can render before it does),
+        // so cards built early showed "Follow" for people I already follow and never corrected
+        // themselves. Called whenever cachedContacts changes to remove those stale pills.
+        function syncFeedFollowPills() {
+            document.querySelectorAll('.feed-post-follow-pill[data-uid]').forEach(pill => {
+                if (cachedContacts[pill.dataset.uid]) pill.remove();
+            });
+            if (typeof currentViewerPostId !== 'undefined' && currentViewerPostId) syncImageViewerAuthorBar();
+        }
+
         async function followUser(targetUid) {
             const me = auth.currentUser;
             if (!me || !targetUid || targetUid === me.uid) return;
@@ -48865,6 +48877,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
 
             onValue(ref(database, `contacts/${user.uid}`), (snap) => {
                 cachedContacts = snap.exists() ? snap.val() : {};
+                syncFeedFollowPills();
                 if (userInfoSheet.classList.contains('active') && userInfoSheetUid) updateUserInfoFollowButton(userInfoSheetUid);
                 renderContactsLists();
                 renderChatRequests();

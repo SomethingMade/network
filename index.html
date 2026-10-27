@@ -7800,6 +7800,81 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
 
 
+
+    <style id="ad-video-view-styles">
+        /* ── AD VIDEO VIEW (promoted posts opened full-screen) ──
+           Black canvas, video centred, advertiser row + "Ad" tag, caption, engagement pills,
+           full-width white CTA, and a proper player bar. Scoped to .reel-item-ad so organic
+           reels keep the immersive full-bleed layout. */
+        #reel-viewer-overlay .reel-item.reel-item-ad { flex-direction: column; align-items: stretch; justify-content: flex-start; background: #000; }
+        #reel-viewer-overlay .reel-item-ad::after { display: none; }
+        .reel-item-ad .reel-item-topbar { background: none; }
+        .reel-item-ad .reel-item-topbar-row { justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 0; }
+        .reel-item-ad .reel-item-back-btn, .reel-item-ad .reel-item-menu-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; background: rgba(24,26,30,0.88); justify-content: center; }
+        .reel-item-ad .reel-item-back-btn:active, .reel-item-ad .reel-item-menu-btn:active { background: rgba(60,62,68,0.95); }
+        .reel-item-ad.chrome-hidden .reel-item-topbar { opacity: 1; pointer-events: auto; }
+
+        .ad-reel-stage { position: relative; flex: 1 1 auto; min-height: 0; margin-top: calc(env(safe-area-inset-top, 0px) + 60px); display: flex; align-items: center; justify-content: center; }
+        .reel-item-ad .reel-item-media { position: relative; width: 100%; height: auto; max-height: 100%; aspect-ratio: 16 / 9; }
+        .reel-item-ad .reel-item-media video { width: 100%; height: 100%; object-fit: contain; }
+        .ad-reel-fs-exit { display: none; position: absolute; top: 12px; right: 12px; z-index: 4; width: 40px; height: 40px; border: none; border-radius: 50%; background: rgba(24,26,30,0.7); color: #fff; align-items: center; justify-content: center; }
+        .ad-reel-fs-exit svg { width: 20px; height: 20px; }
+        .ad-reel-stage:fullscreen, .ad-reel-stage:-webkit-full-screen { width: 100vw; height: 100vh; margin: 0; background: #000; }
+        .ad-reel-stage:fullscreen .reel-item-media, .ad-reel-stage:-webkit-full-screen .reel-item-media { height: 100%; aspect-ratio: auto; }
+        .ad-reel-stage:fullscreen .ad-reel-fs-exit, .ad-reel-stage:-webkit-full-screen .ad-reel-fs-exit { display: flex; }
+        .reel-item-ad.ad-pseudo-fs .ad-reel-stage { position: fixed; inset: 0; margin: 0; z-index: 5; background: #000; }
+        .reel-item-ad.ad-pseudo-fs .reel-item-media { height: 100%; aspect-ratio: auto; }
+        .reel-item-ad.ad-pseudo-fs .ad-reel-fs-exit { display: flex; }
+        .reel-item-ad.ad-pseudo-fs .ad-reel-panel, .reel-item-ad.ad-pseudo-fs .reel-item-topbar { display: none; }
+        .reel-item-ad.ad-pseudo-fs .ad-reel-player { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0)); }
+
+        .ad-reel-panel { position: relative; z-index: 2; flex: 0 0 auto; padding: 18px 16px 4px; color: #fff; }
+        .ad-reel-adv { display: flex; align-items: center; gap: 12px; }
+        .ad-reel-adv .avatar { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 11px; background-size: cover; background-position: center; background-color: #1c1e22; }
+        .ad-reel-adv-info { flex: 1 1 auto; min-width: 0; }
+        .ad-reel-adv-name { display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; }
+        .ad-reel-adv-name .reel-item-topbar-name { overflow: hidden; text-overflow: ellipsis; }
+        .ad-reel-adv-handle { margin-top: 1px; font-size: 14.5px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ad-reel-tag { flex: 0 0 auto; align-self: flex-start; font-size: 14.5px; font-weight: 700; color: rgba(255,255,255,0.6); }
+        .reel-item-ad .reel-item-caption { margin-top: 14px; font-size: 17px; font-weight: 700; line-height: 1.35; text-shadow: none; -webkit-line-clamp: 3; }
+        .reel-item-ad .reel-item-caption-more { text-shadow: none; }
+
+        #reel-viewer-overlay .ad-reel-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+        #reel-viewer-overlay .ad-reel-actions .reel-item-action-btn { flex: 1 1 0; min-width: 0; height: 46px; padding: 0 8px; gap: 6px; justify-content: center; border: none; border-radius: 999px; background: #16181c; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; color: #fff; font-size: 15.5px; font-weight: 600; }
+        #reel-viewer-overlay .ad-reel-actions .reel-item-action-btn::before { display: none; }
+        #reel-viewer-overlay .ad-reel-actions .reel-item-action-btn:active { background: #2a2d33; transform: scale(0.97); }
+        #reel-viewer-overlay .ad-reel-actions .reel-item-action-btn svg { width: 21px; height: 21px; flex: 0 0 auto; color: inherit; }
+        #reel-viewer-overlay .ad-reel-actions .reel-save-btn, #reel-viewer-overlay .ad-reel-actions .reel-share-btn { flex: 0 0 46px; width: 46px; padding: 0; margin: 0; }
+        #reel-viewer-overlay .ad-reel-actions .reel-like-btn.liked, #reel-viewer-overlay .ad-reel-actions .reel-like-btn.liked svg { color: #f91880; background: #16181c; }
+        #reel-viewer-overlay .ad-reel-actions .reel-repost-btn.reposted, #reel-viewer-overlay .ad-reel-actions .reel-repost-btn.reposted svg { color: #00ba7c; background: #16181c; }
+        #reel-viewer-overlay .ad-reel-actions .reel-save-btn.saved, #reel-viewer-overlay .ad-reel-actions .reel-save-btn.saved svg { color: #1d9bf0; background: #16181c; }
+
+        .ad-reel-cta { display: flex; align-items: center; justify-content: center; height: 54px; margin-top: 14px; border-radius: 999px; background: #fff; color: #000; font-size: 17px; font-weight: 800; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease, opacity 0.12s ease; }
+        .ad-reel-cta:active { transform: scale(0.985); opacity: 0.88; }
+
+        .ad-reel-player { position: relative; z-index: 3; flex: 0 0 auto; margin-top: 14px; padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px); }
+        #reel-viewer-overlay .ad-reel-player .reel-item-progress-track { position: relative; left: auto; right: auto; bottom: auto; width: 100%; height: 22px; }
+        .ad-reel-player .reel-item-progress-line { height: 3px; border-radius: 0; background: rgba(255,255,255,0.22); }
+        .ad-reel-player .reel-item-progress-fill { background: #fff; border-radius: 0; }
+        .ad-reel-player .reel-item-progress-thumb { display: none; width: 12px; height: 12px; margin: -6px 0 0 -6px; }
+        .reel-item-ad.scrubbing .ad-reel-player .reel-item-progress-line { height: 5px; }
+        .reel-item-ad.scrubbing .ad-reel-player .reel-item-progress-thumb { display: block; }
+        .ad-reel-controls { display: flex; align-items: center; gap: 2px; padding: 2px 10px 0 10px; }
+        .ad-reel-ctl { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; padding: 0 6px; background: none; border: none; color: #fff; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .ad-reel-ctl svg { width: 26px; height: 26px; }
+        .ad-reel-ctl:active { opacity: 0.6; }
+        .ad-reel-time { margin-left: 4px; font-size: 18px; font-weight: 700; color: rgba(255,255,255,0.78); font-variant-numeric: tabular-nums; }
+        .ad-reel-spacer { flex: 1 1 auto; }
+        .ad-reel-speed { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+        #reel-viewer-overlay .ad-reel-controls .reel-item-mute-btn { position: static; top: auto; right: auto; width: auto; min-width: 44px; height: 44px; border-radius: 0; background: none; }
+        #reel-viewer-overlay .ad-reel-controls .reel-item-mute-btn svg { width: 26px; height: 26px; }
+        .reel-item-ad.chrome-hidden .ad-reel-controls, .reel-item-ad.chrome-hidden .reel-item-mute-btn { opacity: 1; pointer-events: auto; }
+
+        /* Comments open as a strip under the video (see .comments-shrink): keep only the stage. */
+        #reel-viewer-overlay.comments-shrink .reel-item-ad .ad-reel-panel,
+        #reel-viewer-overlay.comments-shrink .reel-item-ad .ad-reel-player { display: none; }
+        #reel-viewer-overlay.comments-shrink .reel-item-ad .ad-reel-stage { margin-top: 0; }
+    </style>
 </head>
 <body>
 
@@ -14532,6 +14607,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // the end, so the swipe never dead-ends.
         let reelPostIds = [];
         let reelActiveIndex = -1;
+        let reelSingleMode = false;
         let reelObserver = null;
 
         function getShuffledVideoPostIds(excludeIds) {
@@ -14654,7 +14730,200 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             video.addEventListener('pause', () => showReelChrome(itemEl));
         }
 
+
+        // ── AD VIDEO VIEW ──
+        // Ads open in a layout of their own (modelled on X's promoted-video view) instead of the
+        // full-bleed reel: video centred on black, advertiser + "Ad" tag, caption, engagement
+        // pills, a full-width call-to-action button, and a real player bar (seek line, play/pause,
+        // time left, speed, volume, fullscreen, pop-out). Reuses the reel item's class names for
+        // everything bindReelItem / fillReelItemText / activateReelItem already wire up.
+        function buildAdReelItemHtml(postId) {
+            const post = cachedPosts[postId] || {};
+            const user = auth.currentUser;
+            const myUid = user ? user.uid : null;
+            const likedByMe = !!(post.reactions && myUid && post.reactions[myUid]);
+            const repostedByMe = !!(post.reposts && myUid && post.reposts[myUid]);
+            const savedByMe = !!(cachedSavedPosts && cachedSavedPosts[postId]);
+            const caption = post.text ? '1' : '';
+            const ctaLabel = escapeHtmlForPost(post.adCta || 'Learn more');
+            const ctaHtml = post.adUrl
+                ? `<a class="ad-reel-cta" href="${escapeHtmlForPost(post.adUrl)}" target="_blank" rel="noopener noreferrer">${ctaLabel}</a>`
+                : '';
+            return `
+                <div class="reel-item reel-item-ad" data-post-id="${postId}">
+                    <div class="reel-item-topbar">
+                        <div class="reel-item-topbar-row">
+                            <button type="button" class="reel-item-back-btn" aria-label="Back">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                            </button>
+                            <button type="button" class="reel-item-menu-btn" aria-label="More">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ad-reel-stage">
+                        <div class="reel-item-media"><div class="reel-item-spinner"></div></div>
+                        <div class="reel-item-play-hint"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></div>
+                        <div class="reel-item-seek-hint seek-left"></div>
+                        <div class="reel-item-seek-hint seek-right"></div>
+                        <div class="reel-item-speed-chip">2x speed</div>
+                        <div class="reel-item-scrub-time"></div>
+                        <button type="button" class="ad-reel-fs-exit" aria-label="Exit fullscreen">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path></svg>
+                        </button>
+                    </div>
+                    <div class="ad-reel-panel">
+                        <div class="ad-reel-adv">
+                            <div class="avatar reel-item-topbar-avatar"></div>
+                            <div class="ad-reel-adv-info">
+                                <div class="ad-reel-adv-name"><span class="reel-item-topbar-name"></span><span class="reel-item-topbar-badge"></span></div>
+                                <div class="ad-reel-adv-handle reel-item-topbar-username"></div>
+                            </div>
+                            <span class="ad-reel-tag">Ad</span>
+                        </div>
+                        ${caption ? `<div class="reel-item-caption"></div><button type="button" class="reel-item-caption-more" style="display:none;">more</button>` : ''}
+                        <div class="ad-reel-actions">
+                            <button type="button" class="reel-item-action-btn reel-comment-btn" data-post-id="${postId}" aria-label="Comments">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21a9 9 0 1 0-7.6-4.2L3 21l4.4-1.2A8.9 8.9 0 0 0 12 21z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01" stroke-width="2.4"/></svg>
+                                <span>${formatFeedCount(post.commentCount || 0)}</span>
+                            </button>
+                            <button type="button" class="reel-item-action-btn reel-repost-btn${repostedByMe ? ' reposted' : ''}" data-post-id="${postId}" aria-label="Repost">
+                                ${repostArrowsSvg()}
+                                <span>${formatFeedCount(post.repostCount || 0)}</span>
+                            </button>
+                            <button type="button" class="reel-item-action-btn reel-like-btn${likedByMe ? ' liked' : ''}" data-post-id="${postId}" aria-label="Like">
+                                <svg viewBox="0 0 24 24" fill="${likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8"><path d="M12.1 21.35l-1.13-1.03C6.14 15.86 3 13.02 3 9.5 3 6.61 5.24 4.5 8 4.5c1.6 0 3.14.75 4.1 1.94A5.44 5.44 0 0 1 16.2 4.5C18.96 4.5 21.2 6.61 21.2 9.5c0 3.52-3.14 6.36-7.97 10.83l-1.13 1.02z"></path></svg>
+                                <span>${formatFeedCount(post.likeCount || 0)}</span>
+                            </button>
+                            <button type="button" class="reel-item-action-btn reel-save-btn${savedByMe ? ' saved' : ''}" data-post-id="${postId}" aria-label="Save to bookmarks">
+                                <svg viewBox="0 0 24 24" fill="${savedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                            </button>
+                            <button type="button" class="reel-item-action-btn reel-share-btn" data-post-id="${postId}" aria-label="Share">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 3 10.5 14"/><path d="M21.5 3 14.5 21l-4-7-7-4z"/></svg>
+                            </button>
+                        </div>
+                        ${ctaHtml}
+                    </div>
+                    <div class="ad-reel-player">
+                        <div class="reel-item-progress-track" role="slider" aria-label="Seek">
+                            <div class="reel-item-progress-line">
+                                <div class="reel-item-progress-fill"></div>
+                                <div class="reel-item-progress-thumb"></div>
+                            </div>
+                        </div>
+                        <div class="ad-reel-controls">
+                            <button type="button" class="ad-reel-ctl ad-reel-playpause" aria-label="Play or pause">
+                                <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M8 5v14l11-7z"></path></svg>
+                                <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"></path></svg>
+                            </button>
+                            <span class="ad-reel-time">-0:00</span>
+                            <span class="ad-reel-spacer"></span>
+                            <button type="button" class="ad-reel-ctl ad-reel-speed" aria-label="Playback speed">1x</button>
+                            <button type="button" class="ad-reel-ctl reel-item-mute-btn${reelSoundMuted ? ' is-muted' : ''}" aria-label="Mute or unmute">
+                                <svg class="reel-icon-unmuted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
+                                <svg class="reel-icon-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon><line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line></svg>
+                            </button>
+                            <button type="button" class="ad-reel-ctl ad-reel-fs" aria-label="Fullscreen">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+                            </button>
+                            <button type="button" class="ad-reel-ctl ad-reel-pip" aria-label="Play floating">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><rect x="11" y="11" width="8" height="6" rx="1" fill="currentColor" stroke="none"></rect></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // Player-bar wiring for an ad's <video>, called once from activateReelItem when the
+        // element is created: remaining-time readout, play/pause icon, speed cycle, fullscreen
+        // (native where available, otherwise an in-page fallback) and pop-out to the floating player.
+        function bindAdReelVideo(itemEl, video, post) {
+            const timeEl = itemEl.querySelector('.ad-reel-time');
+            const playIcon = itemEl.querySelector('.ad-reel-playpause .icon-play');
+            const pauseIcon = itemEl.querySelector('.ad-reel-playpause .icon-pause');
+            const media = itemEl.querySelector('.reel-item-media');
+            const syncTime = () => {
+                if (timeEl) timeEl.textContent = '-' + formatVideoTime(Math.max(0, (video.duration || 0) - video.currentTime));
+            };
+            const syncPlay = () => {
+                if (playIcon) playIcon.style.display = video.paused ? '' : 'none';
+                if (pauseIcon) pauseIcon.style.display = video.paused ? 'none' : '';
+            };
+            video.addEventListener('timeupdate', syncTime);
+            video.addEventListener('loadedmetadata', () => {
+                syncTime();
+                // Size the stage to the clip's own shape so nothing is cropped or boxed in.
+                if (media && video.videoWidth && video.videoHeight) media.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+            });
+            video.addEventListener('durationchange', syncTime);
+            video.addEventListener('play', syncPlay);
+            video.addEventListener('pause', syncPlay);
+            syncPlay();
+
+            const ppBtn = itemEl.querySelector('.ad-reel-playpause');
+            if (ppBtn) ppBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleReelItemPlayback(itemEl, video); });
+
+            const speedBtn = itemEl.querySelector('.ad-reel-speed');
+            const speeds = [1, 1.5, 2, 0.5];
+            let speedIdx = 0;
+            if (speedBtn) speedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                speedIdx = (speedIdx + 1) % speeds.length;
+                const rate = speeds[speedIdx];
+                video.playbackRate = rate;
+                const musicAudio = itemEl.querySelector('.reel-item-music-audio');
+                if (musicAudio) musicAudio.playbackRate = rate;
+                speedBtn.textContent = rate + 'x';
+                triggerHaptic(8);
+            });
+
+            const stage = itemEl.querySelector('.ad-reel-stage');
+            const fsBtn = itemEl.querySelector('.ad-reel-fs');
+            const fsExit = itemEl.querySelector('.ad-reel-fs-exit');
+            const isNativeFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+            const leaveFs = () => {
+                itemEl.classList.remove('ad-pseudo-fs');
+                if (isNativeFs()) { try { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch (_) {} }
+                try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (_) {}
+            };
+            const enterFs = async () => {
+                const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+                try {
+                    if (req) {
+                        await req.call(stage);
+                        try { if (screen.orientation && screen.orientation.lock && video.videoWidth >= video.videoHeight) await screen.orientation.lock('landscape'); } catch (_) {}
+                        return;
+                    }
+                } catch (_) { /* fall through to the in-page fallback */ }
+                if (video.webkitEnterFullscreen && /iPhone|iPod/.test(navigator.userAgent)) { try { video.webkitEnterFullscreen(); return; } catch (_) {} }
+                itemEl.classList.add('ad-pseudo-fs');
+            };
+            const toggleFs = (e) => {
+                if (e) e.stopPropagation();
+                if (isNativeFs() || itemEl.classList.contains('ad-pseudo-fs')) leaveFs(); else enterFs();
+            };
+            if (fsBtn) fsBtn.addEventListener('click', toggleFs);
+            if (fsExit) fsExit.addEventListener('click', toggleFs);
+            document.addEventListener('fullscreenchange', () => {
+                if (!isNativeFs()) { try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (_) {} }
+            });
+
+            const pipBtn = itemEl.querySelector('.ad-reel-pip');
+            if (pipBtn) pipBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const resumeAt = video.currentTime;
+                openFloatingVideoPlayer(post.videoUrl, {
+                    musicUrl: post.music ? post.music.previewUrl : null,
+                    sourceVideo: video,
+                    startTime: resumeAt,
+                    muted: reelSoundMuted
+                });
+                history.back();
+            });
+        }
+
         function buildReelItemHtml(postId) {
+            if (cachedPosts[postId] && cachedPosts[postId].isAd) return buildAdReelItemHtml(postId);
             const post = cachedPosts[postId];
             const author = (post && cachedUsers[post.uid]) || {};
             const name = escapeHtmlForPost(author.name || (post && post.name) || 'User');
@@ -14777,6 +15046,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         function reelExtendQueueIfNeeded() {
+            if (reelSingleMode) return;
             if (reelActiveIndex < reelPostIds.length - 3) return;
             const used = new Set(reelPostIds);
             let more = getShuffledVideoPostIds(used);
@@ -14853,6 +15123,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 video.src = videoUrl;
                 media.appendChild(video);
                 bindReelVideoGestures(itemEl, video);
+                if (itemEl.classList.contains('reel-item-ad')) bindAdReelVideo(itemEl, video, post || {});
                 if (!videoUrl) video.dispatchEvent(new Event('error'));
 
                 // When a song is attached, the clip's own audio stays muted permanently and the
@@ -15072,7 +15343,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             // (or from a blocked-autoplay fallback) shouldn't carry over into this one.
             reelSoundMuted = false;
 
-            reelPostIds = [startPostId, ...getShuffledVideoPostIds([startPostId])];
+            // An ad opens on its own (X-style): no swiping into the organic video queue.
+            reelSingleMode = !!startPost.isAd;
+            reelPostIds = reelSingleMode ? [startPostId] : [startPostId, ...getShuffledVideoPostIds([startPostId])];
             reelActiveIndex = -1;
             const track = document.getElementById('reel-viewer-track');
             track.innerHTML = reelPostIds.map(buildReelItemHtml).join('');
@@ -15118,6 +15391,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             track.innerHTML = '';
             reelPostIds = [];
             reelActiveIndex = -1;
+            reelSingleMode = false;
+            try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (_) {}
+            try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (_) {}
             document.getElementById('reel-viewer-overlay').classList.remove('active', 'above-sheet', 'reel-viewer-fullscreen', 'comments-shrink');
             // The comments sheet's shrink layout (.reel-comments-mode) is only meaningful while
             // this reel viewer is actually sitting above it as a video strip — if the viewer is

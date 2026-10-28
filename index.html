@@ -3322,6 +3322,7 @@
         .ads-banner-scroll { display: flex; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x mandatory; margin: 0 -14px; padding: 0 14px 2px; }
         .ads-banner-scroll::-webkit-scrollbar { display: none; }
         .ad-banner-card { position: relative; flex: 0 0 88%; scroll-snap-align: start; height: 168px; border-radius: 18px; overflow: hidden; cursor: pointer; background: linear-gradient(135deg, var(--primary-blue), var(--gradient-brand-end, var(--primary-blue))) center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 3px 14px rgba(0,0,0,0.12); }
+        .ad-banner-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; pointer-events: none; }
         .ad-banner-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.2) 55%, rgba(0,0,0,0.05) 100%); pointer-events: none; }
         .ad-banner-sponsored-tag { position: absolute; top: 10px; left: 12px; z-index: 2; background: rgba(255,255,255,0.94); color: #111; font-size: 10px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; }
         .ad-banner-body { position: relative; z-index: 1; padding: 12px 14px 14px; }
@@ -3332,6 +3333,8 @@
         .ad-banner-cta { display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #111; font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 20px; }
         .ads-banner-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
         .ads-banner-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border-color); transition: background 0.2s, width 0.2s; }
+        .ads-banner-dot.edge { transform: scale(0.65); }
+        .ads-banner-dot { transition: background 0.2s, width 0.2s, transform 0.2s; }
         .ads-banner-dot.active { background: var(--text-primary); width: 16px; }
         .trend-item { padding: 10px 2px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
         .trend-item:last-child { border-bottom: none; }
@@ -20100,6 +20103,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (dd) dd.classList.remove('active');
             renderDiscoverGrid('');
             stopAdsBannerAutoSlide();
+            syncAdsBannerVideos(-1);
         }
         // While the results dropdown is up it becomes the page (body steps aside) — mirror its
         // .active class onto the tab so CSS can hide the body.
@@ -20296,6 +20300,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const bg = media ? `background-image:url('${escapeHtmlForPost(media)}');` : '';
             return `
                 <div class="ad-banner-card" data-ad-url="${escapeHtmlForPost(post.adUrl || '')}" style="${bg}">
+                    ${post.videoUrl ? `<video class="ad-banner-video" src="${escapeHtmlForPost(post.videoUrl)}" ${media ? `poster="${escapeHtmlForPost(media)}"` : ''} muted loop playsinline preload="metadata"></video>` : ''}
                     <span class="ad-banner-sponsored-tag">Sponsored</span>
                     <div class="ad-banner-body">
                         <div class="ad-banner-brand">
@@ -20328,6 +20333,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }
             scroll.innerHTML = ads.map(adBannerCardHtml).join('');
             dots.innerHTML = ads.map((_, i) => `<span class="ads-banner-dot${i === 0 ? ' active' : ''}"></span>`).join('');
+            updateAdsBannerDots(0);
             scroll.scrollLeft = 0;
             adsBannerIndex = 0;
             const searchEl = document.getElementById('search-discover');
@@ -20346,13 +20352,39 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }, 4200);
         }
         function stopAdsBannerAutoSlide() {
+            if (!document.getElementById('ads-banner-section') || document.getElementById('ads-banner-section').offsetParent === null) syncAdsBannerVideos(-1);
             if (adsBannerTimer) { clearInterval(adsBannerTimer); adsBannerTimer = null; }
             if (adsBannerResumeTimeout) { clearTimeout(adsBannerResumeTimeout); adsBannerResumeTimeout = null; }
         }
+        // Video ads play (muted, looping) in their banner card while it's the one in view, and
+        // every other banner video stays paused. Passing nothing as `index` pauses them all.
+        function syncAdsBannerVideos(index) {
+            const scroll = document.getElementById('ads-banner-scroll');
+            if (!scroll) return;
+            const visible = scroll.offsetParent !== null;
+            Array.from(scroll.children).forEach((card, i) => {
+                const v = card.querySelector('.ad-banner-video');
+                if (!v) return;
+                if (visible && i === index) { v.muted = true; v.play().catch(() => {}); }
+                else if (!v.paused) v.pause();
+            });
+        }
         function updateAdsBannerDots(index) {
+            syncAdsBannerVideos(index);
             const dots = document.getElementById('ads-banner-dots');
             if (!dots) return;
-            dots.querySelectorAll('.ads-banner-dot').forEach((d, i) => d.classList.toggle('active', i === index));
+            // Only four dots are ever shown; the window slides along as you move through the
+            // ads, and the dots at an edge shrink when more ads continue past that side.
+            const all = dots.querySelectorAll('.ads-banner-dot');
+            const n = all.length, MAX = 4;
+            const start = n <= MAX ? 0 : Math.min(Math.max(index - 2, 0), n - MAX);
+            all.forEach((d, i) => {
+                const visible = i >= start && i < start + MAX;
+                d.classList.toggle('active', i === index);
+                d.style.display = visible ? '' : 'none';
+                d.classList.toggle('edge', n > MAX && visible && i !== index &&
+                    ((i === start && start > 0) || (i === start + MAX - 1 && start + MAX < n)));
+            });
         }
         // A manual swipe pauses the auto-slide for a bit rather than fighting it, and keeps the
         // dots synced to whatever card is actually in view.

@@ -7835,6 +7835,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         .ad-reel-adv-name { display: flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; }
         .ad-reel-adv-name .reel-item-topbar-name { overflow: hidden; text-overflow: ellipsis; }
         .ad-reel-adv-handle { margin-top: 1px; font-size: 14.5px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ad-reel-adv .media-viewer-follow-pill { flex: 0 0 auto; margin-left: 4px; }
+        .reel-item-ad .reel-item-music { margin-top: 12px; text-shadow: none; }
         .ad-reel-tag { flex: 0 0 auto; align-self: flex-start; font-size: 14.5px; font-weight: 700; color: rgba(255,255,255,0.6); }
         .reel-item-ad .reel-item-caption { margin-top: 14px; font-size: 17px; font-weight: 700; line-height: 1.35; text-shadow: none; -webkit-line-clamp: 3; }
         .reel-item-ad .reel-item-caption-more { text-shadow: none; }
@@ -14779,7 +14781,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 <div class="ad-reel-adv-name"><span class="reel-item-topbar-name"></span><span class="reel-item-topbar-badge"></span></div>
                                 <div class="ad-reel-adv-handle reel-item-topbar-username"></div>
                             </div>
-                            <span class="ad-reel-tag">Ad</span>
+                            <button type="button" class="media-viewer-follow-pill reel-item-topbar-follow" style="display:none;">Follow</button>
+                            ${post.isAd ? '<span class="ad-reel-tag">Ad</span>' : ''}
                         </div>
                         ${caption ? `<div class="reel-item-caption"></div><button type="button" class="reel-item-caption-more" style="display:none;">more</button>` : ''}
                         <div class="ad-reel-actions">
@@ -14802,7 +14805,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 3 10.5 14"/><path d="M21.5 3 14.5 21l-4-7-7-4z"/></svg>
                             </button>
                         </div>
-                        ${ctaHtml}
+                        ${post.music ? `<div class="reel-item-music"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg><span></span></div>` : ''}
+                        ${post.isAd ? ctaHtml : ''}
                     </div>
                     <div class="ad-reel-player">
                         <div class="reel-item-progress-track" role="slider" aria-label="Seek">
@@ -14923,7 +14927,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         function buildReelItemHtml(postId) {
-            if (cachedPosts[postId] && cachedPosts[postId].isAd) return buildAdReelItemHtml(postId);
+            return buildAdReelItemHtml(postId);
             const post = cachedPosts[postId];
             const author = (post && cachedUsers[post.uid]) || {};
             const name = escapeHtmlForPost(author.name || (post && post.name) || 'User');

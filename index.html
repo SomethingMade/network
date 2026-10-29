@@ -2688,6 +2688,22 @@
         .profile-website-chip:hover { background: rgba(var(--primary-rgb), 0.2); }
         .profile-website-chip svg { width: 14px; height: 14px; flex-shrink: 0; }
         .profile-website-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Floating "visit website" card pinned to the bottom of a Business Account's profile (shown
+           when the business added a website). Lives inside #user-info-sheet-overlay so it opens and
+           closes with the sheet; see updateUserInfoWebsiteCard(). */
+        .uis-web-card { position: absolute; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: none; align-items: center; gap: 4px; max-width: 560px; margin: 0 auto; padding: 8px 8px 8px 8px; border-radius: 18px; background: #36628A; color: #FFFFFF; box-shadow: 0 8px 28px rgba(0,0,0,0.35); animation: uisWebCardIn 0.3s ease-out; }
+        .uis-web-card.show { display: flex; }
+        @keyframes uisWebCardIn { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .uis-web-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 2px 4px; color: inherit; text-decoration: none; }
+        .uis-web-thumb { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 10px; background-size: cover; background-position: center; background-color: rgba(255,255,255,0.18); }
+        .uis-web-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .uis-web-title { font-size: 16px; font-weight: 600; line-height: 1.2; color: #FFFFFF; }
+        .uis-web-sub { font-size: 13.5px; line-height: 1.2; color: rgba(255,255,255,0.82); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .uis-web-close { flex: 0 0 auto; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .uis-web-close:hover { background: rgba(255,255,255,0.14); }
+        .uis-web-close svg { width: 20px; height: 20px; }
+        #user-info-sheet-overlay.profile-locked-view .uis-web-card { display: none !important; }
         .wa-suggested-section { margin-bottom: 22px; }
         .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
         .profile-suggested-scroll::-webkit-scrollbar { display: none; }
@@ -38337,6 +38353,39 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 : `This profile is locked. Send ${lockedName} a follow request to see their posts and details.`;
         }
 
+        // Floating "Visit website" card at the bottom of a Business Account's profile, shown only
+        // when that business has a website on its profile. Tapping the card opens the site; the X
+        // dismisses it for that profile until the app is reloaded.
+        const dismissedWebsiteCards = new Set();
+        function updateUserInfoWebsiteCard(uid, profile, websiteInfo) {
+            let card = document.getElementById('user-info-web-card');
+            const isMe = auth.currentUser && uid === auth.currentUser.uid;
+            const show = !!(profile && profile.isBusinessAccount && websiteInfo && !isMe && !dismissedWebsiteCards.has(uid));
+            if (!card) {
+                if (!show) return;
+                card = document.createElement('div');
+                card.id = 'user-info-web-card';
+                card.className = 'uis-web-card';
+                card.innerHTML = '<a class="uis-web-link" target="_blank" rel="noopener noreferrer" href="#">'
+                    + '<div class="uis-web-thumb"></div>'
+                    + '<div class="uis-web-text"><span class="uis-web-title">Visit website</span><span class="uis-web-sub"></span></div></a>'
+                    + '<button type="button" class="uis-web-close" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+                card.querySelector('.uis-web-close').addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (userInfoSheetUid) dismissedWebsiteCards.add(userInfoSheetUid);
+                    card.classList.remove('show');
+                });
+                userInfoSheet.appendChild(card);
+            }
+            if (!show) { card.classList.remove('show'); return; }
+            const link = card.querySelector('.uis-web-link');
+            link.href = websiteInfo.href;
+            card.querySelector('.uis-web-sub').textContent = 'Go to ' + websiteInfo.label;
+            card.querySelector('.uis-web-thumb').style.backgroundImage = `url('${profile.photoURL || DEFAULT_AVATAR_URL}')`;
+            card.classList.remove('show'); void card.offsetWidth; // restart the slide-in
+            card.classList.add('show');
+        }
+
         function renderUserProfileSheetContent(uid) {
             pauseAllAppMedia(); // don't let a feed video (or the floating popout player, a voice note, etc.) keep playing under the profile sheet
             const profile = cachedUsers[uid] || {};
@@ -38371,6 +38420,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     websiteEl.style.display = 'none';
                 }
             }
+            updateUserInfoWebsiteCard(uid, profile, websiteInfo);
             document.getElementById('user-info-following-count').textContent = formatProfileCount(profile.followingCount);
             document.getElementById('user-info-followers-count').textContent = formatProfileCount(profile.followersCount);
             const postsCount = profilePostCountFor(uid);

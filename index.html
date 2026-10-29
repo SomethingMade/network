@@ -3497,33 +3497,41 @@
         .verified-badge { flex-shrink: 0; vertical-align: middle; position: relative; top: -1px; }
         #chat-view-name { display: flex; align-items: center; gap: 5px; }
 
-        /* ── "GET VERIFIED" PROMO SHEET (verified-badge-page-overlay) ──
-           Deliberately fixed-dark styling, independent of the user's light/dark/glass theme
-           choice — the same pattern most apps use for a premium-upsell/paywall screen, so it
-           reads as a distinct "offer" moment rather than a regular settings page. */
-        .vb-promo-sheet { background: #000000; color: #FFFFFF; }
-        .vb-promo-hero { position: relative; padding: 54px 24px 26px; text-align: center; overflow: hidden; }
-        .vb-promo-close { position: absolute; top: 18px; left: 18px; color: #FFFFFF; cursor: pointer; z-index: 2; opacity: 0.9; }
-        .vb-promo-dot { position: absolute; border-radius: 50%; background: #0A84FF; opacity: 0.85; }
-        .vb-promo-badge-icon { width: 78px; height: 78px; margin: 0 auto 18px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #2B9BFF, #0A84FF 70%); display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(10,132,255,0.35); position: relative; z-index: 1; }
-        .vb-promo-title { margin: 0; font-size: 21px; font-weight: 800; line-height: 1.3; color: #FFFFFF; position: relative; z-index: 1; }
-        .vb-promo-title span { color: #0A84FF; }
-        .vb-promo-scroll { flex: 1; overflow-y: auto; padding: 0 22px 6px; }
-        .vb-promo-benefits-card { background: rgba(255,255,255,0.07); border-radius: 18px; padding: 2px 18px; }
-        .vb-promo-benefit-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .vb-promo-benefit-row:last-child { border-bottom: none; }
-        .vb-promo-benefit-icon { width: 20px; height: 20px; flex-shrink: 0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
-        .vb-promo-benefit-label { font-size: 15px; font-weight: 500; color: #FFFFFF; flex: 1; line-height: 1.3; }
-        .vb-promo-footer { padding: 18px 22px 28px; border-top: 1px solid rgba(255,255,255,0.08); }
-        .vb-promo-plan-card { border: 1.5px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
-        .vb-promo-plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-        .vb-promo-plan-name { font-size: 15px; font-weight: 700; color: #FFFFFF; }
-        .vb-promo-plan-badge { font-size: 11px; font-weight: 700; color: #0A84FF; background: rgba(10,132,255,0.15); padding: 3px 9px; border-radius: 20px; letter-spacing: 0.3px; }
-        .vb-promo-plan-sub { margin: 0 0 12px; font-size: 12.5px; color: rgba(255,255,255,0.6); line-height: 1.45; }
-        .vb-promo-cta { width: 100%; border-radius: 50px; background: transparent; color: #FFFFFF; border: 1.5px solid rgba(255,255,255,0.5); font-size: 15px; font-weight: 700; padding: 13px 0; cursor: pointer; text-align: center; }
-        .vb-promo-cta:disabled { opacity: 0.5; cursor: default; }
-        .vb-promo-cta-primary { background: #FFFFFF; color: #000000; border: none; }
-        .vb-promo-terms { margin: 14px 0 0; font-size: 11px; color: rgba(255,255,255,0.45); text-align: center; line-height: 1.5; }
+        /* ── "GET VERIFIED" SHEET (verified-badge-page-overlay) ──
+           Theme-aware: every surface/text/border colour comes from the app's own variables
+           (--bg-surface, --bg-alt, --text-primary, --text-secondary, --border-color), so it
+           follows light / dark (body.dark-theme) automatically. Only the blue accent is fixed. */
+        .vb-sheet { --vb-blue: #0A84FF; --vb-blue-soft: rgba(10,132,255,0.12); --vb-blue-ring: rgba(10,132,255,0.22);
+            background: var(--bg-surface); color: var(--text-primary); max-height: 92vh; display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
+        body.dark-theme .vb-sheet { --vb-blue-soft: rgba(10,132,255,0.18); --vb-blue-ring: rgba(10,132,255,0.32); }
+        .vb-top { position: relative; padding: 10px 0 0; flex-shrink: 0; }
+        .vb-top .sheet-handle { margin-bottom: 0; }
+        .vb-close { position: absolute; top: 12px; right: 14px; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--bg-input); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s var(--ease-smooth), opacity .15s; }
+        .vb-close:active { transform: scale(0.92); opacity: .75; }
+        .vb-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 4px 22px 8px; }
+        .vb-hero { text-align: center; padding: 22px 0 22px; position: relative; }
+        .vb-hero::before { content: ''; position: absolute; left: 50%; top: -10px; width: 260px; height: 190px; transform: translateX(-50%); background: radial-gradient(closest-side, var(--vb-blue-soft), transparent); pointer-events: none; }
+        .vb-badge-wrap { position: relative; width: 92px; height: 92px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--vb-blue-soft); box-shadow: 0 0 0 8px var(--vb-blue-soft); }
+        .vb-badge-wrap::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; border: 1px solid var(--vb-blue-ring); }
+        .vb-badge-wrap svg { width: 54px; height: 54px; position: relative; z-index: 1; filter: drop-shadow(0 4px 10px rgba(10,132,255,0.35)); }
+        .vb-title { position: relative; margin: 0 0 8px; font-size: 24px; font-weight: 800; line-height: 1.2; letter-spacing: -0.3px; color: var(--text-primary); }
+        .vb-title span { color: var(--vb-blue); }
+        .vb-sub { position: relative; margin: 0 auto; max-width: 300px; font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+        .vb-status-pill { display: none; margin: 14px auto 0; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--vb-blue); background: var(--vb-blue-soft); border: 1px solid var(--vb-blue-ring); position: relative; }
+        .vb-section-label { margin: 6px 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text-secondary); }
+        .vb-benefits { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+        .vb-benefit { display: flex; align-items: center; gap: 14px; padding: 13px 14px; background: var(--bg-alt); border: 1px solid var(--border-color); border-radius: 16px; }
+        .vb-benefit-icon { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; background: var(--vb-blue-soft); color: var(--vb-blue); display: flex; align-items: center; justify-content: center; }
+        .vb-benefit-icon svg { width: 19px; height: 19px; }
+        .vb-benefit-text { flex: 1; min-width: 0; }
+        .vb-benefit-title { display: block; font-size: 14.5px; font-weight: 600; line-height: 1.3; color: var(--text-primary); }
+        .vb-benefit-desc { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.4; color: var(--text-secondary); }
+        .vb-footer { flex-shrink: 0; padding: 14px 22px calc(22px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border-color); background: var(--bg-surface); }
+        .vb-cta { width: 100%; padding: 15px 0; border: none; border-radius: 999px; background: var(--vb-blue); color: #FFFFFF; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 18px rgba(10,132,255,0.32); transition: transform .15s var(--ease-smooth), opacity .15s; }
+        .vb-cta:active { transform: scale(0.98); }
+        .vb-cta:disabled { opacity: .55; cursor: default; box-shadow: none; }
+        .vb-cta-note { margin: 9px 0 0; text-align: center; font-size: 12px; color: var(--text-secondary); }
+        .vb-terms { margin: 12px 0 0; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--text-secondary); }
         .chat-preview p { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
         .chat-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .time { font-size: 11px; color: var(--text-secondary); }
@@ -11027,66 +11035,57 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
          refreshVerifiedBadgePurchaseUI below),
          just moved from a compact settings row into a full standalone page. -->
     <div id="verified-badge-page-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet vb-promo-sheet" style="max-height: 94vh; display:flex; flex-direction:column; padding:0;">
+        <div class="bottom-sheet vb-sheet">
 
-            <div class="vb-promo-hero">
-                <svg id="btn-close-verified-badge-page" class="vb-promo-close" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-
-                <span class="vb-promo-dot" style="width:6px; height:6px; top:14px; left:64px; opacity:0.7;"></span>
-                <span class="vb-promo-dot" style="width:9px; height:9px; top:8px; left:112px;"></span>
-                <span class="vb-promo-dot" style="width:5px; height:5px; top:36px; left:90px; opacity:0.5;"></span>
-                <span class="vb-promo-dot" style="width:7px; height:7px; top:16px; right:70px;"></span>
-                <span class="vb-promo-dot" style="width:11px; height:11px; top:30px; right:36px; opacity:0.8;"></span>
-                <span class="vb-promo-dot" style="width:5px; height:5px; top:6px; right:98px; opacity:0.6;"></span>
-
-                <div class="vb-promo-badge-icon">
-                    <svg viewBox="0 0 22 22" width="38" height="38" aria-label="Verified"><path fill="#FFFFFF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg>
-                </div>
-                <h2 class="vb-promo-title">Get your <span>blue badge</span> on Haba</h2>
+            <div class="vb-top">
+                <div class="sheet-handle"></div>
+                <button type="button" id="btn-close-verified-badge-page" class="vb-close" aria-label="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
 
-            <div class="vb-promo-scroll">
-                <div class="vb-promo-benefits-card">
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="18" height="18" viewBox="0 0 22 22"><path fill="#0A84FF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"></path></svg></div>
-                        <span class="vb-promo-benefit-label">Blue verified checkmark</span>
+            <div class="vb-scroll">
+                <div class="vb-hero">
+                    <div class="vb-badge-wrap">
+                        <svg viewBox="0 0 22 22" aria-label="Verified"><path fill="#0A84FF" d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568-.54.354-.972.853-1.246 1.44-.607-.223-1.264-.272-1.897-.14-.633.13-1.217.437-1.687.882-.444.47-.75 1.053-.882 1.687-.13.633-.083 1.29.14 1.897-.586.274-1.084.706-1.438 1.246-.354.54-.552 1.17-.57 1.816.018.646.216 1.276.57 1.816.354.54.852.972 1.438 1.246-.223.607-.27 1.264-.14 1.897.131.634.437 1.217.882 1.687.47.445 1.054.75 1.687.882.633.13 1.29.083 1.897-.14.274.586.706 1.084 1.246 1.438.54.354 1.17.552 1.813.57.646-.018 1.276-.216 1.816-.57.54-.354.972-.852 1.246-1.438.607.223 1.264.27 1.897.14.634-.131 1.217-.437 1.687-.882.445-.47.75-1.053.882-1.687.13-.633.083-1.29-.14-1.897.586-.274 1.084-.706 1.438-1.246.355-.54.552-1.17.57-1.816zM9.662 14.85l-3.429-3.428 1.293-1.293 2.136 2.136 4.6-4.6 1.293 1.293-5.893 5.892z"/><path fill="#FFFFFF" d="M9.6 14.9l-2.9-2.9 1.1-1.1 1.8 1.8 4.6-4.6 1.1 1.1z"/></svg>
                     </div>
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"></path></svg></div>
-                        <span class="vb-promo-benefit-label">Badge shown in chats, posts, comments &amp; groups</span>
-                    </div>
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></div>
-                        <span class="vb-promo-benefit-label">Download videos shared in the app</span>
-                    </div>
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14l-1.5-9.5a2 2 0 0 0-2-1.5h-7a2 2 0 0 0-2 1.5L5 17z"></path></svg></div>
-                        <span class="vb-promo-benefit-label">Pin your posts to the top of your profile</span>
-                    </div>
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></div>
-                        <span class="vb-promo-benefit-label">Ranking boost for your posts in the Feed</span>
-                    </div>
-                    <div class="vb-promo-benefit-row">
-                        <div class="vb-promo-benefit-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></div>
-                        <span class="vb-promo-benefit-label">Stand out and build trust</span>
-                    </div>
+                    <h2 class="vb-title">Get your <span>blue badge</span></h2>
+                    <p class="vb-sub">Stand out, build trust and unlock extra features on Haba.</p>
+                    <!-- id kept for refreshVerifiedBadgePurchaseUI: it shows this when the account already has a badge -->
+                    <span id="paid-verified-pill" class="vb-status-pill">Verified</span>
                 </div>
+
+                <div class="vb-section-label">What you get</div>
+                <ul class="vb-benefits">
+                    <li class="vb-benefit">
+                        <div class="vb-benefit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+                        <div class="vb-benefit-text"><span class="vb-benefit-title">Blue verified checkmark</span><span class="vb-benefit-desc">Shows your account is the real deal</span></div>
+                    </li>
+                    <li class="vb-benefit">
+                        <div class="vb-benefit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.2a8.4 8.4 0 1 1 16.1-4.3z"/></svg></div>
+                        <div class="vb-benefit-text"><span class="vb-benefit-title">Badge everywhere</span><span class="vb-benefit-desc">Chats, posts, comments and groups</span></div>
+                    </li>
+                    <li class="vb-benefit">
+                        <div class="vb-benefit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+                        <div class="vb-benefit-text"><span class="vb-benefit-title">Download videos</span><span class="vb-benefit-desc">Save videos shared in the app</span></div>
+                    </li>
+                    <li class="vb-benefit">
+                        <div class="vb-benefit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-1.5-9.5a2 2 0 0 0-2-1.5h-7a2 2 0 0 0-2 1.5L5 17z"/></svg></div>
+                        <div class="vb-benefit-text"><span class="vb-benefit-title">Pin your posts</span><span class="vb-benefit-desc">Keep your best post on top of your profile</span></div>
+                    </li>
+                    <li class="vb-benefit">
+                        <div class="vb-benefit-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+                        <div class="vb-benefit-text"><span class="vb-benefit-title">Feed ranking boost</span><span class="vb-benefit-desc">Your posts get more reach in the Feed</span></div>
+                    </li>
+                </ul>
             </div>
 
-            <div class="vb-promo-footer">
-                <!-- Buy Verified card removed — purchases are no longer offered from this sheet.
-                     "paid-verified-pill" is kept (hidden, id preserved) purely so
-                     refreshVerifiedBadgePurchaseUI's DOM lookups still resolve for accounts that
-                     already have paidVerifiedAt/streakVerifiedAt from before this change; their
-                     badge itself is unaffected since that's driven by verifiedBadgeFor elsewhere. -->
-                <div id="verified-buy-card" style="display:none; margin-bottom:12px;">
-                    <button id="btn-buy-verified-badge" type="button" style="width:100%; padding:15px 0; border:none; border-radius:999px; background:#0A84FF; color:#FFFFFF; font-size:16px; font-weight:700; cursor:pointer;">Get verified · R4.99 once-off</button>
-                    <p style="margin:8px 0 0; text-align:center; font-size:12px; opacity:.7;">Permanent badge. Secure payment by Yoco.</p>
+            <div class="vb-footer">
+                <div id="verified-buy-card" style="display:none;">
+                    <button id="btn-buy-verified-badge" type="button" class="vb-cta">Get verified · R4.99 once-off</button>
+                    <p class="vb-cta-note">Permanent badge · Secure payment by Yoco</p>
                 </div>
-                <span id="paid-verified-pill" style="display:none;"></span>
-
-                <p class="vb-promo-terms">The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
+                <p class="vb-terms">The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
             </div>
         </div>
     </div>

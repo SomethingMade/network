@@ -22,6 +22,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haba.</title>
+    <meta name="description" content="Haba is a South African social and messaging app: chat, join communities, go live and share posts. Verified badges, ad credit and coin bundles are available for purchase in rands.">
 
     <meta name="theme-color" content="#FFFFFF">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' rx='45' fill='%23000'/%3E%3Cpath d='M54 55a13 13 0 0 1 26 0V200H54Z' fill='%23FFF'/%3E%3Cpath d='M67 114C67 88 88 78 108 78C132 78 142 94 142 116L142 200' fill='none' stroke='%23FFF' stroke-width='26' stroke-linejoin='round'/%3E%3Ccircle cx='148' cy='46' r='13' fill='%23FFB020'/%3E%3C/svg%3E">
@@ -528,6 +529,9 @@
         #payout-history-sheet-overlay { z-index: 100011; }
         /* Auto Welcome Message editor — also opened from inside Settings. */
         #business-welcome-sheet-overlay { z-index: 100011; }
+        /* Ad Credit top-up is opened from inside Settings (z-index 100010) too — without this it
+           opened underneath Settings, so the amounts and Pay button looked unclickable. */
+        #ad-credit-sheet-overlay { z-index: 100011; }
         /* Tagged Business (choose-business-sheet-overlay) is opened from inside Settings too,
            but it's defined earlier in the DOM than settings-bottom-sheet-overlay, so matching
            z-index (100010) would still paint it underneath — needs to outrank Settings' own
@@ -2927,6 +2931,55 @@
             padding: 30px 0 26px; min-height: 480px;
         }
         @keyframes authLandingGradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+        /* ── PUBLIC INFO (logged-out landing) ── Visible to anyone (incl. payment-provider
+           reviewers) without signing in: what Haba is, pricing, policies, contact. The landing
+           step scrolls so this sits under the Log in / Create account buttons. */
+        #auth-form-side.auth-landing-active { overflow-y: auto; -webkit-overflow-scrolling: touch; align-items: flex-start; }
+        #auth-form-side.auth-landing-active .auth-card-stack { margin: auto; }
+        @media (max-width: 768px) {
+            #auth-form-side.auth-landing-active .auth-card-stack { height: auto; min-height: 100%; }
+            #auth-form-side.auth-landing-active .auth-card { height: auto; }
+            #auth-form-side.auth-landing-active .auth-landing { height: auto; min-height: 100vh; min-height: 100dvh; }
+        }
+
+        /* ── AUTH HOME (single login screen: phone + Google + email) ── fixed light palette,
+           independent of the app theme, same as the old landing splash. */
+        #auth-form-side.auth-landing-active .auth-card-brand { display: none !important; }
+        #auth-step-phone.auth-home { display: flex; flex-direction: column; padding: 30px 0 26px; min-height: 520px; color: #111111; text-align: left; }
+        .ah-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+        .ah-brand svg { width: 60px; height: 60px; display: block; }
+        .ah-brand span { font-family: var(--font-brand); font-size: 15px; letter-spacing: 4px; color: #111111; }
+        .ah-hero { margin-top: 40px; }
+        .ah-hero h1 { margin: 0; font-size: 32px; line-height: 1.12; letter-spacing: -0.8px; font-weight: 800; color: #111111; }
+        .ah-hero p { margin: 14px 0 0; font-size: 15.5px; line-height: 1.5; color: #5F5F5F; }
+        .ah-form { margin-top: 36px; display: flex; flex-direction: column; gap: 10px; }
+        .ah-form label { font-size: 13px; font-weight: 600; color: #111111; }
+        .ah-phone-row { display: flex; gap: 8px; }
+        .ah-input { height: 54px; box-sizing: border-box; border: 0; border-radius: 50px; background: #F0F2F5; color: #111111; font-size: 16px; font-family: inherit; padding: 0 20px; outline: none; min-width: 0; }
+        .ah-input:focus { box-shadow: 0 0 0 2px #111111; }
+        .ah-select { flex: 0 0 104px; padding: 0 12px; font-weight: 600; font-size: 15px; appearance: none; -webkit-appearance: none; text-align: center; text-align-last: center; cursor: pointer; }
+        .ah-phone-row .ah-input:not(.ah-select) { flex: 1; }
+        .ah-btn { width: 100%; height: 54px; border-radius: 50px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: background 0.2s ease, transform 0.15s ease; }
+        .ah-btn:active { transform: scale(0.98); }
+        .ah-btn-primary { background: #111111; color: #FFFFFF; border: 0; margin-top: 6px; }
+        .ah-btn-primary:hover { background: #2E2E2E; }
+        .ah-btn-outline { background: #FFFFFF; color: #111111; border: 1.5px solid #111111; }
+        .ah-btn-outline:hover { background: #F7F8FA; }
+        .ah-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .ah-or { display: flex; align-items: center; gap: 14px; margin: 22px 0; }
+        .ah-or::before, .ah-or::after { content: ''; flex: 1; height: 1px; background: #E3E5E8; }
+        .ah-or span { font-size: 12px; font-weight: 600; color: #6B6B6B; letter-spacing: 1px; }
+        .ah-alt { display: flex; flex-direction: column; gap: 10px; }
+        .ah-legal { margin: auto 0 0; padding-top: 28px; text-align: center; font-size: 12.5px; line-height: 1.6; color: #6B6B6B; }
+        .ah-legal a { color: #111111; font-weight: 600; text-decoration: none; }
+        .ah-legal a:hover { text-decoration: underline; }
+        @media (max-width: 768px) {
+            #auth-form-side.auth-landing-active .auth-home {
+                height: auto; min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
+                padding: max(56px, calc(env(safe-area-inset-top) + 36px)) 28px calc(32px + env(safe-area-inset-bottom));
+            }
+        }
         .auth-landing-topbar { display: flex; align-items: center; gap: 9px; }
         .auth-landing-topbar svg { width: 26px; height: 26px; }
         .auth-landing-topbar span { font-family: var(--font-brand); font-size: 14px; letter-spacing: 3px; color: #111111; font-weight: 400; }
@@ -9853,6 +9906,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     </div>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
+                <div class="wa-list-row" id="open-ad-credit-row" style="cursor:pointer; display:none;">
+                    <div class="wa-row-icon chip-gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg></div>
+                    <div class="wa-row-body">
+                        <span class="wa-row-title">Ad Credit</span>
+                        <span class="wa-row-sub" id="ad-credit-row-sub">Balance: R0.00</span>
+                    </div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </div>
                 <div class="wa-list-row" id="open-business-welcome-row" style="cursor:pointer; display:none;">
                     <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
                     <div class="wa-row-body">
@@ -10595,6 +10656,30 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             </div>
             <div style="padding: 4px 20px 24px;">
                 <button type="button" id="btn-save-business-welcome" class="btn-pill" style="width:100%; background: var(--gradient-brand); color:#fff; border:none;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ad Credit (Settings > Business, business accounts only). Balance lives at
+         users/$uid/adCredit (cents) and is written ONLY by the Cloud Function after Yoco confirms
+         payment. The client just reads it and asks createAdCreditCheckout for a Yoco payment link. -->
+    <div id="ad-credit-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="max-height: 88vh; display:flex; flex-direction:column; padding: 12px 0 0;">
+            <div class="notif-sheet-header">
+                <h3 style="margin:0; font-size:16px;">Ad Credit</h3>
+                <svg id="btn-close-ad-credit-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+            <div style="flex:1; overflow-y:auto; padding: 6px 20px 4px;">
+                <div style="text-align:center; padding: 14px 0 18px;">
+                    <div style="font-size:12px; color:var(--text-secondary);">Current balance</div>
+                    <div id="ad-credit-balance" style="font-size:34px; font-weight:800;">R0.00</div>
+                </div>
+                <div class="wa-field-label">Add credit</div>
+                <div id="ad-credit-packages" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;"></div>
+                <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 4px;">Secure payment by Yoco. Credit is added automatically once your payment is confirmed.</p>
+            </div>
+            <div style="padding: 4px 20px 24px;">
+                <button type="button" id="btn-ad-credit-pay" class="btn-pill" disabled style="width:100%; background: var(--gradient-brand); color:#fff; border:none; opacity:.5;">Select an amount</button>
             </div>
         </div>
     </div>
@@ -11368,61 +11453,56 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     <span>HABA</span>
                 </div>
 
-                <!-- ── LANDING STEP (default / X-style "See what's happening" splash) ── -->
-                <div id="auth-step-landing" class="auth-landing">
-                    <div class="auth-landing-topbar">
-                        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Haba">
-                            <path d="M44 44a14 14 0 0 1 28 0V156a14 14 0 0 1-28 0Z" fill="#111111" stroke="none"/><path d="M58 100C58 74 80 64 102 64C128 64 140 80 140 104V156" fill="none" stroke="#111111" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/><circle cx="146" cy="32" r="14" fill="#FFB020" stroke="none"/>
-                        </svg>
-                        <span>HABA</span>
-                    </div>
-                    <div class="auth-landing-body">
-                        <h2>See what's happening in the Haba world right now</h2>
-                        <ul class="auth-landing-checklist">
-                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Message friends instantly</li>
-                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Join communities you care about</li>
-                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Discover what people are talking about</li>
-                        </ul>
-                    </div>
-                    <div class="auth-landing-actions">
-                        <button type="button" id="btn-landing-login" class="auth-landing-btn-row">
-                            Log in to Haba
-                            <span class="auth-landing-arrow-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
-                        </button>
-                        <button type="button" id="btn-landing-signup" class="auth-landing-btn-row">
-                            Create new account
-                            <span class="auth-landing-arrow-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
-                        </button>
-                    </div>
-                </div>
+                <!-- ── LOGIN SCREEN (single home step: phone, Google or email) ──
+                     The old landing splash and its pricing/policies block are gone; that content
+                     has been removed. The
+                     #auth-step-landing node is kept (hidden) so showAuthStep() keeps working. -->
+                <div id="auth-step-landing" style="display:none;"></div>
 
                 <!-- ── PHONE STEP (default / primary) ── -->
-                <div id="auth-step-phone" style="display:none;">
-                    <button type="button" id="btn-phone-back-to-landing" class="auth-step-back-btn" aria-label="Back">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
-                    </button>
-                    <h2>Happening now</h2>
-                    <p>Join Haba today — enter your phone number to sign in or create an account</p>
-
-                    <div class="input-group" style="display:flex; align-items:center; gap:8px;">
-                        <select id="auth-country-code" class="pill-input" style="flex: 0 0 92px; padding-left:14px; appearance:none;">
-                            <option value="+27" selected>🇿🇦 +27</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+91">🇮🇳 +91</option>
-                            <option value="+234">🇳🇬 +234</option>
-                            <option value="+254">🇰🇪 +254</option>
-                            <option value="+263">🇿🇼 +263</option>
-                            <option value="+61">🇦🇺 +61</option>
-                        </select>
-                        <input type="tel" id="auth-phone" class="pill-input" placeholder="82 123 4567" style="flex:1; margin-bottom:0;" inputmode="numeric" autocomplete="off">
+                <div id="auth-step-phone" class="auth-home">
+                    <div class="ah-brand">
+                        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Haba"><rect width="200" height="200" rx="45" fill="#000"/><path d="M54 55a13 13 0 0 1 26 0V200H54Z" fill="#FFF"/><path d="M67 114C67 88 88 78 108 78C132 78 142 94 142 116L142 200" fill="none" stroke="#FFF" stroke-width="26" stroke-linejoin="round"/><circle cx="148" cy="46" r="13" fill="#FFB020"/></svg>
+                        <span>HABA</span>
+                    </div>
+                    <div class="ah-hero">
+                        <h1>Chat. Connect. Go live.</h1>
+                        <p>Message friends, join communities and see what people around you are talking about.</p>
                     </div>
 
-                    <button type="button" id="btn-send-otp" class="btn-pill btn-primary" style="margin-top: 20px;">Continue</button>
-                    <div id="recaptcha-container" style="margin-top: 12px;"></div>
+                    <div class="ah-form">
+                        <label for="auth-phone">Phone number</label>
+                        <div class="ah-phone-row">
+                            <select id="auth-country-code" class="ah-input ah-select" aria-label="Country code">
+                                <option value="+27" selected>🇿🇦 +27</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+44">🇬🇧 +44</option>
+                                <option value="+91">🇮🇳 +91</option>
+                                <option value="+234">🇳🇬 +234</option>
+                                <option value="+254">🇰🇪 +254</option>
+                                <option value="+263">🇿🇼 +263</option>
+                                <option value="+61">🇦🇺 +61</option>
+                            </select>
+                            <input type="tel" id="auth-phone" class="ah-input" placeholder="82 123 4567" inputmode="numeric" autocomplete="off">
+                        </div>
+                        <button type="button" id="btn-send-otp" class="ah-btn ah-btn-primary">Continue</button>
+                        <div id="recaptcha-container" style="margin-top: 12px;"></div>
+                    </div>
 
-                    <div class="auth-divider"><span>OR</span></div>
-                    <button type="button" id="btn-show-email-auth" class="btn-pill btn-outline">Continue with Email</button>
+                    <div class="ah-or"><span>OR</span></div>
+
+                    <div class="ah-alt">
+                        <button type="button" id="btn-google-auth" class="ah-btn ah-btn-outline">
+                            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.600 28.700c-.5-1.500-.8-3-.8-4.700s.3-3.200.8-4.700l-7.900-6.100C1 16.400 0 20.100 0 24s1 7.600 2.700 10.800l7.900-6.100z"/><path fill="#34A853" d="M24 48c6.300 0 11.600-2.100 15.500-5.700l-7.500-5.800c-2.100 1.400-4.800 2.300-8 2.300-6.200 0-11.500-4.200-13.400-9.800l-7.900 6.100C6.600 42.600 14.600 48 24 48z"/></svg>
+                            Continue with Google
+                        </button>
+                        <button type="button" id="btn-show-email-auth" class="ah-btn ah-btn-outline">Continue with email</button>
+                    </div>
+
+                    <p class="ah-legal">
+                        New here? We'll create your account automatically.<br>
+                        By continuing you agree to our <a href="haba-privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+                    </p>
                 </div>
 
                 <!-- ── OTP STEP ── -->
@@ -13197,7 +13277,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.2.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction, orderByKey, limitToFirst, orderByValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -18505,6 +18585,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const habaAIChatCallable = httpsCallable(functionsClient, 'habaAIChat');
         // Text-to-image via xAI Grok Imagine (see functions/habaAIImage.js). Key stays server-side.
         const habaAIImageCallable = httpsCallable(functionsClient, 'habaAIImage', { timeout: 120000 });
+        // Ad credit top-up via Yoco (see functions/yocoAdCredit.js). The server decides the price.
+        const createAdCreditCheckoutCallable = httpsCallable(functionsClient, 'createAdCreditCheckout');
         // Agora's Primary Certificate is enabled on the haba project (mandatory — Agora no
         // longer offers certificate-free projects), so every join needs a signed token minted
         // server-side. See functions/index.js (generateAgoraToken) for the token-minting side.
@@ -18603,7 +18685,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         // --- PAID VERIFIED BADGE (personal accounts) ---
         // A permanent blue badge (VERIFIED_BADGE_SVG) any personal account can buy outright for
-        // R2.99, independent of follower count. Business accounts already get the gold badge for
+        // R9.99, independent of follower count. Business accounts already get the gold badge for
         // free, so the purchase option is hidden for them.
         //
         // Payment is collected client-side via Paystack Inline (https://js.paystack.co/v1/inline.js,
@@ -18613,7 +18695,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // The Paystack PUBLIC key is safe to expose in the browser (it can only open a checkout,
         // not confirm or move money) — set it to your real key before going live:
         const PAYSTACK_PUBLIC_KEY = 'pk_live_13901900b52860e08c9ae496afdb0bde8e0f42c5';
-        const VERIFIED_BADGE_PRICE_ZAR = 2.99;
+        const VERIFIED_BADGE_PRICE_ZAR = 9.99;
         // Paystack amounts are in the smallest currency unit (cents, for ZAR).
         const VERIFIED_BADGE_PRICE_CENTS = Math.round(VERIFIED_BADGE_PRICE_ZAR * 100);
         //
@@ -27523,10 +27605,30 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             subEl.textContent = business ? `Tagged: ${business.name || 'Business'}` : "Show a business's badge next to your name on your posts";
         }
 
+        // Keeps the Settings > Business controls in step with my live profile. Previously the
+        // Business toggle, "Business" pill, Ad Credit row, Welcome row and the Earnings/Payout
+        // section were only refreshed when the Profile tab was entered, so opening Settings from
+        // any other tab (e.g. Home) showed the toggle OFF even for a verified business account.
+        function syncMyBusinessSettingsUI() {
+            const u = auth && auth.currentUser;
+            if (!u) return;
+            const myProfile = cachedUsers[u.uid];
+            if (!myProfile) return;
+            const isBiz = !!myProfile.isBusinessAccount;
+            const toggle = document.getElementById('business-account-toggle');
+            if (toggle && toggle.checked !== isBiz) toggle.checked = isBiz;
+            const pill = document.getElementById('business-account-pill');
+            if (pill) pill.style.display = isBiz ? 'inline-block' : 'none';
+            const earn = document.getElementById('settings-earnings-section');
+            if (earn) earn.style.display = isBiz ? 'none' : '';
+            refreshBusinessWelcomeSettingsRow(myProfile);
+        }
+
         // Shows/hides the "Auto Welcome Message" settings row for business accounts only, and
         // keeps its subtitle ("Off" / "On" / a preview of the message) in sync with
         // users/$uid/businessAutoReply. See maybeSendBusinessWelcome for where it's read.
         function refreshBusinessWelcomeSettingsRow(myProfile) {
+            refreshAdCreditRow(myProfile);
             const row = document.getElementById('open-business-welcome-row');
             const subEl = document.getElementById('business-welcome-row-sub');
             if (!row || !subEl) return;
@@ -29149,8 +29251,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const authCardBrand = document.querySelector('.auth-card-brand');
 
         function showAuthStep(step) {
-            stepLanding.style.display = step === 'landing' ? 'flex' : 'none';
-            stepPhone.style.display = step === 'phone' ? 'block' : 'none';
+            // There is no separate landing splash any more — "landing" is the same screen as
+            // "phone" (the single login screen with phone, Google and email options).
+            if (step === 'landing') step = 'phone';
+            stepLanding.style.display = 'none';
+            stepPhone.style.display = step === 'phone' ? 'flex' : 'none';
             stepOtp.style.display = step === 'otp' ? 'block' : 'none';
             stepEmail.style.display = step === 'email' ? 'block' : 'none';
             if (stepAccountType) stepAccountType.style.display = step === 'account-type' ? 'block' : 'none';
@@ -29158,11 +29263,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (stepIntro) stepIntro.style.display = step === 'intro' ? 'block' : 'none';
             if (stepProfile) stepProfile.style.display = step === 'profile' ? 'block' : 'none';
             const formSide = document.getElementById('auth-form-side');
-            if (formSide) formSide.classList.toggle('auth-landing-active', step === 'landing');
-            // The landing step carries its own logo/wordmark, so hide the generic mobile
-            // .auth-card-brand (shown above every other step via its own media query) while
-            // landing is active to avoid showing the Haba mark twice.
-            if (authCardBrand) authCardBrand.style.display = step === 'landing' ? 'none' : '';
+            if (formSide) formSide.classList.toggle('auth-landing-active', step === 'phone');
+            // The login screen carries its own logo/wordmark, so hide the generic mobile
+            // .auth-card-brand (shown above every other step) while it is active.
+            if (authCardBrand) authCardBrand.style.display = step === 'phone' ? 'none' : '';
         }
 
         // First-time-signup-only account type choice — shown from onAuthStateChanged (see
@@ -29197,11 +29301,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // a non-empty name; onAuthStateChanged then calls updateProfile() with it before the
         // very first profile write happens.
         let setNameResolve = null;
-        function promptSetName() {
+        function promptSetName(prefill = '') {
             const input = document.getElementById('auth-name-input');
             const continueBtn = document.getElementById('btn-set-name-continue');
-            input.value = '';
-            continueBtn.disabled = true;
+            input.value = (prefill || '').trim().slice(0, 30);
+            continueBtn.disabled = !input.value.trim();
             showAuthStep('name');
             setTimeout(() => input.focus(), 50);
             return new Promise(resolve => { setNameResolve = resolve; });
@@ -29382,9 +29486,54 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // Landing screen ("See what's happening" — X/Twitter-style splash before any input
         // fields) — both buttons lead into the same phone-first flow, which already handles
         // sign-in and sign-up for whichever number is entered.
-        document.getElementById('btn-landing-login').addEventListener('click', () => showAuthStep('phone'));
-        document.getElementById('btn-landing-signup').addEventListener('click', () => showAuthStep('phone'));
-        document.getElementById('btn-phone-back-to-landing').addEventListener('click', () => showAuthStep('landing'));
+        // ── GOOGLE AUTH (sign in + sign up in one) ── a first-time Google account goes through
+        // the same name → intro → profile → account-type signup flow as phone/email signups;
+        // a returning one just signs in. Needs the Google provider enabled in Firebase Console
+        // (Authentication → Sign-in method) and this site's domain under Authorized domains.
+        let googleAuthInFlight = false;
+        document.getElementById('btn-google-auth').addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (googleAuthInFlight) return;
+            googleAuthInFlight = true;
+            showAuthProgress('Connecting to Google…');
+            authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
+            try {
+                const provider = new GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+                const cred = await signInWithPopup(auth, provider);
+                hideAuthProgress();
+                const addInfo = getAdditionalUserInfo(cred);
+                if (addInfo && addInfo.isNewUser) {
+                    const chosenName = await promptSetName(cred.user.displayName || '');
+                    try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
+                    await promptAppIntro();
+                    const profileChoice = await promptSetProfileDetails();
+                    await applySignupProfileChoice(cred.user, profileChoice);
+                    const chosenType = await promptAccountType();
+                    if (chosenType === 'business') {
+                        try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
+                    }
+                }
+            } catch (err) {
+                hideAuthProgress();
+                const code = err && err.code;
+                if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+                    // person backed out of the Google window — nothing to report
+                } else if (code === 'auth/popup-blocked') {
+                    showCustomModal("Popup Blocked", "Your browser blocked the Google sign-in window. Allow popups for this site and try again.");
+                } else if (code === 'auth/account-exists-with-different-credential') {
+                    showCustomModal("Account Already Exists", "An account with this email already exists. Sign in with the method you used originally.");
+                } else if (code === 'auth/unauthorized-domain') {
+                    showCustomModal("Google Sign-in Unavailable", "This domain isn't authorized for Google sign-in yet.");
+                } else {
+                    showCustomModal("Couldn't Sign In with Google", ((err && err.message) || 'Something went wrong.').replace("Firebase: ", ""));
+                }
+            } finally {
+                hideAuthProgress();
+                googleAuthInFlight = false;
+                if (authGateResolve) { authGateResolve(); authGateResolve = null; }
+            }
+        });
 
         // ── OTP BOXES ── individual per-digit inputs that stay in sync with the hidden
         // #auth-otp-code field, so the rest of the verify/resend/reset logic below (which reads
@@ -30032,6 +30181,92 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (e.target.id === 'business-welcome-sheet-overlay') closeBusinessWelcomeSheet();
         });
         document.getElementById('btn-save-business-welcome')?.addEventListener('click', saveBusinessWelcomeMessage);
+
+        // --- Ad Credit top-up (Settings ▸ Business) ---
+        // Packages are display-only: the Cloud Function maps packageId -> price, so tampering
+        // with this list can't change what a customer is charged.
+        const AD_CREDIT_PACKAGES = [
+            { id: 'r50', label: 'R50' }, { id: 'r100', label: 'R100' },
+            { id: 'r250', label: 'R250' }, { id: 'r500', label: 'R500' }
+        ];
+        let selectedAdCreditPackage = null;
+        function formatRand(cents) { return 'R' + ((Number(cents) || 0) / 100).toFixed(2); }
+        function refreshAdCreditRow(myProfile) {
+            const row = document.getElementById('open-ad-credit-row');
+            if (!row) return;
+            row.style.display = (myProfile && myProfile.isBusinessAccount) ? 'flex' : 'none';
+            const bal = formatRand(myProfile && myProfile.adCredit);
+            const subEl = document.getElementById('ad-credit-row-sub');
+            if (subEl) subEl.textContent = 'Balance: ' + bal;
+            const balEl = document.getElementById('ad-credit-balance');
+            if (balEl) balEl.textContent = bal;
+        }
+        function renderAdCreditPackages() {
+            const box = document.getElementById('ad-credit-packages');
+            if (!box) return;
+            box.innerHTML = '';
+            AD_CREDIT_PACKAGES.forEach(pk => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = pk.label;
+                const on = selectedAdCreditPackage === pk.id;
+                b.style.cssText = 'padding:16px 0; border-radius:16px; font-size:17px; font-weight:700; cursor:pointer; border:2px solid ' + (on ? 'var(--text-primary)' : 'var(--border-color)') + '; background:var(--bg-surface); color:var(--text-primary);';
+                b.addEventListener('click', () => { selectedAdCreditPackage = pk.id; renderAdCreditPackages(); });
+                box.appendChild(b);
+            });
+            const payBtn = document.getElementById('btn-ad-credit-pay');
+            if (payBtn) {
+                const pk = AD_CREDIT_PACKAGES.find(x => x.id === selectedAdCreditPackage);
+                payBtn.disabled = !pk;
+                payBtn.style.opacity = pk ? '1' : '.5';
+                payBtn.textContent = pk ? 'Pay ' + pk.label + ' with Yoco' : 'Select an amount';
+            }
+        }
+        function openAdCreditSheet() {
+            const user = auth.currentUser;
+            refreshAdCreditRow(user ? (cachedUsers[user.uid] || {}) : {});
+            selectedAdCreditPackage = null;
+            renderAdCreditPackages();
+            document.getElementById('ad-credit-sheet-overlay').classList.add('active');
+        }
+        function closeAdCreditSheet() {
+            document.getElementById('ad-credit-sheet-overlay').classList.remove('active');
+        }
+        async function startAdCreditPayment() {
+            if (!selectedAdCreditPackage) return;
+            const payBtn = document.getElementById('btn-ad-credit-pay');
+            payBtn.disabled = true;
+            payBtn.textContent = 'Opening secure checkout…';
+            try {
+                const res = await createAdCreditCheckoutCallable({ packageId: selectedAdCreditPackage });
+                const url = res && res.data && res.data.url;
+                if (typeof url !== 'string' || url.indexOf('https://') !== 0) throw new Error('No checkout URL returned');
+                window.location.href = url;
+            } catch (err) {
+                console.error('startAdCreditPayment failed', err);
+                notify("Couldn't start the payment. Please try again.", 'error');
+                renderAdCreditPackages();
+            }
+        }
+        document.getElementById('open-ad-credit-row')?.addEventListener('click', openAdCreditSheet);
+        document.getElementById('btn-close-ad-credit-sheet')?.addEventListener('click', closeAdCreditSheet);
+        document.getElementById('ad-credit-sheet-overlay')?.addEventListener('click', (e) => {
+            if (e.target.id === 'ad-credit-sheet-overlay') closeAdCreditSheet();
+        });
+        document.getElementById('btn-ad-credit-pay')?.addEventListener('click', startAdCreditPayment);
+        // Back from Yoco: ?adCredit=success|cancelled|failed. The balance itself only changes once
+        // the webhook confirms payment, so "success" here just says it may take a moment.
+        (function handleAdCreditReturn() {
+            const q = new URLSearchParams(window.location.search);
+            const r = q.get('adCredit');
+            if (!r) return;
+            history.replaceState(null, '', window.location.pathname + window.location.hash);
+            setTimeout(() => {
+                if (r === 'success') notify('Payment received. Your ad credit will appear in a moment.');
+                else if (r === 'cancelled') notify('Payment cancelled');
+                else notify("Payment didn't go through", 'error');
+            }, 1500);
+        })();
         document.getElementById('choose-business-search-input').addEventListener('input', (e) => {
             renderChooseBusinessList(e.target.value);
         });
@@ -49087,6 +49322,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 }
                 if (typeof syncProfileLockToggle === 'function') syncProfileLockToggle();
                 if (userInfoSheet.classList.contains('active') && userInfoSheetUid) applyProfileLockView(userInfoSheetUid);
+                try { syncMyBusinessSettingsUI(); } catch (e) { console.warn('business settings sync', e); }
             };
             void cachedUsers[user.uid]; // load my own profile (and keep it live)
 
@@ -50918,5 +51154,55 @@ html body .toast{top:auto;left:50%;right:auto;bottom:calc(var(--nav-bar-total,72
 html body .toast.active{transform:translate(-50%,0) translateZ(0)}
 @media (min-width:769px){html body .toast{bottom:28px}}
 </style>
+<style id="desktop-independent-column-scroll">
+/* Desktop/tablet: each column scrolls on its own (left nav, centre feed, right rail).
+   The grid's single implicit row was `auto`, so tall column content stretched the row
+   and the columns moved together. Pin the row to the container height and let every
+   column scroll inside it. */
+@media (min-width:769px){
+  .app-grid{grid-template-rows:minmax(0,1fr);height:100%;}
+  .app-grid > *{min-height:0;}
+  .side-nav,
+  body:is(.feed-open,.search-open,.notif-open,.profile-open,.communities-open) .side-nav{
+    height:100%;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+    scrollbar-width:thin;scrollbar-color:transparent transparent;
+  }
+  .side-nav:hover{scrollbar-color:var(--border-color) transparent;}
+  .side-nav::-webkit-scrollbar{display:block;width:6px;}
+  .side-nav::-webkit-scrollbar-thumb{background:transparent;border-radius:6px;}
+  .side-nav:hover::-webkit-scrollbar-thumb{background:var(--border-color);}
+  .chat-pane{height:100%;min-height:0;}
+  .workspace-pane{min-height:0;overflow-y:auto;}
+  body:is(.feed-open,.search-open,.notif-open,.profile-open,.communities-open) .right-rail{
+    height:100%;max-height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  }
+}
+</style>
+<style id="desktop-fab-in-feed">
+/* Desktop/tablet: keep the floating "back to top" button inside the feed column
+   (bottom-right corner of the timeline) instead of the far edge of the screen. */
+@media (min-width:769px){
+  html body #x-scroll-top{right:auto;left:var(--fab-left,auto);bottom:28px;}
+}
+</style>
+<script>
+(function feedFabPlacement(){
+  var btn=document.getElementById('x-scroll-top'), sc=document.getElementById('discover-grid-scroll');
+  if(!btn||!sc) return;
+  var raf=0;
+  function place(){
+    raf=0;
+    var r=sc.getBoundingClientRect();
+    if(!r.width) return;
+    btn.style.setProperty('--fab-left', Math.max(8, Math.round(r.right-44-20))+'px');
+  }
+  function queue(){ if(!raf) raf=requestAnimationFrame(place); }
+  window.addEventListener('resize',queue);
+  sc.addEventListener('scroll',queue,{passive:true});
+  if(window.ResizeObserver) new ResizeObserver(queue).observe(sc);
+  new MutationObserver(queue).observe(document.body,{attributes:true,attributeFilter:['class']});
+  queue();
+})();
+</script>
 </body>
 </html>

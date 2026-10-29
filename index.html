@@ -11492,17 +11492,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     <div class="ah-or"><span>OR</span></div>
 
                     <div class="ah-alt">
-                        <button type="button" id="btn-google-auth" class="ah-btn ah-btn-outline">
-                            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.600 28.700c-.5-1.500-.8-3-.8-4.700s.3-3.200.8-4.700l-7.900-6.100C1 16.400 0 20.100 0 24s1 7.600 2.700 10.800l7.900-6.100z"/><path fill="#34A853" d="M24 48c6.300 0 11.600-2.100 15.500-5.700l-7.500-5.800c-2.100 1.400-4.800 2.300-8 2.300-6.200 0-11.500-4.200-13.400-9.800l-7.900 6.100C6.600 42.600 14.600 48 24 48z"/></svg>
-                            Continue with Google
-                        </button>
                         <button type="button" id="btn-show-email-auth" class="ah-btn ah-btn-outline">Continue with email</button>
                     </div>
 
-                    <p class="ah-legal">
-                        New here? We'll create your account automatically.<br>
-                        By continuing you agree to our <a href="haba-privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
-                    </p>
                 </div>
 
                 <!-- ── OTP STEP ── -->
@@ -13277,7 +13269,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.22.2.js"></script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction, orderByKey, limitToFirst, orderByValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
@@ -29486,55 +29478,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // Landing screen ("See what's happening" — X/Twitter-style splash before any input
         // fields) — both buttons lead into the same phone-first flow, which already handles
         // sign-in and sign-up for whichever number is entered.
-        // ── GOOGLE AUTH (sign in + sign up in one) ── a first-time Google account goes through
-        // the same name → intro → profile → account-type signup flow as phone/email signups;
-        // a returning one just signs in. Needs the Google provider enabled in Firebase Console
-        // (Authentication → Sign-in method) and this site's domain under Authorized domains.
-        let googleAuthInFlight = false;
-        document.getElementById('btn-google-auth').addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (googleAuthInFlight) return;
-            googleAuthInFlight = true;
-            showAuthProgress('Connecting to Google…');
-            authGatePromise = new Promise(resolve => { authGateResolve = resolve; });
-            try {
-                const provider = new GoogleAuthProvider();
-                provider.setCustomParameters({ prompt: 'select_account' });
-                const cred = await signInWithPopup(auth, provider);
-                hideAuthProgress();
-                const addInfo = getAdditionalUserInfo(cred);
-                if (addInfo && addInfo.isNewUser) {
-                    const chosenName = await promptSetName(cred.user.displayName || '');
-                    try { await updateProfile(cred.user, { displayName: chosenName }); } catch (err) { console.error('Failed to save signup display name', err); }
-                    await promptAppIntro();
-                    const profileChoice = await promptSetProfileDetails();
-                    await applySignupProfileChoice(cred.user, profileChoice);
-                    const chosenType = await promptAccountType();
-                    if (chosenType === 'business') {
-                        try { await update(ref(database, `users/${cred.user.uid}`), { isBusinessAccount: true }); } catch (err) { console.error('Failed to save signup account type', err); }
-                    }
-                }
-            } catch (err) {
-                hideAuthProgress();
-                const code = err && err.code;
-                if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-                    // person backed out of the Google window — nothing to report
-                } else if (code === 'auth/popup-blocked') {
-                    showCustomModal("Popup Blocked", "Your browser blocked the Google sign-in window. Allow popups for this site and try again.");
-                } else if (code === 'auth/account-exists-with-different-credential') {
-                    showCustomModal("Account Already Exists", "An account with this email already exists. Sign in with the method you used originally.");
-                } else if (code === 'auth/unauthorized-domain') {
-                    showCustomModal("Google Sign-in Unavailable", "This domain isn't authorized for Google sign-in yet.");
-                } else {
-                    showCustomModal("Couldn't Sign In with Google", ((err && err.message) || 'Something went wrong.').replace("Firebase: ", ""));
-                }
-            } finally {
-                hideAuthProgress();
-                googleAuthInFlight = false;
-                if (authGateResolve) { authGateResolve(); authGateResolve = null; }
-            }
-        });
-
         // ── OTP BOXES ── individual per-digit inputs that stay in sync with the hidden
         // #auth-otp-code field, so the rest of the verify/resend/reset logic below (which reads
         // and clears that hidden field) doesn't need to change at all.
@@ -34208,13 +34151,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // actually slides up to fill the space, instead of leaving a gap. ---
         (function initHeaderScrollHide() {
             const pairs = [
-                // tab-chats intentionally excluded — its header (avatar/title, filter pill, and
-                // the search bar) stays pinned at the top while the chat list scrolls, rather
-                // than sliding away like the other tabs below.
-                ['tab-status', 'discover-grid-scroll'],
-                ['tab-groups', 'communities-feed-container'],
-                ['tab-calls', 'calls-list-container'],
-                ['tab-contacts', 'contacts-list-container'],
+                // Every tab header now stays pinned while its list scrolls (no hide-on-scroll),
+                // same as tab-chats always did. To bring the hide/reveal behaviour back for a
+                // tab, add its pair here, e.g. ['tab-status', 'discover-grid-scroll'].
             ];
             const THRESHOLD = 6; // ignore tiny scroll jitter
             pairs.forEach(([tabId, scrollId]) => {

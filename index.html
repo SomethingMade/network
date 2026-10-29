@@ -11080,6 +11080,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                      refreshVerifiedBadgePurchaseUI's DOM lookups still resolve for accounts that
                      already have paidVerifiedAt/streakVerifiedAt from before this change; their
                      badge itself is unaffected since that's driven by verifiedBadgeFor elsewhere. -->
+                <div id="verified-buy-card" style="display:none; margin-bottom:12px;">
+                    <button id="btn-buy-verified-badge" type="button" style="width:100%; padding:15px 0; border:none; border-radius:999px; background:#0A84FF; color:#FFFFFF; font-size:16px; font-weight:700; cursor:pointer;">Get verified · R4.99 once-off</button>
+                    <p style="margin:8px 0 0; text-align:center; font-size:12px; opacity:.7;">Permanent badge. Secure payment by Yoco.</p>
+                </div>
                 <span id="paid-verified-pill" style="display:none;"></span>
 
                 <p class="vb-promo-terms">The badge is a cosmetic profile feature and doesn't affect your account's visibility or reach.</p>
@@ -13899,7 +13903,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const STREAK_MILESTONES = {
             3: "Nice, 3 days in a row! 🔥",
             7: "One week strong! 🎉",
-            21: "Three weeks running — you've earned a permanent free Verified Badge! ✅",
+            21: "Three weeks running — keep it going! 🔥",
             30: "A whole month streak! 🏆",
             60: "60 days of showing up. Incredible.",
             100: "100-day streak. Legendary. 🎖️",
@@ -13961,8 +13965,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const bannerEl = document.getElementById('streak-verified-banner');
             const viewBadgeBtn = document.getElementById('btn-view-streak-badge');
             const user = auth.currentUser;
-            const alreadyVerifiedByStreak = !!(user && cachedUsers[user.uid] && cachedUsers[user.uid].streakVerifiedAt);
-            const justEarnedPermanentVerify = justCheckedIn && currentStreakData.count === STREAK_PERMANENT_VERIFY_THRESHOLD;
+            const alreadyVerifiedByStreak = false; // streak no longer earns a badge (blue badge is purchase-only)
+            const justEarnedPermanentVerify = false; // streak no longer earns a badge
 
             flameEl.classList.toggle('streak-flame-verified', justEarnedPermanentVerify);
             hintEl.style.display = 'none';
@@ -13988,17 +13992,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 document.getElementById('streak-verified-banner-title').textContent = "You have a permanent Verified Badge";
                 document.getElementById('streak-verified-banner-sub').textContent = "Earned it with your streak — it's yours for good.";
                 bannerEl.style.display = 'flex';
-            } else if (currentStreakData.count > 0) {
-                // Below the threshold and never earned it by streak — nudge with how close the
-                // free badge actually is, so it reads as a near-term reward worth returning for
-                // rather than a milestone buried in a long list.
-                const daysToGo = STREAK_PERMANENT_VERIFY_THRESHOLD - currentStreakData.count;
-                if (daysToGo > 0) {
-                    hintEl.textContent = daysToGo === 1
-                        ? "1 more day to a free Verified Badge! ✅"
-                        : `${daysToGo} more days to a free Verified Badge! ✅`;
-                    hintEl.style.display = 'block';
-                }
             }
 
             overlay.classList.add('active');
@@ -14050,9 +14043,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // Covers an account that already had a long-enough streak before this feature
                 // existed (or a previous grant attempt failed) — catches it up next time they
                 // open the app, not just on the exact day the count first crosses the threshold.
-                if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
-                    grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
-                }
                 return;
             }
 
@@ -14066,9 +14056,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             await update(ref(database, `users/${uid}/streak`), { count, longest, lastCheckIn: today, history });
             currentStreakData = { count, longest, lastCheckIn: today, history };
             updateStreakBadgeUI();
-            if (count >= STREAK_PERMANENT_VERIFY_THRESHOLD && !streakVerifiedAt) {
-                grantStreakPermanentVerified(uid).catch((err) => console.error('Streak permanent verify grant failed', err));
-            }
             showStreakModal(true);
         }
 
@@ -18595,6 +18582,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const habaAIImageCallable = httpsCallable(functionsClient, 'habaAIImage', { timeout: 120000 });
         // Ad credit top-up via Yoco (see functions/yocoAdCredit.js). The server decides the price.
         const createAdCreditCheckoutCallable = httpsCallable(functionsClient, 'createAdCreditCheckout');
+        // Blue Verified Badge, R4.99 once-off via Yoco (see functions/yocoAdCredit.js). Server grants the badge.
+        const createVerifiedBadgeCheckoutCallable = httpsCallable(functionsClient, 'createVerifiedBadgeCheckout');
         // Agora's Primary Certificate is enabled on the haba project (mandatory — Agora no
         // longer offers certificate-free projects), so every join needs a signed token minted
         // server-side. See functions/index.js (generateAgoraToken) for the token-minting side.
@@ -18703,7 +18692,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // The Paystack PUBLIC key is safe to expose in the browser (it can only open a checkout,
         // not confirm or move money) — set it to your real key before going live:
         const PAYSTACK_PUBLIC_KEY = 'pk_live_13901900b52860e08c9ae496afdb0bde8e0f42c5';
-        const VERIFIED_BADGE_PRICE_ZAR = 9.99;
+        const VERIFIED_BADGE_PRICE_ZAR = 4.99;
         // Paystack amounts are in the smallest currency unit (cents, for ZAR).
         const VERIFIED_BADGE_PRICE_CENTS = Math.round(VERIFIED_BADGE_PRICE_ZAR * 100);
         //
@@ -18774,8 +18763,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const profile = cachedUsers[uid];
             if (profile && profile.isBusinessAccount) return BUSINESS_BADGE_SVG;
             if (profile && profile.paidVerifiedAt) return VERIFIED_BADGE_SVG;
-            if (profile && profile.streakVerifiedAt) return VERIFIED_BADGE_SVG;
-            if (profile && (profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return VERIFIED_BADGE_SVG;
             return '';
         }
 
@@ -18788,8 +18775,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!profile) return false;
             if (profile.isBusinessAccount) return true;
             if (profile.paidVerifiedAt) return true;
-            if (profile.streakVerifiedAt) return true;
-            if ((profile.followersCount || 0) > FRIENDS_BADGE_THRESHOLD) return true;
             return false;
         }
 
@@ -30213,6 +30198,37 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (e.target.id === 'ad-credit-sheet-overlay') closeAdCreditSheet();
         });
         document.getElementById('btn-ad-credit-pay')?.addEventListener('click', startAdCreditPayment);
+
+        // --- Buy the blue Verified Badge (R4.99, Yoco) ---
+        document.getElementById('btn-buy-verified-badge')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btn-buy-verified-badge');
+            const label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Opening secure checkout…';
+            try {
+                const res = await createVerifiedBadgeCheckoutCallable({});
+                const url = res && res.data && res.data.url;
+                if (typeof url !== 'string' || url.indexOf('https://') !== 0) throw new Error('No checkout URL returned');
+                window.location.href = url;
+            } catch (err) {
+                console.error('buy verified badge failed', err);
+                notify(err && err.code === 'functions/already-exists' ? 'You are already verified.' : "Couldn't start the payment. Please try again.", 'error');
+                btn.disabled = false;
+                btn.textContent = label;
+            }
+        });
+        // Back from Yoco: ?verified=success|cancelled|failed. The badge appears once the webhook confirms payment.
+        (function handleVerifiedReturn() {
+            const q = new URLSearchParams(window.location.search);
+            const r = q.get('verified');
+            if (!r) return;
+            history.replaceState(null, '', window.location.pathname + window.location.hash);
+            setTimeout(() => {
+                if (r === 'success') notify('Payment received. Your blue badge will appear in a moment.');
+                else if (r === 'cancelled') notify('Payment cancelled');
+                else notify("Payment didn't go through", 'error');
+            }, 1500);
+        })();
         // Back from Yoco: ?adCredit=success|cancelled|failed. The balance itself only changes once
         // the webhook confirms payment, so "success" here just says it may take a moment.
         (function handleAdCreditReturn() {
@@ -30511,11 +30527,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // STREAK_PERMANENT_VERIFY_THRESHOLD-day streak) still get a status line and the pill
         // confirming it, since that badge itself is untouched by removing the purchase flow.
         function refreshVerifiedBadgePurchaseUI(myProfile) {
+            const buyCard = document.getElementById('verified-buy-card');
+            if (buyCard) {
+                const u = auth.currentUser;
+                buyCard.style.display = (u && !isVerifiedUid(u.uid)) ? 'block' : 'none';
+            }
             const pill = document.getElementById('paid-verified-pill');
-            if (myProfile.streakVerifiedAt) {
-                pill.textContent = `Earned free with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak`;
-                pill.style.display = 'inline-block';
-            } else if (myProfile.paidVerifiedAt) {
+            if (myProfile.paidVerifiedAt) {
                 pill.textContent = 'Verified';
                 pill.style.display = 'inline-block';
             } else {
@@ -30533,9 +30551,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (myProfile.isBusinessAccount) {
                 statusEl.textContent = 'Business accounts get a gold badge automatically';
                 pill.style.display = 'none';
-            } else if (myProfile.streakVerifiedAt) {
-                statusEl.textContent = `Earned free with a ${STREAK_PERMANENT_VERIFY_THRESHOLD}-day streak`;
-                pill.style.display = 'inline-block';
             } else if (myProfile.paidVerifiedAt) {
                 statusEl.textContent = "You've bought the permanent blue Verified Badge";
                 pill.style.display = 'inline-block';

@@ -547,6 +547,11 @@
            (z-index 100008, see image-viewer-post-menu-btn), so it needs to clear that too,
            not just the default bottom-sheet layer (100002). */
         #post-options-sheet-overlay { z-index: 100010; }
+        /* Help & Support chooser — above Settings (100010), which it opens from. */
+        #help-support-sheet-overlay { z-index: 100012; }
+        #help-support-sheet-overlay .help-support-sub { margin: 0 4px 12px; font-size: 13px; color: var(--text-secondary); text-align: center; }
+        #help-support-sheet-overlay .help-opt-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+        #help-support-sheet-overlay .help-opt-text small { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
         #community-post-options-sheet-overlay { z-index: 100010; }
         /* Repost options (Repost vs Quote) can also be opened from inside the image/reel
            viewer (image-viewer-repost-btn / reel-repost-btn), same reasoning as Post Options
@@ -8563,6 +8568,24 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             <div class="modal-actions">
                 <button type="button" id="btn-cancel-group-invite" class="btn-pill btn-outline">Cancel</button>
                 <button type="button" id="btn-confirm-group-invite" class="btn-pill btn-primary">Send Invite</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="help-support-sheet-overlay" class="bottom-sheet-overlay">
+        <div class="bottom-sheet" style="padding-bottom: 24px;">
+            <div class="sheet-handle"></div>
+            <h3 style="text-align:center; margin: 0 0 4px;">Help &amp; Support</h3>
+            <p class="help-support-sub">How would you like to get help?</p>
+            <div class="options-sheet-group">
+                <button class="msg-option-btn with-icon" id="btn-help-ai" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                    <span class="help-opt-text"><span>Talk to AI now</span><small>Fastest — voice call with Haba AI</small></span>
+                </button>
+                <button class="msg-option-btn with-icon" id="btn-help-live">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                    <span class="help-opt-text"><span>Chat with a live agent</span><small>A person will reply as soon as they can</small></span>
+                </button>
             </div>
         </div>
     </div>
@@ -18025,8 +18048,44 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         });
 
         // --- Help & Support ---
+        // Help & Support opens a chooser: a live-agent chat (everyone) and an instant AI voice
+        // call (verified members only — same gate as openHabaAIVoiceOverlay, which uses the
+        // in-app xAI voice session via the habaAIVoiceToken Cloud Function).
+        // Set this to the uid of the human support account that agents reply from.
+        const SUPPORT_AGENT_UID = '';
+        // Saved xAI agent ("Haba Support", console.x.ai) used for the instant voice call.
+        // habaAIVoiceToken must read data.agentId and load that agent's config server-side.
+        const SUPPORT_VOICE_AGENT_ID = 'agent_1pNnX9T2KcZtA7Ne';
+        const helpSupportSheet = document.getElementById('help-support-sheet-overlay');
+        function closeHelpSupportSheet() { helpSupportSheet.classList.remove('active'); }
         document.getElementById('setting-help').addEventListener('click', () => {
-            showCustomModal("Help & Support", "Need a hand? Reach out to us anytime at support@webmessenger.app and we'll get back to you as soon as we can.");
+            const u = auth.currentUser;
+            document.getElementById('btn-help-ai').style.display = (u && isVerifiedUid(u.uid)) ? 'flex' : 'none';
+            helpSupportSheet.classList.add('active');
+        });
+        helpSupportSheet.addEventListener('click', (e) => { if (e.target === helpSupportSheet) closeHelpSupportSheet(); });
+        document.getElementById('btn-help-ai').addEventListener('click', () => {
+            closeHelpSupportSheet();
+            closeSettingsSheet(); // Settings sits above the voice overlay in z-order
+            openHabaAIVoiceOverlay({ agentId: SUPPORT_VOICE_AGENT_ID });
+        });
+        document.getElementById('btn-help-live').addEventListener('click', async () => {
+            closeHelpSupportSheet();
+            if (!SUPPORT_AGENT_UID) {
+                showCustomModal("Help & Support", "Live chat isn't available right now. Email support@webmessenger.app and we'll get back to you as soon as we can.");
+                return;
+            }
+            closeSettingsSheet();
+            let profile = cachedUsers[SUPPORT_AGENT_UID];
+            if (!profile) {
+                try {
+                    const snap = await get(ref(database, `users/${SUPPORT_AGENT_UID}`));
+                    profile = snap.val() || {};
+                    cachedUsers[SUPPORT_AGENT_UID] = profile;
+                } catch (err) { profile = {}; }
+            }
+            try { if (!cachedContacts[SUPPORT_AGENT_UID]) await followUser(SUPPORT_AGENT_UID); } catch (err) { /* non-fatal */ }
+            openChatView(SUPPORT_AGENT_UID, profile.name || 'Haba Support', profile.photoURL || '');
         });
 
         
@@ -43599,7 +43658,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             xaiMicNode = xaiMicStream = xaiMicCtx = xaiMicSink = xaiPlayCtx = null;
             xaiMicMuted = false;
         }
-        async function startXaiVoiceSession() {
+        async function startXaiVoiceSession(opts = {}) {
             try {
                 const Ctx = window.AudioContext || window.webkitAudioContext;
                 try { xaiPlayCtx = new Ctx({ sampleRate: XAI_VOICE_RATE }); } catch (e) { xaiPlayCtx = new Ctx(); }
@@ -43609,7 +43668,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 xaiAnalyserBuf = new Uint8Array(xaiAnalyser.fftSize);
                 xaiAnalyser.connect(xaiPlayCtx.destination);
 
-                const tokenResult = await habaAIVoiceTokenCallable({});
+                const tokenResult = await habaAIVoiceTokenCallable(opts.agentId ? { agentId: opts.agentId } : {});
                 const token = tokenResult.data && tokenResult.data.value;
                 if (!token) throw new Error('No voice token returned');
                 // Saved agent from the xAI console (instructions, voice, tools) — fetched server-side.
@@ -43737,7 +43796,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             }, 1000);
         }
 
-        async function openHabaAIVoiceOverlay() {
+        async function openHabaAIVoiceOverlay(opts = {}) {
             const user = auth.currentUser;
             if (!user) return;
             if (!isVerifiedUid(user.uid)) { showVerifiedOnlySheet('aiVoice'); return; }
@@ -43752,7 +43811,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             document.getElementById('btn-ai-voice-mute').classList.remove('on');
             aiVoiceIsMuted = false;
 
-            if (AI_VOICE_PROVIDER === 'xai') { await startXaiVoiceSession(); return; }
+            if (AI_VOICE_PROVIDER === 'xai') { await startXaiVoiceSession(opts); return; }
 
             const client = ensureAIVoiceClient();
             if (!client) { closeHabaAIVoiceOverlay(); return; }

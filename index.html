@@ -1484,7 +1484,8 @@
         .notif-type-badge.type-follow { background: #A855F7; }
         .notif-type-badge.type-repost { background: var(--success-green); }
         .notif-type-badge.type-job_application { background: #F59E0B; }
-        .notif-type-badge.type-verified { background: #1D9BF0; }
+        .notif-type-badge.type-verified, .notif-type-badge.type-purchase_badge { background: #1D9BF0; }
+        .notif-type-badge.type-purchase_ad_credit { background: #10B981; }
         .notif-type-badge.type-milestone_post, .notif-type-badge.type-milestone_like { background: #F59E0B; }
 
         /* The bottom divider lives on the content column (not the row) so it starts at the text's
@@ -22555,10 +22556,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     });
                     awardFirstMilestone('firstPost');
                     // Success feedback: the composer already closed/reset optimistically above
-                    // (posting happens behind the thin progress bar), so this custom alert is
+                    // (posting happens behind the thin progress bar), so this bottom alert is
                     // what actually confirms to the person that their post made it up, rather
                     // than them just having to trust the progress bar finished silently.
-                    showCustomModal('Posted!', 'Your post has been uploaded successfully.');
+                    notify('Your post has been uploaded successfully.', 'success');
                 } catch (e) {
                     // If a photo/video upload was the cause, uploadComposerImageEntry/
                     // uploadComposerVideoEntry already showed a specific toast about it —
@@ -27778,6 +27779,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 milestone_like: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>',
                 verified: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M12 2l2.4 2.2 3.2-.6.9 3.1 3.1.9-.6 3.2L23 12l-2.2 2.4.6 3.2-3.1.9-.9 3.1-3.2-.6L12 23l-2.4-2.2-3.2.6-.9-3.1-3.1-.9.6-3.2L1 12l2.2-2.4-.6-3.2 3.1-.9.9-3.1 3.2.6z"/><path d="M9 12.5l2 2 4-4.5" stroke="#1D9BF0" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>'
             };
+            icons.purchase_badge = icons.verified;
+            icons.purchase_ad_credit = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M6.5 15h3"/></svg>';
             icons.story_like = icons.like;
             icons.follow_request = icons.follow;
             icons.follow_accepted = icons.follow;
@@ -27801,6 +27804,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (notif.type === 'mention') return `<b>${name}</b> tagged you: ${notif.text || ''}`;
             if (notif.type === 'job_application') return `<b>${name}</b> applied to your job: ${notif.text || ''}`;
             if (notif.type === 'verified') return notif.text || "You're verified! Your blue badge is live.";
+            if (notif.type === 'purchase_badge') return notif.text || 'Payment received. Your blue Verified Badge is live.';
+            if (notif.type === 'purchase_ad_credit') return notif.text || 'Payment received. Ad credit added to your balance.';
             if (notif.type === 'milestone_post' || notif.type === 'milestone_like') return notif.text || 'Nice first step!';
             return `<b>${name}</b> interacted with your post`;
         }
@@ -28093,6 +28098,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 case 'mention': return 'Mentioned you';
                 case 'job_application': return 'Applied to your job';
                 case 'verified': return 'Account update';
+                case 'purchase_badge': return 'Purchase receipt · Verified Badge';
+                case 'purchase_ad_credit': return 'Purchase receipt · Ad credit';
                 case 'milestone_post': return 'Your first post 🎉';
                 case 'milestone_like': return 'Your first like 💛';
                 default: return 'Interacted with your post';

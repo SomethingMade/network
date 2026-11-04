@@ -2718,6 +2718,10 @@
         .uis-web-close:hover { background: rgba(255,255,255,0.14); }
         .uis-web-close svg { width: 20px; height: 20px; }
         #user-info-sheet-overlay.profile-locked-view .uis-web-card { display: none !important; }
+        /* On phones the overlay stays mounted (only its .bottom-sheet panel slides off-canvas), so
+           the card — a direct child of the overlay, not of the panel — would otherwise keep floating
+           after the profile closes. Only show it while the profile sheet is actually open. */
+        #user-info-sheet-overlay:not(.active) .uis-web-card { display: none !important; }
         .wa-suggested-section { margin-bottom: 22px; }
         .profile-suggested-scroll { display: flex; gap: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
         .profile-suggested-scroll::-webkit-scrollbar { display: none; }
@@ -3572,7 +3576,7 @@
         .feed-post-why-ad-inline { background: none; border: none; padding: 0; margin-left: 3px; font-size: 10px; font-weight: 600; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
         .feed-post-why-ad-inline:hover { color: var(--text-primary); }
         /* Small clickable company-avatar tag shown next to a person's @username on their feed
-           posts, when they've tagged a Business Account in Settings (see getTaggedBusiness). */
+           posts, when a Business Account has tagged them (Settings > Business > Tagged People, see getTaggedBusiness). */
         /* Lives in .x-post-headline-main right after .name-badge now (X-style "tagged business"
            avatar next to the display name), not in the username row below it. */
         .feed-post-company-tag { display: inline-flex; align-items: center; flex-shrink: 0; cursor: pointer; vertical-align: middle; }
@@ -9353,20 +9357,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <div id="choose-business-sheet-overlay" class="bottom-sheet-overlay">
         <div class="bottom-sheet" style="max-height: 82vh; display:flex; flex-direction:column; padding: 12px 0 0;">
             <div class="notif-sheet-header">
-                <h3 style="margin:0; font-size:16px;">Tagged Business</h3>
+                <h3 style="margin:0; font-size:16px;">Tagged People</h3>
                 <svg id="btn-close-choose-business-sheet" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </div>
             <div style="padding: 12px 20px 4px;">
                 <div class="input-group">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" id="choose-business-search-input" class="pill-input" placeholder="Search businesses by name or @handle" autocomplete="off" name="haba-choose-business-search" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
+                    <input type="text" id="choose-business-search-input" class="pill-input" placeholder="Search people by name or @handle" autocomplete="off" name="haba-choose-business-search" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')">
                 </div>
             </div>
-            <div id="choose-business-remove-row" class="tag-people-item" style="display:none;">
-                <div class="tag-people-item-body"><div class="tag-people-item-name" style="color:var(--danger-red);">Remove tagged business</div></div>
-            </div>
             <div id="choose-business-list" style="flex:1; overflow-y:auto; padding: 8px 20px 4px;"></div>
-            <div id="choose-business-empty" class="notif-empty-state" style="display:none;">No business accounts found.</div>
+            <div id="choose-business-empty" class="notif-empty-state" style="display:none;">No people found.</div>
         </div>
     </div>
 
@@ -10060,11 +10061,11 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div class="wa-list-row" id="open-tagged-business-row" style="cursor:pointer;">
+                <div class="wa-list-row" id="open-tagged-business-row" style="cursor:pointer; display:none;">
                     <div class="wa-row-icon chip-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg></div>
                     <div class="wa-row-body">
-                        <span class="wa-row-title">Tagged Business</span>
-                        <span class="wa-row-sub" id="tagged-business-row-sub">Show a business's badge next to your name on your posts</span>
+                        <span class="wa-row-title">Tagged People</span>
+                        <span class="wa-row-sub" id="tagged-business-row-sub">Show your business logo next to the names of people you tag</span>
                     </div>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
@@ -19125,7 +19126,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // followers organically. Same blue badge, no matter which path got them there.
         // The small business-avatar tag shown after the verified badge (same one posts show), for a profile's name.
         function companyTagHtmlFor(uid) {
-            const biz = getTaggedBusiness(cachedUsers[uid]);
+            const biz = getTaggedBusiness(uid);
             if (!biz) return '';
             const safe = String(biz.photoURL).replace(/'/g, "%27");
             const title = String(biz.name || '').replace(/"/g, '&quot;');
@@ -19900,15 +19901,29 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             return `<div class="avatar ${sizeClass || ''}" style="background-image: url('${photoURL}');"></div>`;
         }
 
-        // Returns the Business Account a person has chosen (via Settings > Business > Tagged
-        // Business, see openChooseBusinessSheet/setTaggedBusiness) to show next to their name on
-        // their feed posts, as { uid, photoURL, name } — or null if they haven't tagged one.
-        // Used by applyLiveProfileToPostCard. Previously this was inferred from a @mention typed
-        // into the person's bio; that's been replaced by this explicit Settings selection.
-        function getTaggedBusiness(profile) {
-            const buid = profile && profile.taggedBusinessUid;
+        // Returns the Business Account that has TAGGED this person (a business adds people in
+        // Settings > Business > Tagged People; stored on the business's own profile as
+        // users/{businessUid}/taggedPeople/{personUid} = true), as { uid, photoURL, name } — or
+        // null if no business has tagged them. A person can't pick or claim a business
+        // themselves any more: the logo only appears when the business did the tagging.
+        // Lookup is via a person -> business index built from the cached Business Accounts
+        // (loaded up-front by loadBusinessUsersOnce) and rebuilt whenever the user cache changes.
+        let businessTagIndex = null;
+        function getTaggedBusiness(uid) {
+            if (!uid) return null;
+            if (!businessTagIndex) {
+                businessTagIndex = {};
+                Object.keys(userStore).forEach((buid) => {
+                    const bu = userStore[buid];
+                    if (!bu || !bu.isBusinessAccount || !bu.taggedPeople || typeof bu.taggedPeople !== 'object') return;
+                    Object.keys(bu.taggedPeople).forEach((pu) => {
+                        if (bu.taggedPeople[pu] && !businessTagIndex[pu]) businessTagIndex[pu] = buid;
+                    });
+                });
+            }
+            const buid = businessTagIndex[uid];
             if (!buid) return null;
-            const bu = cachedUsers[buid];
+            const bu = userStore[buid];
             if (!bu || !bu.isBusinessAccount) return null;
             return { uid: buid, photoURL: bu.photoURL || DEFAULT_AVATAR_URL, name: bu.name || '' };
         }
@@ -19949,7 +19964,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (captionNameEl) captionNameEl.textContent = displayName;
             const companyTagEl = card.querySelector('.feed-post-company-tag');
             if (companyTagEl) {
-                const taggedBusiness = getTaggedBusiness(profile);
+                const taggedBusiness = getTaggedBusiness(uid);
                 if (taggedBusiness) {
                     companyTagEl.dataset.uid = taggedBusiness.uid;
                     companyTagEl.title = taggedBusiness.name || '';
@@ -28021,32 +28036,45 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             document.getElementById('location-picker-sheet-overlay').classList.remove('active');
         }
 
-        // --- TAGGED BUSINESS (Settings > Business > Tagged Business) ---
-        // Single-select variant of the Tag People sheet, filtered to Business Accounts. Tapping
-        // an entry sets it immediately (no separate "Done" step) and closes the sheet.
+        // --- TAGGED PEOPLE (Settings > Business > Tagged People) ---
+        // Business Accounts only. The business picks people to tag; each tagged person then shows
+        // the business's logo next to their name (see getTaggedBusiness). Tapping a person toggles
+        // the tag immediately; the sheet stays open so several people can be tagged in one go.
+        // Stored on the business's own profile: users/{businessUid}/taggedPeople/{personUid} = true.
+        const MAX_TAGGED_PEOPLE = 50;
+        function myTaggedPeopleUids(myProfile) {
+            const t = (myProfile && myProfile.taggedPeople) || {};
+            return Object.keys(t).filter((k) => t[k]);
+        }
         function renderChooseBusinessList(filterText) {
-            if (!businessPoolLoaded) loadBusinessUsersOnce().then((ch) => { businessPoolLoaded = true; if (ch) renderChooseBusinessList(filterText); });
             prefetchUsersMatching(filterText).then((ch) => { if (ch) renderChooseBusinessList(filterText); });
             const list = document.getElementById('choose-business-list');
             const emptyEl = document.getElementById('choose-business-empty');
             const me = auth.currentUser;
             const myProfile = (me && cachedUsers[me.uid]) || {};
+            const taggedUids = myTaggedPeopleUids(myProfile);
+            const taggedSet = new Set(taggedUids);
+            // Make sure everyone I've already tagged is loaded so they appear (and can be untagged).
+            loadUsers(taggedUids).then((ch) => { if (ch) renderChooseBusinessList(filterText); });
             const q = (filterText || '').trim().toLowerCase();
 
             const entries = Object.entries(cachedUsers).filter(([uid, u]) => {
                 if (!me || uid === me.uid) return false;
-                if (!u || !u.isBusinessAccount) return false;
+                if (!u || u.isBusinessAccount) return false;
                 if (!u.name && !u.username) return false;
                 if (!q) return true;
                 return (u.name && u.name.toLowerCase().includes(q)) || (u.username && u.username.toLowerCase().includes(q));
-            }).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+            }).sort((a, b) => {
+                const ta = taggedSet.has(a[0]) ? 0 : 1, tb = taggedSet.has(b[0]) ? 0 : 1;
+                return ta - tb || (a[1].name || '').localeCompare(b[1].name || '');
+            });
 
             list.innerHTML = '';
             emptyEl.style.display = entries.length === 0 ? 'block' : 'none';
 
             entries.forEach(([uid, u]) => {
                 const item = document.createElement('div');
-                item.className = 'tag-people-item' + (myProfile.taggedBusinessUid === uid ? ' selected' : '');
+                item.className = 'tag-people-item' + (taggedSet.has(uid) ? ' selected' : '');
                 item.innerHTML = `
                     ${feedAvatarHtml(u)}
                     <div class="tag-people-item-body">
@@ -28055,9 +28083,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     </div>
                     <div class="tag-people-item-check"></div>
                 `;
-                item.querySelector('.tag-people-item-name').innerHTML = escapeHtmlForPost(u.name || 'Business') + verifiedBadgeFor(uid, false);
+                item.querySelector('.tag-people-item-name').innerHTML = escapeHtmlForPost(u.name || 'User') + verifiedBadgeFor(uid, false);
                 item.querySelector('.tag-people-item-username').textContent = u.username ? '@' + u.username : '';
-                item.addEventListener('click', () => setTaggedBusiness(uid));
+                item.addEventListener('click', () => toggleTaggedPerson(uid));
                 list.appendChild(item);
             });
         }
@@ -28065,11 +28093,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function openChooseBusinessSheet() {
             const me = auth.currentUser;
             const myProfile = (me && cachedUsers[me.uid]) || {};
+            if (!myProfile.isBusinessAccount) { notify('Only Business Accounts can tag people', 'error'); return; }
             const searchInput = document.getElementById('choose-business-search-input');
             searchInput.value = '';
             renderChooseBusinessList('');
-            const removeRow = document.getElementById('choose-business-remove-row');
-            if (removeRow) removeRow.style.display = myProfile.taggedBusinessUid ? 'flex' : 'none';
             document.getElementById('choose-business-sheet-overlay').classList.add('active');
         }
 
@@ -28077,28 +28104,41 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             document.getElementById('choose-business-sheet-overlay').classList.remove('active');
         }
 
-        // Writes (or, if uid is falsy, clears) the Business Account the current user has chosen
-        // to have shown next to their name on their own feed posts — see getTaggedBusiness /
-        // applyLiveProfileToPostCard.
-        async function setTaggedBusiness(uid) {
+        // Adds/removes one person from this business's tagged people.
+        async function toggleTaggedPerson(personUid) {
             const user = auth.currentUser;
-            if (!user) return;
+            if (!user || !personUid || personUid === user.uid) return;
+            const myProfile = cachedUsers[user.uid] || {};
+            if (!myProfile.isBusinessAccount) return;
+            const already = !!(myProfile.taggedPeople && myProfile.taggedPeople[personUid]);
+            if (!already && myTaggedPeopleUids(myProfile).length >= MAX_TAGGED_PEOPLE) {
+                notify(`You can tag up to ${MAX_TAGGED_PEOPLE} people`, 'error');
+                return;
+            }
             try {
-                await update(ref(database, `users/${user.uid}`), { taggedBusinessUid: uid || null });
-                notify(uid ? 'Business tagged' : 'Business tag removed');
+                await update(ref(database, `users/${user.uid}/taggedPeople`), { [personUid]: already ? null : true });
+                // Reflect it locally right away (the live listener will deliver the same data).
+                if (!myProfile.taggedPeople || typeof myProfile.taggedPeople !== 'object') myProfile.taggedPeople = {};
+                if (already) delete myProfile.taggedPeople[personUid]; else myProfile.taggedPeople[personUid] = true;
+                businessTagIndex = null;
+                notify(already ? 'Tag removed' : 'Person tagged');
+                renderChooseBusinessList(document.getElementById('choose-business-search-input').value);
+                refreshTaggedBusinessSettingsRow(myProfile);
+                refreshAllFeedPostProfiles();
             } catch (err) {
-                console.error('Failed to update tagged business', err);
+                console.error('Failed to update tagged people', err);
                 notify('Something went wrong', 'error');
             }
-            closeChooseBusinessSheet();
         }
 
-        // Reflects the current user's taggedBusinessUid into the Settings row's subtitle.
+        // Settings row: only Business Accounts see it; subtitle shows how many people are tagged.
         function refreshTaggedBusinessSettingsRow(myProfile) {
+            const rowEl = document.getElementById('open-tagged-business-row');
+            if (rowEl) rowEl.style.display = (myProfile && myProfile.isBusinessAccount) ? '' : 'none';
             const subEl = document.getElementById('tagged-business-row-sub');
             if (!subEl) return;
-            const business = myProfile.taggedBusinessUid ? cachedUsers[myProfile.taggedBusinessUid] : null;
-            subEl.textContent = business ? `Tagged: ${business.name || 'Business'}` : "Show a business's badge next to your name on your posts";
+            const n = myTaggedPeopleUids(myProfile).length;
+            subEl.textContent = n ? `${n} ${n === 1 ? 'person' : 'people'} tagged` : 'Show your business logo next to the names of people you tag';
         }
 
         // Keeps the Settings > Business controls in step with my live profile. Previously the
@@ -28118,6 +28158,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const earn = document.getElementById('settings-earnings-section');
             if (earn) earn.style.display = isBiz ? 'none' : '';
             refreshBusinessWelcomeSettingsRow(myProfile);
+            refreshTaggedBusinessSettingsRow(myProfile);
         }
 
         // Shows/hides the "Auto Welcome Message" settings row for business accounts only, and
@@ -30777,7 +30818,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         document.getElementById('choose-business-search-input').addEventListener('input', (e) => {
             renderChooseBusinessList(e.target.value);
         });
-        document.getElementById('choose-business-remove-row').addEventListener('click', () => setTaggedBusiness(null));
 
         const profileTabEl = document.getElementById('tab-profile');
         const editProfileSheetOverlay = document.getElementById('edit-profile-sheet-overlay');
@@ -40430,6 +40470,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const LAZY_UID_RE = /^[A-Za-z0-9_-]{6,128}$/;
         const LAZY_UID_JUNK = new Set(['undefined', 'null', 'NaN']);
         function notifyUsersChanged() {
+            businessTagIndex = null; // person -> tagging-business lookup (see getTaggedBusiness) is rebuilt lazily
             if (userNotifyTimer) return;
             userNotifyTimer = setTimeout(() => {
                 userNotifyTimer = null;
@@ -49870,6 +49911,9 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 try { syncMyBusinessSettingsUI(); } catch (e) { console.warn('business settings sync', e); }
             };
             void cachedUsers[user.uid]; // load my own profile (and keep it live)
+            // Business Accounts hold the "tagged people" lists that drive the logo next to a
+            // person's name (see getTaggedBusiness), so make sure they're in the cache.
+            try { loadBusinessUsersOnce().then(() => { businessPoolLoaded = true; }); } catch (e) { /* no-op */ }
 
             // Stories: instead of one live listener on the whole stories node (everyone's stories,
             // views and likes, forever), watch the small story_authors index for people who posted in

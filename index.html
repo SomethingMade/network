@@ -2322,17 +2322,28 @@
         /* Embedded original-post preview shown inside a quote repost — both the compact
            read-only version rendered in the feed (buildQuoteEmbedHtmlInner/fillQuoteEmbed)
            and the static preview shown while composing one (quote-composer-embed-preview). */
-        .quote-embed-card { border: 1px solid var(--border-color); border-radius: 14px; padding: 10px 12px; margin-top: 10px; cursor: pointer; transition: background 0.15s; overflow: hidden; }
-        .quote-embed-card:hover { background: var(--bg-hover); }
+        /* Quoted-post card (X-style): author row with name, badge, @handle and time; text; then the
+           media edge-to-edge along the bottom of the card. Used by quote reposts, comment quotes and
+           the quote composer preview (see buildQuoteEmbedHtml). */
+        .quote-embed-card { border: 1px solid var(--border-color); border-radius: 16px; padding: 12px 14px; margin-top: 10px; cursor: pointer; transition: background 0.15s; overflow: hidden; }
+        .quote-embed-card:hover, .quote-embed-card:active { background: var(--bg-hover); }
         .quote-embed-card-static { cursor: default; margin-top: 12px; }
-        .quote-embed-card-static:hover { background: none; }
+        .quote-embed-card-static:hover, .quote-embed-card-static:active { background: none; }
         .quote-embed-loading { font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
-        .quote-embed-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-        .quote-embed-header .avatar.quote-embed-avatar { width: 18px; height: 18px; flex-shrink: 0; }
-        .quote-embed-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
-        .quote-embed-time { font-size: 12.5px; color: var(--text-secondary); }
-        .quote-embed-text { font-size: 13.5px; line-height: 1.4; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-        .quote-embed-thumb { display: block; width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-top: 8px; }
+        .quote-embed-header { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; min-width: 0; }
+        .quote-embed-header .avatar.quote-embed-avatar { width: 22px; height: 22px; flex-shrink: 0; margin-right: 1px; }
+        .quote-embed-name { flex: 0 1 auto; min-width: 0; max-width: 58%; font-size: 14.5px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .quote-embed-badge { display: inline-flex; align-items: center; flex-shrink: 0; }
+        .quote-embed-badge svg { width: 15px; height: 15px; }
+        .quote-embed-handle { flex: 1 1 0; min-width: 0; font-size: 13.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .quote-embed-time { flex-shrink: 0; font-size: 13.5px; color: var(--text-secondary); white-space: nowrap; }
+        .quote-embed-time::before { content: '\00B7'; margin-right: 5px; }
+        .quote-embed-text { font-size: 14.5px; line-height: 1.4; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+        .quote-embed-poll { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 5px 10px; border-radius: 50px; background: var(--bg-input); font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+        .quote-embed-media { position: relative; margin: 10px -14px -12px; background: var(--bg-input); line-height: 0; }
+        .quote-embed-media img { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 260px; object-fit: cover; }
+        .quote-embed-play { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(0,0,0,0.55); color: #fff; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .quote-embed-more { position: absolute; right: 8px; bottom: 8px; padding: 3px 9px; border-radius: 50px; background: rgba(0,0,0,0.62); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.4; }
         .feed-post-view-stat { cursor: default; }
         .feed-empty-state { text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 40px 20px; }
         .feed-loading-more { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 16px 0; }
@@ -24858,24 +24869,47 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }
         }
 
-        // Compact read-only preview of the original post, embedded below a quote repost's own
-        // text (see submitQuoteRepost / buildFeedPostCard). Tapping it opens the original.
-        function buildQuoteEmbedHtmlInner(originalId, post) {
-            const liveAuthor = cachedUsers[post.uid] || {};
-            const name = escapeHtmlForPost(liveAuthor.name || post.name || 'User');
-            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || post.name, photoURL: liveAuthor.photoURL || post.photoURL }, 'quote-embed-avatar');
-            const text = post.text ? linkifyHashtags(post.text) : '';
-            const images = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
-            const thumbUrl = images.length ? images[0] : (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+        // Shared markup for the quoted-post card (X-style): author row (avatar, name, badge,
+        // @handle, time), text, then media edge-to-edge along the bottom of the card. Everything
+        // user-supplied goes through escapeHtmlForPost / linkifyHashtags.
+        function buildQuoteEmbedHtml(o) {
+            const liveAuthor = cachedUsers[o.uid] || {};
+            const name = escapeHtmlForPost(liveAuthor.name || o.name || 'User');
+            const handle = liveAuthor.username ? '@' + escapeHtmlForPost(liveAuthor.username) : '';
+            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || o.name, photoURL: liveAuthor.photoURL || o.photoURL }, 'quote-embed-avatar');
+            const badge = verifiedBadgeFor(o.uid, o.uid === AI_UID);
+            const text = o.text ? linkifyHashtags(o.text) : '';
+            const media = o.mediaUrl ? `
+                <div class="quote-embed-media">
+                    <img src="${escapeHtmlForPost(o.mediaUrl)}" alt="" loading="lazy">
+                    ${o.isVideo ? '<span class="quote-embed-play"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></span>' : ''}
+                    ${o.extraCount > 0 ? `<span class="quote-embed-more">+${o.extraCount}</span>` : ''}
+                </div>` : '';
+            const poll = o.hasPoll ? '<div class="quote-embed-poll"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>Poll</div>' : '';
             return `
                 <div class="quote-embed-header">
                     ${avatarHtml}
                     <span class="quote-embed-name">${name}</span>
-                    <span class="quote-embed-time"><span data-rel-ts="${post.timestamp}">${formatTime(post.timestamp)}</span></span>
+                    ${badge ? `<span class="quote-embed-badge">${badge}</span>` : ''}
+                    ${handle ? `<span class="quote-embed-handle">${handle}</span>` : '<span style="flex:1"></span>'}
+                    <span class="quote-embed-time"><span data-rel-ts="${o.timestamp}">${formatTime(o.timestamp)}</span></span>
                 </div>
                 ${text ? `<div class="quote-embed-text">${text}</div>` : ''}
-                ${thumbUrl ? `<img class="quote-embed-thumb" src="${thumbUrl}" alt="">` : ''}
+                ${poll}
+                ${media}
             `;
+        }
+
+        // Compact read-only preview of the original post, embedded below a quote repost's own
+        // text (see submitQuoteRepost / buildFeedPostCard). Tapping it opens the original.
+        function buildQuoteEmbedHtmlInner(originalId, post) {
+            const images = (post.imageUrls && post.imageUrls.length) ? post.imageUrls : (post.imageUrl ? [post.imageUrl] : []);
+            const thumbUrl = images.length ? images[0] : (post.videoUrl ? (post.videoThumbnail || cloudinaryVideoThumbnail(post.videoUrl, 1)) : '');
+            return buildQuoteEmbedHtml({
+                uid: post.uid, name: post.name, photoURL: post.photoURL, timestamp: post.timestamp,
+                text: post.text, mediaUrl: thumbUrl, isVideo: !images.length && !!post.videoUrl,
+                extraCount: images.length > 1 ? images.length - 1 : 0, hasPoll: !!post.poll
+            });
         }
         // Fills a quote repost card's embedded original-post preview, fetching the original
         // from Firebase if it isn't already cached (e.g. it fell outside the paginated feed
@@ -24915,19 +24949,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // post preview, just sourced from a comment — a GIF (comments' only attachment type)
         // stands in for the image/video thumb.
         function buildCommentQuoteEmbedHtmlInner(commentId, comment) {
-            const liveAuthor = cachedUsers[comment.uid] || {};
-            const name = escapeHtmlForPost(liveAuthor.name || comment.name || 'User');
-            const avatarHtml = feedAvatarHtml({ name: liveAuthor.name || comment.name, photoURL: liveAuthor.photoURL || comment.photoURL }, 'quote-embed-avatar');
-            const text = comment.text ? linkifyHashtags(comment.text) : '';
-            return `
-                <div class="quote-embed-header">
-                    ${avatarHtml}
-                    <span class="quote-embed-name">${name}</span>
-                    <span class="quote-embed-time"><span data-rel-ts="${comment.timestamp}">${formatTime(comment.timestamp)}</span></span>
-                </div>
-                ${text ? `<div class="quote-embed-text">${text}</div>` : ''}
-                ${comment.gifUrl ? `<img class="quote-embed-thumb" src="${comment.gifUrl}" alt="">` : ''}
-            `;
+            return buildQuoteEmbedHtml({
+                uid: comment.uid, name: comment.name, photoURL: comment.photoURL, timestamp: comment.timestamp,
+                text: comment.text, mediaUrl: comment.gifUrl || '', isVideo: false, extraCount: 0, hasPoll: false
+            });
         }
         // Fills a comment-quote card's embedded original-comment preview, fetching the comment
         // from Firebase (comments aren't kept in a client-side cache the way posts are) — same

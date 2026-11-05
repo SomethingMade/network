@@ -7580,7 +7580,7 @@ body.dark-theme .dhc-input{background:var(--fb-hover)}
 </style>
 <style id="notif-title-font">
 /* Notifications, Messages and Communities header titles use the same script font as the "Haba." wordmark on the Home header */
-#tab-notifications .activity-title,#tab-chats .msgs-title,#tab-groups .chat-header-top h1{font-family:'Grand Hotel','Billabong','Brush Script MT',cursive!important;font-size:36px!important;font-weight:400!important;letter-spacing:0!important;line-height:1!important;padding-top:2px;color:var(--text-primary)!important}
+#tab-notifications .activity-title,#tab-chats .msgs-title{font-family:'Grand Hotel','Billabong','Brush Script MT',cursive!important;font-size:36px!important;font-weight:400!important;letter-spacing:0!important;line-height:1!important;padding-top:2px;color:var(--text-primary)!important}
 </style>
 <style id="fb-post-options-theme">
 /* Facebook-style post options sheet (feed + community posts) */
@@ -7680,7 +7680,7 @@ body.dark-theme #post-options-sheet-overlay .msg-option-btn.with-icon svg,body.d
 .feed-post-ad-card-footer-url{font-size:var(--fs-sm)}
 
 /* Header titles (Notifications / Messages / Communities) */
-#tab-notifications .activity-title,#tab-chats .msgs-title,#tab-groups .chat-header-top h1{font-size:clamp(28px,9vw,36px)!important}
+#tab-notifications .activity-title,#tab-chats .msgs-title{font-size:clamp(28px,9vw,36px)!important}
 
 /* Very small phones: tighten a bit more */
 @media(max-width:360px){
@@ -12203,6 +12203,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 <button type="button" class="xc-all-btn" id="xc-all-btn" aria-haspopup="true" aria-expanded="false"><span id="xc-all-label">All</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg><span class="xc-all-dot" id="xc-all-dot" style="display:none;"></span></button>
                                 <div class="xc-all-menu" id="xc-all-menu" role="menu">
                                     <button type="button" role="menuitem" data-xc-view="inbox" class="active">All</button>
+                                    <button type="button" role="menuitem" data-xc-view="groups">Groups</button>
                                     <button type="button" role="menuitem" data-xc-view="updates">Updates</button>
                                     <button type="button" role="menuitem" data-xc-view="requests">Requests<span class="xc-menu-count" id="xc-menu-req-count" style="display:none;"></span></button>
                                 </div>
@@ -12225,6 +12226,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                 
                             </div>
                             <button type="button" class="msgs-chip active" data-msgs-view="inbox">Inbox</button>
+                            <button type="button" class="msgs-chip" data-msgs-view="groups">Groups</button>
                             <button type="button" class="msgs-chip" data-msgs-view="updates">Updates</button>
                             <button type="button" class="msgs-chip" data-msgs-view="requests">Requests<span class="msgs-chip-count" id="msgs-requests-count" style="display:none;"></span></button>
                         </div>
@@ -43862,15 +43864,29 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function applyChatsInboxView() {
             const isRequests = chatsInboxView === 'requests';
             const isUpdates = chatsInboxView === 'updates';
+            const isGroups = chatsInboxView === 'groups';
             const listEl = document.getElementById('chat-list-container');
+            if (listEl) {
+                listEl.classList.toggle('xc-groups-only', isGroups);
+                const hasGroupRows = !!listEl.querySelector('.chat-item[data-group-id]');
+                let gEmpty = listEl.querySelector('.xc-groups-empty');
+                if (isGroups && !hasGroupRows) {
+                    if (!gEmpty) {
+                        gEmpty = document.createElement('div');
+                        gEmpty.className = 'xc-groups-empty msgs-requests-empty';
+                        gEmpty.innerHTML = "<strong>No groups yet</strong><span>Groups you create or join will show up here.</span>";
+                        listEl.appendChild(gEmpty);
+                    }
+                } else if (gEmpty) gEmpty.remove();
+            }
             const reqEl = document.getElementById('chat-requests-container');
             const updatesEl = document.getElementById('chat-updates-container');
             if (listEl) listEl.style.display = (isRequests || isUpdates) ? 'none' : '';
             const favStripEl = document.getElementById('msgs-fav-strip');
-            if (favStripEl) favStripEl.style.visibility = (isRequests || isUpdates) ? 'hidden' : '';
-            if (favStripEl) favStripEl.style.height = (isRequests || isUpdates) ? '0' : '';
-            if (favStripEl) favStripEl.style.padding = (isRequests || isUpdates) ? '0' : '';
-            if (favStripEl) favStripEl.style.overflow = (isRequests || isUpdates) ? 'hidden' : '';
+            if (favStripEl) favStripEl.style.visibility = (isRequests || isUpdates || isGroups) ? 'hidden' : '';
+            if (favStripEl) favStripEl.style.height = (isRequests || isUpdates || isGroups) ? '0' : '';
+            if (favStripEl) favStripEl.style.padding = (isRequests || isUpdates || isGroups) ? '0' : '';
+            if (favStripEl) favStripEl.style.overflow = (isRequests || isUpdates || isGroups) ? 'hidden' : '';
             if (reqEl) reqEl.style.display = isRequests ? 'flex' : 'none';
             if (updatesEl) updatesEl.style.display = isUpdates ? '' : 'none';
             if (isUpdates) renderChatUpdatesList();
@@ -51491,7 +51507,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             const dot = document.getElementById('xc-all-dot');
             const reqCountSrc = document.getElementById('msgs-requests-count');
             const reqCountMenu = document.getElementById('xc-menu-req-count');
-            const names = { inbox: 'All', updates: 'Updates', requests: 'Requests' };
+            const names = { inbox: 'All', groups: 'Groups', updates: 'Updates', requests: 'Requests' };
             const close = () => { menu.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
             const syncCount = () => {
                 const t = reqCountSrc ? reqCountSrc.textContent.trim() : '';
@@ -51636,6 +51652,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 renderMsgsFavouritesStrip(chats);
                 updateTotalUnreadBadge(totalUnread);
                 filterListItems(chatSearchInput, 'chat-list-container');
+                if (chatsInboxView === 'groups') applyChatsInboxView();
                 renderChatRequests();
                 renderChatSuggestions();
             }
@@ -52516,6 +52533,11 @@ html body #tab-chats .xc-all-btn:active{opacity:.6}
 html body #tab-chats .xc-all-dot{position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--xc-blue);border:2px solid var(--bg-base)}
 html body #tab-chats .xc-all-menu{display:none;position:absolute;right:0;top:46px;min-width:170px;padding:6px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-color);box-shadow:var(--shadow-elevated);z-index:60}
 html body #tab-chats .xc-all-menu.open{display:block}
+/* Pages header uses the same title font as Chat / Notifications / Home */
+html body #tab-groups .chat-header-top h1{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif!important;font-size:20px!important;font-weight:800!important;letter-spacing:-.2px!important;line-height:1!important;padding:0!important;color:var(--text-primary)!important}
+html body #tab-chats #chat-list-container.xc-groups-only .chat-item:not([data-group-id]),
+html body #tab-chats #chat-list-container.xc-groups-only .xc-suggest,
+html body #tab-chats #chat-list-container.xc-groups-only .empty-msg{display:none!important}
 html body #tab-chats .xc-all-menu button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:11px 12px;border:none;background:none;border-radius:9px;color:var(--text-primary);font:600 15px system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;text-align:left;cursor:pointer}
 html body #tab-chats .xc-all-menu button.active{color:var(--xc-blue)}
 html body #tab-chats .xc-all-menu button:active{background:var(--bg-hover)}

@@ -12286,6 +12286,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                     <button type="button" role="menuitem" data-xh-filter="photos">Photos</button>
                                     <button type="button" role="menuitem" data-xh-filter="videos">Videos</button>
                                     <button type="button" role="menuitem" data-xh-filter="text">Text only</button>
+                                    <div class="xh-menu-sep" role="separator"></div>
+                                    <button type="button" role="menuitem" data-xh-action="stories"><span class="xh-menu-dot" id="xh-stories-dot"></span>Stories</button>
+                                    <button type="button" role="menuitem" data-xh-action="add-story">Add story</button>
                                 </div>
                             </div>
                         </div>
@@ -12298,7 +12301,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                             </div>
                         </div>
                         <div id="feed-posts-container">
-                            <div class="feed-stories-strip" id="feed-stories-strip"></div>
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
                             <div id="feed-posts-list"></div>
                             <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
@@ -42238,6 +42240,17 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         // --- Feed tab's Stories subtab: same story data/cards as the Discover strip, just
         // rendered into #feed-stories-grid's responsive grid instead of a horizontal scroller.
+        // Blue dot on the Home header menu's "Stories" entry when someone you haven't watched has a live story.
+        function updateStoriesMenuDot() {
+            const dot = document.getElementById('xh-stories-dot');
+            const user = auth.currentUser;
+            if (!dot || !user) return;
+            const now = Date.now();
+            const unseen = Object.keys(cachedStories || {}).some(uid => uid !== user.uid &&
+                Object.values(cachedStories[uid] || {}).some(st => now - st.createdAt < STORY_TTL && !(st.views && st.views[user.uid])));
+            dot.classList.toggle('on', unseen);
+        }
+
         function renderFeedStoryCards(usersData, storiesData) {
             const grid = document.getElementById('feed-stories-strip');
             const user = auth.currentUser;
@@ -42895,6 +42908,46 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         // --- STORY VIEWER ENGINE ---
         let storiesGloballyMuted = false;
+        // Stories opened from the Home header menu play as one continuous queue: when a person's
+        // stories finish it moves on to the next person, and swiping up / down jumps between people.
+        let storyQueue = { list: [], pos: -1 };
+        function storyQueueOpenAt(pos, fromEnd) {
+            const entry = storyQueue.list[pos];
+            if (!entry) return false;
+            storyQueue.pos = pos;
+            let start = 0;
+            if (fromEnd) start = entry.items.length - 1;
+            else { const i = entry.items.findIndex(it => !(it.views && it.views[auth.currentUser.uid])); start = i >= 0 ? i : 0; }
+            openStoryViewer(entry.uid, entry.name, entry.photoURL, entry.items, entry.isOwn, start);
+            return true;
+        }
+        function storyAdvanceUser() {
+            if (storyQueue.pos >= 0 && storyQueueOpenAt(storyQueue.pos + 1, false)) return;
+            storyQueue = { list: [], pos: -1 };
+            history.back();
+        }
+        function storyPreviousUser() {
+            if (storyQueue.pos > 0) storyQueueOpenAt(storyQueue.pos - 1, true);
+        }
+        function openStoriesFromHeader() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const now = Date.now();
+            const list = [];
+            Object.keys(cachedStories || {}).forEach(uid => {
+                const items = Object.entries(cachedStories[uid] || {}).map(([key, val]) => ({ ...val, key })).filter(st => now - st.createdAt < STORY_TTL).sort((a, b) => a.createdAt - b.createdAt);
+                if (!items.length) return;
+                const prof = (cachedUsers && cachedUsers[uid]) || {};
+                const isOwn = uid === user.uid;
+                list.push({ uid, isOwn, items, name: isOwn ? (prof.name || user.displayName || 'You') : (prof.name || 'User'), photoURL: prof.photoURL || (isOwn ? user.photoURL : '') || '',
+                    unseen: !isOwn && items.some(it => !(it.views && it.views[user.uid])), latest: items[items.length - 1].createdAt });
+            });
+            // Unseen people first (newest first), then ones you've already watched, then your own.
+            list.sort((a, b) => (a.isOwn - b.isOwn) || (b.unseen - a.unseen) || (b.latest - a.latest));
+            if (!list.length) { notify('No stories right now', 'error'); return; }
+            storyQueue = { list, pos: -1 };
+            storyQueueOpenAt(0, false);
+        }
         let storyState = { items: [], index: 0, timer: null, isOwn: false, currentUid: null, totalMs: 0, elapsedMs: 0, startedAt: 0, suppressNextClick: false };
 
         function setupProgressBars() {
@@ -43161,7 +43214,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
             if (remainingMs <= 0) {
                 storyState.index++;
-                if (storyState.index >= storyState.items.length) { history.back(); }
+                if (storyState.index >= storyState.items.length) { storyAdvanceUser(); }
                 else { playStory(); }
                 return;
             }
@@ -43188,7 +43241,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 videoEl.pause();
                 musicAudioEl.pause();
                 storyState.index++;
-                if (storyState.index >= storyState.items.length) { history.back(); }
+                if (storyState.index >= storyState.items.length) { storyAdvanceUser(); }
                 else { playStory(); }
             }, remainingMs);
         }
@@ -43500,7 +43553,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             } catch(err) { showCustomModal("Error", "Could not delete the story."); }
         });
 
-        document.getElementById('story-viewer-close').addEventListener('click', () => history.back());
+        document.getElementById('story-viewer-close').addEventListener('click', () => { storyQueue = { list: [], pos: -1 }; history.back(); });
         document.getElementById('story-mute-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             storiesGloballyMuted = !storiesGloballyMuted;
@@ -43532,10 +43585,31 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         document.getElementById('story-tap-left').addEventListener('click', () => {
             if (storyState.suppressNextClick) { storyState.suppressNextClick = false; return; }
             if (storyState.index > 0) { storyState.index--; playStory(); }
+            else if (storyQueue.pos > 0) storyPreviousUser();
         });
+
+        // Swipe up = next person, swipe down = previous person (like TikTok).
+        (function initStorySwipe() {
+            let sy = 0, sx = 0, tracking = false;
+            const el = document.getElementById('story-viewer-overlay');
+            el.addEventListener('touchstart', (e) => {
+                if (isInteractiveTarget(e.target) || e.touches.length !== 1) { tracking = false; return; }
+                tracking = true; sy = e.touches[0].clientY; sx = e.touches[0].clientX;
+            }, { passive: true });
+            el.addEventListener('touchend', (e) => {
+                if (!tracking) return;
+                tracking = false;
+                const t = e.changedTouches[0];
+                const dy = t.clientY - sy, dx = t.clientX - sx;
+                if (Math.abs(dy) < 70 || Math.abs(dy) < Math.abs(dx) * 1.5) return;
+                storyState.suppressNextClick = true;
+                setTimeout(() => { storyState.suppressNextClick = false; }, 350);
+                if (dy < 0) storyAdvanceUser(); else storyPreviousUser();
+            }, { passive: true });
+        })();
         document.getElementById('story-tap-right').addEventListener('click', () => {
             if (storyState.suppressNextClick) { storyState.suppressNextClick = false; return; }
-            storyState.index++; if (storyState.index >= storyState.items.length) { history.back(); } else { playStory(); }
+            storyState.index++; if (storyState.index >= storyState.items.length) { storyAdvanceUser(); } else { playStory(); }
         });
 
         function updateNavBadge(tabId, count) {
@@ -51050,6 +51124,13 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             });
             document.addEventListener('click', (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) close(); });
             menu.addEventListener('click', (e) => {
+                const actionItem = e.target.closest('[data-xh-action]');
+                if (actionItem) {
+                    close();
+                    if (actionItem.dataset.xhAction === 'stories') openStoriesFromHeader();
+                    else if (actionItem.dataset.xhAction === 'add-story') document.getElementById('story-type-sheet-overlay').classList.add('active');
+                    return;
+                }
                 const item = e.target.closest('[data-xh-filter]');
                 if (!item) return;
                 feedMediaFilter = item.dataset.xhFilter;
@@ -51074,6 +51155,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderFeedStoryCards(cachedUsers, cachedStories);
+                updateStoriesMenuDot();
                 renderChatRequests();
                 // Profiles load lazily, so names/photos arrive after the first paint: redraw the chat list.
                 try { if (userChatsInitialized) renderChatListFromCache(); } catch (e) { console.warn('chat list refresh', e); }
@@ -51106,6 +51188,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 renderStoriesBar(cachedUsers, cachedStories);
                 renderDiscoverStoryCards(cachedUsers, cachedStories);
                 renderFeedStoryCards(cachedUsers, cachedStories);
+                updateStoriesMenuDot();
                 refreshPostLiveRings();
                 if (userChatsInitialized) renderChatListFromCache();
             };
@@ -52622,6 +52705,9 @@ html body #tab-chats .xc-all-btn:active{opacity:.6}
 html body #tab-chats .xc-all-dot{position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--xc-blue);border:2px solid var(--bg-base)}
 html body #tab-chats .xc-all-menu{display:none;position:absolute;right:0;top:46px;min-width:170px;padding:6px;border-radius:14px;background:var(--bg-surface);border:1px solid var(--border-color);box-shadow:var(--shadow-elevated);z-index:60}
 html body #tab-chats .xc-all-menu.open{display:block}
+.xh-menu-sep{height:1px;margin:4px 8px;background:var(--border-color)}
+.xh-menu-dot{display:none;width:8px;height:8px;border-radius:50%;background:var(--primary-blue);margin-right:8px;flex-shrink:0}
+.xh-menu-dot.on{display:inline-block}
 /* Pages header uses the same title font as Chat / Notifications / Home */
 html body #tab-groups .chat-header-top h1{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif!important;font-size:20px!important;font-weight:800!important;letter-spacing:-.2px!important;line-height:1!important;padding:0!important;color:var(--text-primary)!important}
 html body #tab-chats #chat-list-container.xc-groups-only .chat-item:not([data-group-id]),

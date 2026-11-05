@@ -38787,9 +38787,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 } else {
                     let mediaURL = '', mediaType = '';
                     if (c.file) {
-                        const up = await uploadToCloudinary(c.file);
-                        mediaURL = up.url;
-                        mediaType = up.type === 'video' ? 'video' : 'image';
+                        const isVid = (c.file.type || '').startsWith('video/');
+                        if (isVid && c.file.size > 100 * 1024 * 1024) throw new Error('Video is too large (max 100 MB)');
+                        const safeName = (c.file.name || 'media').replace(/[^a-zA-Z0-9._-]/g, '_');
+                        const upFile = isVid ? c.file : await compressImageForUpload(c.file);
+                        mediaURL = await uploadToFirebaseStorage(upFile, `page_media/${user.uid}/${Date.now()}_${safeName}`);
+                        mediaType = isVid ? 'video' : 'image';
                     }
                     const postKey = push(ref(database, `pagePosts/${c.pid}`)).key;
                     await update(ref(database), {
@@ -38878,8 +38881,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             pgEditorRefreshImages();
             pgEditorRefreshSave();
             try {
-                const up = await uploadToCloudinary(file);
-                if (pgEditing === ed) ed[kind + 'URL'] = up.url;
+                const upFile = await compressImageForUpload(file);
+                const safeName = (upFile.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
+                const url = await uploadToFirebaseStorage(upFile, `page_media/${auth.currentUser.uid}/${Date.now()}_${kind}_${safeName}`);
+                if (pgEditing === ed) ed[kind + 'URL'] = url;
             } catch (err) {
                 if (pgEditing === ed) { URL.revokeObjectURL(ed[prevKey]); ed[prevKey] = ''; notify('Photo upload failed \u2014 try again', 'error'); }
             } finally {

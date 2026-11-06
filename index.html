@@ -10522,7 +10522,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 </div>
                 <div class="wa-list-row wa-row-clickable" id="setting-help">
                     <div class="wa-row-icon chip-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
-                    <div class="wa-row-body"><span class="wa-row-title">Help &amp; Support</span></div>
+                    <div class="wa-row-body"><span class="wa-row-title">Help &amp; Support</span><span class="wa-row-sub" id="support-row-sub" style="display:none;"></span></div>
                     <svg class="setting-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </div>
                 <div class="wa-list-row" id="setting-about-version">
@@ -18465,8 +18465,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // Help & Support opens a chooser: a live-agent chat (everyone) and an instant AI voice
         // call (verified members only — same gate as openHabaAIVoiceOverlay, which uses the
         // in-app xAI voice session via the habaAIVoiceToken Cloud Function).
-        // Set this to the uid of the human support account that agents reply from.
-        const SUPPORT_AGENT_UID = '';
         // Saved xAI agent ("Haba Support", console.x.ai) used for the instant voice call.
         // habaAIVoiceToken must read data.agentId and load that agent's config server-side.
         const SUPPORT_VOICE_AGENT_ID = 'agent_1pNnX9T2KcZtA7Ne';
@@ -18483,24 +18481,44 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             closeSettingsSheet(); // Settings sits above the voice overlay in z-order
             openHabaAIVoiceOverlay({ agentId: SUPPORT_VOICE_AGENT_ID });
         });
+        // Live agent chat: opens the in-app support chat (js/haba-support.js), which creates tickets in
+        // support_tickets / support_messages so agents answer from the Haba Support dashboard.
+        // Loaded on demand, so a missing file can never break the rest of the app.
         document.getElementById('btn-help-live').addEventListener('click', async () => {
             closeHelpSupportSheet();
-            if (!SUPPORT_AGENT_UID) {
-                showCustomModal("Help & Support", "Live chat isn't available right now. Email support@webmessenger.app and we'll get back to you as soon as we can.");
+            const u = auth.currentUser;
+            if (!u) {
+                showCustomModal("Help & Support", "Please sign in to chat with a support agent.");
                 return;
             }
             closeSettingsSheet();
-            let profile = cachedUsers[SUPPORT_AGENT_UID];
-            if (!profile) {
-                try {
-                    const snap = await get(ref(database, `users/${SUPPORT_AGENT_UID}`));
-                    profile = snap.val() || {};
-                    cachedUsers[SUPPORT_AGENT_UID] = profile;
-                } catch (err) { profile = {}; }
+            try {
+                const mod = await import('./js/haba-support.js');
+                mod.openSupportChat({ auth, db: database, profile: cachedUsers[u.uid] || {} });
+            } catch (err) {
+                console.error('Support chat failed to load', err);
+                showCustomModal("Help & Support", "Live chat couldn't load. Check your connection and try again.");
             }
-            try { if (!cachedContacts[SUPPORT_AGENT_UID]) await followUser(SUPPORT_AGENT_UID); } catch (err) { /* non-fatal */ }
-            openChatView(SUPPORT_AGENT_UID, profile.name || 'Haba Support', profile.photoURL || '');
         });
+
+        // Small "N new replies" note under the Help & Support row when an agent has answered.
+        let _stopSupportWatch = null;
+        async function habaSupportWatch(user) {
+            if (_stopSupportWatch) { _stopSupportWatch(); _stopSupportWatch = null; }
+            const sub = document.getElementById('support-row-sub');
+            if (sub) { sub.style.display = 'none'; sub.textContent = ''; }
+            if (!user) return;
+            try {
+                const mod = await import('./js/haba-support.js');
+                if (auth.currentUser !== user) return;
+                _stopSupportWatch = mod.watchSupportUnread({ auth, db: database, onChange: (n) => {
+                    const el = document.getElementById('support-row-sub');
+                    if (!el) return;
+                    el.textContent = n ? (n === 1 ? '1 new reply from support' : n + ' new replies from support') : '';
+                    el.style.display = n ? '' : 'none';
+                } });
+            } catch (err) { /* support module not deployed yet; ignore */ }
+        }
 
         
         function updateNotificationBtnVisibility() {
@@ -44792,6 +44810,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 dot.classList.toggle('is-offline', !isOnline);
             });
         }
+
+        onAuthStateChanged(auth, (u) => { habaSupportWatch(u); });
 
         onAuthStateChanged(auth, async (user) => {
             if (await checkForForcedUpdate()) return;

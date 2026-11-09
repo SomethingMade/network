@@ -34552,8 +34552,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 let friendUid = null;
                 // If this came from scanning the Share Profile QR, it'll be a full profile
                 // URL rather than a bare username — pull the trailing slug out first.
-                if (rawInput.startsWith(PROFILE_WEB_BASE_URL)) {
-                    rawInput = rawInput.slice(PROFILE_WEB_BASE_URL.length).replace(/\/+$/, '');
+                const matchedProfileBase = [PROFILE_WEB_BASE_URL].concat(LEGACY_PROFILE_WEB_BASE_URLS).find(b => rawInput.startsWith(b));
+                if (matchedProfileBase) {
+                    rawInput = rawInput.slice(matchedProfileBase.length).replace(/\/+$/, '');
                 }
                 const digitsOnly = rawInput.replace(/[^0-9]/g, '');
                 const looksLikePhone = digitsOnly.length >= 7 && !rawInput.replace(/[\s+()-]/g, '').match(/[a-zA-Z@_]/);
@@ -34647,9 +34648,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             }
         }
 
+        // Every link Haba shares (profiles, posts, pages, community invites) uses the custom domain,
+        // never whatever host the app happens to be open on (web.app, firebaseapp.com, localhost, an app wrapper...).
+        const HABA_PUBLIC_ORIGIN = 'https://habaapp.co.za';
         // Public read-only profile page, served by the profileView Cloud Function via a
-        // Firebase Hosting rewrite (see firebase.json). Update this if you attach a custom domain.
-        const PROFILE_WEB_BASE_URL = 'https://newstart-64c43.web.app/u/';
+        // Firebase Hosting rewrite (see firebase.json) on the custom domain.
+        const PROFILE_WEB_BASE_URL = HABA_PUBLIC_ORIGIN + '/u/';
+        // Profile links/QR codes created before the switch used the default Firebase host; keep reading them.
+        const LEGACY_PROFILE_WEB_BASE_URLS = ['https://newstart-64c43.web.app/u/', 'https://newstart-64c43.firebaseapp.com/u/'];
 
         // Renders the QR code inside the Share Profile sheet — same qrValue convention as
         // renderMyQrCode (username if set, uid as fallback) so both codes scan to the same result.
@@ -38657,7 +38663,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         // ── share ─────────────────────────────────────────────────────────────────
-        function pageShareUrl(pid) { return `${window.location.origin}${window.location.pathname}?page=${pid}`; }
+        function pageShareUrl(pid) { return `${HABA_PUBLIC_ORIGIN}/?page=${encodeURIComponent(pid)}`; }
         async function sharePage(pid) {
             const p = pgPages[pid];
             if (!p) return;
@@ -39519,7 +39525,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // (private groups only), this is meant to be freely shared and joined by anyone who opens
         // it, so use "Invite by ID" instead for a private group you want to keep closed off.
         function communityInviteUrl(groupId) {
-            return `${window.location.origin}${window.location.pathname}?joinCommunity=${groupId}`;
+            return `${HABA_PUBLIC_ORIGIN}/?joinCommunity=${encodeURIComponent(groupId)}`;
         }
         document.getElementById('btn-share-community').addEventListener('click', async () => {
             if (!activeGroupId) return;

@@ -586,6 +586,8 @@
         .bottom-sheet-overlay.active { opacity: 1; visibility: visible; }
         .bottom-sheet { background: var(--bg-surface); width: 100%; max-width: 420px; border-radius: 28px 28px 0 0; padding: 12px 28px 32px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); transform: translateY(100%); transition: transform 0.35s var(--ease-smooth); max-height: min(85vh, 100%); overflow-y: auto; overflow-x: hidden; color: var(--text-primary); }
         .bottom-sheet-overlay.active .bottom-sheet { transform: translateY(0); }
+        /* A sheet's own scrolling must never chain to the page behind it. */
+        .bottom-sheet-overlay, .bottom-sheet { overscroll-behavior: contain; }
 
         /* ── SIDEBAR DRAWER (header menu button / avatar) ──
            Profile card with cover, stat chips, quick-action tiles, a clean list and a pinned
@@ -54778,5 +54780,65 @@ html body #tab-groups.map-fullview #pages-container,
 html body #tab-groups.map-fullview #group-invites-container{display:none!important}
 
 </style>
+
+<script>
+/* ── SHEET SCROLL LOCK ─────────────────────────────────────────────────────────────────────────
+   While any bottom sheet / full-screen sheet overlay is open, the page behind it must not scroll.
+   Scrolling is only allowed inside a scrollable element that lives INSIDE the open sheet and can still
+   move in the direction of the gesture. Everything else (touching the dimmed backdrop, a sheet that is
+   already at the top/bottom of its content, a sheet with nothing to scroll) is blocked, so it can no
+   longer "chain" through to the feed / chat list underneath. Horizontal swipes on scrollable rows
+   (e.g. the Pages pills) and gestures on sliders / canvases / video are left alone. */
+(function () {
+    var OVERLAYS = '.bottom-sheet-overlay.active, .modal-overlay.active';
+    var startX = 0, startY = 0;
+
+    function anyOpen() { return document.querySelector(OVERLAYS) !== null; }
+    function activeOverlayOf(el) {
+        var ov = el && el.closest ? el.closest('.bottom-sheet-overlay, .modal-overlay') : null;
+        return ov && ov.classList.contains('active') ? ov : null;
+    }
+    // Can this element scroll further in the gesture's direction?
+    function canScroll(el, vertical, delta) {
+        var cs = getComputedStyle(el);
+        if (vertical) {
+            if (!/(auto|scroll)/.test(cs.overflowY) || el.scrollHeight <= el.clientHeight + 1) return false;
+            return delta > 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+        }
+        return /(auto|scroll)/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 1;
+    }
+    function scrollableInside(target, overlay, vertical, delta) {
+        for (var el = target; el && el !== document.body; el = el.parentElement) {
+            if (el.nodeType === 1 && canScroll(el, vertical, delta)) return true;
+            if (el === overlay) break;
+        }
+        return false;
+    }
+    function exempt(t) {
+        return t && t.closest && t.closest('input[type="range"], canvas, video, audio, [data-allow-scroll]');
+    }
+
+    document.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 1) { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+        if (e.touches.length !== 1 || !anyOpen() || exempt(e.target)) return;     // pinch etc. untouched
+        var overlay = activeOverlayOf(e.target);
+        if (!overlay) { e.preventDefault(); return; }                              // finger is outside every open sheet
+        var dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
+        var vertical = Math.abs(dy) >= Math.abs(dx);
+        if (!scrollableInside(e.target, overlay, vertical, vertical ? dy : dx)) e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('wheel', function (e) {
+        if (e.ctrlKey || !anyOpen() || exempt(e.target)) return;                  // ctrl+wheel = browser zoom
+        var overlay = activeOverlayOf(e.target);
+        if (!overlay) { e.preventDefault(); return; }
+        var vertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+        if (!scrollableInside(e.target, overlay, vertical, vertical ? -e.deltaY : -e.deltaX)) e.preventDefault();
+    }, { passive: false });
+})();
+</script>
 </body>
 </html>

@@ -35070,30 +35070,60 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 .sort((a, b) => (cachedCommunities[b].createdAt || 0) - (cachedCommunities[a].createdAt || 0));
         }
 
-        // Renders the horizontally-scrollable "joined communities" pill row shown just above the
-        // followers/following stats on both profile sheets (own profile and viewing someone else's).
-        function renderProfileCommunityPills(containerId, uid) {
+        // Renders the horizontally-scrollable "Pages" pill row shown just above the followers/following
+        // stats on both profile sheets (own profile and viewing someone else's). It lists every Page the
+        // person OWNS (created) plus every Page they have JOINED (follow), owned ones first. This replaced
+        // the old "joined groups" row, so the function name and container ids are unchanged.
+        const profilePagesToken = {};
+        async function renderProfileCommunityPills(containerId, uid) {
             const wrap = document.getElementById(containerId);
             if (!wrap) return;
-            const ids = getJoinedCommunityIds(uid);
-            if (ids.length === 0) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-            wrap.style.display = 'flex';
-            wrap.innerHTML = ids.map(gid => {
-                const g = cachedCommunities[gid];
-                const avatarHtml = g.photoURL
-                    ? `<span class="profile-community-pill-avatar" style="background-image:url('${g.photoURL}');"></span>`
-                    : `<span class="profile-community-pill-avatar" style="background-color:var(--accent-purple); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;">${groupInitials(g.name)}</span>`;
-                return `<button type="button" class="profile-community-pill" data-group-id="${gid}">${avatarHtml}<span>${groupNameLabel(g)}</span></button>`;
-            }).join('');
+            const token = profilePagesToken[containerId] = (profilePagesToken[containerId] || 0) + 1;
+            wrap.style.display = 'none'; wrap.innerHTML = '';
+            if (!uid) return;
+            try {
+                const [ownedSnap, followedSnap] = await Promise.all([
+                    get(ref(database, `userPages/${uid}`)).catch(() => null),
+                    get(ref(database, `userFollowedPages/${uid}`)).catch(() => null)
+                ]);
+                const owned = ownedSnap && ownedSnap.exists() ? Object.keys(ownedSnap.val()) : [];
+                const followed = followedSnap && followedSnap.exists() ? Object.keys(followedSnap.val()) : [];
+                const ids = Array.from(new Set(owned.concat(followed)));
+                if (!ids.length) return;
+                const pages = await Promise.all(ids.map(id => pgFetchPage(id)));
+                if (token !== profilePagesToken[containerId]) return; // a newer render took over
+                const items = ids.map((id, i) => ({ id, page: pages[i] })).filter(x => x.page);
+                items.forEach(x => { x.owned = owned.includes(x.id) || x.page.ownerUid === uid; });
+                items.sort((x, y) => (y.owned - x.owned) || ((y.page.createdAt || 0) - (x.page.createdAt || 0)));
+                if (!items.length) return;
+                wrap.style.display = 'flex';
+                wrap.innerHTML = items.map(({ id, page, owned: isOwner }) => {
+                    const name = page.name || 'Page';
+                    const img = pgSafeUrl(page.avatarURL);
+                    const h = pgHue(name);
+                    const avatarHtml = img
+                        ? `<span class="profile-community-pill-avatar" style="background-image:url('${pgEsc(img)}');"></span>`
+                        : `<span class="profile-community-pill-avatar" style="background:linear-gradient(135deg,hsl(${h},62%,46%),hsl(${(h + 40) % 360},66%,34%)); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;">${pgEsc(pgInitials(name))}</span>`;
+                    const tag = isOwner ? ' <em style="font-style:normal; opacity:.6; font-size:11px; font-weight:600;">· Owner</em>' : '';
+                    return `<button type="button" class="profile-community-pill" data-page-id="${pgEsc(id)}">${avatarHtml}<span>${pgEsc(name)}${tag}</span></button>`;
+                }).join('');
+            } catch (err) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
         }
 
+        // Opening a Page from a profile sheet: lift the Page screen (and the sheets it opens) above the
+        // profile sheet for as long as it is open — see the body.pg-from-profile rules in the CSS.
+        function openPageFromProfile(pid) {
+            if (!pid) return;
+            document.body.classList.add('pg-from-profile');
+            openPageScreen(pid);
+        }
         document.getElementById('my-profile-community-pills').addEventListener('click', (e) => {
             const pill = e.target.closest('.profile-community-pill');
-            if (pill) openGroupChatView(pill.dataset.groupId);
+            if (pill) openPageFromProfile(pill.dataset.pageId);
         });
         document.getElementById('user-info-community-pills').addEventListener('click', (e) => {
             const pill = e.target.closest('.profile-community-pill');
-            if (pill) openGroupChatView(pill.dataset.groupId);
+            if (pill) openPageFromProfile(pill.dataset.pageId);
         });
 
         // Small "people" glyph used to prefix member-count meta lines in the Community tab,
@@ -38661,6 +38691,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         function closePageScreen() {
             document.getElementById('page-screen-overlay').classList.remove('active');
+            document.body.classList.remove('pg-from-profile');
             activePageId = null;
             pgActivePosts = null;
         }
@@ -40292,7 +40323,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const joinedLabel = formatJoinedDate(profile.createdAt);
             if (joinedRow) joinedRow.style.display = joinedLabel ? 'flex' : 'none';
             const joinedEl = document.getElementById('user-info-joined');
-            if (joinedEl) joinedEl.textContent = joinedLabel;
+            if (joinedEl) joinedEl.textContent = joinedLabel ? 'Joined at ' + joinedLabel : '';
             const websiteEl = document.getElementById('user-info-website');
             const websiteInfo = normalizeProfileWebsite(profile.website);
             if (websiteEl) {
@@ -51630,7 +51661,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             $('xc-sheet-bio').textContent = p.about || '';
             $('xc-sheet-bio').style.display = p.about ? '' : 'none';
             const joined = formatJoinedDate(p.createdAt);
-            $('xc-sheet-joined-text').textContent = joined ? 'Joined ' + joined : '';
+            $('xc-sheet-joined-text').textContent = joined ? 'Joined at ' + joined : '';
             $('xc-sheet-joined').style.display = joined ? 'flex' : 'none';
             $('xc-sheet-following').textContent = formatProfileCount(p.followingCount);
             $('xc-sheet-followers').textContent = formatProfileCount(p.followersCount);
@@ -54627,6 +54658,11 @@ html body #tab-groups #pages-container{flex:1;overflow-y:auto;-webkit-overflow-s
 
 /* ── full-screen Page view + editors (class .bottom-sheet-overlay gives back-button support) ── */
 #page-screen-overlay,#page-edit-overlay,#page-composer-overlay,#page-menu-overlay{align-items:stretch;justify-content:center;background:var(--bg-base);backdrop-filter:none;-webkit-backdrop-filter:none}
+/* Page opened from a profile sheet (z 100010): lift it and the sheets it opens above that sheet. */
+body.pg-from-profile #page-screen-overlay{z-index:100011}
+body.pg-from-profile #post-comments-sheet-overlay,body.pg-from-profile #image-viewer-overlay{z-index:100012}
+body.pg-from-profile #page-edit-overlay,body.pg-from-profile #page-composer-overlay{z-index:100013}
+body.pg-from-profile #page-menu-overlay{z-index:100014}
 #page-screen-overlay{z-index:100001}
 #page-edit-overlay{z-index:100003}
 #page-composer-overlay{z-index:100003}

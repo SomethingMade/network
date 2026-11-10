@@ -47158,6 +47158,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 if (!sawFirstValue) { sawFirstValue = true; return; } // skip the initial fire — we just fetched it ourselves
                 delete peerPublicKeyCache[peerUid];
                 delete sharedKeyCache[peerUid];
+                resetKeyHistoryCaches();
             });
         }
 
@@ -47166,6 +47167,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             const snap = await get(ref(database, `users/${peerUid}/e2ee/publicKey`));
             if (!snap.exists()) return null;
             const key = await crypto.subtle.importKey('jwk', snap.val(), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+            rememberPeerPublicJwk(peerUid, snap.val());
             peerPublicKeyCache[peerUid] = key;
             watchPeerPublicKey(peerUid);
             return key;
@@ -47192,6 +47194,73 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 sharedKeyCache[peerUid] = sharedKey;
                 return sharedKey;
             } catch (e) { return null; }
+        }
+
+        // --- KEY HISTORY (silent self-healing decryption) ---
+        // Whenever this device replaces its own keypair (restore / reset), the old one is
+        // archived locally; whenever a peer's published public key is fetched, it is remembered.
+        // If a message can't be opened with the current shared key (or a freshly re-fetched one),
+        // decryptForPeer quietly tries every (my old/new key x peer old/new key) combination
+        // before giving up -- so a rotated key on either side doesn't leave "Encrypted message"
+        // rows behind. Messages that really can't be opened are dropped silently by the callers.
+        const keyHistoryCache = {};
+        const unreadablePayloads = new Set();
+        function resetKeyHistoryCaches() {
+            Object.keys(keyHistoryCache).forEach(k => delete keyHistoryCache[k]);
+            unreadablePayloads.clear();
+        }
+        function e2eJwkId(j) { return j ? (j.x || '') + '.' + (j.y || '') : ''; }
+        async function archiveCurrentKeypair(uid) {
+            try {
+                const cur = myE2EKeypair || await idbGet('keys', 'keypair-' + uid);
+                if (!cur || !cur.privateKey || !cur.publicKey) return;
+                const pj = await crypto.subtle.exportKey('jwk', cur.publicKey);
+                const list = (await idbGet('keys', 'archive-' + uid)) || [];
+                const id = e2eJwkId(pj);
+                if (list.some(e => e.id === id)) return;
+                list.unshift({ id, privateKey: cur.privateKey, publicKey: cur.publicKey });
+                await idbSet('keys', 'archive-' + uid, list.slice(0, 10));
+                resetKeyHistoryCaches();
+            } catch (e) { /* best-effort */ }
+        }
+        async function rememberPeerPublicJwk(peerUid, jwk) {
+            try {
+                if (!jwk) return;
+                const k = 'peerpubs-' + peerUid;
+                const list = (await idbGet('keys', k)) || [];
+                const id = e2eJwkId(jwk);
+                if (list.some(j => e2eJwkId(j) === id)) return;
+                list.unshift(jwk);
+                await idbSet('keys', k, list.slice(0, 10));
+                resetKeyHistoryCaches();
+            } catch (e) { /* best-effort */ }
+        }
+        async function getHistoricKeys(peerUid) {
+            if (keyHistoryCache[peerUid]) return keyHistoryCache[peerUid];
+            const out = [];
+            const user = auth.currentUser;
+            if (!user || peerUid === AI_UID) return out;
+            try {
+                const mine = [];
+                const cur = await getMyKeypair();
+                if (cur) mine.push(cur);
+                ((await idbGet('keys', 'archive-' + user.uid)) || []).forEach(e => mine.push(e));
+                const peers = [];
+                try { const pk = await getPeerPublicKey(peerUid); if (pk) peers.push(pk); } catch (e) {}
+                for (const jwk of ((await idbGet('keys', 'peerpubs-' + peerUid)) || [])) {
+                    try { peers.push(await crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, [])); } catch (e) {}
+                }
+                for (const my of mine) {
+                    for (const pub of peers) {
+                        if (out.length >= 30) break;
+                        try {
+                            out.push(await crypto.subtle.deriveKey({ name: 'ECDH', public: pub }, my.privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+                        } catch (e) { /* skip unusable combo */ }
+                    }
+                }
+            } catch (e) { /* fall through with whatever we have */ }
+            keyHistoryCache[peerUid] = out;
+            return out;
         }
 
         function isE2EPayload(s) { return typeof s === 'string' && s.startsWith(E2E_PREFIX); }
@@ -47245,23 +47314,25 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 if (m && m.text === E2E_UNREADABLE_TEXT && !m.mediaURL) list.splice(i, 1);
             }
         }
-        function friendlyE2EPreview(text) { return text === E2E_UNREADABLE_TEXT ? '🔒 Encrypted message' : text; }
+        function friendlyE2EPreview(text) { return text === E2E_UNREADABLE_TEXT ? 'Message' : text; }
 
         async function decryptForPeer(peerUid, payload) {
             if (!isE2EPayload(payload)) return payload;
-            const key = await deriveSharedKey(peerUid);
-            if (!key) return '🔒 Encrypted message';
-            try {
-                return await tryDecryptOnce(key, payload);
-            } catch (e) {
-                const freshKey = await deriveSharedKey(peerUid, true);
-                if (!freshKey) return '🔒 Unable to decrypt message';
-                try {
-                    return await tryDecryptOnce(freshKey, payload);
-                } catch (e2) {
-                    return '🔒 Unable to decrypt message';
-                }
+            if (unreadablePayloads.has(payload)) return E2E_UNREADABLE_TEXT;
+            // 1) current shared key, 2) freshly re-fetched key, 3) every older key combination.
+            const attempt = async (key) => { try { return await tryDecryptOnce(key, payload); } catch (e) { return null; } };
+            let key = null;
+            try { key = await deriveSharedKey(peerUid); } catch (e) {}
+            if (key) { const r = await attempt(key); if (r !== null) return r; }
+            let fresh = null;
+            try { fresh = await deriveSharedKey(peerUid, true); } catch (e) {}
+            if (fresh) { const r = await attempt(fresh); if (r !== null) return r; }
+            for (const k of await getHistoricKeys(peerUid)) {
+                const r = await attempt(k);
+                if (r !== null) return r;
             }
+            unreadablePayloads.add(payload);
+            return E2E_UNREADABLE_TEXT;
         }
 
         // Encrypts a photo File's raw bytes for a 1:1 thread with peerUid, ahead of upload.
@@ -47512,38 +47583,38 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             // CORS on the Storage bucket: `gsutil cors set cors.json gs://<your-bucket>`
             // allowing GET from your app's origin.
             let fetchFailedForReasonOtherThanKey = false;
+            let cipherAll = null;
             const tryWithKey = async (key) => {
-                let res;
-                try {
-                    res = await fetch(mediaURL);
-                } catch (networkOrCorsErr) {
-                    fetchFailedForReasonOtherThanKey = true;
-                    throw networkOrCorsErr;
+                if (!cipherAll) {
+                    try {
+                        const res = await fetch(mediaURL);
+                        cipherAll = await res.arrayBuffer();
+                    } catch (networkOrCorsErr) {
+                        fetchFailedForReasonOtherThanKey = true;
+                        throw networkOrCorsErr;
+                    }
                 }
-                const buf = await res.arrayBuffer();
-                const iv = new Uint8Array(buf.slice(0, 12));
-                const cipherBuf = buf.slice(12);
+                const iv = new Uint8Array(cipherAll.slice(0, 12));
+                const cipherBuf = cipherAll.slice(12);
                 const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBuf);
                 return new Blob([plainBuf], { type: mimeType || 'application/octet-stream' });
             };
+            const attempt = async (key) => { try { return await tryWithKey(key); } catch (e) { return null; } };
 
-            const key = await deriveSharedKey(peerUid, bypassCache);
-            if (!key) return null;
-            try {
-                return await tryWithKey(key);
-            } catch (e) {
-                // Skip the wasted key-rotation retry when we already know the fetch itself
-                // failed (network/CORS) — a fresh key can't fix that, and re-deriving/re-fetching
-                // just delays the failure state showing up.
+            let key = null;
+            try { key = await deriveSharedKey(peerUid, bypassCache); } catch (e) {}
+            if (key) { const r = await attempt(key); if (r) return r; }
+            if (fetchFailedForReasonOtherThanKey) return null;
+            let fresh = null;
+            try { fresh = await deriveSharedKey(peerUid, true); } catch (e) {}
+            if (fresh) { const r = await attempt(fresh); if (r) return r; }
+            if (fetchFailedForReasonOtherThanKey) return null;
+            for (const k of await getHistoricKeys(peerUid)) {
+                const r = await attempt(k);
+                if (r) return r;
                 if (fetchFailedForReasonOtherThanKey) return null;
-                const freshKey = await deriveSharedKey(peerUid, true);
-                if (!freshKey) return null;
-                try {
-                    return await tryWithKey(freshKey);
-                } catch (e2) {
-                    return null;
-                }
             }
+            return null;
         }
 
         // bypassCache lets a manual "tap to retry" re-attempt from scratch instead of reusing
@@ -47673,6 +47744,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 );
 
                 const keypair = { privateKey, publicKey };
+                await archiveCurrentKeypair(user.uid);
                 myE2EKeypair = keypair;
                 await idbSet('keys', 'keypair-' + user.uid, keypair);
                 await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
@@ -48012,6 +48084,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             showLoading();
             try {
                 const keypair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+                await archiveCurrentKeypair(user.uid);
                 await idbSet('keys', 'keypair-' + user.uid, keypair);
                 const publicJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey);
                 await set(ref(database, `users/${user.uid}/e2ee/publicKey`), publicJwk);
@@ -49601,6 +49674,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                                 if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
                                 if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
                                     msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                                    if (msg.replyToMessage.text === E2E_UNREADABLE_TEXT) msg.replyToMessage.text = 'Message';
                                 }
                             }));
                             dropUnreadableE2EMessages(entries);
@@ -50178,6 +50252,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                         if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
                         if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
                             msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                                    if (msg.replyToMessage.text === E2E_UNREADABLE_TEXT) msg.replyToMessage.text = 'Message';
                         }
                     }));
                     dropUnreadableE2EMessages(liveItems);

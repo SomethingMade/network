@@ -47124,6 +47124,18 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                     const stored = await idbGet('keys', 'keypair-' + user.uid);
                     if (stored && stored.publicKey && stored.privateKey) {
                         myE2EKeypair = stored;
+                        // Self-heal: if the public key published for this account doesn't match the
+                        // private key on this device (DB reset, key restored/rotated elsewhere, failed
+                        // publish), peers encrypt to the WRONG key and everything they send us is
+                        // undecryptable (and used to be silently hidden). Republish the matching one.
+                        try {
+                            const localJwk = await crypto.subtle.exportKey('jwk', stored.publicKey);
+                            const pubSnap = await get(ref(database, `users/${user.uid}/e2ee/publicKey`));
+                            const publishedJwk = pubSnap.exists() ? pubSnap.val() : null;
+                            if (!publishedJwk || e2eJwkId(publishedJwk) !== e2eJwkId(localJwk)) {
+                                await set(ref(database, `users/${user.uid}/e2ee/publicKey`), localJwk);
+                            }
+                        } catch (e) { /* best-effort */ }
                         return myE2EKeypair;
                     }
                 } catch (e) { /* fall through to generate a fresh one */ }
@@ -47309,9 +47321,16 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
         // the chat just carries on with the current (new) key.
         const E2E_UNREADABLE_TEXT = '🔒 Unable to decrypt message';
         function dropUnreadableE2EMessages(list) {
+            const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
             for (let i = list.length - 1; i >= 0; i--) {
                 const m = list[i];
-                if (m && m.text === E2E_UNREADABLE_TEXT && !m.mediaURL) list.splice(i, 1);
+                if (!m || m.text !== E2E_UNREADABLE_TEXT || m.mediaURL) continue;
+                // Recent messages from the other person stay visible (as the "Unable to decrypt"
+                // placeholder) so a received message never just vanishes; only old, permanently
+                // unreadable history is dropped.
+                const me = auth.currentUser && auth.currentUser.uid;
+                if (m.senderUid && m.senderUid !== me && (m.createdAt || 0) >= recentCutoff) continue;
+                list.splice(i, 1);
             }
         }
         function friendlyE2EPreview(text) { return text === E2E_UNREADABLE_TEXT ? 'Message' : text; }
@@ -50249,11 +50268,13 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
 
                 if (!isAIThread) {
                     await Promise.all(liveItems.map(async (msg) => {
-                        if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
-                        if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
-                            msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
-                                    if (msg.replyToMessage.text === E2E_UNREADABLE_TEXT) msg.replyToMessage.text = 'Message';
-                        }
+                        try {
+                            if (isE2EPayload(msg.text)) msg.text = await decryptForPeer(otherUid, msg.text);
+                            if (msg.replyToMessage && isE2EPayload(msg.replyToMessage.text)) {
+                                msg.replyToMessage.text = await decryptForPeer(otherUid, msg.replyToMessage.text);
+                                        if (msg.replyToMessage.text === E2E_UNREADABLE_TEXT) msg.replyToMessage.text = 'Message';
+                            }
+                        } catch (e) { console.warn('DM decrypt failed', e); msg.text = E2E_UNREADABLE_TEXT; }
                     }));
                     dropUnreadableE2EMessages(liveItems);
                 }
@@ -50288,12 +50309,12 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 // to offer instead of waiting on a round-trip fetch to discover that.
                 if (liveItems.length < MSG_PAGE_SIZE) noMoreOlderMessages = true;
 
-                await warmDecryptedMediaCache(liveItems);
+                try { await warmDecryptedMediaCache(liveItems); } catch (e) { console.warn('warmDecryptedMediaCache failed', e); }
                 renderDmThread();
                 // Mirror the refreshed window to disk (fire-and-forget) so the next time this
                 // thread is opened — even after a full reload — it can paint from here instantly.
                 writeCachedThreadMessagesToDisk(threadId, cachedThreadMessages);
-            });
+            }, (err) => { console.error('DM messages listener cancelled:', err); });
             window.location.hash = 'chat';
             document.getElementById('chat-view-overlay').classList.add('active');
             highlightActiveChat();

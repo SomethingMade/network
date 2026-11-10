@@ -4807,9 +4807,7 @@
         .chat-view-overlay .chat-view-info h4 { font-size: 16px; font-weight: 600; line-height: 1.25; letter-spacing: -0.1px; }
         .chat-view-overlay .chat-view-info p { font-size: 13px; font-weight: 500; line-height: 1.3; color: var(--text-secondary); }
         .chat-view-overlay .chat-view-info .about-bubble { display: none !important; }
-        .chat-view-overlay .chat-view-header > #btn-call-voice,
-        .chat-view-overlay .chat-view-header > #btn-call-video,
-        .chat-view-overlay .chat-view-header > #btn-group-call-voice { display: none !important; }
+        /* call buttons are shown again (WhatsApp skin below); JS still toggles them inline */
         .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu { width: 26px; height: 26px; padding: 7px 4px; box-sizing: content-box; stroke-width: 1.8; -webkit-tap-highlight-color: transparent; }
         .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu:active { opacity: 0.55; }
         @media (min-width: 1025px) { .chat-view-overlay .chat-view-header { padding-left: 20px; } } /* back arrow is hidden on desktop */
@@ -6574,7 +6572,84 @@
         .applock-forgot-link { color: var(--text-secondary); font-size: 12.5px; margin-top: 28px; text-decoration: underline; cursor: pointer; }
         @keyframes applockShake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
         .pin-shake { animation: applockShake 0.5s ease; }
-    </style>
+    
+        /* ══════════ WHATSAPP-STYLE CHAT SKIN ══════════
+           Header with call buttons, doodle wallpaper, tailed bubbles with the time inside,
+           blue read ticks, white date pills, and a pill composer with a round green mic.
+           Appended last so it wins over the earlier Instagram-style rules; user-picked
+           wallpapers and custom bubble colours (inline vars) still take priority. */
+        :root { --wa-green: #00A884; --wa-header: #FFFFFF; --wa-wall: #EFEAE2; --wa-pill: #FFFFFF; --wa-out: #D9FDD3; --wa-in: #FFFFFF; --wa-text: #111B21; --wa-sub: #667781; --wa-tick-read: #53BDEB; }
+        body.dark-theme { --wa-header: #202C33; --wa-wall: #0B141A; --wa-pill: #2A3942; --wa-out: #005C4B; --wa-in: #202C33; --wa-text: #E9EDEF; --wa-sub: #8696A0; }
+
+        /* header */
+        .chat-view-overlay .chat-view-header { background: var(--wa-header); padding: calc(8px + min(env(safe-area-inset-top), 20px)) 6px 8px 2px; gap: 8px; box-shadow: 0 1px 0 rgba(0,0,0,0.07); }
+        .chat-view-overlay .chat-view-avatar { width: 40px; height: 40px; }
+        .chat-view-overlay .chat-view-info h4 { font-size: 17px; font-weight: 600; letter-spacing: 0; color: var(--wa-text); }
+        .chat-view-overlay .chat-view-info p { font-size: 13px; font-weight: 400; color: var(--wa-sub); }
+        .chat-view-overlay .chat-view-header > #btn-call-voice,
+        .chat-view-overlay .chat-view-header > #btn-call-video,
+        .chat-view-overlay .chat-view-header > #btn-group-call-voice { width: 22px; height: 22px; padding: 9px 8px; box-sizing: content-box; color: var(--wa-text); -webkit-tap-highlight-color: transparent; }
+        .chat-view-overlay .chat-view-header > #btn-call-voice:active,
+        .chat-view-overlay .chat-view-header > #btn-call-video:active,
+        .chat-view-overlay .chat-view-header > #btn-group-call-voice:active { opacity: 0.55; }
+        .chat-view-overlay .chat-view-menu-wrap #btn-chat-view-menu { width: 22px; height: 22px; padding: 9px 6px; color: var(--wa-text); }
+
+        /* wallpaper (default = doodles; picked wallpapers keep working) */
+        .chat-view-messages:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom),
+        .wallpaper-preview-frame:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom) {
+            background-color: var(--wa-wall); background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='220' viewBox='0 0 240 220'><g fill='none' stroke='%238A7B5E' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round' opacity='0.34'><g transform='translate(10 10) rotate(-12)'><path d='M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z'/></g><g transform='translate(78 6) rotate(10)'><path d='M9 18V5l11-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='17' cy='16' r='3'/></g><g transform='translate(140 14) rotate(-8)'><circle cx='12' cy='12' r='10'/><path d='M8 14a4 4 0 0 0 8 0'/><circle cx='9' cy='9.5' r='.6'/><circle cx='15' cy='9.5' r='.6'/></g><g transform='translate(196 8) rotate(14)'><polygon points='12,2 15,9 22,9.5 16.5,14.5 18,22 12,18 6,22 7.5,14.5 2,9.5 9,9'/></g><g transform='translate(36 62) rotate(12)'><rect x='2' y='6' width='20' height='14' rx='3'/><circle cx='12' cy='13' r='4'/><path d='M8 6l1.5-3h5L16 6'/></g><g transform='translate(104 58) rotate(-14)'><rect x='3' y='9' width='18' height='12' rx='1.5'/><line x1='12' y1='9' x2='12' y2='21'/><path d='M3 13h18'/><path d='M12 9C9 9 7.5 4 10 4s2 5 2 5zm0 0c3 0 4.5-5 2-5s-2 5-2 5z'/></g><g transform='translate(168 64) rotate(8)'><path d='M22 2L11 13'/><path d='M22 2l-7 20-4-9-9-4z'/></g><g transform='translate(8 118) rotate(-10)'><path d='M18 18H7a5 5 0 1 1 1.2-9.8A6 6 0 0 1 20 10.5 4 4 0 0 1 18 18z'/></g><g transform='translate(72 112) rotate(16)'><path d='M9 18h6M10 21h4'/><path d='M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z'/></g><g transform='translate(134 118) rotate(-6)'><rect x='6' y='2' width='12' height='20' rx='3'/><line x1='11' y1='18.5' x2='13' y2='18.5'/></g><g transform='translate(194 112) rotate(12)'><circle cx='12' cy='12' r='2.5'/><circle cx='12' cy='5.5' r='3'/><circle cx='12' cy='18.5' r='3'/><circle cx='5.5' cy='12' r='3'/><circle cx='18.5' cy='12' r='3'/></g><g transform='translate(40 170) rotate(-14)'><path d='M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z'/><circle cx='12' cy='10' r='2.5'/></g><g transform='translate(104 168) rotate(10)'><path d='M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z'/></g><g transform='translate(166 172) rotate(-12)'><path d='M9 18V5l11-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='17' cy='16' r='3'/></g></g></svg>"); background-size: 240px 220px; background-repeat: repeat; }
+        body.dark-theme .chat-view-messages:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom),
+        body.dark-theme .wallpaper-preview-frame:not(.wallpaper-default-1):not(.wallpaper-default-2):not(.wallpaper-default-3):not(.wallpaper-custom) {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='220' viewBox='0 0 240 220'><g fill='none' stroke='%233A4D58' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round' opacity='0.55'><g transform='translate(10 10) rotate(-12)'><path d='M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z'/></g><g transform='translate(78 6) rotate(10)'><path d='M9 18V5l11-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='17' cy='16' r='3'/></g><g transform='translate(140 14) rotate(-8)'><circle cx='12' cy='12' r='10'/><path d='M8 14a4 4 0 0 0 8 0'/><circle cx='9' cy='9.5' r='.6'/><circle cx='15' cy='9.5' r='.6'/></g><g transform='translate(196 8) rotate(14)'><polygon points='12,2 15,9 22,9.5 16.5,14.5 18,22 12,18 6,22 7.5,14.5 2,9.5 9,9'/></g><g transform='translate(36 62) rotate(12)'><rect x='2' y='6' width='20' height='14' rx='3'/><circle cx='12' cy='13' r='4'/><path d='M8 6l1.5-3h5L16 6'/></g><g transform='translate(104 58) rotate(-14)'><rect x='3' y='9' width='18' height='12' rx='1.5'/><line x1='12' y1='9' x2='12' y2='21'/><path d='M3 13h18'/><path d='M12 9C9 9 7.5 4 10 4s2 5 2 5zm0 0c3 0 4.5-5 2-5s-2 5-2 5z'/></g><g transform='translate(168 64) rotate(8)'><path d='M22 2L11 13'/><path d='M22 2l-7 20-4-9-9-4z'/></g><g transform='translate(8 118) rotate(-10)'><path d='M18 18H7a5 5 0 1 1 1.2-9.8A6 6 0 0 1 20 10.5 4 4 0 0 1 18 18z'/></g><g transform='translate(72 112) rotate(16)'><path d='M9 18h6M10 21h4'/><path d='M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z'/></g><g transform='translate(134 118) rotate(-6)'><rect x='6' y='2' width='12' height='20' rx='3'/><line x1='11' y1='18.5' x2='13' y2='18.5'/></g><g transform='translate(194 112) rotate(12)'><circle cx='12' cy='12' r='2.5'/><circle cx='12' cy='5.5' r='3'/><circle cx='12' cy='18.5' r='3'/><circle cx='5.5' cy='12' r='3'/><circle cx='18.5' cy='12' r='3'/></g><g transform='translate(40 170) rotate(-14)'><path d='M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z'/><circle cx='12' cy='10' r='2.5'/></g><g transform='translate(104 168) rotate(10)'><path d='M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z'/></g><g transform='translate(166 172) rotate(-12)'><path d='M9 18V5l11-2v13'/><circle cx='6' cy='18' r='3'/><circle cx='17' cy='16' r='3'/></g></g></svg>"); }
+        .chat-view-messages { gap: 2px; --msg-in-bg: var(--wa-in); --msg-in-text: var(--wa-text); --msg-out-bg: var(--wa-out); --msg-out-text: var(--wa-text); --msg-in-time: var(--wa-sub); --msg-out-time: var(--wa-sub); --msg-out-tick: var(--wa-sub); --msg-tick-seen: var(--wa-tick-read); }
+        @media (max-width: 768px) { .chat-view-messages { padding: 10px 10px 6px; } }
+
+        /* date pills + notices */
+        .date-separator { margin: 8px 0 6px; }
+        .date-separator span { background: var(--wa-in); color: var(--wa-sub); font-size: 12.5px; font-weight: 500; padding: 5px 12px; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); backdrop-filter: none; -webkit-backdrop-filter: none; }
+        .dm-e2e-banner-pill { background: #FFEECD; color: #54656F; border: none; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); font-size: 12.5px; }
+        body.dark-theme .dm-e2e-banner-pill { background: #182229; color: #FFD279; }
+        .dm-e2e-banner-pill.dm-e2e-banner-off { background: #FDECEA; color: #B3261E; }
+        body.dark-theme .dm-e2e-banner-pill.dm-e2e-banner-off { background: #3B1F1D; color: #FFB4AB; }
+
+        /* bubbles: 8px radius, tail on the first bubble of a run, time inline bottom-right */
+        .msg-bubble { --bubble-r: 8px; --bubble-tight: 8px; padding: 6px 8px 6px 9px; font-size: 14.8px; line-height: 1.35; max-width: 82%; }
+        .msg-bubble.grp-prev { margin-top: 0; }
+        .msg-bubble.in { background: var(--msg-in-bg); color: var(--msg-in-text); box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); }
+        .msg-bubble.out { background: var(--msg-out-bg); color: var(--msg-out-text); box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); }
+        .msg-bubble:not(.media):not(.sticker) { display: flow-root; }
+        .msg-bubble:not(.media):not(.sticker) > div:not([class]) { display: inline; }
+        .msg-bubble:not(.media):not(.sticker) .msg-meta-wrap,
+        .msg-bubble.grp-next:not(.media):not(.sticker) .msg-meta-wrap { display: flex; float: right; margin: 6px -2px -3px 12px; gap: 3px; line-height: 1; align-items: flex-end; position: relative; top: 2px; }
+        .msg-bubble:not(.media):not(.sticker) .msg-time { font-size: 11px; }
+        .msg-ticks svg { width: 17px; height: 12px; }
+        .msg-bubble.in:not(.media):not(.sticker):not(.grp-prev) { --br-tl: 0px; }
+        .msg-bubble.out:not(.media):not(.sticker):not(.grp-prev) { --br-tr: 0px; }
+        .msg-bubble.in:not(.media):not(.sticker):not(.grp-prev)::after,
+        .msg-bubble.out:not(.media):not(.sticker):not(.grp-prev)::after { content: ''; position: absolute; top: 0; width: 8px; height: 13px; pointer-events: none; }
+        .msg-bubble.in:not(.media):not(.sticker):not(.grp-prev)::after { left: -8px; background: var(--msg-in-bg); clip-path: path('M8 0 H0 C3 1.5 7 5.5 8 13 Z'); }
+        .msg-bubble.out:not(.media):not(.sticker):not(.grp-prev)::after { right: -8px; background: var(--msg-out-bg); clip-path: path('M0 0 H8 C5 1.5 1 5.5 0 13 Z'); }
+        .chat-view-messages.peer-avatars .msg-bubble.in { margin-left: 0; }
+        .chat-view-messages.peer-avatars .msg-bubble.in.show-peer-avatar::before { display: none; }
+        .msg-bubble.out .msg-voice-waveform .wf-progress .wf-bar { background: var(--wa-green); }
+        .typing-bubble { background: var(--wa-in); border-radius: 0 8px 8px 8px; box-shadow: 0 1px 0.5px rgba(11,20,26,0.13); }
+        .read-receipt { display: none; }
+
+        /* composer: white pill [sticker | text | attach | gif] + round green mic */
+        .chat-view-input-row { background: transparent; align-items: flex-end; gap: 6px; padding: 6px 8px calc(8px + min(env(safe-area-inset-bottom), 16px)); }
+        .chat-view-input-row .chat-input-wrap { background: var(--wa-pill); border-radius: 24px; min-height: 48px; padding: 2px 6px 2px 4px; align-items: center; box-shadow: 0 1px 1px rgba(11,20,26,0.12); gap: 0; }
+        .chat-input-wrap textarea { font-size: 16px; padding: 10px 6px; color: var(--wa-text); }
+        .chat-input-wrap textarea::placeholder { color: var(--wa-sub); }
+        .chat-view-input-row .chat-input-wrap .chat-input-action-btn,
+        .chat-view-input-row .chat-input-wrap .chat-attach-btn { width: 40px; height: 40px; margin: 0; border-radius: 50%; background: transparent; color: var(--wa-sub); box-shadow: none; flex-shrink: 0; }
+        .chat-view-input-row .chat-input-wrap .chat-attach-btn:not(.icon-collapsed) { background: transparent; color: var(--wa-sub); width: 40px; height: 40px; }
+        .chat-view-input-row .chat-input-wrap .chat-attach-btn svg { width: 22px; height: 22px; }
+        .chat-view-input-row .chat-input-wrap .chat-input-action-btn svg { width: 22px; height: 22px; }
+        .chat-view-input-row .chat-input-wrap .chat-attach-btn.icon-collapsed { width: 0; }
+        .chat-view-input-row > .chat-view-send { width: 48px; height: 48px; margin: 0; background: var(--wa-green); color: #fff; box-shadow: 0 1px 2px rgba(11,20,26,0.25); }
+        .chat-view-input-row > .chat-view-send:hover { transform: none; box-shadow: 0 1px 2px rgba(11,20,26,0.25); }
+        .chat-view-input-row > .chat-view-send svg { width: 22px; height: 22px; }
+</style>
 
     <style>
         /* ══════════════════════════════════════════════════════════════════
@@ -13039,7 +13114,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 <svg id="btn-user-info" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; display:none; flex-shrink:0;" title="Contact Info"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             </div>
             <div class="chat-view-menu-wrap">
-                <svg id="btn-chat-view-menu" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;" title="More options"><circle cx="12" cy="12" r="10"></circle><circle cx="7.6" cy="12" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="16.4" cy="12" r="1.1" fill="currentColor" stroke="none"></circle></svg>
+                <svg id="btn-chat-view-menu" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor:pointer; flex-shrink:0;" title="More options"><circle cx="12" cy="5" r="1.9" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none"></circle><circle cx="12" cy="19" r="1.9" fill="currentColor" stroke="none"></circle></svg>
                 <div class="chat-view-menu-dropdown" id="chat-view-menu-dropdown">
                     <button type="button" class="chats-menu-item" id="chat-view-menu-voice-call" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
@@ -13122,24 +13197,22 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         <div id="word-suggest-bar" class="word-suggest-bar" style="display:none;"></div>
 
         <div class="chat-view-input-row" id="chat-view-input-row">
-            <button type="button" class="chat-attach-btn" id="chat-attach-btn" title="Attach">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
             <div class="chat-input-wrap">
-                <textarea id="chat-view-input" placeholder="Message..." rows="1" autocomplete="off" enterkeyhint="send"></textarea>
-                <div class="chat-input-actions">
-                    <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Send a sticker">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3.05V9a4 4 0 0 0 4 4h5.95"></path><path d="M11.5 21H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h6.5L21 10.5V17a4 4 0 0 1-4 4h-1.5"></path><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"></circle><circle cx="14" cy="10" r="1" fill="currentColor" stroke="none"></circle><path d="M8.5 14.5c.7.9 1.8 1.5 3 1.5s2.3-.6 3-1.5"></path></svg>
+                <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Send a sticker">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14a4.5 4.5 0 0 0 8 0"></path><circle cx="9" cy="9.5" r=".7" fill="currentColor"></circle><circle cx="15" cy="9.5" r=".7" fill="currentColor"></circle></svg>
                     </button>
-                    <button type="button" class="chat-input-action-btn" id="chat-gif-btn" title="Send a GIF">
+                <textarea id="chat-view-input" placeholder="Message..." rows="1" autocomplete="off" enterkeyhint="send"></textarea>
+                <button type="button" class="chat-attach-btn" id="chat-attach-btn" title="Attach">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            </button>
+                <button type="button" class="chat-input-action-btn" id="chat-gif-btn" title="Send a GIF">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="12" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect><text x="12" y="15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="currentColor" stroke="none">GIF</text></svg>
                     </button>
-                </div>
-                <button type="button" class="chat-view-send" id="chat-view-send">
+            </div>
+            <button type="button" class="chat-view-send" id="chat-view-send">
                     <svg class="send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     <svg class="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                 </button>
-            </div>
         </div>
 
         <div class="chat-view-input-row voice-recording-row" id="voice-recording-row" style="display:none;">

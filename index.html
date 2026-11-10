@@ -6409,6 +6409,8 @@
         .dm-e2e-banner-row { display: flex; justify-content: center; align-self: center; margin: 0 0 8px; max-width: 100%; }
         .dm-e2e-banner-pill { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 14px; border-radius: var(--radius-pill); background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; line-height: 1.35; text-align: center; box-shadow: var(--shadow-bubble); border: 1px solid var(--border-color); }
         .dm-e2e-banner-pill svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.85; }
+        .dm-e2e-banner-pill.dm-e2e-banner-off { background: rgba(255,159,10,0.12); color: #B26A00; border-color: rgba(255,159,10,0.35); }
+        body.dark-theme .dm-e2e-banner-pill.dm-e2e-banner-off { color: #FFB340; }
         /* "This is a Business Account" banner — same pinned-at-top treatment as the E2E notice
            above (buildBusinessAccountBanner), shown only in DMs with a business account. Also
            doubles as the chat-header chip (.chat-header-business-chip) next to the contact's
@@ -16581,13 +16583,30 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // inside the scrolling message list itself (like buildDateSeparator above), so it's
         // pinned to the very top of the conversation history — it scrolls with the thread and
         // is always the first thing you see when you scroll all the way up, on every DM.
-        function buildE2EBanner() {
+        function buildE2EBanner(peerUid) {
             const row = document.createElement('div');
             row.className = 'dm-e2e-banner-row';
-            row.innerHTML = `<div class="dm-e2e-banner-pill">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                <span>Messages are end-to-end encrypted. No one outside this chat can read them.</span>
-            </div>`;
+            const lockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
+            const openLockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 9.6-2"></path></svg>';
+            const showEncrypted = () => {
+                row.innerHTML = `<div class="dm-e2e-banner-pill">${lockSvg}<span>Messages are end-to-end encrypted. No one outside this chat can read them.</span></div>`;
+            };
+            // Encryption is only active once BOTH sides have a published key. Until then chats
+            // keep working as normal (plaintext, and any message that is plaintext is shown as
+            // is), and this banner reminds the user instead of claiming a protection that
+            // isn't there.
+            const showNotEncrypted = () => {
+                const peerName = ((typeof cachedUsers !== 'undefined' && cachedUsers[peerUid]) || {}).name || 'This person';
+                row.innerHTML = `<div class="dm-e2e-banner-pill dm-e2e-banner-off">${openLockSvg}<span>End-to-end encryption isn\u2019t on for this chat yet. ${escapeHtmlForPost(peerName)} needs to turn it on too \u2014 until then messages are sent as normal text.</span></div>`;
+            };
+            if (!peerUid || (typeof sharedKeyCache !== 'undefined' && sharedKeyCache[peerUid])) {
+                showEncrypted();
+            } else {
+                row.style.visibility = 'hidden'; // don't flash a wrong claim while we check
+                deriveSharedKey(peerUid).then((key) => {
+                    if (key) showEncrypted(); else showNotEncrypted();
+                }).catch(() => showNotEncrypted()).finally(() => { row.style.visibility = ''; });
+            }
             return row;
         }
 
@@ -50006,7 +50025,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
 
             function appendDmStartBanners(container) {
                 if (isAIThread) return;
-                container.appendChild(buildE2EBanner());
+                container.appendChild(buildE2EBanner(otherUid));
                 if ((cachedUsers[otherUid] || {}).isBusinessAccount) container.appendChild(buildBusinessAccountBanner());
             }
 

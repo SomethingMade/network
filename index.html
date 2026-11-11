@@ -47112,6 +47112,21 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
         // in flight — all await the SAME generate-and-publish instead of racing to each generate
         // and publish their own keypair, which would leave `myE2EKeypair` pointing at whichever
         // one finished last while other in-flight encrypt/decrypt calls used a different one.
+        // Self-heal: if the public key published for this account doesn't match the private key
+        // on this device (DB reset, key restored/rotated elsewhere, failed publish), peers encrypt
+        // to the WRONG key and everything they send us is undecryptable. Republish the matching one.
+        async function ensurePublishedKeyMatches(uid, keypair) {
+            try {
+                const localJwk = await crypto.subtle.exportKey('jwk', keypair.publicKey);
+                const pubSnap = await get(ref(database, `users/${uid}/e2ee/publicKey`));
+                const publishedJwk = pubSnap.exists() ? pubSnap.val() : null;
+                if (!publishedJwk || e2eJwkId(publishedJwk) !== e2eJwkId(localJwk)) {
+                    await set(ref(database, `users/${uid}/e2ee/publicKey`), localJwk);
+                    console.info('E2EE: republished public key to match this device');
+                }
+            } catch (e) { console.warn('E2EE key check failed', e); }
+        }
+
         let myKeypairPromise = null;
         async function getMyKeypair() {
             if (myE2EKeypair) return myE2EKeypair;
@@ -47124,18 +47139,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                     const stored = await idbGet('keys', 'keypair-' + user.uid);
                     if (stored && stored.publicKey && stored.privateKey) {
                         myE2EKeypair = stored;
-                        // Self-heal: if the public key published for this account doesn't match the
-                        // private key on this device (DB reset, key restored/rotated elsewhere, failed
-                        // publish), peers encrypt to the WRONG key and everything they send us is
-                        // undecryptable (and used to be silently hidden). Republish the matching one.
-                        try {
-                            const localJwk = await crypto.subtle.exportKey('jwk', stored.publicKey);
-                            const pubSnap = await get(ref(database, `users/${user.uid}/e2ee/publicKey`));
-                            const publishedJwk = pubSnap.exists() ? pubSnap.val() : null;
-                            if (!publishedJwk || e2eJwkId(publishedJwk) !== e2eJwkId(localJwk)) {
-                                await set(ref(database, `users/${user.uid}/e2ee/publicKey`), localJwk);
-                            }
-                        } catch (e) { /* best-effort */ }
+                        await ensurePublishedKeyMatches(user.uid, stored);
                         return myE2EKeypair;
                     }
                 } catch (e) { /* fall through to generate a fresh one */ }
@@ -47813,6 +47817,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 const stored = await idbGet('keys', 'keypair-' + user.uid);
                 if (stored && stored.publicKey && stored.privateKey) {
                     myE2EKeypair = stored;
+                    await ensurePublishedKeyMatches(user.uid, stored);
                     maybeShowE2EBackupPrompt(user.uid); // still un-backed-up on this account? offer it
                     return;
                 }

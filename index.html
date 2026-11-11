@@ -4946,7 +4946,12 @@
         #emoji-pane { display: flex; }
         #sticker-sheet-overlay.es-pane { display: none; }
         #sticker-sheet-overlay.es-pane.es-show { display: flex !important; }
-        .es-pane .emoji-picker-scroll, .es-pane .sticker-grid-scroll { min-height: 0; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        #es-gif-pane.es-pane { display: none; }
+        #es-gif-pane.es-pane.es-show { display: flex !important; }
+        .es-gif-grid { padding: 4px 2px 8px !important; }
+        .es-gif-note { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 10px 0 20px; margin: 0; }
+        .es-gif-grid:empty { display: none; }
+        .es-pane .emoji-picker-scroll, .es-pane .sticker-grid-scroll, .es-pane .es-gif-grid { min-height: 0; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .emoji-cat-section-title { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin: 14px 2px 8px; }
         .emoji-cat-section-title:first-child { margin-top: 2px; }
         .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -13215,9 +13220,6 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 <button type="button" class="chat-attach-btn" id="chat-attach-btn" title="Attach">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
             </button>
-                <button type="button" class="chat-input-action-btn" id="chat-gif-btn" title="Send a GIF">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="6" width="19" height="12" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect><text x="12" y="15" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="8" font-weight="700" fill="currentColor" stroke="none">GIF</text></svg>
-                    </button>
             </div>
             <button type="button" class="chat-view-send" id="chat-view-send">
                     <svg class="send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -13407,10 +13409,22 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             <div class="es-modes" id="emoji-sheet-modes">
                 <button type="button" class="es-mode-btn active" data-mode="emoji">Emoji</button>
                 <button type="button" class="es-mode-btn" data-mode="stickers">Stickers</button>
+                <button type="button" class="es-mode-btn" data-mode="gifs">GIF</button>
             </div>
             <div class="es-pane" id="emoji-pane">
                 <div id="emoji-cat-tabs" class="emoji-cat-tabs"></div>
                 <div class="emoji-picker-scroll" id="emoji-picker-scroll"></div>
+            </div>
+            <div class="es-pane" id="es-gif-pane" style="display:none;">
+                <div class="sticker-search-wrap">
+                    <div class="search-box" style="margin-bottom:0;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="es-gif-search" placeholder="Search GIFs" autocomplete="off">
+                    </div>
+                </div>
+                <div id="es-gif-grid" class="gif-picker-grid es-gif-grid"></div>
+                <p id="es-gif-loading" class="es-gif-note">Loading GIFs…</p>
+                <p id="es-gif-empty" class="es-gif-note" style="display:none;">No GIFs found.</p>
             </div>
             <div class="es-pane" id="sticker-sheet-overlay" style="display:none;">
                 <div class="sticker-search-wrap">
@@ -50766,11 +50780,6 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             if (!q) { exitStickerApiMode(); return; }
             stickerApiSearchDebounce = setTimeout(() => loadStickerApiResults(q), 350);
         });
-        document.getElementById('chat-gif-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            const target = activeGroupId ? 'group' : 'chat';
-            openGifPickerSheet(target);
-        });
         const emojiSheetOverlay = document.getElementById('emoji-sheet-overlay');
         let emojiSheetMode = 'emoji';
         function setEmojiSheetMode(mode) {
@@ -50778,8 +50787,62 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             document.querySelectorAll('#emoji-sheet-modes .es-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === emojiSheetMode));
             document.getElementById('emoji-pane').style.display = emojiSheetMode === 'emoji' ? 'flex' : 'none';
             document.getElementById('sticker-sheet-overlay').classList.toggle('es-show', emojiSheetMode === 'stickers');
+            document.getElementById('es-gif-pane').classList.toggle('es-show', emojiSheetMode === 'gifs');
             if (emojiSheetMode === 'stickers') buildStickerGridOnce();
+            if (emojiSheetMode === 'gifs' && !document.getElementById('es-gif-grid').children.length) loadEsGifResults('');
         }
+        // GIF tab: same Giphy source as the comment/post picker, but rendered inside this sheet
+        // and sent straight into the open chat or group.
+        async function loadEsGifResults(query) {
+            const grid = document.getElementById('es-gif-grid');
+            const emptyEl = document.getElementById('es-gif-empty');
+            const loadingEl = document.getElementById('es-gif-loading');
+            const reqId = ++esGifReq;
+            esGifLastQuery = query || '';
+            grid.innerHTML = '';
+            emptyEl.style.display = 'none';
+            loadingEl.style.display = 'block';
+            try {
+                const endpoint = query
+                    ? `https://api.giphy.com/v1/gifs/search?api_key=${GIF_API_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=pg-13`
+                    : `https://api.giphy.com/v1/gifs/trending?api_key=${GIF_API_KEY}&limit=24&rating=pg-13`;
+                const res = await fetch(endpoint);
+                const data = await res.json();
+                if (reqId !== esGifReq) return; // a newer search replaced this one
+                loadingEl.style.display = 'none';
+                const gifs = data.data || [];
+                if (!gifs.length) { emptyEl.textContent = 'No GIFs found.'; emptyEl.style.display = 'block'; return; }
+                gifs.forEach((g) => {
+                    const images = g.images || {};
+                    const previewUrl = (images.fixed_width_small || images.fixed_width || images.original || {}).url;
+                    const fullUrl = (images.original || images.fixed_width || {}).url;
+                    if (!previewUrl || !fullUrl) return;
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'gif-picker-item';
+                    item.innerHTML = `<img src="${previewUrl}" loading="lazy" alt="GIF">`;
+                    item.addEventListener('click', () => {
+                        selectedChatGif = { url: fullUrl, previewUrl };
+                        closeEmojiSheet();
+                        sendChatGifMessage();
+                        selectedChatGif = null;
+                    });
+                    grid.appendChild(item);
+                });
+            } catch (err) {
+                if (reqId !== esGifReq) return;
+                console.error('GIF search failed', err);
+                loadingEl.style.display = 'none';
+                emptyEl.textContent = "Couldn't load GIFs. Check your connection.";
+                emptyEl.style.display = 'block';
+            }
+        }
+        let esGifReq = 0, esGifDebounce = null, esGifLastQuery = '';
+        document.getElementById('es-gif-search').addEventListener('input', (e) => {
+            clearTimeout(esGifDebounce);
+            const q = e.target.value.trim();
+            esGifDebounce = setTimeout(() => loadEsGifResults(q), 400);
+        });
         function closeEmojiSheet() { emojiSheetOverlay.classList.remove('active'); }
         function openEmojiPicker(mode) {
             const input = document.getElementById('chat-view-input');
@@ -50793,6 +50856,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             b.addEventListener('click', () => {
                 setEmojiSheetMode(b.dataset.mode);
                 if (b.dataset.mode === 'stickers') resetStickerSheetToDefault();
+                if (b.dataset.mode === 'gifs') { document.getElementById('es-gif-search').value = ''; if (esGifLastQuery) loadEsGifResults(''); }
             });
         });
         emojiSheetOverlay.addEventListener('click', (e) => {

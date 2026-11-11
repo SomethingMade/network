@@ -4937,6 +4937,16 @@
         .emoji-cat-tab { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; border: none; background: transparent; font-size: 19px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease; }
         .emoji-cat-tab.active { background: var(--bg-hover); }
         .emoji-picker-scroll { overflow-y: auto; flex: 1; }
+        /* Combined Emoji | Stickers sheet */
+        .emoji-sticker-sheet { height: 68vh; max-height: 68vh; display: flex; flex-direction: column; }
+        .es-modes { display: flex; gap: 4px; padding: 4px; margin: 0 0 10px; background: var(--bg-hover); border-radius: 14px; flex-shrink: 0; }
+        .es-mode-btn { flex: 1; border: none; background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 700; padding: 9px 0; border-radius: 11px; cursor: pointer; font-family: inherit; transition: background .15s, color .15s; }
+        .es-mode-btn.active { background: var(--bg-surface); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        .es-pane { flex: 1; min-height: 0; flex-direction: column; }
+        #emoji-pane { display: flex; }
+        #sticker-sheet-overlay.es-pane { display: none; }
+        #sticker-sheet-overlay.es-pane.es-show { display: flex !important; }
+        .es-pane .emoji-picker-scroll, .es-pane .sticker-grid-scroll { min-height: 0; flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .emoji-cat-section-title { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin: 14px 2px 8px; }
         .emoji-cat-section-title:first-child { margin-top: 2px; }
         .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -13198,7 +13208,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         <div class="chat-view-input-row" id="chat-view-input-row">
             <div class="chat-input-wrap">
-                <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Send a sticker">
+                <button type="button" class="chat-input-action-btn" id="chat-sticker-btn" title="Emoji &amp; stickers">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14a4.5 4.5 0 0 0 8 0"></path><circle cx="9" cy="9.5" r=".7" fill="currentColor"></circle><circle cx="15" cy="9.5" r=".7" fill="currentColor"></circle></svg>
                     </button>
                 <textarea id="chat-view-input" placeholder="Message..." rows="1" autocomplete="off" enterkeyhint="send"></textarea>
@@ -13391,28 +13401,29 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <input type="file" id="chat-camera-input" accept="image/*,video/*" capture="environment" style="display:none;">
     <input type="file" id="chat-document-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.rtf" multiple style="display:none;">
 
-    <div id="sticker-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="max-height: 68vh; display: flex; flex-direction: column;">
-            <div class="sheet-handle"></div>
-            <div class="sheet-title">Stickers</div>
-            <div class="sticker-search-wrap">
-                <div class="search-box" style="margin-bottom:0;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" id="sticker-search-input" placeholder="Search stickers" autocomplete="off">
-                </div>
-            </div>
-            <div id="sticker-quick-cats" class="sticker-quick-cats"></div>
-            <div id="sticker-cat-tabs" class="sticker-cat-tabs"></div>
-            <div class="sticker-grid-scroll"><div id="sticker-grid" class="sticker-grid"></div></div>
-            <input type="file" id="sticker-upload-input" accept="image/*" multiple style="display:none;">
-        </div>
-    </div>
-
     <div id="emoji-sheet-overlay" class="bottom-sheet-overlay">
-        <div class="bottom-sheet" style="max-height: 60vh; display: flex; flex-direction: column;">
+        <div class="bottom-sheet emoji-sticker-sheet">
             <div class="sheet-handle"></div>
-            <div id="emoji-cat-tabs" class="emoji-cat-tabs"></div>
-            <div class="emoji-picker-scroll" id="emoji-picker-scroll"></div>
+            <div class="es-modes" id="emoji-sheet-modes">
+                <button type="button" class="es-mode-btn active" data-mode="emoji">Emoji</button>
+                <button type="button" class="es-mode-btn" data-mode="stickers">Stickers</button>
+            </div>
+            <div class="es-pane" id="emoji-pane">
+                <div id="emoji-cat-tabs" class="emoji-cat-tabs"></div>
+                <div class="emoji-picker-scroll" id="emoji-picker-scroll"></div>
+            </div>
+            <div class="es-pane" id="sticker-sheet-overlay" style="display:none;">
+                <div class="sticker-search-wrap">
+                    <div class="search-box" style="margin-bottom:0;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="sticker-search-input" placeholder="Search stickers" autocomplete="off">
+                    </div>
+                </div>
+                <div id="sticker-quick-cats" class="sticker-quick-cats"></div>
+                <div id="sticker-cat-tabs" class="sticker-cat-tabs"></div>
+                <div class="sticker-grid-scroll"><div id="sticker-grid" class="sticker-grid"></div></div>
+                <input type="file" id="sticker-upload-input" accept="image/*" multiple style="display:none;">
+            </div>
         </div>
     </div>
 
@@ -19667,7 +19678,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 img.loading = 'lazy';
                 btn.appendChild(img);
                 btn.addEventListener('click', () => {
-                    document.getElementById('sticker-sheet-overlay').classList.remove('active');
+                    closeEmojiSheet();
                     sendStickerMessage(sticker.cp, sticker.ch);
                 });
                 grid.appendChild(btn);
@@ -19759,7 +19770,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     img.loading = 'lazy';
                     btn.appendChild(img);
                     btn.addEventListener('click', () => {
-                        document.getElementById('sticker-sheet-overlay').classList.remove('active');
+                        closeEmojiSheet();
                         sendStickerMessage(null, null, fullUrl);
                     });
                     grid.appendChild(btn);
@@ -19914,7 +19925,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 btn.addEventListener('contextmenu', (e) => { e.preventDefault(); });
                 btn.addEventListener('click', () => {
                     if (longPressed) { longPressed = false; return; }
-                    document.getElementById('sticker-sheet-overlay').classList.remove('active');
+                    closeEmojiSheet();
                     sendStickerMessage(null, null, st.url);
                 });
                 grid.appendChild(btn);
@@ -20021,8 +20032,9 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const end = input.selectionEnd ?? input.value.length;
             input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
             const newPos = start + emoji.length;
-            input.focus();
-            input.setSelectionRange(newPos, newPos);
+            const sheetOpen = document.getElementById('emoji-sheet-overlay').classList.contains('active');
+            if (!sheetOpen) input.focus();
+            try { input.setSelectionRange(newPos, newPos); } catch (e) {}
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
@@ -47079,6 +47091,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
         const E2E_PREFIX = '\u27e6e2e1\u27e7';
         let myE2EKeypair = null;
         const peerPublicKeyCache = {};
+        const peerPublicJwkCache = {};
         const sharedKeyCache = {};
         const peerKeyWatchStarted = {};
 
@@ -47173,6 +47186,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             onValue(ref(database, `users/${peerUid}/e2ee/publicKey`), (snap) => {
                 if (!sawFirstValue) { sawFirstValue = true; return; } // skip the initial fire — we just fetched it ourselves
                 delete peerPublicKeyCache[peerUid];
+                delete peerPublicJwkCache[peerUid];
                 delete sharedKeyCache[peerUid];
                 resetKeyHistoryCaches();
             });
@@ -47184,6 +47198,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             if (!snap.exists()) return null;
             const key = await crypto.subtle.importKey('jwk', snap.val(), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
             rememberPeerPublicJwk(peerUid, snap.val());
+            peerPublicJwkCache[peerUid] = snap.val();
             peerPublicKeyCache[peerUid] = key;
             watchPeerPublicKey(peerUid);
             return key;
@@ -47303,7 +47318,17 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             try {
                 const iv = crypto.getRandomValues(new Uint8Array(12));
                 const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext));
-                return E2E_PREFIX + bufToBase64(iv) + ':' + bufToBase64(cipherBuf);
+                // Self-describing payload: which of the recipient's keys this was sealed to ('r') and the
+                // sender's REAL public key ('s'). With these the receiver can open the message even if the
+                // sender's published key was stale, and can tell exactly why one can't be opened.
+                let meta = '';
+                try {
+                    const my = await getMyKeypair();
+                    const myJwk = await crypto.subtle.exportKey('jwk', my.publicKey);
+                    const peerJwk = peerPublicJwkCache[peerUid];
+                    meta = ':' + btoa(JSON.stringify({ s: { x: myJwk.x, y: myJwk.y }, r: peerJwk ? e2eJwkId(peerJwk) : '' }));
+                } catch (e) { meta = ''; }
+                return E2E_PREFIX + bufToBase64(iv) + ':' + bufToBase64(cipherBuf) + meta;
             } catch (e) { return plaintext; }
         }
 
@@ -47350,12 +47375,55 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             let fresh = null;
             try { fresh = await deriveSharedKey(peerUid, true); } catch (e) {}
             if (fresh) { const r = await attempt(fresh); if (r !== null) return r; }
+
+            // 3) the key the sender says they used (covers a stale/missing published key on their side)
+            let meta = null;
+            try { const parts = payload.slice(E2E_PREFIX.length).split(':'); if (parts[2]) meta = JSON.parse(atob(parts[2])); } catch (e) {}
+            if (meta && meta.s && meta.s.x && meta.s.y) {
+                try {
+                    const senderPub = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: meta.s.x, y: meta.s.y, ext: true }, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+                    const mine = [];
+                    const cur = await getMyKeypair();
+                    if (cur) mine.push(cur);
+                    const me = auth.currentUser;
+                    if (me) ((await idbGet('keys', 'archive-' + me.uid)) || []).forEach(e => mine.push(e));
+                    for (const my of mine) {
+                        try {
+                            const k = await crypto.subtle.deriveKey({ name: 'ECDH', public: senderPub }, my.privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+                            const r = await attempt(k);
+                            if (r !== null) return r;
+                        } catch (e) { /* try next */ }
+                    }
+                } catch (e) { /* fall through */ }
+            }
+
+            // 4) every older key combination
             for (const k of await getHistoricKeys(peerUid)) {
                 const r = await attempt(k);
                 if (r !== null) return r;
             }
             unreadablePayloads.add(payload);
+            scheduleE2EKeyRecovery();
             return E2E_UNREADABLE_TEXT;
+        }
+
+        // Lost / mismatched keys: when something can't be opened, make sure the key published for this
+        // account is the one this device actually holds (and generate+publish a new one if this device
+        // has none), so every NEW message sent to us is sealed to a key we can read. Messages already
+        // sealed to a key nobody holds can't be recovered; they stay as the "Unable to decrypt" note.
+        let lastE2ERecoveryAt = 0;
+        function scheduleE2EKeyRecovery() {
+            const now = Date.now();
+            if (now - lastE2ERecoveryAt < 30000) return;
+            lastE2ERecoveryAt = now;
+            setTimeout(async () => {
+                try {
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    const kp = await getMyKeypair(); // creates + publishes a fresh pair if this device has none
+                    if (kp) await ensurePublishedKeyMatches(user.uid, kp);
+                } catch (e) { /* best-effort */ }
+            }, 0);
         }
 
         // Encrypts a photo File's raw bytes for a 1:1 thread with peerUid, ahead of upload.
@@ -50687,12 +50755,9 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             document.getElementById('chat-document-input').click();
         });
 
-        const stickerSheetOverlay = document.getElementById('sticker-sheet-overlay');
         document.getElementById('chat-sticker-btn').addEventListener('click', (e) => {
             e.preventDefault();
-            buildStickerGridOnce();
-            resetStickerSheetToDefault();
-            stickerSheetOverlay.classList.add('active');
+            openEmojiPicker();
         });
         document.getElementById('sticker-search-input').addEventListener('input', (e) => {
             const q = e.target.value.trim();
@@ -50706,15 +50771,30 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             const target = activeGroupId ? 'group' : 'chat';
             openGifPickerSheet(target);
         });
-        stickerSheetOverlay.addEventListener('click', (e) => {
-            if (e.target === stickerSheetOverlay) stickerSheetOverlay.classList.remove('active');
-        });
-
         const emojiSheetOverlay = document.getElementById('emoji-sheet-overlay');
-        function openEmojiPicker() {
+        let emojiSheetMode = 'emoji';
+        function setEmojiSheetMode(mode) {
+            emojiSheetMode = mode === 'stickers' ? 'stickers' : 'emoji';
+            document.querySelectorAll('#emoji-sheet-modes .es-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === emojiSheetMode));
+            document.getElementById('emoji-pane').style.display = emojiSheetMode === 'emoji' ? 'flex' : 'none';
+            document.getElementById('sticker-sheet-overlay').classList.toggle('es-show', emojiSheetMode === 'stickers');
+            if (emojiSheetMode === 'stickers') buildStickerGridOnce();
+        }
+        function closeEmojiSheet() { emojiSheetOverlay.classList.remove('active'); }
+        function openEmojiPicker(mode) {
+            const input = document.getElementById('chat-view-input');
+            if (input && document.activeElement === input) input.blur(); // keep the keyboard from covering the sheet
             buildEmojiPickerOnce();
+            setEmojiSheetMode(mode || emojiSheetMode);
+            if (emojiSheetMode === 'stickers') resetStickerSheetToDefault();
             emojiSheetOverlay.classList.add('active');
         }
+        document.querySelectorAll('#emoji-sheet-modes .es-mode-btn').forEach(b => {
+            b.addEventListener('click', () => {
+                setEmojiSheetMode(b.dataset.mode);
+                if (b.dataset.mode === 'stickers') resetStickerSheetToDefault();
+            });
+        });
         emojiSheetOverlay.addEventListener('click', (e) => {
             if (e.target === emojiSheetOverlay) emojiSheetOverlay.classList.remove('active');
         });

@@ -13900,7 +13900,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, onIdTokenChanged, signOut, updateProfile, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, getAdditionalUserInfo } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        import { getDatabase, ref, onValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction, orderByKey, limitToFirst, orderByValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import { getDatabase, ref, onValue as rawOnValue, get, push, set, update, remove, serverTimestamp, increment, onDisconnect, off, query, orderByChild, equalTo, onChildAdded, onChildChanged, onChildRemoved, limitToLast, startAt, endAt, runTransaction, orderByKey, limitToFirst, orderByValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, serverTimestamp as fsServerTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-functions.js";
@@ -18886,6 +18886,178 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         const auth = getAuth(app);
         const database = getDatabase(app);
 
+        // ════════════════════════════════════════════════════════════════════════════════
+        // PERSISTENT DATA CACHE (IndexedDB) — "open the app and it's already there", like X.
+        // Realtime Database's web SDK keeps nothing on disk, so every cold start used to show
+        // empty lists until each listener's first round trip landed. `onValue` below is now a
+        // thin wrapper around Firebase's: for a whitelist of safe-to-replay paths (chat list,
+        // communities, profiles, contacts, notifications, jobs, shops …) it
+        //   1) immediately replays the last snapshot saved on this device (flagged
+        //      snap.__fromCache === true) so the UI paints instantly / works offline, then
+        //   2) attaches the real listener, whose snapshots replace the replay and refresh the
+        //      saved copy (debounced, one IndexedDB transaction per flush).
+        // Everything not whitelisted (calls, typing, presence, ride tracking, live rooms …)
+        // goes straight to Firebase untouched, so nothing time-sensitive is ever replayed.
+        // Wiped on sign-out (see habaDcClear) so a shared device never leaks the last account.
+        // ════════════════════════════════════════════════════════════════════════════════
+        const HABA_DC_DB = 'habaDataCache';
+        const HABA_DC_STORE = 'snaps';
+        const HABA_DC_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+        const HABA_DC_MAX_BYTES = 1500000; // skip persisting any single node bigger than this
+        const HABA_DC_PATHS = [
+            /^user_chats\/[^/]+$/, /^user_group_chats\/[^/]+$/, /^communities$/,
+            /^blocks\/[^/]+$/, /^not_interested\/[^/]+$/, /^saved_posts\/[^/]+$/,
+            /^bookmark_collections\/[^/]+$/, /^notifications\/[^/]+$/, /^contacts\/[^/]+$/,
+            /^followers\/[^/]+$/, /^jobs$/, /^shops$/, /^users\/[^/]+$/,
+            /^users\/[^/]+\/(myJobApplications|myShopId)$/
+        ];
+        let habaDcDbPromise = null;
+        const habaDcPending = new Map();
+        let habaDcTimer = null;
+
+        function habaRace(promise, ms) {
+            return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+        }
+        function habaDcOpen() {
+            if (!habaDcDbPromise) {
+                habaDcDbPromise = new Promise((resolve, reject) => {
+                    try {
+                        const req = indexedDB.open(HABA_DC_DB, 1);
+                        req.onupgradeneeded = () => req.result.createObjectStore(HABA_DC_STORE);
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => reject(req.error);
+                    } catch (e) { reject(e); }
+                }).catch((e) => { habaDcDbPromise = null; throw e; });
+            }
+            return habaDcDbPromise;
+        }
+        async function habaDcRead(key) {
+            try {
+                const db = await habaDcOpen();
+                return await new Promise((resolve) => {
+                    const r = db.transaction(HABA_DC_STORE, 'readonly').objectStore(HABA_DC_STORE).get(key);
+                    r.onsuccess = () => resolve(r.result || null);
+                    r.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+        async function habaDcFlush() {
+            habaDcTimer = null;
+            if (!habaDcPending.size) return;
+            const batch = [];
+            habaDcPending.forEach((snap, key) => {
+                try {
+                    const ex = snap.exists();
+                    let v = null, o = null;
+                    if (ex) {
+                        v = snap.val();
+                        if (v && typeof v === 'object') { o = []; snap.forEach((c) => { o.push(c.key); }); }
+                    }
+                    if (ex && JSON.stringify(v).length > HABA_DC_MAX_BYTES) batch.push([key, null]);
+                    else batch.push([key, { v, ex, o, t: Date.now() }]);
+                } catch (e) { /* best-effort */ }
+            });
+            habaDcPending.clear();
+            try {
+                const db = await habaDcOpen();
+                const store = db.transaction(HABA_DC_STORE, 'readwrite').objectStore(HABA_DC_STORE);
+                batch.forEach(([key, rec]) => { if (rec) store.put(rec, key); else store.delete(key); });
+            } catch (e) { /* cache is best-effort */ }
+        }
+        function habaDcQueue(key, snap) {
+            habaDcPending.set(key, snap);
+            if (!habaDcTimer) habaDcTimer = setTimeout(habaDcFlush, 1500);
+        }
+        async function habaDcClear() {
+            habaDcPending.clear();
+            try {
+                const db = await habaDcOpen();
+                db.transaction(HABA_DC_STORE, 'readwrite').objectStore(HABA_DC_STORE).clear();
+            } catch (e) { /* ignore */ }
+        }
+        window.habaDcClear = habaDcClear;
+        window.addEventListener('pagehide', () => { try { habaDcFlush(); } catch (e) {} });
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { habaDcFlush(); } catch (e) {} } });
+
+        function habaDcPathOf(q) {
+            const r = (q && q.ref) || q;
+            return decodeURIComponent(String(r.toString()).replace(/^[a-z]+:\/\/[^/]+\/?/i, '')).replace(/^\/+|\/+$/g, '');
+        }
+        function habaDcKeyFor(q) {
+            const u = auth.currentUser;
+            if (!u) return null;
+            const path = habaDcPathOf(q);
+            if (!HABA_DC_PATHS.some((re) => re.test(path))) return null;
+            let qid = 'default';
+            try { if (q._queryIdentifier) qid = String(q._queryIdentifier); } catch (e) {}
+            return u.uid + '|' + path + '|' + qid;
+        }
+
+        // Minimal DataSnapshot stand-in for replaying a saved copy (everything the app's
+        // listeners use: val/exists/forEach/child/key/size/hasChildren/…).
+        class HabaCachedSnapshot {
+            constructor(q, rec, key) {
+                this._ex = !!rec.ex;
+                this._v = this._ex ? rec.v : null;
+                this._o = rec.o || null;
+                this.ref = (q && q.ref) || q;
+                if (key !== undefined) this.key = key;
+                else { const p = habaDcPathOf(this.ref); this.key = p ? p.split('/').pop() : null; }
+                this.__fromCache = true;
+            }
+            val() { return this._ex ? this._v : null; }
+            exportVal() { return this.val(); }
+            toJSON() { return this.val(); }
+            exists() { return this._ex; }
+            getPriority() { return null; }
+            _keys() {
+                const v = this._v;
+                if (!v || typeof v !== 'object') return [];
+                if (this._o && this._o.length) return this._o.filter((k) => k in v);
+                return Object.keys(v);
+            }
+            hasChildren() { return this._keys().length > 0; }
+            numChildren() { return this._keys().length; }
+            get size() { return this._keys().length; }
+            hasChild(path) { return this.child(path).exists(); }
+            child(path) {
+                const segs = String(path).split('/').filter(Boolean);
+                let v = this._v;
+                segs.forEach((s) => { v = (v && typeof v === 'object' && s in v) ? v[s] : undefined; });
+                const ex = v !== undefined && v !== null;
+                return new HabaCachedSnapshot(this.ref, { ex, v: ex ? v : null, o: ex && typeof v === 'object' ? Object.keys(v) : null }, segs.length ? segs[segs.length - 1] : this.key);
+            }
+            forEach(cb) {
+                const v = this._v;
+                const keys = this._keys();
+                for (let i = 0; i < keys.length; i++) {
+                    const c = v[keys[i]];
+                    const ex = c !== undefined && c !== null;
+                    const childSnap = new HabaCachedSnapshot(this.ref, { ex, v: ex ? c : null, o: ex && typeof c === 'object' ? Object.keys(c) : null }, keys[i]);
+                    if (cb(childSnap) === true) return true;
+                }
+                return false;
+            }
+        }
+
+        function onValue(q, cb, errCb, opts) {
+            let key = null;
+            try { if (typeof cb === 'function' && (!opts || typeof opts !== 'object') && typeof errCb !== 'object') key = habaDcKeyFor(q); } catch (e) { key = null; }
+            if (!key) return rawOnValue.apply(null, Array.prototype.slice.call(arguments));
+            let liveSeen = false, cancelled = false;
+            habaDcRead(key).then((rec) => {
+                if (liveSeen || cancelled || !rec) return;
+                if (Date.now() - (rec.t || 0) > HABA_DC_MAX_AGE_MS) return;
+                try { cb(new HabaCachedSnapshot(q, rec)); } catch (e) { console.warn('cached snapshot replay failed', e); }
+            });
+            const unsub = rawOnValue(q, (snap) => {
+                liveSeen = true;
+                try { habaDcQueue(key, snap); } catch (e) {}
+                cb(snap);
+            }, errCb);
+            return () => { cancelled = true; unsub(); };
+        }
+
         // Mobile keyboards resize the visual viewport without resizing the layout viewport (especially
         // on Android Chrome), so fixed-position bottom sheets can end up pinned below the keyboard until
         // some other event forces a reflow. Track the keyboard's height here and feed it back as a CSS
@@ -18988,6 +19160,14 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         }
 
         async function checkForForcedUpdate() {
+            // Never let launch wait on the network: if Remote Config hasn't answered in ~2.5s
+            // (slow data, offline) boot carries on with the last-activated values, and the
+            // check still finishes in the background and shows the update screen if needed.
+            const pending = checkForForcedUpdateInner();
+            const first = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve('timeout'), 2500))]);
+            return first === 'timeout' ? false : first;
+        }
+        async function checkForForcedUpdateInner() {
             try {
                 await fetchAndActivate(remoteConfig);
                 const minVersion = getValue(remoteConfig, 'min_supported_version').asString();
@@ -20121,7 +20301,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!('serviceWorker' in navigator)) return null;
             if (fcmSwRegistration) return fcmSwRegistration;
             try {
-                fcmSwRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+                fcmSwRegistration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { updateViaCache: 'none' });
                 return fcmSwRegistration;
             } catch (err) {
                 console.error('FCM service worker registration failed', err);
@@ -22456,6 +22636,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             reorderFeedCards();
             applyFeedSubtabFilter();
             syncFeedFollowPills();
+            window.__habaFeedPaintedFromCache = true; // lets the launch shimmer lift without waiting on the network
         }
         // After the live window has loaded: any card still flagged from-cache was not
         // re-delivered by Firebase. Keep it if the post still exists, drop it if deleted.
@@ -45178,8 +45359,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // reveal below, so a targeted read of just this one field keeps the check cheap
                 // for every other (unflagged) login.
                 try {
-                    const needsNamePromptSnap = await get(ref(database, 'users/' + user.uid + '/needsNamePrompt'));
-                    if (needsNamePromptSnap.exists() && needsNamePromptSnap.val()) {
+                    const needsNamePromptSnap = navigator.onLine ? await habaRace(get(ref(database, 'users/' + user.uid + '/needsNamePrompt')), 3000) : null;
+                    if (needsNamePromptSnap && needsNamePromptSnap.exists() && needsNamePromptSnap.val()) {
                         // Unlike the signup flows above, this can fire on a plain page load with
                         // an already-persisted session (no phone/OTP UI was ever shown this
                         // visit), so #auth-screen may still be at its default display:none —
@@ -45224,6 +45405,20 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 requestAnimationFrame(updateNavIndicator);
                 initE2EForThisDevice().catch(() => {});
 
+                // Attach the data listeners NOW instead of after the profile/username/AI-chat
+                // network steps below. Combined with the on-device cache (see onValue above) the
+                // chat list, feed, notifications, jobs and shops paint straight away on launch
+                // and still work offline. Later calls to these are no-ops (attached guards).
+                try {
+                    initChatListeners();
+                    initFeedListeners();
+                    initNotificationsListener();
+                    initJobsListener();
+                    initMarketListener();
+                } catch (err) { console.warn('early listener attach failed', err); }
+                // Offline app shell (see haba-offline.js, imported by firebase-messaging-sw.js).
+                if ('serviceWorker' in navigator) registerFcmServiceWorker().catch(() => {});
+
                 updateNotificationBtnVisibility();
                 if ('Notification' in window && Notification.permission === 'granted') {
                     setupPushNotifications(user);
@@ -45249,8 +45444,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 // login), and so a real uploaded photo always wins over the placeholder.
                 let existingProfileData = {};
                 try {
-                    const existingProfileSnap = await get(ref(database, 'users/' + user.uid));
-                    if (existingProfileSnap.exists()) existingProfileData = existingProfileSnap.val();
+                    const existingProfileSnap = await habaRace(get(ref(database, 'users/' + user.uid)), 4000);
+                    if (existingProfileSnap && existingProfileSnap.exists()) existingProfileData = existingProfileSnap.val();
                 } catch (err) { console.error('Failed to read existing profile before defaulting', err); }
 
                 await update(ref(database, 'users/' + user.uid), {
@@ -45319,6 +45514,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 document.getElementById('messenger-screen').style.display = 'none';
                 chatListenersAttached = false;
                 userChatsInitialized = false;
+                try { habaDcClear(); } catch (e) {}
                 feedListenersAttached = false;
                 feedInitialLoadComplete = false;
                 removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
@@ -45380,7 +45576,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         // splash is gone: shimmer is what the person sees until the feed is ready
                         const endShimmerWhenReady = () => {
                             const shown = performance.now(); // shimmer has been up since first paint
-                            const ready = !user || feedInitialLoadComplete;
+                            const ready = !user || feedInitialLoadComplete || window.__habaFeedPaintedFromCache;
                             if ((ready && shown >= SHIMMER_MIN_MS) || shown >= SHIMMER_MAX_MS) hidePageShimmer();
                             else setTimeout(endShimmerWhenReady, 100);
                         };
@@ -51921,6 +52117,11 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
 
             onValue(ref(database, "communities"), (snap) => {
                 cachedCommunities = snap.exists() ? snap.val() : {};
+                if (snap.__fromCache) {
+                    renderGroupsLists();
+                    habaScheduleCachedChatListPaint();
+                    return;
+                }
                 renderGroupsLists();
                 if (userChatsInitialized) renderChatListFromCache();
                 renderCallList(cachedCallLogEntries); // group names/photos may have just arrived
@@ -51986,6 +52187,16 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             watchCallLog();
 
             onValue(ref(database, `user_group_chats/${user.uid}`), (snap) => {
+                if (snap.__fromCache) {
+                    cachedGroupChatsMeta = snap.exists() ? snap.val() : {};
+                    previousGroupChatsMeta = JSON.parse(JSON.stringify(cachedGroupChatsMeta));
+                    let cachedGroupUnread = 0;
+                    Object.values(cachedGroupChatsMeta).forEach(meta => { if (meta && meta.unreadCount > 0) cachedGroupUnread += meta.unreadCount; });
+                    updateGroupsUnreadBadge(cachedGroupUnread);
+                    renderGroupsLists();
+                    habaScheduleCachedChatListPaint();
+                    return;
+                }
                 const prevGroupChatsMeta = previousGroupChatsMeta;
                 cachedGroupChatsMeta = snap.exists() ? snap.val() : {};
                 if (activeGroupId && cachedGroupChatsMeta[activeGroupId] && cachedGroupChatsMeta[activeGroupId].unreadCount > 0) {
@@ -52063,7 +52274,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 // readable by the owner.
                 const followingCount = Object.keys(cachedContacts).length;
                 const myCachedProfile = cachedUsers[user.uid];
-                if (!myCachedProfile || (myCachedProfile.followingCount || 0) !== followingCount) {
+                if (!snap.__fromCache && (!myCachedProfile || (myCachedProfile.followingCount || 0) !== followingCount)) {
                     update(ref(database, `users/${user.uid}`), { followingCount });
                 }
             });
@@ -52077,7 +52288,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
 
                 const followersCount = Object.keys(cachedFollowers).length;
                 const myCachedProfile = cachedUsers[user.uid];
-                if (!myCachedProfile || (myCachedProfile.followersCount || 0) !== followersCount) {
+                if (!snap.__fromCache && (!myCachedProfile || (myCachedProfile.followersCount || 0) !== followersCount)) {
                     update(ref(database, `users/${user.uid}`), { followersCount });
                 }
             });
@@ -52098,7 +52309,26 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 removeHiddenAuthorCardsFromFeed();
             });
 
+            // Chat list, groups and communities each replay their own on-device copy; coalesce
+            // those into one render, and never once the live data has already drawn the list.
+            let habaCachedPaintTimer = null;
+            function habaScheduleCachedChatListPaint() {
+                clearTimeout(habaCachedPaintTimer);
+                habaCachedPaintTimer = setTimeout(() => {
+                    if (userChatsInitialized) return;
+                    try { renderChatListFromCache(); } catch (e) { console.warn('cached chat list paint', e); }
+                }, 80);
+            }
+
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {
+                if (snap.__fromCache) {
+                    // On-device copy: paint the chat list now. Not "initialized" yet, so the first
+                    // live snapshot isn't mistaken for brand-new messages (no blip/banner on launch).
+                    cachedUserChatsData = snap.exists() ? snap.val() : {};
+                    previousUserChatsData = JSON.parse(JSON.stringify(cachedUserChatsData));
+                    habaScheduleCachedChatListPaint();
+                    return;
+                }
                 const prevUserChatsData = previousUserChatsData;
                 cachedUserChatsData = snap.exists() ? snap.val() : {};
 

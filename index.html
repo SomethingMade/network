@@ -6664,6 +6664,85 @@
         .chat-view-input-row > .chat-view-send { width: 48px; height: 48px; margin: 0; background: var(--wa-green); color: #fff; box-shadow: 0 1px 2px rgba(11,20,26,0.25); }
         .chat-view-input-row > .chat-view-send:hover { transform: none; box-shadow: 0 1px 2px rgba(11,20,26,0.25); }
         .chat-view-input-row > .chat-view-send svg { width: 22px; height: 22px; }
+
+        /* ═══ MODERN BUBBLE REDESIGN ═══
+           Tailless, softly-rounded bubbles. Outgoing: subtle tonal gradient built from the
+           user's bubble colour (--msg-out-bg, so "Change Bubble Color" still works).
+           Incoming: quiet surface with a hairline border. Grouped runs tighten their joining
+           corners; time + ticks sit inline bottom-right. */
+        .msg-bubble {
+            --bubble-r: 20px; --bubble-tight: 6px;
+            padding: 8px 13px 7px 14px; font-size: 15px; line-height: 1.4; letter-spacing: -0.1px;
+            max-width: 78%; border: 1px solid transparent;
+            animation: bubbleInModern 0.32s cubic-bezier(0.34, 1.4, 0.5, 1) both;
+            -webkit-font-smoothing: antialiased;
+        }
+        @keyframes bubbleInModern {
+            from { opacity: 0; transform: translateY(8px) scale(0.94); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .msg-bubble.out { transform-origin: bottom right; }
+        .msg-bubble.in  { transform-origin: bottom left; }
+
+        .msg-bubble.out {
+            background: linear-gradient(155deg, color-mix(in srgb, var(--msg-out-bg) 82%, #fff) 0%, var(--msg-out-bg) 70%);
+            color: var(--msg-out-text);
+            box-shadow: 0 6px 16px -6px rgba(var(--primary-rgb), 0.45), 0 1px 2px rgba(0,0,0,0.08);
+        }
+        .msg-bubble.in {
+            background: var(--msg-in-bg); color: var(--msg-in-text);
+            border-color: rgba(0,0,0,0.06);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px -6px rgba(0,0,0,0.10);
+        }
+        body.dark-theme .msg-bubble.in {
+            background: #232326; border-color: rgba(255,255,255,0.07);
+            box-shadow: 0 4px 14px -8px rgba(0,0,0,0.6);
+        }
+        body.dark-theme .msg-bubble.out {
+            box-shadow: 0 6px 16px -8px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.10);
+        }
+
+        /* No tails: the corner by the sender just tightens; grouped runs tighten the joins. */
+        .msg-bubble.in:not(.media):not(.sticker):not(.grp-prev)::after,
+        .msg-bubble.out:not(.media):not(.sticker):not(.grp-prev)::after { display: none; }
+        .msg-bubble.in:not(.media):not(.sticker):not(.grp-prev)  { --br-tl: var(--bubble-r); }
+        .msg-bubble.out:not(.media):not(.sticker):not(.grp-prev) { --br-tr: var(--bubble-r); }
+        .msg-bubble.in:not(.grp-next)  { --br-bl: 6px; }
+        .msg-bubble.out:not(.grp-next) { --br-br: 6px; }
+        .msg-bubble.out.grp-next { --br-br: var(--bubble-tight); }
+        .msg-bubble.out.grp-prev { --br-tr: var(--bubble-tight); }
+        .msg-bubble.in.grp-next  { --br-bl: var(--bubble-tight); }
+        .msg-bubble.in.grp-prev  { --br-tl: var(--bubble-tight); }
+        .msg-bubble.grp-prev { margin-top: -5px; }
+        .chat-view-messages { gap: 7px; }
+
+        /* Meta: small, quiet, tabular */
+        .msg-bubble:not(.media):not(.sticker) .msg-meta-wrap,
+        .msg-bubble.grp-next:not(.media):not(.sticker) .msg-meta-wrap { margin: 7px -1px -2px 12px; }
+        .msg-bubble:not(.media):not(.sticker) .msg-time {
+            font-size: 10.5px; font-weight: 500; letter-spacing: 0.2px; font-variant-numeric: tabular-nums; opacity: 0.85;
+        }
+
+        /* Replies, docs, voice: match the softer shape */
+        .quoted-msg { border-radius: 12px; border-left-width: 3px; padding: 7px 10px; }
+        .msg-bubble.in .quoted-msg { background: rgba(var(--primary-rgb), 0.07); }
+        .msg-bubble.out .quoted-msg { background: rgba(255,255,255,0.16); }
+
+        /* Media with caption keeps the same shape */
+        .msg-bubble.media:has(.msg-media-caption) { border-radius: var(--br-tl) var(--br-tr) var(--br-br) var(--br-bl) !important; }
+        .msg-media-img, .msg-media-video { border-radius: 18px var(--br-tr) var(--br-br) var(--br-bl); }
+
+        /* Reactions float as small pills */
+        .msg-reactions { border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,0.14); }
+
+        /* Typing bubble */
+        .typing-bubble {
+            background: var(--msg-in-bg); border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 20px 20px 20px 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px -6px rgba(0,0,0,0.10);
+        }
+        body.dark-theme .typing-bubble { background: #232326; border-color: rgba(255,255,255,0.07); }
+
+        @media (prefers-reduced-motion: reduce) { .msg-bubble { animation: none; } }
 </style>
 
     <style>

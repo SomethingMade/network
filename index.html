@@ -6743,6 +6743,42 @@
         body.dark-theme .typing-bubble { background: #232326; border-color: rgba(255,255,255,0.07); }
 
         @media (prefers-reduced-motion: reduce) { .msg-bubble { animation: none; } }
+
+        /* ═══ MESSENGER-STYLE TYPING BUBBLE ═══
+           Pops in from the bottom-left, three dots bounce in a wave, and two little
+           "thought" circles trail off the corner. Same element/ids as before, CSS only. */
+        .typing-bubble {
+            --typing-bg: var(--msg-in-bg);
+            position: relative; align-self: flex-start; width: fit-content;
+            display: flex; align-items: center; gap: 5px;
+            padding: 13px 16px; margin: 4px 0 6px 8px;
+            background: var(--typing-bg); border: none; border-radius: 20px;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13), 0 4px 12px -6px rgba(0,0,0,0.10);
+            transform-origin: left bottom;
+            animation: habaTypePop 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+        }
+        body.dark-theme .typing-bubble { --typing-bg: #232326; border: none; }
+        .typing-bubble::before, .typing-bubble::after {
+            content: ''; position: absolute; border-radius: 50%; background: var(--typing-bg);
+        }
+        .typing-bubble::before { width: 12px; height: 12px; left: -3px; bottom: 0; }
+        .typing-bubble::after  { width: 6px;  height: 6px;  left: -8px; bottom: -4px; }
+        .typing-bubble .typing-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: #9A9AA0;
+            animation: habaTypeDot 1.3s infinite ease-in-out both;
+        }
+        .typing-bubble .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-bubble .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-bubble .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes habaTypeDot {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+            30%           { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes habaTypePop { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+            .typing-bubble { animation: none; }
+            .typing-bubble .typing-dot { animation-duration: 2.6s; }
+        }
 </style>
 
     <style>
@@ -12468,6 +12504,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                                     <button type="button" role="menuitem" data-xc-view="groups">Groups</button>
                                     <button type="button" role="menuitem" data-xc-view="updates">Updates</button>
                                     <button type="button" role="menuitem" data-xc-view="requests">Requests<span class="xc-menu-count" id="xc-menu-req-count" style="display:none;"></span></button>
+                                    <button type="button" role="menuitem" id="xc-menu-archived">Archived</button>
                                 </div>
                             </div>
                         </div>
@@ -45940,6 +45977,39 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         let activeContextMenuMsg = null;
         function threadIdFor(uidA, uidB) { return [uidA, uidB].sort().join('_'); }
 
+        // ── Permanent "Delete Chat" on my side ──
+        // DM messages live in one shared thread (dm_threads/<id>/messages), so deleting the
+        // thread would wipe the other person's copy too. Instead, deleting a chat stamps a
+        // per-user cutoff time: every message at or before it is never loaded again for me
+        // (list, scroll-back, AI history, or a brand-new conversation with the same person).
+        // Stored on this device (instant, works offline) and mirrored to
+        // user_chat_cleared/<myUid>/<otherUid> so it follows the account across devices.
+        const chatClearedMem = {};
+        function chatClearedStoreKey(myUid) { return 'haba_chat_cleared_v1:' + myUid; }
+        function loadChatClearedLocal(myUid) {
+            try { return JSON.parse(localStorage.getItem(chatClearedStoreKey(myUid)) || '{}') || {}; } catch (e) { return {}; }
+        }
+        function getChatClearedAt(myUid, otherUid) {
+            if (!myUid || !otherUid) return 0;
+            const mem = chatClearedMem[myUid] || (chatClearedMem[myUid] = loadChatClearedLocal(myUid));
+            return Number(mem[otherUid]) || 0;
+        }
+        function setChatClearedAt(myUid, otherUid, ts) {
+            const mem = chatClearedMem[myUid] || (chatClearedMem[myUid] = loadChatClearedLocal(myUid));
+            if ((Number(mem[otherUid]) || 0) >= ts) return;
+            mem[otherUid] = ts;
+            try { localStorage.setItem(chatClearedStoreKey(myUid), JSON.stringify(mem)); } catch (e) {}
+        }
+        async function syncChatClearedFromServer(myUid) {
+            try {
+                const snap = await get(ref(database, `user_chat_cleared/${myUid}`));
+                if (snap.exists()) {
+                    const v = snap.val();
+                    Object.keys(v).forEach(k => setChatClearedAt(myUid, k, Number(v[k]) || 0));
+                }
+            } catch (e) { /* offline or rules: the on-device cutoff still applies */ }
+        }
+
         // --- DM CALLS (Agora RTC, same App ID/project as the Live feature) ---
         // Firebase Realtime Database still handles signaling/state (ringing, accept, decline,
         // busy, hang up, call log) exactly as before — only the media transport changed from
@@ -50065,12 +50135,10 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 const skeletonNodes = (opts && opts.silent) ? [] : showChatLoadingSkeletons(messagesEl);
 
                 try {
-                    const olderQuery = query(
-                        ref(database, `dm_threads/${threadId}/messages`),
-                        orderByChild('createdAt'),
-                        endAt(oldestLoadedMessageTimestamp - 1),
-                        limitToLast(MSG_PAGE_SIZE)
-                    );
+                    const clearedAtOlder = getChatClearedAt(user.uid, otherUid);
+                    const olderQuery = clearedAtOlder
+                        ? query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), startAt(clearedAtOlder + 1), endAt(oldestLoadedMessageTimestamp - 1), limitToLast(MSG_PAGE_SIZE))
+                        : query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), endAt(oldestLoadedMessageTimestamp - 1), limitToLast(MSG_PAGE_SIZE));
                     const snap = await get(olderQuery);
                     let fetchedCount = 0;
                     const newlyLoaded = [];
@@ -50651,7 +50719,10 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             // messages live (so edits/reactions/deletes on recent messages still patch in
             // place); older history is fetched on demand via loadOlderDmMessages above instead
             // of ever loading the whole thread at once.
-            const dmMessagesQuery = query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
+            const clearedAtLive = getChatClearedAt(user.uid, otherUid);
+            const dmMessagesQuery = clearedAtLive
+                ? query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), startAt(clearedAtLive + 1), limitToLast(MSG_PAGE_SIZE))
+                : query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), limitToLast(MSG_PAGE_SIZE));
             unsubscribeChatMessages = onValue(dmMessagesQuery, async (snap) => {
                 const isFirstLiveSnapshot = !liveThreadSnapshotReceived;
                 liveThreadSnapshotReceived = true;
@@ -50817,10 +50888,14 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             chatItemOptionsSheet.classList.remove('active');
             if (!user || !uid) return;
 
-            const confirmed = await showCustomModal('Delete Chat', 'This removes the chat from your list. The other person will still have their copy.', true);
+            const confirmed = await showCustomModal('Delete Chat', 'This permanently deletes the whole conversation on your side. You won\'t be able to get it back, even if you start a new chat with them. The other person will still have their copy.', true);
             if (!confirmed) return;
 
             try {
+                // Cutoff first (on-device, instant) so nothing old can ever reload for me.
+                const clearedTs = Date.now();
+                setChatClearedAt(user.uid, uid, clearedTs);
+                set(ref(database, `user_chat_cleared/${user.uid}/${uid}`), clearedTs).catch(() => {});
                 await remove(ref(database, `user_chats/${user.uid}/${uid}`));
                 if (activeChatUid === uid) { activeChatUid = null; history.back(); }
                 notify('Chat deleted');
@@ -50998,7 +51073,10 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
             try {
                 // Pull this thread's existing history so the model has context: an array of
                 // { role, content } turns, oldest first.
-                const historySnap = await get(ref(database, `dm_threads/${threadId}/messages`));
+                const clearedAtAI = getChatClearedAt(user.uid, AI_UID);
+                const historySnap = await get(clearedAtAI
+                    ? query(ref(database, `dm_threads/${threadId}/messages`), orderByChild('createdAt'), startAt(clearedAtAI + 1))
+                    : ref(database, `dm_threads/${threadId}/messages`));
                 // Only text turns, newest 30 — keeps requests small and fast (the Cloud Function
                 // also enforces this). Falls back to just the current message.
                 let conversation = historySnap.exists()
@@ -52428,6 +52506,7 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 }, 80);
             }
 
+            syncChatClearedFromServer(user.uid);
             onValue(ref(database, `user_chats/${user.uid}`), (snap) => {
                 if (snap.__fromCache) {
                     // On-device copy: paint the chat list now. Not "initialized" yet, so the first
@@ -52724,6 +52803,12 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                         menu.querySelectorAll('[data-xc-view]').forEach(i => i.classList.toggle('active', i === item));
                         close(); syncCount();
                     });
+                });
+                const archBtn = document.getElementById('xc-menu-archived');
+                if (archBtn) archBtn.addEventListener('click', () => {
+                    close();
+                    const row = document.getElementById('wa-archived-row');
+                    if (row) row.click();
                 });
                 if (reqCountSrc) new MutationObserver(syncCount).observe(reqCountSrc, { childList: true, characterData: true, subtree: true, attributes: true });
                 syncCount();

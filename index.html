@@ -45840,6 +45840,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function hydrateThreadFromDiskCache(threadKey, isStillCurrentThread, renderFn) {
             readCachedThreadMessagesFromDisk(threadKey).then(async (cached) => {
                 if (!cached || !cached.messages) return;
+                // Never repaint anything I deleted: drop cached messages at/before my cutoff.
+                const clearedCut = getClearedCutoffForThreadKey(threadKey);
+                if (clearedCut) {
+                    cached.messages = Object.fromEntries(Object.entries(cached.messages).filter(([, m]) => !((m && m.createdAt || 0) <= clearedCut)));
+                    if (!Object.keys(cached.messages).length) return;
+                }
                 // Pull this thread's already-downloaded photos/videos from disk into memory first,
                 // so the very first paint shows them instead of placeholders (bounded, ~300ms max).
                 await warmDecryptedMediaCache(Object.values(cached.messages));
@@ -46008,6 +46014,25 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     Object.keys(v).forEach(k => setChatClearedAt(myUid, k, Number(v[k]) || 0));
                 }
             } catch (e) { /* offline or rules: the on-device cutoff still applies */ }
+        }
+        // DM threadId -> my "deleted up to" time (0 if none). Group ids never match.
+        function getClearedCutoffForThreadKey(threadKey) {
+            const u = auth.currentUser;
+            if (!u) return 0;
+            const mem = chatClearedMem[u.uid] || (chatClearedMem[u.uid] = loadChatClearedLocal(u.uid));
+            for (const other in mem) if (threadIdFor(u.uid, other) === threadKey) return Number(mem[other]) || 0;
+            return 0;
+        }
+        // Drops this thread's on-device message copy so it can never be repainted.
+        async function deleteCachedThreadFromDisk(threadKey) {
+            try {
+                const db = await openMessagesCacheDB();
+                await new Promise((resolve) => {
+                    const tx = db.transaction(MSG_CACHE_STORE, 'readwrite');
+                    tx.objectStore(MSG_CACHE_STORE).delete(threadKey);
+                    tx.oncomplete = resolve; tx.onerror = resolve;
+                });
+            } catch (e) { /* best-effort */ }
         }
 
         // --- DM CALLS (Agora RTC, same App ID/project as the Live feature) ---
@@ -50762,6 +50787,8 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 // older-page entries that have re-entered the live window, e.g. after an edit
                 // or a new reaction) and track how far back we've loaded for pagination.
                 liveItems.forEach(msg => { cachedThreadMessages[msg.key] = msg; });
+                { const cutLive = getChatClearedAt(user.uid, otherUid);
+                  if (cutLive) for (const k in cachedThreadMessages) if ((cachedThreadMessages[k].createdAt || 0) <= cutLive) delete cachedThreadMessages[k]; }
                 if (liveItems.length) {
                     const liveOldest = Math.min(...liveItems.map(m => m.createdAt));
                     oldestLoadedMessageTimestamp = Math.min(oldestLoadedMessageTimestamp, liveOldest);
@@ -50896,6 +50923,8 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                 const clearedTs = Date.now();
                 setChatClearedAt(user.uid, uid, clearedTs);
                 set(ref(database, `user_chat_cleared/${user.uid}/${uid}`), clearedTs).catch(() => {});
+                cachedThreadMessages = {};
+                await deleteCachedThreadFromDisk(threadIdFor(user.uid, uid));
                 await remove(ref(database, `user_chats/${user.uid}/${uid}`));
                 if (activeChatUid === uid) { activeChatUid = null; history.back(); }
                 notify('Chat deleted');

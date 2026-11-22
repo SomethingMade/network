@@ -22502,7 +22502,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     <div class="feed-skeleton-bar feed-skeleton-text-line"></div>
                     <div class="feed-skeleton-bar feed-skeleton-text-line short"></div>
                     ${showMedia ? '<div class="feed-skeleton-bar feed-skeleton-media"></div>' : ''}
-                </div>`;
+                </div>
+                <div class="feed-skeleton-actions"><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div></div>`;
             return card;
         }
 
@@ -38114,7 +38115,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 <div class="feed-post-body">
                     <div class="feed-skeleton-bar feed-skeleton-text-line"></div>
                     <div class="feed-skeleton-bar feed-skeleton-text-line short"></div>
-                </div>`;
+                </div>
+                <div class="feed-skeleton-actions"><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div><div class="feed-skeleton-bar"></div></div>`;
             return card;
         }
         function showCommunityFeedLoadingSkeletons(list) {
@@ -55998,6 +56000,68 @@ html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts
   html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat{padding:0 4px!important}
   html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat svg{display:none}
 }
+</style>
+<style id="shimmer-feed-match">
+/* Loading shimmers restyled to match the feed UI: full-bleed cards split by the thick 6px gap, 40px avatar header row
+   (name / time), text lines, edge-to-edge media, and an icon row — plus story-card tiles in the stories strip.
+   Same placeholders and same JS; this only changes how they look. Calmer, flatter sheen. */
+:root{--sh-base:color-mix(in srgb,var(--text-primary,#111) 7%,var(--bg-base,#fff));--sh-hi:rgba(255,255,255,.6)}
+body.dark-theme{--sh-base:color-mix(in srgb,#fff 9%,var(--bg-base,#000));--sh-hi:rgba(255,255,255,.07)}
+
+/* shared bone colour + sheen */
+html body #page-shimmer-overlay .pshim-block,
+html body .feed-post-skeleton .feed-skeleton-avatar,
+html body .feed-post-skeleton .feed-skeleton-bar{background:var(--sh-base)}
+html body #page-shimmer-overlay .pshim-block::after,
+html body .feed-post-skeleton .feed-skeleton-avatar::after,
+html body .feed-post-skeleton .feed-skeleton-bar::after{background:linear-gradient(100deg,transparent 20%,var(--sh-hi) 50%,transparent 80%);background-size:200% 100%;animation:statusShimmer 1.6s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){
+  html body #page-shimmer-overlay .pshim-block::after,
+  html body .feed-post-skeleton .feed-skeleton-avatar::after,
+  html body .feed-post-skeleton .feed-skeleton-bar::after{animation:none;opacity:0}
+}
+
+/* ───────── feed / community loading cards ───────── */
+html body .feed-post-card.feed-post-skeleton{background:var(--bg-base);margin:0!important;padding:12px 0 0;border:0!important;border-bottom:6px solid var(--fb-gap,var(--bg-alt))!important;border-radius:0;box-shadow:none!important;overflow:hidden;width:100%;max-width:100%}
+html body .feed-post-skeleton .x-post-row{padding:0 12px;gap:10px;align-items:center}
+html body .feed-post-skeleton .feed-skeleton-avatar{width:40px;height:40px;border-radius:50%}
+html body .feed-post-skeleton .x-post-content-col{display:flex;flex-direction:column;gap:6px;min-width:0}
+html body .feed-post-skeleton .feed-skeleton-name{width:36%;height:13px;margin:0;border-radius:7px}
+html body .feed-post-skeleton .feed-skeleton-time{width:22%;height:10px;border-radius:5px}
+html body .feed-post-skeleton .feed-post-body{margin:12px 0 0;width:100%;padding:0 12px;box-sizing:border-box}
+html body .feed-post-skeleton .feed-skeleton-text-line{width:100%;height:12px;margin-top:8px;border-radius:6px}
+html body .feed-post-skeleton .feed-skeleton-text-line:first-child{margin-top:0}
+html body .feed-post-skeleton .feed-skeleton-text-line.short{width:62%}
+html body .feed-post-skeleton .feed-skeleton-media{width:calc(100% + 24px);margin:12px -12px 0;height:auto;aspect-ratio:4/3;border-radius:0}
+html body .feed-post-skeleton .feed-skeleton-actions{display:flex;align-items:center;gap:18px;padding:12px 12px 14px}
+html body .feed-post-skeleton .feed-skeleton-actions .feed-skeleton-bar{width:22px;height:22px;border-radius:50%;flex:0 0 auto}
+html body .feed-post-skeleton .feed-skeleton-actions .feed-skeleton-bar:last-child{margin-left:auto}
+html body .feed-post-skeleton .feed-skeleton-actions .feed-skeleton-bar:nth-last-child(2){margin-left:auto;width:44px;height:10px;border-radius:5px}
+html body .feed-post-skeleton .feed-skeleton-actions .feed-skeleton-bar:nth-last-child(2)+.feed-skeleton-bar{margin-left:0}
+
+/* ───────── launch (whole-page) shimmer ───────── */
+/* stories strip → story-card tiles, like the real strip */
+html body #page-shimmer-overlay .pshim-stories{gap:8px;padding:12px;border-bottom:6px solid var(--fb-gap,var(--bg-alt))}
+html body #page-shimmer-overlay .pshim-story{display:block;position:relative;flex:0 0 auto;width:clamp(100px,28vw,124px);aspect-ratio:9/15;border-radius:12px;overflow:hidden;background:var(--sh-base)}
+html body #page-shimmer-overlay .pshim-story .pshim-block:nth-child(1){position:absolute;inset:0;width:100%;height:100%;border-radius:0}
+html body #page-shimmer-overlay .pshim-story .pshim-block:nth-child(2){position:absolute;left:8px;bottom:8px;width:62%;height:10px;border-radius:5px;background:color-mix(in srgb,var(--bg-base) 55%,transparent);z-index:2}
+html body #page-shimmer-overlay .pshim-story .pshim-block:nth-child(2)::after{display:none}
+html body #page-shimmer-overlay .pshim-story::before{content:"";position:absolute;top:8px;left:8px;width:34px;height:34px;border-radius:50%;background:color-mix(in srgb,var(--text-primary,#111) 16%,var(--bg-base));box-shadow:0 0 0 2px var(--bg-base);z-index:2}
+
+/* post → full-bleed card: avatar + name/handle header, text, edge-to-edge media, icon row */
+html body #page-shimmer-overlay .pshim-post{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:10px;row-gap:0;align-items:start;padding:12px 12px 0;border-bottom:6px solid var(--fb-gap,var(--bg-alt))}
+html body #page-shimmer-overlay .pshim-col{display:contents}
+html body #page-shimmer-overlay .pshim-avatar{grid-column:1;grid-row:1/3;width:40px;height:40px;border-radius:50%}
+html body #page-shimmer-overlay .pshim-name{grid-column:2;grid-row:1;align-self:end;width:38%;height:13px;margin:0 0 3px;border-radius:7px}
+html body #page-shimmer-overlay .pshim-handle{grid-column:2;grid-row:2;align-self:start;width:24%;height:10px;margin:3px 0 0;border-radius:5px}
+html body #page-shimmer-overlay .pshim-line{grid-column:1/-1;width:100%;height:12px;margin-top:8px;border-radius:6px}
+html body #page-shimmer-overlay .pshim-name + .pshim-handle + .pshim-line{margin-top:14px}
+html body #page-shimmer-overlay .pshim-line.pshim-short{width:62%}
+html body #page-shimmer-overlay .pshim-media{grid-column:1/-1;width:auto;margin:12px -12px 0;aspect-ratio:4/3;border-radius:0}
+html body #page-shimmer-overlay .pshim-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-start;gap:18px;padding:12px 0 14px}
+html body #page-shimmer-overlay .pshim-actions .pshim-block{width:22px;height:22px;border-radius:50%;flex:0 0 auto}
+html body #page-shimmer-overlay .pshim-actions .pshim-block:nth-child(4){margin-left:auto;width:44px;height:10px;border-radius:5px}
+html body #page-shimmer-overlay .pshim-actions .pshim-block:nth-child(5){margin-left:0}
 </style>
 </body>
 </html>

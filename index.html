@@ -3480,15 +3480,6 @@
         .feed-stories-strip { display: flex; gap: 8px; overflow-x: auto; padding: 6px 14px 8px; scrollbar-width: none; border-bottom: 4px solid var(--bg-alt); -webkit-overflow-scrolling: touch; }
         .feed-stories-strip::-webkit-scrollbar { display: none; }
         .feed-stories-strip:empty { display: none; }
-        /* X-style circular stories: avatar rings instead of tall cards. */
-        .feed-stories-strip { gap: 14px; padding: 10px 14px 12px; }
-        .feed-stories-strip .story-item { width: 68px; }
-        .feed-stories-strip .story-ring { width: 64px; height: 64px; }
-        .feed-stories-strip .story-ring-inner { width: 56px; height: 56px; }
-        .feed-stories-strip .story-label { font-size: 12px; max-width: 68px; }
-        /* White fade at the bottom of each story card, with dark name text on top of it. */
-        .feed-stories-strip .story-card-gradient { height: 48%; background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.75) 55%, rgba(255,255,255,0.95) 100%); }
-        .feed-stories-strip .story-card:not(.story-card-add) .story-card-name { color: #111111; text-shadow: none; }
         .feed-stories-strip .story-card-add { justify-content: flex-end; padding-bottom: 10px; gap: 14px; }
         .feed-stories-strip .story-card-add-avatar { opacity: 1; filter: none; bottom: 58px; }
         .feed-stories-strip .story-card-add-scrim { display: none; }
@@ -12602,6 +12593,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                         </div>
                         <div id="feed-posts-container">
                             <button type="button" id="feed-new-posts-pill" style="display:none;">New posts</button>
+                            <div class="feed-stories-strip" id="feed-stories-strip" role="list" aria-label="Stories"></div>
                             <div id="feed-posts-list"></div>
                             <div class="feed-loading-more" id="feed-loading-more" style="display:none;">Loading more...</div>
                             <div class="feed-empty-state" id="feed-empty-state" style="display:none;">
@@ -22792,6 +22784,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (feedListenersAttached) return;
             feedListenersAttached = true;
             initFeedScrollListener();
+            try { renderFeedStoryCards(typeof cachedUsers !== 'undefined' ? cachedUsers : {}, typeof cachedStories !== 'undefined' ? cachedStories : {}); } catch (_) {}
 
             // Prefetch the shared news batch so it's ready the moment someone opens the Search
             // view's News tab (renderExploreNews) — no longer sprinkled into the feed itself.
@@ -43040,16 +43033,18 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const grid = document.getElementById('feed-stories-strip');
             const user = auth.currentUser;
             if (!grid || !user) return;
+            const prevScroll = grid.scrollLeft;
             grid.innerHTML = "";
             const now = Date.now();
 
             const ownProfile = (usersData && usersData[user.uid]) || {};
-            grid.appendChild(buildAddStoryItem(false, ownProfile.photoURL || user.photoURL || ""));
-            const addLbl = grid.querySelector('.story-item.is-add-story .story-label');
-            if (addLbl) addLbl.textContent = 'Create story';
+            const ownPhoto = ownProfile.photoURL || user.photoURL || "";
+            const addCard = buildAddStoryCardItem(ownPhoto);
+            const addName = addCard.querySelector('.story-card-name');
+            if (addName) addName.textContent = 'Create story';
+            addCard.setAttribute('role', 'listitem');
+            grid.appendChild(addCard);
 
-            let othersCount = 0;
-            let unreadCount = 0;
             const ownRaw = [];
             if (storiesData && storiesData[user.uid]) {
                 Object.entries(storiesData[user.uid]).forEach(([key, val]) => ownRaw.push({ ...val, key }));
@@ -43057,31 +43052,33 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const ownItems = ownRaw.filter(s => now - s.createdAt < STORY_TTL);
 
             if (ownItems.length > 0) {
-                grid.appendChild(buildStoryItem(
-                    user.uid,
-                    ownProfile.name || user.displayName || "You",
-                    ownProfile.photoURL || user.photoURL || "",
-                    ownItems,
-                    true
-                ));
+                const ownCard = buildStoryCardItem(user.uid, ownProfile.name || user.displayName || "You", ownPhoto, ownItems, true);
+                const ownName = ownCard.querySelector('.story-card-name');
+                if (ownName) ownName.textContent = 'Your story';
+                ownCard.setAttribute('role', 'listitem');
+                grid.appendChild(ownCard);
             }
 
+            // Friends with a story you haven't watched yet come first, like Facebook.
+            const others = [];
             Object.keys(storiesData || {}).forEach(uid => {
                 if (uid === user.uid) return;
                 const raw = [];
                 Object.entries(storiesData[uid]).forEach(([key, val]) => raw.push({ ...val, key }));
                 const items = raw.filter(s => now - s.createdAt < STORY_TTL);
                 if (items.length === 0) return;
-
-                othersCount++;
-                // Same "unviewed" check buildStoryRing uses per-item — a user counts toward the
-                // subtab's unread badge if ANY of their still-live stories hasn't been viewed yet,
-                // mirroring how their ring shows colored (not greyed out) in the grid below.
-                if (items.some(item => !(item.views && item.views[user.uid]))) unreadCount++;
-                const profile = (usersData && usersData[uid]) || {};
-                grid.appendChild(buildStoryItem(uid, profile.name || "User", profile.photoURL || "", items, false));
+                const unseen = items.some(item => !(item.views && item.views[user.uid]));
+                const latest = items.reduce((m, it) => Math.max(m, it.createdAt || 0), 0);
+                others.push({ uid, items, unseen, latest });
             });
-
+            others.sort((a, b) => (b.unseen - a.unseen) || (b.latest - a.latest));
+            others.forEach(({ uid, items }) => {
+                const profile = (usersData && usersData[uid]) || {};
+                const card = buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false);
+                card.setAttribute('role', 'listitem');
+                grid.appendChild(card);
+            });
+            grid.scrollLeft = prevScroll;
         }
 
         // --- STORY PREVIEW ---------------------------------------------------------------
@@ -43525,6 +43522,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             const storiesBarFeed = document.getElementById('stories-scroll-feed');
             storiesBar.classList.add('uploading');
             if (storiesBarFeed) storiesBarFeed.classList.add('uploading');
+            const feedStoriesStrip = document.getElementById('feed-stories-strip');
+            if (feedStoriesStrip) feedStoriesStrip.classList.add('uploading');
             updateAddStoryUploadProgress(0);
             // Same thin top-of-screen bar as a feed post upload (see submitFeedPost /
             // showGlobalUploadProgress) — the story composer/preview is already closed by the
@@ -43560,6 +43559,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             } finally {
                 storiesBar.classList.remove('uploading');
                 if (storiesBarFeed) storiesBarFeed.classList.remove('uploading');
+                const feedStoriesStripDone = document.getElementById('feed-stories-strip');
+                if (feedStoriesStripDone) feedStoriesStripDone.classList.remove('uploading');
                 updateAddStoryUploadProgress(null);
                 document.getElementById('story-file-input').value = "";
                 pendingStoryFiles = null;
@@ -55845,6 +55846,18 @@ html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .feed-post-reactors{padding:0 12px 10px;margin:0;font-size:14px;color:var(--fb-sub)}
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-view-comments{padding:0 12px 10px;font-size:14px;color:var(--fb-sub);text-align:left}
 #post-comments-post-preview .feed-post-card.feed-post-card-ig{background:var(--bg-base);box-shadow:none}
+</style>
+<style id="fb-stories-strip">
+/* Facebook-style stories row at the top of the feed */
+html body #feed-posts-container .feed-stories-strip{display:flex;flex-wrap:nowrap;gap:8px;padding:12px 12px 12px;overflow-x:auto;overflow-y:hidden;background:var(--bg-base)!important;border-bottom:6px solid var(--fb-gap,var(--bg-alt));scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+html body #feed-posts-container .feed-stories-strip .story-card{flex:0 0 auto;width:clamp(100px,28vw,124px);height:auto;aspect-ratio:9/15;border-radius:12px;scroll-snap-align:start;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+html body #feed-posts-container .feed-stories-strip .story-card-gradient{height:55%;background:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.62) 100%)}
+html body #feed-posts-container .feed-stories-strip .story-card:not(.story-card-add) .story-card-name{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55);font-size:13px;font-weight:600}
+html body #feed-posts-container .feed-stories-strip .story-card-avatar-ring.story-ring{top:8px;left:8px;width:38px;height:38px}
+html body #feed-posts-container .feed-stories-strip .story-card-avatar-ring .story-ring-inner{width:32px;height:32px}
+html body #feed-posts-container .feed-stories-strip .story-card-add{border:1px solid var(--border-color);background:var(--bg-surface)}
+html body #feed-posts-container .feed-stories-strip .story-card-add .story-card-name{color:var(--text-primary);font-size:12.5px;font-weight:600}
+html body #feed-posts-container .feed-stories-strip.uploading .story-card-add{opacity:.5;pointer-events:none}
 </style>
 </body>
 </html>

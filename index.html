@@ -55927,5 +55927,77 @@ html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts
   html body #feed-posts-container .feed-stories-strip{max-width:100%;min-width:0}
 }
 </style>
+<style id="feed-action-icons-redesign">
+/* Post action row redesign — Instagram-style, refined.
+   CSS only: same buttons, same classes, same handlers (like / hold-for-reactions, comment, repost, share, views, save).
+   Left: like · comment · repost · share.  Right: views · save.
+   Better than the stock look: bigger tap targets, per-action colours (red heart, green repost, blue comment/share),
+   a crisp paper-plane share icon, springy press/pop feedback, tabular-number counts. */
+:root{--haba-like:#FF3040;--haba-repost:#00BA7C;--haba-reply:#1D9BF0;--haba-ai:clamp(22px,6vw,24px)}
+
+/* row */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-actions{padding:2px 4px 8px!important;width:100%;max-width:100%;box-sizing:border-box}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-actions-left{display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:0;min-width:0;width:100%}
+
+/* every action = a 40px-tall tap target with a soft round highlight */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn{position:relative;box-sizing:border-box;height:40px;min-width:36px!important;padding:0 clamp(5px,1.9vw,9px)!important;gap:5px;border-radius:999px!important;background:transparent!important;color:var(--text-primary)!important;flex:0 1 auto;transition:background-color .15s ease,color .15s ease;-webkit-tap-highlight-color:transparent}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn svg{width:var(--haba-ai);height:var(--haba-ai);flex:0 0 auto;stroke-width:1.8;transition:transform .18s cubic-bezier(.2,.9,.3,1.3)}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn span{font-size:clamp(12.5px,3.5vw,14px);font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;line-height:1;color:inherit!important;min-width:0;white-space:nowrap}
+
+/* icons drawn with masks (like / comment / share) share one size + press feedback */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-like-btn:not(:has(.feed-like-emoji))::before,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-comment-btn::before,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-share-btn::before{width:var(--haba-ai);height:var(--haba-ai);transition:transform .18s cubic-bezier(.2,.9,.3,1.3)}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-like-btn .feed-like-emoji{font-size:calc(var(--haba-ai) - 2px)!important;line-height:1!important}
+
+/* new comment bubble + paper-plane share (own artwork) */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-comment-btn{--sc-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.6c-4.7 0-8.5 3.3-8.5 7.5 0 2.3 1.1 4.3 2.9 5.7L5.6 20.4l3.9-1.9c.8.2 1.6.3 2.5.3 4.7 0 8.5-3.3 8.5-7.5S16.7 3.6 12 3.6Z'/%3E%3C/svg%3E")}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-share-btn{--sc-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 3.5 10.2 14.3'/%3E%3Cpath d='M21 3.5l-6.6 17-4.2-6.2-6.2-4.2 17-6.6Z'/%3E%3C/svg%3E")}
+
+/* hover (mouse) — soft tint + the action's own colour */
+@media(hover:hover){
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn:not(.feed-post-view-stat):hover{background:rgba(128,128,128,.13)!important}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-like-btn:hover{color:var(--haba-like)!important}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-repost-btn:hover{color:var(--haba-repost)!important}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig :is(.feed-comment-btn,.feed-share-btn):hover{color:var(--haba-reply)!important}
+}
+/* press (touch + mouse) — icon squishes, then springs back */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn:not(.feed-post-view-stat):active{background:rgba(128,128,128,.18)!important}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn:not(.feed-post-view-stat):active svg,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-like-btn:not(:has(.feed-like-emoji)):active::before,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-comment-btn:active::before,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-share-btn:active::before{transform:scale(.85)}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn:focus-visible{outline:2px solid var(--haba-reply);outline-offset:-2px}
+
+/* active states */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn.feed-like-btn.liked,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn.feed-like-btn.liked span{color:var(--haba-like)!important}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn.feed-repost-btn.reposted,
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn.feed-repost-btn.reposted span{color:var(--haba-repost)!important}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn.feed-save-btn.saved{color:var(--text-primary)!important}
+
+@keyframes habaHeartPop{0%{transform:scale(.7)}35%{transform:scale(1.3)}65%{transform:scale(.94)}100%{transform:scale(1)}}
+@keyframes habaSpinPop{0%{transform:rotate(-180deg) scale(.8)}100%{transform:rotate(0) scale(1)}}
+@keyframes habaSavePop{0%{transform:translateY(2px) scale(.85)}50%{transform:translateY(-2px) scale(1.12)}100%{transform:none}}
+@media(prefers-reduced-motion:no-preference){
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-like-btn.liked:not(:has(.feed-like-emoji))::before{animation:habaHeartPop .45s cubic-bezier(.2,.9,.3,1.2)}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-repost-btn.reposted svg{animation:habaSpinPop .45s ease-out}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-save-btn.saved svg{animation:habaSavePop .35s ease-out}
+}
+
+/* right side: views (quiet, info only) · save */
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat{order:8;margin-left:auto!important;gap:4px;min-width:0!important;padding:0 8px!important;color:var(--fb-sub,var(--text-secondary))!important;font-weight:500;pointer-events:none}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat svg{width:16px;height:16px;stroke-width:2}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat span{font-size:12.5px;font-weight:500}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-save-btn{order:9;margin-left:0!important;padding:0 clamp(6px,2vw,10px)!important}
+
+/* very small phones: tighten so all six items still fit on one line */
+@media(max-width:350px){
+  :root{--haba-ai:21px}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-action-btn{padding:0 4px!important;gap:3px}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat{padding:0 4px!important}
+  html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list,#post-comments-post-preview) .feed-post-card.feed-post-card-ig .feed-post-view-stat svg{display:none}
+}
+</style>
 </body>
 </html>

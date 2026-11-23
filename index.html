@@ -20585,7 +20585,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         let feedSentinelIO = null;          // IntersectionObserver driving loadOlderPosts
         let feedObservedSentinel = null;    // the sentinel node currently being observed
         let feedAutoFillStreak = 0;         // consecutive batches that added nothing visible
-        const FEED_AUTOFILL_MAX_STREAK = 6;
+        const FEED_AUTOFILL_MAX_STREAK = 12; // pages are smaller now (20), so allow more empty-looking pages in filtered sub-tabs
         // Profile post totals. cachedPosts only holds the feed's loaded window (+ pages
         // fetched via infinite scroll), so counting it undercounts anyone with older posts.
         // These hold the full set of a user's post ids from a uid-indexed query.
@@ -22484,7 +22484,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
 
         document.getElementById('feed-new-posts-pill')?.addEventListener('click', applyPendingNewPosts);
 
-        const FEED_PAGE_SIZE = 50;
+        // First load is deliberately small: the live window is what streams on every cold start, so a
+        // smaller one means a faster first paint and less live-listener traffic. Scrolling then pages in
+        // older posts FEED_PAGE_SIZE at a time (loadOlderPosts) and every page is saved to the on-device
+        // cache, so scrolling deeper also works offline.
+        const FEED_LIVE_WINDOW = 20;
+        const FEED_PAGE_SIZE = 20;
         const FEED_SKELETON_COUNT = 3;
 
         function buildFeedPostSkeletonCard(showMedia) {
@@ -22621,6 +22626,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     const searchInput = document.getElementById('search-feed-posts');
                     if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
                     addedVisible = newCards.filter(c => c.isConnected && c.style.display !== 'none').length;
+                    scheduleFeedCacheSave(); // keep scrolled-in pages for offline
                 }
 
                 if (fetchedCount === 0) {
@@ -22683,7 +22689,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // ---- Feed cache (IndexedDB): instant first paint + offline viewing -------------------
         // Stores the newest FEED_CACHE_SIZE visible posts per user. On open the cached cards
         // render immediately, then the live Firebase listener patches/reconciles them.
-        const FEED_CACHE_SIZE = 30;
+        const FEED_CACHE_SIZE = 60; // newest posts incl. every page scrolled in, so deeper scrolling works offline too
+        let feedHydratePromise = Promise.resolve();
         const FEED_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // ignore caches older than a week
         let feedCacheTimer = null;
         function openFeedCacheDB() {
@@ -22740,30 +22747,84 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (!list || list.querySelector('.feed-post-card[data-post-id]')) return;
             removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
             feedInitialSkeletonNodes = [];
-            data.posts.forEach(([postId, post]) => {
-                if (!post || !canViewPost(post)) return;
-                if (list.querySelector(`[data-post-id="${postId}"]`)) return;
-                if (!cachedPosts[postId]) cachedPosts[postId] = post;
-                const card = buildFeedPostCard(postId, post);
-                card.dataset.fromCache = '1';
-                list.appendChild(card);
-            });
-            reorderFeedCards();
-            applyFeedSubtabFilter();
-            syncFeedFollowPills();
+            const items = data.posts.filter(([postId, post]) => post && canViewPost(post));
+            // Newest cached post: lets reconcile tell whether the cache reaches into the live window
+            // (contiguous, trustworthy) or is older than a gap of missed posts (then it is dropped).
+            window.__feedCacheNewestTs = items.reduce((m, [, p]) => Math.max(m, p.timestamp || 0), 0);
+            const renderChunk = (chunk) => {
+                chunk.forEach(([postId, post]) => {
+                    if (list.querySelector(`[data-post-id="${postId}"]`)) return;
+                    if (!cachedPosts[postId]) cachedPosts[postId] = post;
+                    const card = buildFeedPostCard(postId, post);
+                    card.dataset.fromCache = '1';
+                    list.appendChild(card);
+                });
+                reorderFeedCards();
+                applyFeedSubtabFilter();
+                syncFeedFollowPills();
+            };
+            // First screenful straight away (the launch shimmer lifts right after it); the rest of the
+            // saved posts are rendered in small idle-time chunks so the main thread never janks.
+            const FIRST = 8, CHUNK = 8;
+            renderChunk(items.slice(0, FIRST));
             window.__habaFeedPaintedFromCache = true; // lets the launch shimmer lift without waiting on the network
+            for (let i = FIRST; i < items.length; i += CHUNK) {
+                await new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 400 }) : setTimeout(r, 60)));
+                renderChunk(items.slice(i, i + CHUNK));
+            }
         }
-        // After the live window has loaded: any card still flagged from-cache was not
-        // re-delivered by Firebase. Keep it if the post still exists, drop it if deleted.
+        // After the live window has loaded: any card still flagged from-cache was not re-delivered by
+        // Firebase. Verify them with ONE range query (instead of one read per card): keep + refresh the
+        // posts that still exist, drop the deleted ones. If the cache does not reach the live window
+        // (the person was away long enough to miss posts) the stale tail is dropped so there is no gap;
+        // normal pagination then fills it in.
         async function reconcileCachedFeedCards() {
             if (!navigator.onLine) return; // can't verify offline — keep showing cached cards
-            const stale = document.querySelectorAll('#feed-posts-list [data-from-cache="1"]');
+            try { await feedHydratePromise; } catch (e) {}
+            const stale = Array.from(document.querySelectorAll('#feed-posts-list [data-from-cache="1"]'));
+            if (!stale.length) return;
+            // Live window never arrived (flaky link): can't judge anything yet, keep what is shown.
+            if (!isFinite(oldestLoadedPostTimestamp)) return;
+            const dropCard = (card) => { const id = card.dataset.postId; card.remove(); delete cachedPosts[id]; };
+            if ((window.__feedCacheNewestTs || 0) < oldestLoadedPostTimestamp) {
+                stale.forEach(dropCard);
+                ensureFeedSentinel();
+                return;
+            }
+            let minTs = Infinity, maxTs = 0;
+            stale.forEach((card) => {
+                const p = cachedPosts[card.dataset.postId];
+                const t = p && p.timestamp;
+                if (t) { if (t < minTs) minTs = t; if (t > maxTs) maxTs = t; }
+            });
+            if (isFinite(minTs)) {
+                try {
+                    const snap = await get(query(ref(database, 'posts'), orderByChild('timestamp'), startAt(minTs), endAt(maxTs)));
+                    const found = {};
+                    snap.forEach((child) => { found[child.key] = child.val(); return false; });
+                    stale.forEach((card) => {
+                        if (!card.isConnected) return;
+                        const id = card.dataset.postId;
+                        const fresh = found[id];
+                        if (fresh) { cachedPosts[id] = fresh; patchFeedPostCounts(card, fresh); delete card.dataset.fromCache; }
+                        else dropCard(card);
+                    });
+                    // Everything from minTs up is now verified, so the next "older" page can start there
+                    // instead of re-downloading posts that are already on screen.
+                    if (minTs < oldestLoadedPostTimestamp) oldestLoadedPostTimestamp = minTs;
+                    applyFeedSubtabFilter();
+                    ensureFeedSentinel();
+                    scheduleFeedCacheSave();
+                    return;
+                } catch (e) { /* fall back to per-card checks below */ }
+            }
             for (const card of stale) {
+                if (!card.isConnected) continue;
                 const postId = card.dataset.postId;
                 try {
                     const snap = await get(ref(database, `posts/${postId}`));
                     if (snap.exists()) { cachedPosts[postId] = snap.val(); patchFeedPostCounts(card, snap.val()); delete card.dataset.fromCache; }
-                    else { card.remove(); delete cachedPosts[postId]; }
+                    else dropCard(card);
                 } catch (e) { /* offline: keep showing the cached card */ }
             }
         }
@@ -22774,7 +22835,13 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             el.textContent = "You're offline \u2014 showing saved posts";
             document.body.appendChild(el);
             const sync = () => el.classList.toggle('show', !navigator.onLine);
-            window.addEventListener('online', () => { sync(); if (auth.currentUser) scheduleFeedCacheSave(); });
+            window.addEventListener('online', () => {
+                sync();
+                if (!auth.currentUser) return;
+                scheduleFeedCacheSave();
+                // Back online: Firebase re-syncs the live window by itself; also verify any cards that were shown from the saved copy.
+                setTimeout(() => { try { reconcileCachedFeedCards(); } catch (e) {} }, 2500);
+            });
             window.addEventListener('offline', sync);
             sync();
         }
@@ -22820,7 +22887,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 else renderSavedFilterBar();
             });
 
-            const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE));
+            const postsQuery = query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_LIVE_WINDOW));
 
             // Firebase fires onChildAdded once for every post already in the initial page as soon
             // as we attach, then again for genuinely new posts as they're created. We want the
@@ -22853,7 +22920,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             document.getElementById('feed-empty-state').style.display = 'none';
             feedInitialSkeletonNodes = showFeedLoadingSkeletons();
             initFeedOfflineBanner();
-            hydrateFeedFromCache(user.uid); // instant paint from IndexedDB; live data reconciles it
+            feedHydratePromise = hydrateFeedFromCache(user.uid); // instant paint from IndexedDB; live data reconciles it
             let feedBurstEnded = false;
             const endFeedInitialBurst = () => {
                 if (feedBurstEnded) return;
@@ -30601,6 +30668,36 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             return candidate;
         }
 
+        // Jobs + shops are two 200-item downloads that nothing on the first screen needs. They used to
+        // compete with the feed for bandwidth on every launch; now they attach once the feed has painted
+        // (or right away on the first tap / key press / navigation, whichever comes first). Their saved
+        // copy still replays instantly from the on-device cache when they do attach.
+        let secondaryListenersFor = null;
+        function scheduleSecondaryListeners() {
+            const user = auth.currentUser;
+            if (!user || secondaryListenersFor === user.uid) return;
+            const uid = user.uid;
+            secondaryListenersFor = uid;
+            let ran = false;
+            const evts = ['pointerdown', 'keydown', 'hashchange'];
+            const run = () => {
+                if (ran) return;
+                ran = true;
+                evts.forEach((t) => window.removeEventListener(t, run, true));
+                if (!auth.currentUser || auth.currentUser.uid !== uid) return;
+                try { initJobsListener(); } catch (e) { console.warn('jobs listener failed', e); }
+                try { initMarketListener(); } catch (e) { console.warn('market listener failed', e); }
+            };
+            evts.forEach((t) => window.addEventListener(t, run, true));
+            const waitForFeed = (n) => {
+                if (ran) return;
+                const ready = feedInitialLoadComplete || window.__habaFeedPaintedFromCache || n >= 30; // ~6s cap
+                if (!ready) { setTimeout(() => waitForFeed(n + 1), 200); return; }
+                if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 }); else setTimeout(run, 800);
+            };
+            waitForFeed(0);
+        }
+
         let isInitialLoad = true;
 
         // ── PHONE AUTH (primary) + EMAIL AUTH (optional alternative) ──
@@ -33425,7 +33522,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
             try {
                 if (auth.currentUser && list) {
-                    const snap = await get(query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_PAGE_SIZE)));
+                    const snap = await get(query(ref(database, 'posts'), orderByChild('timestamp'), limitToLast(FEED_LIVE_WINDOW)));
                     if (snap.exists()) {
                         snap.forEach((child) => {
                             const postId = child.key;
@@ -45559,8 +45656,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     initChatListeners();
                     initFeedListeners();
                     initNotificationsListener();
-                    initJobsListener();
-                    initMarketListener();
+                    scheduleSecondaryListeners();
                 } catch (err) { console.warn('early listener attach failed', err); }
                 // Offline app shell (see haba-offline.js, imported by firebase-messaging-sw.js).
                 if ('serviceWorker' in navigator) registerFcmServiceWorker().catch(() => {});
@@ -45649,8 +45745,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 initChatListeners();
                 initFeedListeners();
                 initNotificationsListener();
-                initJobsListener();
-                initMarketListener();
+                scheduleSecondaryListeners();
                 initIncomingCallListener();
                 initPayoutHistoryListener();
                 ['feed-posts-list', 'my-profile-posts-list', 'my-profile-replies-list', 'my-profile-saved-list', 'user-info-posts-list', 'user-info-replies-list'].forEach(watchThreadConnectors);
@@ -45676,6 +45771,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 cachedPosts = {};
                 pendingNewPosts = {};
                 oldestLoadedPostTimestamp = Infinity;
+                secondaryListenersFor = null; // jobs/shops re-attach for the next sign-in
+                feedHydratePromise = Promise.resolve();
                 const staleFeedList = document.getElementById('feed-posts-list');
                 if (staleFeedList) staleFeedList.innerHTML = '';
                 feedObservedSentinel = null; // the sentinel went with the innerHTML wipe; ensureFeedSentinel() rebuilds + re-observes it

@@ -7430,7 +7430,7 @@ body.dark-theme .feed-comment-icon-btn{color:#C9CDD5}
     var cap=card.querySelector('.ig-caption'); if(!cap||cap.__scDone) return;
     var txt=cap.querySelector('.feed-post-text'); if(!txt) return;
     cap.__scDone=true;
-    var more=document.createElement('span'); more.className='sc-more'; more.textContent='\u2026more';
+    var more=document.createElement('span'); more.className='sc-more'; more.textContent='\u2026 see more';
     cap.appendChild(more);
     more.addEventListener('click',function(e){e.stopPropagation();cap.classList.remove('sc-clamped');cap.__scOpen=true;});
     var check=function(){ if(cap.__scOpen) return; cap.classList.add('sc-clamped'); if(txt.scrollHeight<=txt.clientHeight+1) cap.classList.remove('sc-clamped'); };
@@ -7440,7 +7440,7 @@ body.dark-theme .feed-comment-icon-btn{color:#C9CDD5}
   function scan(root){ (root.querySelectorAll?root.querySelectorAll('.feed-post-card-ig'):[]).forEach(setup); if(root.classList&&root.classList.contains('feed-post-card-ig')) setup(root); }
   window.__scScan=scan;
   function boot(){
-    var c=document.getElementById('feed-posts-container'); if(!c) return;
+    var c=document.body; if(!c) return;
     scan(c);
     new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1) scan(n);});});}).observe(c,{childList:true,subtree:true});
   }
@@ -22225,7 +22225,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 <div class="discover-suggest-card-header">
                     <div class="discover-suggest-card-header-text">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        <span class="discover-suggest-card-title">People you may know</span>
+                        <span class="discover-suggest-card-title">Suggested for you</span>
                     </div>
                 </div>
                 <div class="profile-suggested-scroll">${cards}</div>
@@ -22239,12 +22239,21 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         function sprinkleSuggestedPeople() {
             const list = document.getElementById('feed-posts-list');
             if (!list) return;
-            // "People you may know" cards no longer weave into the Feed — clean up anything a
-            // stale render left behind and stop there. Suggested-follow surfaces now live in
-            // Explore ▸ People (renderExplorePeople) and the Profile "Suggested Friends" row
-            // instead. Kept as a no-op (rather than deleting every call site) so reorderFeedCards
-            // / the feed-subtab switch / renderDiscoverGrid can keep calling it safely.
+            // Re-weave fresh "Suggested for you" rows between posts (Threads-style): one after the
+            // 3rd post and another after the 14th. Reorders strip old rows first (see reorderFeedCards).
             list.querySelectorAll('.discover-suggest-card').forEach(el => el.remove());
+            const postCards = Array.from(list.children).filter(el => el.dataset && el.dataset.postId);
+            if (postCards.length < 3) return;
+            let pool = [];
+            try {
+                const mutualsMap = getFreshMutualsCache() || {};
+                pool = rankByMutuals(shuffleWithSeed(getSuggestableUsers(), 'feed-sp-' + discoverShuffleSeed), mutualsMap);
+            } catch (e) { pool = []; }
+            [2, 13].forEach((slot, i) => {
+                const uids = pool.slice(i * 8, i * 8 + 8);
+                if (uids.length < 2 || postCards.length <= slot) return;
+                postCards[slot].after(buildSuggestionCard(uids));
+            });
         }
 
         // Follow buttons on the "People you may know" widgets woven into the feed (see
@@ -25622,7 +25631,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             return result;
         }
 
-        const FEED_CAPTION_TRUNCATE_LIMIT = 240;
+        const FEED_CAPTION_TRUNCATE_LIMIT = 100000; // captions are cut by CSS at 2 lines ("see more"), not by character count
         const FEED_COMMENT_TRUNCATE_LIMIT = 150;
 
         // Shared "show more / show less" truncation for feed captions and comments.
@@ -56239,8 +56248,10 @@ html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts
 /* text */
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig>.feed-post-body{grid-column:2/-1;grid-row:5;margin:2px 0 0;padding:0;width:auto}
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig>.feed-post-body .feed-post-text{font-size:15px;font-weight:400;line-height:1.4;color:var(--th-text)}
-html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption.sc-clamped .feed-post-text{display:block;-webkit-line-clamp:unset;overflow:visible}
-html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption .sc-more{display:none!important}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption{position:relative;display:block}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption.sc-clamped .feed-post-text{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption .sc-more{display:none;position:absolute;right:0;bottom:0;padding-left:34px;background:linear-gradient(90deg,transparent,var(--bg-base) 45%);color:var(--th-sub);font-size:15px;line-height:1.4;font-weight:400;cursor:pointer}
+html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .ig-caption.sc-clamped .sc-more{display:block!important}
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .feed-link-preview,html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig .quote-embed-card{width:100%;max-width:100%;margin:8px 0 0;border:.5px solid var(--th-media-bd)!important;border-radius:14px!important;overflow:hidden}
 
 /* media = rounded bordered cards inside the content column */
@@ -56266,6 +56277,25 @@ html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig>.feed-post-reactors{grid-column:2/-1;grid-row:9;padding:6px 0 0;margin:0;font-size:14px;color:var(--th-sub)}
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig>.ig-view-comments{grid-column:2/-1;grid-row:10;padding:6px 0 0;font-size:14px;color:var(--th-sub);text-align:left}
 html:root body :is(#feed-posts-container,#my-profile-posts-list,#user-info-posts-list,.pg-feed-list) .feed-post-card.feed-post-card-ig>.feed-post-ai-label{grid-column:2/-1;grid-row:11;padding:6px 0 0;margin:0}
+
+/* ═══ "Suggested for you" row (Threads-style) ═══ */
+:root{--th-card:#F5F5F5}body.dark-theme{--th-card:#1C1C1E}
+html:root body .discover-suggest-card{width:100%;max-width:100%;margin:0;padding:14px 0 16px;background:var(--bg-base);border:0;border-bottom:.5px solid var(--th-sep);border-radius:0;box-shadow:none}
+html:root body .discover-suggest-card .discover-suggest-card-header{padding:0 16px 12px;margin:0;background:none;border:0}
+html:root body .discover-suggest-card .discover-suggest-card-header-text svg{display:none}
+html:root body .discover-suggest-card .discover-suggest-card-title{font-size:15px;font-weight:600;color:var(--th-sub)}
+html:root body .discover-suggest-card .profile-suggested-scroll{display:flex;gap:8px;padding:0 16px;margin:0;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none}
+html:root body .discover-suggest-card .profile-suggested-scroll::-webkit-scrollbar{display:none}
+html:root body .discover-suggest-card .profile-suggested-card{position:relative;flex:0 0 134px;width:134px;max-width:none;display:flex;flex-direction:column;align-items:center;padding:14px 10px 12px;background:var(--th-card);border:0;border-radius:18px;box-shadow:none;text-align:center;transform:none;scroll-snap-align:start}
+html:root body .discover-suggest-card .profile-suggested-cover{display:none}
+html:root body .discover-suggest-card .profile-suggested-card-dismiss{top:8px;right:8px;width:22px;height:22px;background:none;color:var(--th-sub)}
+html:root body .discover-suggest-card .profile-suggested-avatar-ring{order:1;position:static;width:68px;height:68px;margin:0 0 8px;padding:0;border:0;background:none;box-shadow:none;border-radius:50%}
+html:root body .discover-suggest-card .profile-suggested-avatar-ring .avatar{width:100%;height:100%;border:0}
+html:root body .discover-suggest-card .profile-suggested-info{order:2;flex:1 1 auto;width:100%;margin:0 0 10px;padding:0;text-align:center}
+html:root body .discover-suggest-card .profile-suggested-info h4{font-size:15px;font-weight:600;color:var(--th-text);margin:0 0 2px}
+html:root body .discover-suggest-card .profile-suggested-username{display:none}
+html:root body .discover-suggest-card .profile-suggested-bio{font-size:12.5px;line-height:1.3;color:var(--th-sub);margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+html:root body .discover-suggest-card .profile-suggested-follow-btn{order:3;position:static;width:100%;height:32px;margin:0;padding:0;border:0;border-radius:10px;background:var(--th-text);color:var(--bg-base);font-size:14px;font-weight:600;box-shadow:none}
 </style>
 </body>
 </html>

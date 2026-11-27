@@ -19347,9 +19347,12 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
         // photos cost far less data for everyone. GIFs, non-images, already-small files and anything
         // the browser can't decode pass through untouched; the original is also kept if the result
         // isn't actually smaller.
-        async function compressImageForUpload(file, maxEdge = 1600, quality = 0.8) {
+        async function compressImageForUpload(file, maxEdge = 1600, quality = 0.8, force = false) {
             try {
-                if (typeof window.isDataSaverOn === 'function' && !window.isDataSaverOn()) return file;
+                // Chat uploads still only shrink when Data Saver is on; feed posts, stories and profile
+                // photos pass force=true so they are ALWAYS resized (full-size phone photos made the
+                // feed slow to load from Firebase Storage).
+                if (!force && typeof window.isDataSaverOn === 'function' && !window.isDataSaverOn()) return file;
                 const type = (file && file.type || '').toLowerCase();
                 if (!/^image\/(jpeg|jpg|png|webp|heic|heif)$/.test(type)) return file;
                 let bmp;
@@ -22911,7 +22914,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             // long as they keep coming in close succession, and only start queuing once things
             // go quiet. That adapts to however long the burst actually takes instead of guessing
             // a fixed duration, and it can't be left empty by a separate fetch failing.
-            const FEED_BURST_QUIET_MS = 1500;  // no arrival for this long => burst is over
+            const FEED_BURST_QUIET_MS = 800;   // no arrival for this long => burst is over (also ends early once a full window has arrived)
             const FEED_BURST_MAX_MS = 10000;   // hard cap so a stuck connection can't wedge this open
             let feedBurstQuietTimer = null;
             feedInitialBurstActive = true;
@@ -22924,9 +22927,26 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             initFeedOfflineBanner();
             feedHydratePromise = hydrateFeedFromCache(user.uid); // instant paint from IndexedDB; live data reconciles it
             let feedBurstEnded = false;
+            let feedBurstArrivals = 0;
+            // During the first-page burst, cards are only inserted per post; the (layout-measuring)
+            // sort/filter pass runs ONCE per batch instead of once per post.
+            let feedBurstReflowTimer = null;
+            const flushFeedBurstReflow = () => {
+                if (feedBurstReflowTimer) { clearTimeout(feedBurstReflowTimer); feedBurstReflowTimer = null; }
+                reorderFeedCards();
+                applyFeedSubtabFilter();
+                const si = document.getElementById('search-feed-posts');
+                if (si && si.value.trim()) filterFeedPosts(si);
+            };
+            const scheduleFeedBurstReflow = () => {
+                if (feedBurstReflowTimer) return;
+                feedBurstReflowTimer = setTimeout(flushFeedBurstReflow, 50);
+            };
             const endFeedInitialBurst = () => {
                 if (feedBurstEnded) return;
                 feedBurstEnded = true;
+                clearTimeout(feedBurstQuietTimer);
+                if (feedBurstReflowTimer) flushFeedBurstReflow();
                 feedInitialBurstActive = false;
                 feedInitialLoadComplete = true;
                 removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
@@ -22947,6 +22967,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             onChildAdded(postsQuery, (snap) => {
                 const postId = snap.key;
                 const post = snap.val();
+                if (feedInitialBurstActive) feedBurstArrivals++;
 
                 // ALWAYS keep the cursor accurate — even posts that arrive after the
                 // burst ends (and get queued) still affect where pagination starts.
@@ -22970,20 +22991,29 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 const list = document.getElementById('feed-posts-list');
                 const cachedCard = list && list.querySelector(`[data-post-id="${postId}"][data-from-cache="1"]`);
                 if (cachedCard) { patchFeedPostCounts(cachedCard, post); delete cachedCard.dataset.fromCache; }
-                if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
-                    list.prepend(buildFeedPostCard(postId, post));
-                    reorderFeedCards();
-                    const searchInput = document.getElementById('search-feed-posts');
-                    if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
+                if (feedInitialBurstActive) {
+                    // First-page burst: insert now, sort/filter once for the whole batch.
+                    if (list && !list.querySelector(`[data-post-id="${postId}"]`)) list.prepend(buildFeedPostCard(postId, post));
+                    scheduleFeedBurstReflow();
+                } else {
+                    if (list && !list.querySelector(`[data-post-id="${postId}"]`)) {
+                        list.prepend(buildFeedPostCard(postId, post));
+                        reorderFeedCards();
+                        const searchInput = document.getElementById('search-feed-posts');
+                        if (searchInput && searchInput.value.trim()) filterFeedPosts(searchInput);
+                    }
+                    applyFeedSubtabFilter();
                 }
-                applyFeedSubtabFilter();
                 if (feedInitialBurstActive && !window.__habaFeedFirstPaintTimer) {
                     window.__habaFeedFirstPaintTimer = setTimeout(() => {
                         window.__habaFeedPaintedFromCache = true; // lets the launch shimmer lift
                         removeFeedLoadingSkeletons(feedInitialSkeletonNodes);
                         feedInitialSkeletonNodes = [];
-                    }, 300);
+                    }, 120);
                 }
+                // A full live window has arrived: the first page is complete, no need to wait out
+                // the quiet timer.
+                if (feedInitialBurstActive && feedBurstArrivals >= FEED_LIVE_WINDOW) endFeedInitialBurst();
             });
 
             onChildChanged(postsQuery, (snap) => {
@@ -23427,7 +23457,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             function uploadComposerImageEntry(entry, file, uid) {
                 const safeName = (file.name || 'image').replace(/[^a-zA-Z0-9.\-_]/g, '_');
                 const path = `posts/${uid}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-                entry.promise = compressImageForUpload(file).then((small) => uploadToFirebaseStorage(small, path)).then((url) => {
+                entry.promise = compressImageForUpload(file, 1440, 0.8, true).then((small) => uploadToFirebaseStorage(small, path)).then((url) => {
                     entry.url = url;
                     entry.uploading = false;
                     if (feedComposerImages.includes(entry)) renderComposerPreview();
@@ -30868,7 +30898,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             wrapper.classList.add('uploading');
             try {
                 const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
+                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82, true), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingSignupPhotoURL = url;
                 const preview = document.getElementById('signup-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
@@ -33351,7 +33381,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             wrapper.classList.add('uploading');
             try {
                 const safeName = (file.name || 'avatar').replace(/[^a-zA-Z0-9.\-_]/g, '_');
-                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
+                const url = await uploadToFirebaseStorage(await compressImageForUpload(file, 1024, 0.82, true), `profile_photos/${user.uid}/${Date.now()}_${safeName}`);
                 pendingPhotoURL = url;
                 const preview = document.getElementById('profile-avatar-preview');
                 preview.style.backgroundImage = `url('${url}')`;
@@ -43035,6 +43065,8 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 mediaLayer.appendChild(vid);
             } else {
                 const img = document.createElement('img');
+                img.loading = 'lazy';
+                img.decoding = 'async';
                 img.src = latest.mediaURL;
                 img.alt = 'Status';
                 mediaLayer.appendChild(img);
@@ -43131,6 +43163,10 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
             dot.classList.toggle('on', unseen);
         }
 
+        // Pagination state for the Home story strip (see appendFeedStoryPage below).
+        const FEED_STORY_PAGE_SIZE = 6;
+        const feedStoryPager = { others: [], usersData: {}, shown: 0, wanted: 0, bound: false };
+
         function renderFeedStoryCards(usersData, storiesData) {
             const grid = document.getElementById('feed-stories-strip');
             const user = auth.currentUser;
@@ -43174,13 +43210,51 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                 others.push({ uid, items, unseen, latest });
             });
             others.sort((a, b) => (b.unseen - a.unseen) || (b.latest - a.latest));
-            others.forEach(({ uid, items }) => {
-                const profile = (usersData && usersData[uid]) || {};
+
+            // Paginated: only the first page of cards is built (and so only its media is
+            // requested); the next page is appended as the strip is scrolled near its end.
+            // A live DB update re-renders at least as many cards as were already showing, so
+            // the scroll position and loaded pages survive it.
+            feedStoryPager.others = others;
+            feedStoryPager.usersData = usersData || {};
+            feedStoryPager.shown = 0;
+            const wanted = Math.max(feedStoryPager.wanted || 0, FEED_STORY_PAGE_SIZE);
+            appendFeedStoryPage(grid, wanted);
+            feedStoryPager.wanted = feedStoryPager.shown;
+            attachFeedStoryPager(grid);
+            grid.scrollLeft = prevScroll;
+        }
+
+        // --- FEED STORY STRIP PAGINATION -----------------------------------------------
+        function appendFeedStoryPage(grid, upTo) {
+            const end = Math.min(upTo, feedStoryPager.others.length);
+            for (let i = feedStoryPager.shown; i < end; i++) {
+                const { uid, items } = feedStoryPager.others[i];
+                const profile = feedStoryPager.usersData[uid] || {};
                 const card = buildStoryCardItem(uid, profile.name || "User", profile.photoURL || "", items, false);
                 card.setAttribute('role', 'listitem');
                 grid.appendChild(card);
-            });
-            grid.scrollLeft = prevScroll;
+            }
+            feedStoryPager.shown = end;
+        }
+
+        function attachFeedStoryPager(grid) {
+            if (feedStoryPager.bound) return;
+            feedStoryPager.bound = true;
+            let ticking = false;
+            grid.addEventListener('scroll', () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => {
+                    ticking = false;
+                    if (feedStoryPager.shown >= feedStoryPager.others.length) return;
+                    // Load the next page once the user is within ~2 cards of the end.
+                    if (grid.scrollWidth - (grid.scrollLeft + grid.clientWidth) < 260) {
+                        appendFeedStoryPage(grid, feedStoryPager.shown + FEED_STORY_PAGE_SIZE);
+                        feedStoryPager.wanted = feedStoryPager.shown;
+                    }
+                });
+            }, { passive: true });
         }
 
         // --- STORY PREVIEW ---------------------------------------------------------------
@@ -43639,7 +43713,7 @@ body:not(.dark-theme) :is(#feed-posts-container,#my-profile-posts-list,#user-inf
                     const type = file.type.startsWith('video/') ? 'video' : 'image';
                     const safeName = (file.name || type).replace(/[^a-zA-Z0-9.\-_]/g, '_');
                     const url = await uploadToFirebaseStorage(
-                        type === 'image' ? await compressImageForUpload(file, 1440, 0.8) : file,
+                        type === 'image' ? await compressImageForUpload(file, 1440, 0.8, true) : file,
                         `stories/${user.uid}/${Date.now()}_${i}_${safeName}`,
                         (filePct) => updateAddStoryUploadProgress(((i + filePct / 100) / total) * 100)
                     );
@@ -52428,7 +52502,19 @@ Speak naturally for a phone call: short turns of 1–2 sentences, everyday words
                     if (found.includes(user.uid)) markStoryAuthor(user.uid);
                 } catch (e) { /* non-fatal: the index listener above still works */ }
             };
-            discoverStoryAuthors();
+            // The scan downloads the whole stories node, so don't let it compete with the feed's
+            // first page for bandwidth: start it once the feed has painted (or after a ~6s cap).
+            (function startStoryAuthorScanWhenFeedReady() {
+                let tries = 0;
+                const tick = () => {
+                    if (feedInitialLoadComplete || window.__habaFeedPaintedFromCache || ++tries >= 30) {
+                        setTimeout(discoverStoryAuthors, 500);
+                    } else {
+                        setTimeout(tick, 200);
+                    }
+                };
+                tick();
+            })();
             setInterval(() => { if (document.visibilityState === 'visible') discoverStoryAuthors(); }, 5 * 60 * 1000);
 
             onValue(ref(database, "communities"), (snap) => {
